@@ -1,8 +1,10 @@
 <?php
-
 /**
  * Checkout Modifications
  * Purpose: Custom modifications to WooCommerce checkout for InterSoccer.
+ * Author: Jeremy Lee
+ * Changes:
+ * - Removed inline CSS to allow inheritance of base widget formatting (2025-05-26).
  */
 
 defined('ABSPATH') or die('No script kiddies please!');
@@ -12,8 +14,7 @@ error_log('InterSoccer: checkout.php file loaded');
 
 // Render player assignment section on checkout
 add_action('woocommerce_checkout_after_customer_details', 'intersoccer_render_player_assignment_checkout');
-function intersoccer_render_player_assignment_checkout()
-{
+function intersoccer_render_player_assignment_checkout() {
     // Check if user is logged in
     $user_id = get_current_user_id();
     if (!$user_id) {
@@ -76,47 +77,6 @@ function intersoccer_render_player_assignment_checkout()
             <input type="hidden" class="player-assignments-validated" name="player_assignments_validated[<?php echo esc_attr($cart_item_key); ?>]" value="">
         </div>
     <?php
-    }
-}
-
-// Add inline CSS to ensure visibility and basic styling
-add_action('wp_head', 'intersoccer_checkout_inline_styles');
-function intersoccer_checkout_inline_styles()
-{
-    if (is_checkout()) {
-    ?>
-        <style>
-            .intersoccer-player-assignment {
-                display: block !important;
-                margin: 20px 0;
-                padding: 10px;
-                background-color: var(--wp--preset--color--bg-color, #1B1A1A);
-                color: var(--wp--preset--color--text-dark, #FFFEFE);
-                border: 1px solid var(--wp--preset--color--text-light, #8F8E8E);
-                border-radius: 4px;
-            }
-
-            .intersoccer-player-assignment h3 {
-                margin-top: 0;
-                color: var(--wp--preset--color--text-dark, #FFFEFE);
-            }
-
-            .intersoccer-player-assignment label {
-                display: block;
-                margin-bottom: 5px;
-                color: var(--wp--preset--color--text-dark, #FFFEFE);
-            }
-
-            .intersoccer-player-assignment select {
-                width: 100%;
-                padding: 5px;
-                background-color: var(--wp--preset--color--bg-color, #1B1A1A);
-                color: var(--wp--preset--color--text-dark, #FFFEFE);
-                border: 1px solid var(--wp--preset--color--text-light, #8F8E8E);
-                border-radius: 4px;
-            }
-        </style>
-<?php
     }
 }
 

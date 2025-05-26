@@ -1,15 +1,16 @@
 <?php
-
 /**
  * File: elementor-widgets.php
  * Description: Extends Elementor’s Single Product widget to inject player and day selection fields into the product form variations table for the InterSoccer Player Management plugin.
  * Dependencies: None
+ * Author: Jeremy Lee
  * Changes:
  * - Improved DOM injection reliability with retries (2025-05-25).
  * - Updated form validation to handle booking type changes (2025-05-25).
  * - Ensured day selection row visibility for single-day camps (2025-05-25).
  * - Enhanced AJAX error handling and UI feedback for player loading (2025-05-26).
  * - Added loading timeout to prevent indefinite "Loading players..." (2025-05-26).
+ * - Removed inline CSS to allow inheritance of base widget formatting (2025-05-26).
  */
 
 // Prevent direct access
@@ -60,7 +61,7 @@ add_action('wp_footer', function () {
             <th><label><?php esc_html_e('Select Days', 'intersoccer-player-management'); ?></label></th>
             <td>
                 <div class="intersoccer-day-checkboxes"></div>
-                <div class="intersoccer-day-notification" style="margin-top: 10px; color: #007cba;"></div>
+                <div class="intersoccer-day-notification" style="margin-top: 10px;"></div>
                 <span class="error-message" style="color: red; display: none;"></span>
             </td>
         </tr>

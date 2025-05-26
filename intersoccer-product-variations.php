@@ -50,34 +50,36 @@ add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
     error_log('InterSoccer: Generated nonce for intersoccer_nonce: ' . $nonce);
 
-    // Enqueue variation-details.js
-    wp_enqueue_script(
-        'intersoccer-variation-details',
-        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
-        ['jquery'],
-        '1.9.' . time(),
-        true
-    );
+    // Conditionally enqueue variation-details.js only on product pages
+    if (is_product()) {
+        wp_enqueue_script(
+            'intersoccer-variation-details',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
+            ['jquery'],
+            '1.9.0',
+            true
+        );
 
-    // Localize script with AJAX data
-    wp_localize_script(
-        'intersoccer-variation-details',
-        'intersoccerCheckout',
-        [
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => $nonce,
-            'user_id' => get_current_user_id(),
-            'server_time' => current_time('c'),
-            'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
-        ]
-    );
+        // Localize script with AJAX data
+        wp_localize_script(
+            'intersoccer-variation-details',
+            'intersoccerCheckout',
+            [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => $nonce,
+                'user_id' => get_current_user_id(),
+                'server_time' => current_time('c'),
+                'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
+            ]
+        );
+    }
 
     // Enqueue styles
     wp_enqueue_style(
         'intersoccer-styles',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
-        '1.9.' . time()
+        '1.9.0'
     );
 });
 
@@ -89,8 +91,7 @@ register_activation_hook(__FILE__, function () {
 // AJAX handler for nonce refresh
 add_action('wp_ajax_intersoccer_refresh_nonce', 'intersoccer_refresh_nonce');
 add_action('wp_ajax_nopriv_intersoccer_refresh_nonce', 'intersoccer_refresh_nonce');
-function intersoccer_refresh_nonce()
-{
+function intersoccer_refresh_nonce() {
     if (ob_get_length()) {
         ob_clean();
     }
@@ -135,8 +136,7 @@ add_action('init', function () {
 });
 
 // Increase AJAX variation threshold
-function custom_wc_ajax_variation_threshold($qty, $product)
-{
+function custom_wc_ajax_variation_threshold($qty, $product) {
     return 500; // Change this to the number of variations you want
 }
 add_filter('woocommerce_ajax_variation_threshold', 'custom_wc_ajax_variation_threshold', 10, 2);

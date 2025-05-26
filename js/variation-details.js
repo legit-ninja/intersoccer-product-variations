@@ -15,6 +15,7 @@
  * - Enhanced MutationObserver with periodic retries and Elementor event listener (2025-05-26).
  * - Always send remaining_weeks for Course products to ensure Discount message display (2025-05-26).
  * - Added price display for non-discounted Courses with remaining_weeks (2025-05-26).
+ * - Removed inline CSS to allow inheritance of base widget formatting (2025-05-26).
  */
 
 jQuery(document).ready(function ($) {
@@ -276,41 +277,6 @@ jQuery(document).ready(function ($) {
       let currentVariationId = null;
       let isCheckboxUpdate = false;
       let cachedSubtotal = null;
-
-      // Add inline CSS for custom price container
-      $form.append(`
-        <style>
-          .intersoccer-custom-price {
-            margin-top: 5px;
-            padding: 10px;
-            background: #f9f9f9;
-            border-radius: 4px;
-            display: block !important;
-            position: relative;
-            top: 0;
-            left: 0;
-            clear: both;
-            width: 100%;
-            order: 2;
-            flex-grow: 1;
-          }
-          .intersoccer-custom-price .total-price {
-            font-size: 1em;
-            color: #eec432;
-            display: block;
-          }
-          .intersoccer-custom-price .savings {
-            color: #27ae60;
-            margin-left: 10px;
-          }
-          .intersoccer-custom-price .subtotal,
-          .intersoccer-custom-price .weeks-remaining {
-            font-size: 0.9em;
-            color: #333333;
-            display: block;
-          }
-        </style>
-      `);
 
       function updateFormData(playerId, days, price, remainingWeeks = null, variationId = null) {
         $form.find('input[name="player_assignment"]').remove();
@@ -650,7 +616,6 @@ jQuery(document).ready(function ($) {
                     let $priceParent = $priceDisplay.closest('.woocommerce-variation-price, .price, .elementor-widget-woocommerce-product-price');
                     let $customPrice = $priceParent.siblings(".intersoccer-custom-price");
                     const newContent = `
-                      <span class="subtotal">Subtotal: CHF ${totalPrice.toFixed(2)}</span>
                       <span class="weeks-remaining">${remainingWeeks} Weeks Remaining</span>
                       <span class="discounted-price">Discounted: CHF ${totalPrice.toFixed(2)}</span>
                       <span class="savings">You saved CHF ${savings.toFixed(2)}</span>
