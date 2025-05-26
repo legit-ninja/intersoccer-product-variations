@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
@@ -39,7 +38,7 @@ $includes = [
 foreach ($includes as $file) {
     if (file_exists(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file)) {
         require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file;
-        //error_log('InterSoccer: Included ' . $file);
+        error_log('InterSoccer: Included ' . $file);
     } else {
         error_log('InterSoccer: Failed to include ' . $file . ' - File not found');
     }
@@ -49,7 +48,7 @@ foreach ($includes as $file) {
 add_action('wp_enqueue_scripts', function () {
     // Generate a fresh nonce for each page load
     $nonce = wp_create_nonce('intersoccer_nonce');
-    //error_log('InterSoccer: Generated nonce for intersoccer_nonce: ' . $nonce);
+    error_log('InterSoccer: Generated nonce for intersoccer_nonce: ' . $nonce);
 
     // Enqueue variation-details.js
     wp_enqueue_script(
@@ -84,7 +83,6 @@ add_action('wp_enqueue_scripts', function () {
 
 // Register activation hook
 register_activation_hook(__FILE__, function () {
-    // Add any activation tasks here
     error_log('InterSoccer: Plugin activated');
 });
 
@@ -128,7 +126,6 @@ add_filter('woocommerce_account_menu_items', function ($items) {
     return $new_items;
 }, 10);
 
-
 // Flush permalinks on activation
 add_action('init', function () {
     if (get_option('intersoccer_flush_permalinks')) {
@@ -146,5 +143,6 @@ add_filter('woocommerce_ajax_variation_threshold', 'custom_wc_ajax_variation_thr
 
 // Show variation price
 add_filter('woocommerce_show_variation_price', function () {
-    return TRUE;
+    return true;
 });
+?>

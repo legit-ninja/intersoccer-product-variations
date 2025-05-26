@@ -7,6 +7,8 @@
  * Changes:
  * - Added logging and fallback for missing pa_days-of-week (2025-05-25).
  * - Improved course metadata validation (2025-05-25).
+ * - Relaxed user_id check in intersoccer_get_user_players (2025-05-26).
+ * - Added detailed logging for nonce and user issues (2025-05-26).
  */
 
 // Prevent direct access
@@ -29,17 +31,29 @@ function intersoccer_get_user_players()
     error_log('InterSoccer: intersoccer_get_user_players called');
     error_log('InterSoccer: POST data: ' . print_r($_POST, true));
 
-    check_ajax_referer('intersoccer_nonce', 'nonce', false);
-    $user_id = get_current_user_id();
-    if (!$user_id) {
-        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
+    // Verify nonce
+    $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
+    if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
+        error_log('InterSoccer: Nonce verification failed for intersoccer_get_user_players. Provided nonce: ' . $nonce);
+        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-player-management')], 403);
+        return;
     }
 
-    if (!isset($_POST['user_id']) || absint($_POST['user_id']) !== $user_id) {
-        wp_send_json_error(['message' => __('Unauthorized.', 'intersoccer-player-management')], 403);
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        error_log('InterSoccer: User not logged in for intersoccer_get_user_players');
+        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
+        return;
+    }
+
+    // Relaxed user_id check: Log mismatch but don't fail
+    if (isset($_POST['user_id']) && absint($_POST['user_id']) !== $user_id) {
+        error_log('InterSoccer: User ID mismatch in intersoccer_get_user_players. POST user_id: ' . absint($_POST['user_id']) . ', Server user_id: ' . $user_id);
+        // Proceed with server-side user_id
     }
 
     $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
+    error_log('InterSoccer: Fetched players for user ID ' . $user_id . ': ' . print_r($players, true));
     wp_send_json_success(['players' => $players]);
 }
 
@@ -225,11 +239,13 @@ function intersoccer_get_days_of_week()
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         error_log('InterSoccer: Nonce verification failed for intersoccer_get_days_of_week. Provided nonce: ' . $nonce);
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-player-management')], 403);
+        return;
     }
 
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
         error_log('InterSoccer: Invalid product or variation ID in intersoccer_get_days_of_week');
         wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-player-management')], 400);
+        return;
     }
 
     $product_id = absint($_POST['product_id']);
@@ -238,6 +254,7 @@ function intersoccer_get_days_of_week()
     if (!$product) {
         error_log('InterSoccer: Product not found for ID: ' . $variation_id);
         wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
+        return;
     }
 
     $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product_id;
@@ -323,3 +340,4 @@ function intersoccer_get_course_metadata()
     error_log('InterSoccer: Course metadata for variation ' . $variation_id . ': ' . print_r($metadata, true));
     wp_send_json_success($metadata);
 }
+?>

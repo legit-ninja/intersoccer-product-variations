@@ -8,6 +8,8 @@
  * - Improved DOM injection reliability with retries (2025-05-25).
  * - Updated form validation to handle booking type changes (2025-05-25).
  * - Ensured day selection row visibility for single-day camps (2025-05-25).
+ * - Enhanced AJAX error handling and UI feedback for player loading (2025-05-26).
+ * - Added loading timeout to prevent indefinite "Loading players..." (2025-05-26).
  */
 
 // Prevent direct access
@@ -39,9 +41,9 @@ add_action('wp_footer', function () {
         <td>
             <div class="intersoccer-player-content">
                 <?php if (!$user_id) : ?>
-                    <p class="intersoccer-login-prompt">Please <a href="https://intersoccer.legit.ninja/membership-login/">log in</a> or <a href="https://intersoccer.legit.ninja/membership-login/">register</a>.</p>
+                    <p class="intersoccer-login-prompt">Please <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">log in</a> or <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">register</a>.</p>
                 <?php else : ?>
-                    <p>Loading players...</p>
+                    <p class="intersoccer-loading-players">Loading players...</p>
                 <?php endif; ?>
             </div>
         </td>
@@ -139,6 +141,13 @@ add_action('wp_footer', function () {
 
                 // Fetch player content for logged-in users
                 if (intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0') {
+                    var $playerContent = $form.find('.intersoccer-player-content');
+                    // Set a timeout to prevent indefinite loading
+                    var loadingTimeout = setTimeout(function() {
+                        $playerContent.html('<p>Error: Unable to load players. Please try refreshing the page.</p>');
+                        console.error('InterSoccer: Player loading timed out after 10 seconds');
+                    }, 10000);
+
                     $.ajax({
                         url: intersoccerCheckout.ajax_url,
                         type: 'POST',
@@ -148,8 +157,8 @@ add_action('wp_footer', function () {
                             user_id: intersoccerCheckout.user_id
                         },
                         success: function(response) {
+                            clearTimeout(loadingTimeout);
                             console.log('InterSoccer: Player fetch response:', response);
-                            var $playerContent = $form.find('.intersoccer-player-content');
                             if (response.success && response.data.players) {
                                 if (response.data.players.length > 0) {
                                     var $select = $('<select name="player_assignment" id="player_assignment_select" class="player-select intersoccer-player-select"></select>');
@@ -171,7 +180,7 @@ add_action('wp_footer', function () {
                                         }
                                     });
                                 } else {
-                                    $playerContent.html('<p>No players registered. <a href="/my-account/manage-players/">Add a player</a>.</p>');
+                                    $playerContent.html('<p>No players registered. <a href="<?php echo esc_url(wc_get_account_endpoint_url('manage-players')); ?>">Add a player</a>.</p>');
                                 }
                                 // Parse HTML for links
                                 $playerContent.find('p').each(function() {
@@ -180,12 +189,13 @@ add_action('wp_footer', function () {
                                     $this.html(htmlContent);
                                 });
                             } else {
-                                $playerContent.html('<p>Error loading players.</p>');
+                                $playerContent.html('<p>Error loading players: ' + (response.data ? response.data.message : 'Unknown error') + '</p>');
                             }
                         },
                         error: function(xhr) {
-                            console.error('InterSoccer: Failed to fetch players:', xhr.responseText);
-                            $form.find('.intersoccer-player-content').html('<p>Error loading players.</p>');
+                            clearTimeout(loadingTimeout);
+                            console.error('InterSoccer: Failed to fetch players:', xhr.status, xhr.responseText);
+                            $playerContent.html('<p>Error loading players: ' + (xhr.responseJSON && xhr.responseJSON.data ? xhr.responseJSON.data.message : 'Request failed') + '</p>');
                         }
                     });
                 }
