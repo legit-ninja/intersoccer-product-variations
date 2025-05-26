@@ -2,8 +2,11 @@
 
 /**
  * File: ajax-handlers.php
- * Description: Handles AJAX requests for player management operations in the InterSoccer Player Management plugin, including adding, editing, deleting, retrieving player profiles, product types, days of the week, and course metadata.
+ * Description: Handles AJAX requests for player management operations in the InterSoccer Player Management plugin.
  * Dependencies: None
+ * Changes:
+ * - Added logging and fallback for missing pa_days-of-week (2025-05-25).
+ * - Improved course metadata validation (2025-05-25).
  */
 
 // Prevent direct access
@@ -224,15 +227,16 @@ function intersoccer_get_days_of_week()
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-player-management')], 403);
     }
 
-    if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id'])) {
-        error_log('InterSoccer: Invalid product ID in intersoccer_get_days_of_week');
-        wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-player-management')], 400);
+    if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
+        error_log('InterSoccer: Invalid product or variation ID in intersoccer_get_days_of_week');
+        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-player-management')], 400);
     }
 
     $product_id = absint($_POST['product_id']);
-    $product = wc_get_product($product_id);
+    $variation_id = absint($_POST['variation_id']);
+    $product = wc_get_product($variation_id);
     if (!$product) {
-        error_log('InterSoccer: Product not found for ID: ' . $product_id);
+        error_log('InterSoccer: Product not found for ID: ' . $variation_id);
         wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
     }
 
@@ -245,7 +249,9 @@ function intersoccer_get_days_of_week()
 
     if (empty($days)) {
         error_log('InterSoccer: No days of the week found for parent product ID: ' . $parent_id);
-        wp_send_json_error(['message' => __('No days of the week found for this product. Please ensure the Days of Week attribute is set.', 'intersoccer-player-management')], 404);
+        // Fallback to default days if none set
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        error_log('InterSoccer: Using fallback days: ' . print_r($days, true));
     }
 
     $day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -291,7 +297,7 @@ function intersoccer_get_course_metadata()
 
     if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
         error_log('InterSoccer: Invalid or missing _course_start_date for variation ' . $variation_id);
-        $start_date = '2025-01-01';
+        $start_date = date('Y-m-d'); // Fallback to today
     }
     $weekly_discount = floatval($weekly_discount ?: 0);
     $total_weeks = intval($total_weeks ?: 1);
@@ -300,13 +306,20 @@ function intersoccer_get_course_metadata()
         $total_weeks = 1;
     }
 
+    // Calculate remaining weeks
+    $server_time = current_time('Y-m-d');
+    $start = new DateTime($start_date);
+    $current = new DateTime($server_time);
+    $weeks_passed = floor(($current->getTimestamp() - $start->getTimestamp()) / (7 * 24 * 60 * 60));
+    $remaining_weeks = max(0, $total_weeks - $weeks_passed);
+
     $metadata = [
         'start_date' => $start_date,
         'weekly_discount' => $weekly_discount,
         'total_weeks' => $total_weeks,
+        'remaining_weeks' => $remaining_weeks,
     ];
 
     error_log('InterSoccer: Course metadata for variation ' . $variation_id . ': ' . print_r($metadata, true));
     wp_send_json_success($metadata);
 }
-

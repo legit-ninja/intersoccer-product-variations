@@ -2,10 +2,12 @@
 
 /**
  * File: elementor-widgets.php
- * Description: Extends Elementor’s Single Product widget to inject player and day selection fields into the product form variations table for the InterSoccer Player Management plugin. Ensures fields follow the same formatting as other variations.
+ * Description: Extends Elementor’s Single Product widget to inject player and day selection fields into the product form variations table for the InterSoccer Player Management plugin.
  * Dependencies: None
  * Changes:
- * - Updated form validation to check hidden camp_days[] inputs instead of visible checkboxes (2025-05-15).
+ * - Improved DOM injection reliability with retries (2025-05-25).
+ * - Updated form validation to handle booking type changes (2025-05-25).
+ * - Ensured day selection row visibility for single-day camps (2025-05-25).
  */
 
 // Prevent direct access
@@ -29,7 +31,7 @@ add_action('wp_footer', function () {
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
 
-    // Player selection HTML (placeholder, content loaded via AJAX for logged-in users)
+    // Player selection HTML
     ob_start();
 ?>
     <tr class="intersoccer-player-selection intersoccer-injected">
@@ -47,9 +49,9 @@ add_action('wp_footer', function () {
     <?php
     $player_selection_html = ob_get_clean();
 
-    // Day selection HTML (hidden by default, as a table row with checkboxes)
+    // Day selection HTML
     $day_selection_html = '';
-    if ($product->get_type() === 'variable') {
+    if ($is_variable) {
         ob_start();
     ?>
         <tr class="intersoccer-day-selection intersoccer-injected" style="display: none;">
@@ -64,29 +66,34 @@ add_action('wp_footer', function () {
         $day_selection_html = ob_get_clean();
     }
 
-    // Inject fields into the variations table and load player content dynamically
+    // Inject fields and load player content dynamically
     ?>
     <script>
         jQuery(document).ready(function($) {
             console.log('InterSoccer: Document ready, attempting to inject fields');
 
-            function injectFields() {
-                console.log('InterSoccer: InjectFields called');
+            function injectFields(retryCount = 0, maxRetries = 5) {
+                console.log('InterSoccer: injectFields called, attempt:', retryCount + 1);
 
                 // Find the product form
                 var $form = $('form.cart');
                 if (!$form.length) {
                     $form = $('.woocommerce-product-details form.cart, .product form.cart, .single-product form.cart');
                 }
+                if (!$form.length && retryCount < maxRetries) {
+                    console.error('InterSoccer: Product form not found, retrying in 1s');
+                    setTimeout(() => injectFields(retryCount + 1), 1000);
+                    return;
+                }
                 if (!$form.length) {
-                    console.error('InterSoccer: Product form not found with any selector');
+                    console.error('InterSoccer: Product form not found after retries');
                     return;
                 }
                 console.log('InterSoccer: Found product form:', $form);
 
-                // Check if already injected to prevent duplicates
+                // Check if already injected
                 if ($form.find('.intersoccer-injected').length > 0) {
-                    console.log('InterSoccer: Player and day selection fields already injected, skipping');
+                    console.log('InterSoccer: Fields already injected, skipping');
                     return;
                 }
 
@@ -99,7 +106,7 @@ add_action('wp_footer', function () {
                         <?php if ($day_selection_html) : ?>
                             $tbody.append(<?php echo json_encode($day_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                         <?php endif; ?>
-                        console.log('InterSoccer: Injected player and day selection fields into variations table');
+                        console.log('InterSoccer: Injected fields into variations table');
                     } else {
                         console.error('InterSoccer: Variations table tbody not found, appending to variations table');
                         $variationsTable.append(<?php echo json_encode($player_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
@@ -109,28 +116,28 @@ add_action('wp_footer', function () {
                     }
                 } else {
                     // Fallback: Append to form
-                    console.error('InterSoccer: Variations table not found, appended to form');
+                    console.error('InterSoccer: Variations table not found, appending to form');
                     $form.append(<?php echo json_encode($player_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                     <?php if ($day_selection_html) : ?>
                         $form.append(<?php echo json_encode($day_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                     <?php endif; ?>
                 }
 
-                // Parse HTML content after injection to ensure links render properly
+                // Parse HTML content for links
                 $form.find('.intersoccer-player-content').each(function() {
                     var $this = $(this);
                     var htmlContent = $this.html();
                     $this.html(htmlContent);
                 });
 
-                // Disable the Add to Cart button by default
+                // Disable Add to Cart button by default
                 var $addToCartButton = $form.find('button.single_add_to_cart_button');
                 if ($addToCartButton.length) {
                     $addToCartButton.prop('disabled', true);
                     console.log('InterSoccer: Add to Cart button disabled by default');
                 }
 
-                // Fetch player content dynamically only for logged-in users
+                // Fetch player content for logged-in users
                 if (intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0') {
                     $.ajax({
                         url: intersoccerCheckout.ajax_url,
@@ -153,7 +160,7 @@ add_action('wp_footer', function () {
                                     $playerContent.html($select);
                                     $playerContent.append('<span class="error-message" style="color: red; display: none;"></span>');
 
-                                    // Enable Add to Cart button when a player is selected
+                                    // Enable Add to Cart button on player selection
                                     $select.on('change', function() {
                                         if ($(this).val()) {
                                             $addToCartButton.prop('disabled', false);
@@ -166,7 +173,7 @@ add_action('wp_footer', function () {
                                 } else {
                                     $playerContent.html('<p>No players registered. <a href="/my-account/manage-players/">Add a player</a>.</p>');
                                 }
-                                // Parse HTML content to ensure links render properly
+                                // Parse HTML for links
                                 $playerContent.find('p').each(function() {
                                     var $this = $(this);
                                     var htmlContent = $this.html();
@@ -184,16 +191,16 @@ add_action('wp_footer', function () {
                 }
             }
 
-            // Initial injection attempt
+            // Initial injection
             injectFields();
 
-            // Retry injection after a delay to ensure Elementor has fully rendered
-            setTimeout(injectFields, 3000);
+            // Retry injection after delay
+            setTimeout(() => injectFields(), 3000);
 
-            // Listen for variation changes and re-inject if necessary
+            // Re-inject on variation change
             $('form.cart').on('found_variation', function() {
                 if (!$('form.cart').find('.intersoccer-day-selection').length) {
-                    console.log('InterSoccer: Day selection container missing after variation change, re-injecting');
+                    console.log('InterSoccer: Day selection missing after variation change, re-injecting');
                     injectFields();
                 }
             });
@@ -210,13 +217,10 @@ add_action('wp_footer', function () {
 ?>
     <script>
         jQuery(document).ready(function($) {
-            // Use a more generic selector for the form
+            // Find the product form
             var $form = $('form.cart');
             if (!$form.length) {
-                $form = $('.woocommerce-product-details form.cart');
-            }
-            if (!$form.length) {
-                $form = $('.product form.cart');
+                $form = $('.woocommerce-product-details form.cart, .product form.cart, .single-product form.cart');
             }
             if ($form.length) {
                 $form.on('submit', function(e) {
@@ -226,7 +230,7 @@ add_action('wp_footer', function () {
                         $form.find('.intersoccer-player-selection .error-message').text('Please Select an Attendee.').show();
                         setTimeout(() => $form.find('.intersoccer-player-selection .error-message').hide(), 5000);
                     }
-                    var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
+                    var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
                     if (bookingType === 'single-days') {
                         var selectedDays = $form.find('input[name="camp_days[]"]').length;
                         if (!selectedDays) {

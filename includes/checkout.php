@@ -61,7 +61,7 @@ function intersoccer_render_player_assignment_checkout()
             <h3><?php echo esc_html__('Assign Player to Event: ', 'intersoccer-player-management') . esc_html($product->get_name()); ?></h3>
             <label for="player-select-<?php echo esc_attr($cart_item_key); ?>"><?php esc_html_e('Select Player', 'intersoccer-player-management'); ?></label>
             <select id="player-select-<?php echo esc_attr($cart_item_key); ?>" class="player-select" name="player_assignments[<?php echo esc_attr($cart_item_key); ?>]">
-                <option value=""><?php esc_html_e('Select a player', 'intersoccer-player-management'); ?></option>
+                <option value=""><?php esc_html_e('Select an attendee', 'intersoccer-player-management'); ?></option>
                 <?php
                 foreach ($players as $index => $player) {
                     $player_name = trim($player['first_name'] . ' ' . $player['last_name']);
@@ -120,4 +120,5 @@ function intersoccer_checkout_inline_styles()
     }
 }
 
+// Save player assignments to cart meta (already handled in woocommerce-modifications.php)
 ?>

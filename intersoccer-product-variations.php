@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('INTERSOCCER_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Load plugin text domain for translations
 add_action('plugins_loaded', function () {
@@ -39,7 +39,7 @@ $includes = [
 foreach ($includes as $file) {
     if (file_exists(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file)) {
         require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file;
-//        error_log('InterSoccer: Included ' . $file);
+        //error_log('InterSoccer: Included ' . $file);
     } else {
         error_log('InterSoccer: Failed to include ' . $file . ' - File not found');
     }
@@ -54,7 +54,7 @@ add_action('wp_enqueue_scripts', function () {
     // Enqueue variation-details.js
     wp_enqueue_script(
         'intersoccer-variation-details',
-        INTERSOCCER_PLUGIN_URL . 'js/variation-details.js',
+        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
         ['jquery'],
         '1.9.' . time(),
         true
@@ -76,7 +76,7 @@ add_action('wp_enqueue_scripts', function () {
     // Enqueue styles
     wp_enqueue_style(
         'intersoccer-styles',
-        INTERSOCCER_PLUGIN_URL . 'css/styles.css',
+        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
         '1.9.' . time()
     );
@@ -85,7 +85,7 @@ add_action('wp_enqueue_scripts', function () {
 // Register activation hook
 register_activation_hook(__FILE__, function () {
     // Add any activation tasks here
-    //error_log('InterSoccer: Plugin activated');
+    error_log('InterSoccer: Plugin activated');
 });
 
 // AJAX handler for nonce refresh
@@ -100,3 +100,51 @@ function intersoccer_refresh_nonce()
     wp_send_json_success(['nonce' => $nonce]);
 }
 
+// Add custom roles
+add_action('init', function () {
+    add_role('coach', __('Coach', 'intersoccer-player-management'), array('read' => true, 'edit_posts' => true));
+    add_role('organizer', __('Organizer', 'intersoccer-player-management'), array('read' => true, 'edit_posts' => true));
+});
+
+// Register endpoint
+add_action('init', function () {
+    add_rewrite_endpoint('manage-players', EP_ROOT | EP_PAGES);
+});
+
+// Add menu item with high priority (after Dashboard)
+add_filter('woocommerce_account_menu_items', function ($items) {
+    $new_items = [];
+    $inserted = false;
+    foreach ($items as $key => $label) {
+        $new_items[$key] = $label;
+        if ($key === 'dashboard' && !$inserted) {
+            $new_items['manage-players'] = __('Manage Players', 'intersoccer-player-management');
+            $inserted = true;
+        }
+    }
+    if (!$inserted) {
+        $new_items['manage-players'] = __('Manage Players', 'intersoccer-player-management');
+    }
+    return $new_items;
+}, 10);
+
+
+// Flush permalinks on activation
+add_action('init', function () {
+    if (get_option('intersoccer_flush_permalinks')) {
+        flush_rewrite_rules();
+        delete_option('intersoccer_flush_permalinks');
+    }
+});
+
+// Increase AJAX variation threshold
+function custom_wc_ajax_variation_threshold($qty, $product)
+{
+    return 500; // Change this to the number of variations you want
+}
+add_filter('woocommerce_ajax_variation_threshold', 'custom_wc_ajax_variation_threshold', 10, 2);
+
+// Show variation price
+add_filter('woocommerce_show_variation_price', function () {
+    return TRUE;
+});

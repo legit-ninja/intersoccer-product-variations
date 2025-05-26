@@ -142,4 +142,3 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
         update_post_meta($variation_id, '_course_weekly_discount', $weekly_discount);
     }
 }
-
