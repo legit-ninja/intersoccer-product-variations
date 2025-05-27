@@ -16,6 +16,7 @@
  * - Always send remaining_weeks for Course products to ensure Discount message display (2025-05-26).
  * - Added price display for non-discounted Courses with remaining_weeks (2025-05-26).
  * - Removed inline CSS to allow inheritance of base widget formatting (2025-05-26).
+ * - Fixed pro-rated discount calculation for Courses (2025-05-27).
  */
 
 jQuery(document).ready(function ($) {
@@ -119,27 +120,40 @@ jQuery(document).ready(function ($) {
 
       const weeksPassed = Math.floor((serverTime - start) / (7 * 24 * 60 * 60 * 1000));
       const remainingWeeks = Math.max(0, totalWeeks - weeksPassed);
-      let discountedPrice = basePrice - (weeksPassed * weeklyDiscount);
-      // Cap discounted price
-      discountedPrice = Math.min(basePrice, Math.max(0, discountedPrice));
+
+      // Calculate the original price per week
+      const originalPricePerWeek = basePrice / totalWeeks;
+      // Apply the weekly discount to get the discounted price per week
+      // const discountedPricePerWeek = Math.max(0, originalPricePerWeek - weeklyDiscount);
+      // Calculate the pro-rated price based on remaining weeks
+      let proratedPrice = calculateProRate(weeklyDiscount, remainingWeeks);
+      // Ensure the price doesn't go below 0
+      proratedPrice = Math.max(0, proratedPrice);
 
       console.log(
         "InterSoccer: Pro-rated price - Base:",
         basePrice,
         "Start:",
         startDate,
+        "Total Weeks:",
+        totalWeeks,
         "Weeks passed:",
         weeksPassed,
         "Remaining:",
         remainingWeeks,
-        "Weekly discount:",
+        "Original Price per Week:",
+        originalPricePerWeek.toFixed(2),
+        "Weekly price:",
         weeklyDiscount,
-        "Discounted price:",
-        discountedPrice
+        "Pro-rated Price:",
+        proratedPrice.toFixed(2)
       );
-      return { price: discountedPrice.toFixed(2), remainingWeeks };
+      return { price: proratedPrice.toFixed(2), remainingWeeks };
     }
 
+    function calculateProRate(weeksRemaining, weeklyRate) {
+      return weeksRemaining * weeklyRate;
+    }
     function fetchCourseMetadata(productId, variationId) {
       return new Promise((resolve, reject) => {
         $.ajax({
@@ -878,5 +892,5 @@ jQuery(document).ready(function ($) {
 
   // Reinitialize on dynamic content load
   document.addEventListener('DOMContentLoaded', initializePlugin);
-  window.addEventListener('load', initializePlugin);
+  document.addEventListener('load', initializePlugin);
 });
