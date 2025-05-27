@@ -9,6 +9,11 @@
  * - Improved course metadata validation (2025-05-25).
  * - Relaxed user_id check in intersoccer_get_user_players (2025-05-26).
  * - Added detailed logging for nonce and user issues (2025-05-26).
+ * - Removed duplicate intersoccer_get_product_type handler, using version from woocommerce-modifications.php (2025-05-27).
+ * - Updated intersoccer_get_course_metadata to use intersoccer_get_product_type (2025-05-27).
+ * - Fixed start_date retrieval to use get_attribute for pa_start-date (2025-05-27).
+ * - Fixed start_date retrieval to use get_post_meta for _course_start_date (2025-05-27).
+ * - Removed fallback in intersoccer_get_days_of_week, relying on pa_days-of-week attribute (2025-05-27).
  */
 
 // Prevent direct access
@@ -190,38 +195,6 @@ function intersoccer_delete_player()
     wp_send_json_success(['message' => __('Player deleted successfully.', 'intersoccer-player-management')]);
 }
 
-// Get product type
-add_action('wp_ajax_intersoccer_get_product_type', 'intersoccer_get_product_type');
-add_action('wp_ajax_nopriv_intersoccer_get_product_type', 'intersoccer_get_product_type');
-function intersoccer_get_product_type()
-{
-    if (ob_get_length()) {
-        ob_clean();
-    }
-
-    error_log('InterSoccer: intersoccer_get_product_type called');
-    error_log('InterSoccer: POST data: ' . print_r($_POST, true));
-
-    check_ajax_referer('intersoccer_nonce', 'nonce', false);
-    if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id'])) {
-        wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-player-management')], 400);
-    }
-
-    $product_id = absint($_POST['product_id']);
-    $product = wc_get_product($product_id);
-    if (!$product) {
-        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
-    }
-
-    $activity_type = wc_get_product_terms($product_id, 'pa_activity-type', ['fields' => 'names']);
-    $product_type = !empty($activity_type) ? strtolower($activity_type[0]) : '';
-    $is_camp = $product_type === 'camp';
-
-    error_log('InterSoccer: Product ID ' . $product_id . ' activity type: ' . $product_type);
-
-    wp_send_json_success(['product_type' => $is_camp ? 'camp' : 'course']);
-}
-
 // Get days of the week for a product
 add_action('wp_ajax_intersoccer_get_days_of_week', 'intersoccer_get_days_of_week');
 add_action('wp_ajax_nopriv_intersoccer_get_days_of_week', 'intersoccer_get_days_of_week');
@@ -266,9 +239,8 @@ function intersoccer_get_days_of_week()
 
     if (empty($days)) {
         error_log('InterSoccer: No days of the week found for parent product ID: ' . $parent_id);
-        // Fallback to default days if none set
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-        error_log('InterSoccer: Using fallback days: ' . print_r($days, true));
+        wp_send_json_error(['message' => __('No days of the week defined for this product.', 'intersoccer-player-management')], 400);
+        return;
     }
 
     $day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -308,14 +280,38 @@ function intersoccer_get_course_metadata()
         wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
     }
 
-    $start_date = get_post_meta($variation_id, '_course_start_date', true);
-    $weekly_discount = get_post_meta($variation_id, '_course_weekly_discount', true);
-    $total_weeks = get_post_meta($variation_id, '_course_total_weeks', true);
-
-    if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
-        error_log('InterSoccer: Invalid or missing _course_start_date for variation ' . $variation_id);
-        $start_date = date('Y-m-d'); // Fallback to today
+    $product_type = intersoccer_get_product_type($product_id);
+    if ($product_type !== 'course') {
+        error_log('InterSoccer: Product ' . $product_id . ' is not a Course, returning default metadata');
+        wp_send_json_success(array(
+            'start_date' => '',
+            'total_weeks' => 0,
+            'weekly_discount' => 0,
+            'remaining_weeks' => 0,
+        ));
+        wp_die();
     }
+
+    // Retrieve start_date using get_post_meta for _course_start_date
+    $start_date = get_post_meta($variation_id, '_course_start_date', true);
+    if (!$start_date) {
+        // Fallback to parent product if variation doesn't have the meta
+        $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product_id;
+        $start_date = get_post_meta($parent_id, '_course_start_date', true);
+        error_log('InterSoccer: Retrieved _course_start_date from parent product ' . $parent_id . ': ' . ($start_date ?: 'not set'));
+    }
+
+    $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+    $weekly_discount = (float) get_post_meta($variation_id, '_course_weekly_discount', true);
+
+    // Validate date format (should already be in YYYY-MM-DD from admin save)
+    if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) || !strtotime($start_date)) {
+        error_log('InterSoccer: Invalid or missing _course_start_date for variation ' . $variation_id . ', raw value: ' . ($start_date ?: 'not set'));
+        $start_date = date('Y-m-d'); // Fallback to today
+    } else {
+        error_log('InterSoccer: Retrieved _course_start_date for variation ' . $variation_id . ': ' . $start_date);
+    }
+
     $weekly_discount = floatval($weekly_discount ?: 0);
     $total_weeks = intval($total_weeks ?: 1);
     if ($total_weeks < 1) {
@@ -324,16 +320,19 @@ function intersoccer_get_course_metadata()
     }
 
     // Calculate remaining weeks
-    $server_time = current_time('Y-m-d');
-    $start = new DateTime($start_date);
-    $current = new DateTime($server_time);
-    $weeks_passed = floor(($current->getTimestamp() - $start->getTimestamp()) / (7 * 24 * 60 * 60));
-    $remaining_weeks = max(0, $total_weeks - $weeks_passed);
+    $server_time = current_time('timestamp');
+    $start = strtotime($start_date);
+
+    $remaining_weeks = $total_weeks;
+    if ($start && $server_time > $start) {
+        $weeks_passed = floor(($server_time - $start) / (7 * 24 * 60 * 60));
+        $remaining_weeks = max(0, $total_weeks - $weeks_passed);
+    }
 
     $metadata = [
         'start_date' => $start_date,
-        'weekly_discount' => $weekly_discount,
         'total_weeks' => $total_weeks,
+        'weekly_discount' => $weekly_discount,
         'remaining_weeks' => $remaining_weeks,
     ];
 

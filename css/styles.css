@@ -13,3 +13,8 @@
   font-size: 0.5em;
   color: #eec432;
 }
+
+.intersoccer-custom-price {
+    display: block !important;
+    margin-top: 5px;
+}
