@@ -9,6 +9,7 @@
  * - Fixed price calculations, removed client-side price storage, and improved security (2025-05-27).
  * - Added dynamic price updates via AJAX, fixed button enabling, and resolved infinite loops (2025-05-27).
  * - Ensured days of week display for Camps and fixed player toggle issues (2025-05-27).
+ * - Fixed Add to cart button disabling when changing days for Camps (2025-05-27).
  */
 
 jQuery(document).ready(function ($) {
@@ -150,6 +151,10 @@ jQuery(document).ready(function ($) {
           success: function (response) {
             if (response.success && response.data.price) {
               console.log("InterSoccer: Updated product price:", response.data.price);
+              // Log if price is zero due to no days selected
+              if (campDays.length === 0 && response.data.raw_price === 0) {
+                console.log("InterSoccer: No days selected, price set to zero.");
+              }
               // Update the displayed price
               const $priceElement = $("form.cart .woocommerce-variation-price .price");
               if ($priceElement.length) {
@@ -248,7 +253,7 @@ jQuery(document).ready(function ($) {
       let currentVariation = null;
       let lastVariationId = null;
       let lastBookingType = null; // Track the last booking type to detect changes
-      let lastValidPlayerId = ""; // Track the last valid player ID to prevent button disabling
+      let lastValidPlayerId = ""; // Track the last valid player ID for form submission
 
       function fetchProductType() {
         $.ajax({
@@ -322,36 +327,26 @@ jQuery(document).ready(function ($) {
           lastValidPlayerId = playerId;
         }
 
-        // Use the last valid player ID if the current selection is empty
-        const effectivePlayerId = hasPlayer ? playerId : lastValidPlayerId;
-        const effectiveHasPlayer = effectivePlayerId && effectivePlayerId !== "";
-
         if (bookingType === "single-days") {
-          // For single-days, require either a player or at least one day selected
-          isValid = effectiveHasPlayer || selectedDaysCount > 0;
+          // For single-days, enable the button if at least one day is selected
+          // Disable only if no days are selected
+          isValid = selectedDaysCount > 0;
           $addToCartButton.prop("disabled", !isValid);
           console.log(
-            "InterSoccer: Updated button state - Current Player:",
+            "InterSoccer: Updated button state - Player:",
             playerId,
-            "Effective Player:",
-            effectivePlayerId,
-            "Has Player (effective):",
-            effectiveHasPlayer,
             "Days selected:",
             selectedDaysCount,
             "Enabled:",
             isValid
           );
         } else {
-          isValid = effectiveHasPlayer;
+          // For other booking types (e.g., full-week), require a player
+          isValid = hasPlayer;
           $addToCartButton.prop("disabled", !isValid);
           console.log(
-            "InterSoccer: Updated button state - Current Player:",
+            "InterSoccer: Updated button state - Player:",
             playerId,
-            "Effective Player:",
-            effectivePlayerId,
-            "Has Player (effective):",
-            effectiveHasPlayer,
             "Enabled:",
             isValid
           );
