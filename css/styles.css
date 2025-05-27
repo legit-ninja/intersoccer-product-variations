@@ -7,3 +7,9 @@
 .intersoccer-player-selection select, .intersoccer-day-selection input[type="checkbox"] {
     width: 100%;
 }
+
+.intersoccer-custom-price .total-price {
+  margin-top: 10px;
+  font-size: 0.5em;
+  color: #eec432;
+}
