@@ -19,6 +19,8 @@
  * - Added admin option to update existing Processing orders with parent product attributes (2025-06-03).
  * - Refined attribute filtering to exclude variation attributes and added safe backporting with fix option (2025-06-03).
  * - Added support for event-specific downloadable PDFs for Camps, Courses, and Birthdays (2025-06-03).
+ * - Removed product type filtering for order updates to process all orders (2025-06-03).
+ * - Removed assigned_player from order details and added option to delete it from existing orders (2025-06-03).
  */
 
 // Prevent direct access
@@ -420,7 +422,7 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         return $cart_item_data;
     }
 
-    // Add player assignment
+    // Add player assignment (use player_assignment, not assigned_player)
     if (isset($_POST['player_assignment'])) {
         $cart_item_data['player_assignment'] = sanitize_text_field($_POST['player_assignment']);
         error_log('InterSoccer: Added player to cart via POST: ' . $cart_item_data['player_assignment']);
@@ -879,7 +881,7 @@ function intersoccer_render_update_orders_page() {
     ?>
     <div class="wrap">
         <h1><?php _e('Update Processing Orders with Parent Attributes', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Select orders to update with visible, non-variation parent product attributes. Updated details will appear in the Completed Order email. Use "Fix Incorrect Attributes" to correct orders with unwanted attributes (e.g., all days of the week).', 'intersoccer-player-management'); ?></p>
+        <p><?php _e('Select orders to update with new visible, non-variation parent product attributes for reporting and analytics. Use "Remove Assigned Player" to delete the unwanted assigned_player field from orders. Use "Fix Incorrect Attributes" to correct orders with unwanted attributes (e.g., all days of the week).', 'intersoccer-player-management'); ?></p>
         <?php if (!empty($orders)) : ?>
             <form id="intersoccer-update-orders-form">
                 <table class="wp-list-table widefat fixed striped">
@@ -904,6 +906,12 @@ function intersoccer_render_update_orders_page() {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <p>
+                    <label>
+                        <input type="checkbox" id="remove-assigned-player" name="remove_assigned_player">
+                        <?php _e('Remove Assigned Player Field', 'intersoccer-player-management'); ?>
+                    </label>
+                </p>
                 <p>
                     <label>
                         <input type="checkbox" id="fix-incorrect-attributes" name="fix_incorrect_attributes">
@@ -931,6 +939,7 @@ function intersoccer_render_update_orders_page() {
                     return $(this).val();
                 }).get();
                 var nonce = $('#intersoccer_update_orders_nonce').val();
+                var removeAssignedPlayer = $('#remove-assigned-player').is(':checked');
                 var fixIncorrect = $('#fix-incorrect-attributes').is(':checked');
 
                 if (orderIds.length === 0) {
@@ -947,6 +956,7 @@ function intersoccer_render_update_orders_page() {
                         action: 'intersoccer_update_processing_orders',
                         nonce: nonce,
                         order_ids: orderIds,
+                        remove_assigned_player: removeAssignedPlayer,
                         fix_incorrect_attributes: fixIncorrect
                     },
                     success: function(response) {
@@ -971,7 +981,7 @@ function intersoccer_render_update_orders_page() {
 }
 
 /**
- * AJAX handler to update Processing orders with parent attributes.
+ * AJAX handler to update Processing orders with parent attributes and remove unwanted fields.
  */
 add_action('wp_ajax_intersoccer_update_processing_orders', 'intersoccer_update_processing_orders_callback');
 function intersoccer_update_processing_orders_callback() {
@@ -983,6 +993,7 @@ function intersoccer_update_processing_orders_callback() {
     }
 
     $order_ids = isset($_POST['order_ids']) && is_array($_POST['order_ids']) ? array_map('intval', $_POST['order_ids']) : [];
+    $remove_assigned_player = isset($_POST['remove_assigned_player']) && $_POST['remove_assigned_player'] === 'true';
     $fix_incorrect = isset($_POST['fix_incorrect_attributes']) && $_POST['fix_incorrect_attributes'] === 'true';
 
     if (empty($order_ids)) {
@@ -991,43 +1002,56 @@ function intersoccer_update_processing_orders_callback() {
     }
 
     foreach ($order_ids as $order_id) {
-    $order = wc_get_order($order_id);
-    if (!$order || $order->get_status() !== 'processing') {
-        error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
-        continue;
-    }
-
-    foreach ($order->get_items() as $item_id => $item) {
-        $product_id = $item->get_product_id();
-        $variation_id = $item->get_variation_id();
-        $product = wc_get_product($variation_id ?: $product_id);
-
-        if (!$product) {
-            error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+        $order = wc_get_order($order_id);
+        if (!$order || $order->get_status() !== 'processing') {
+            error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
             continue;
         }
 
-        // Get parent attributes
-        $parent_attributes = intersoccer_get_parent_attributes($product, intersoccer_get_product_type($product_id));
+        foreach ($order->get_items() as $item_id => $item) {
+            $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
+            $product = wc_get_product($variation_id ?: $product_id);
 
-        // Add only new parent attributes to order item meta
-        foreach ($parent_attributes as $label => $value) {
-            $existing_meta = $item->get_meta($label);
-            if (!$existing_meta) {
-                $item->add_meta_data(esc_html($label), esc_html($value));
-                error_log('InterSoccer: Added new parent attribute to order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
-            } else {
-                error_log('InterSoccer: Skipped existing parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label);
+            if (!$product) {
+                error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+                continue;
             }
+
+            $product_type = intersoccer_get_product_type($product_id);
+
+            // Remove assigned_player if requested
+            if ($remove_assigned_player) {
+                $item->delete_meta_data('assigned_player');
+                error_log('InterSoccer: Removed assigned_player from order item ' . $item_id . ' in order ' . $order_id);
+            }
+
+            // Fix incorrect attributes if requested
+            if ($fix_incorrect && $product_type === 'camp') {
+                $item->delete_meta_data('Days-of-week');
+                error_log('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
+            }
+
+            // Get parent attributes
+            $parent_attributes = intersoccer_get_parent_attributes($product, $product_type);
+
+            // Add only new parent attributes to order item meta
+            foreach ($parent_attributes as $label => $value) {
+                $existing_meta = $item->get_meta($label);
+                if (!$existing_meta) {
+                    $item->add_meta_data(esc_html($label), esc_html($value));
+                    error_log('InterSoccer: Added new parent attribute to order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
+                } else {
+                    error_log('InterSoccer: Skipped existing parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label);
+                }
+            }
+
+            $item->save();
         }
 
-        $item->save();
+        $order->save();
+        error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
     }
-
-    $order->save();
-    error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes');
-}
-
 
     wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-player-management')]);
     wp_die();
