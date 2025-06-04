@@ -16,6 +16,8 @@
  * - Updated to append visible, non-variation parent attributes to cart item data (2025-06-03).
  * - Enhanced attribute retrieval to include all visible, non-variation parent attributes and debug missing attributes (2025-06-03).
  * - Fixed syntax errors and ensured complete attribute inclusion in cart item data (2025-06-03).
+ * - Added admin option to update existing Processing orders with parent product attributes (2025-06-03).
+ * - Refined attribute filtering to exclude variation attributes and added safe backporting with fix option (2025-06-03).
  */
 
 // Prevent direct access
@@ -316,7 +318,7 @@ function intersoccer_clear_session_data_callback() {
     if ($product_id) {
         // Ensure session is initialized
         if (function_exists('WC') && WC()->session) {
-            WC()->session->set('intersoc tiempos_discovered', []);
+            WC()->session->set('intersoccer_selected_days_' . $product_id, []);
             WC()->session->set('intersoccer_remaining_weeks_' . $product_id, null);
             error_log('InterSoccer: Session data cleared for product ' . $product_id);
             wp_send_json_success(['message' => 'Session data cleared']);
@@ -326,8 +328,70 @@ function intersoccer_clear_session_data_callback() {
         }
     } else {
         wp_send_json_error(['message' => 'Invalid product ID']);
+        wp_die();
     }
-    wp_die();
+}
+
+/**
+ * Get visible, non-variation parent attributes for a product, excluding camp-specific overlaps.
+ *
+ * @param WC_Product $product Product object (variation or parent).
+ * @param string $product_type Product type ('camp', 'course', etc.).
+ * @return array Array of attribute label => value pairs.
+ */
+function intersoccer_get_parent_attributes($product, $product_type = '') {
+    $attributes = [];
+
+    // Get parent product for variations
+    $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product->get_id();
+    $parent_product = wc_get_product($parent_id);
+
+    if (!$parent_product) {
+        error_log('InterSoccer: No parent product found for product ID ' . $product->get_id());
+        return $attributes;
+    }
+
+    $product_attributes = $parent_product->get_attributes();
+    error_log('InterSoccer: Retrieving attributes for parent product ID ' . $parent_id . ': ' . print_r($product_attributes, true));
+
+    foreach ($product_attributes as $attribute_name => $attribute) {
+        $label = wc_attribute_label($attribute_name);
+        $value = '';
+
+        // Skip Days-of-week for camps to avoid overlap with Days Selected
+        if ($product_type === 'camp' && $attribute_name === 'pa_days-of-week') {
+            error_log('InterSoccer: Skipped attribute ' . $attribute_name . ' for camp product ' . $parent_id . ': overlaps with Days Selected meta');
+            continue;
+        }
+
+        if (!is_object($attribute)) {
+            // Custom attribute
+            $is_visible = isset($attribute['is_visible']) && $attribute['is_visible'];
+            if ($is_visible) {
+                $value = $attribute['value'];
+                error_log('InterSoccer: Processing custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
+            } else {
+                error_log('InterSoccer: Skipped custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': not visible');
+            }
+        } else {
+            // Taxonomy-based attribute
+            $is_visible = $attribute->get_visible();
+            $is_variation = $attribute->get_variation();
+            if ($is_visible && !$is_variation) {
+                $terms = wc_get_product_terms($parent_id, $attribute_name, ['fields' => 'names']);
+                $value = !empty($terms) ? implode(', ', $terms) : '';
+                error_log('InterSoccer: Processing taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
+            } else {
+                error_log('InterSoccer: Skipped taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false'));
+            }
+        }
+
+        if (!empty($value)) {
+            $attributes[$label] = $value;
+        }
+    }
+
+    return $attributes;
 }
 
 // Save player, days, discount, and parent attributes to cart item
@@ -344,15 +408,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
     $product = wc_get_product($variation_id ?: $product_id);
     if (!$product) {
         error_log('InterSoccer: Invalid product for cart item: product_id=' . $product_id . ', variation_id=' . $variation_id);
-        $is_processing = false;
-        return $cart_item_data;
-    }
-
-    // Get parent product for variations
-    $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product_id;
-    $parent_product = wc_get_product($parent_id);
-    if (!$parent_product) {
-        error_log('InterSoccer: No parent product found for product ID ' . $product_id);
         $is_processing = false;
         return $cart_item_data;
     }
@@ -391,6 +446,7 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         if ($product_type === 'course') {
             $start_date = get_post_meta($variation_id, '_course_start_date', true);
             if (!$start_date) {
+                $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product_id;
                 $start_date = get_post_meta($parent_id, '_course_start_date', true);
                 error_log('InterSoccer: Retrieved _course_start_date from parent product ' . $parent_id . ': ' . ($start_date ?: 'not set'));
             }
@@ -415,41 +471,8 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
     }
 
     // Add visible, non-variation parent attributes
-    $parent_attributes = $parent_product->get_attributes();
-    $cart_item_data['parent_attributes'] = [];
-    error_log('InterSoccer: Retrieving attributes for parent product ID ' . $parent_id . ': ' . print_r($parent_attributes, true));
-
-    foreach ($parent_attributes as $attribute_name => $attribute) {
-        $label = wc_attribute_label($attribute_name);
-        $value = '';
-
-        if (!is_object($attribute)) {
-            // Custom attribute
-            $is_visible = isset($attribute['is_visible']) && $attribute['is_visible'];
-            if ($is_visible) {
-                $value = $attribute['value'];
-                error_log('InterSoccer: Processing custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
-            } else {
-                error_log('InterSoccer: Skipped custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': not visible');
-            }
-        } else {
-            // Taxonomy-based attribute
-            $is_visible = $attribute->get_visible();
-            $is_variation = $attribute->get_variation();
-            if ($is_visible && !$is_variation) {
-                $terms = wc_get_product_terms($parent_id, $attribute_name, ['fields' => 'names']);
-                $value = !empty($terms) ? implode(', ', $terms) : '';
-                error_log('InterSoccer: Processing taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
-            } else {
-                error_log('InterSoccer: Skipped taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false'));
-            }
-        }
-
-        if (!empty($value)) {
-            $cart_item_data['parent_attributes'][$label] = $value;
-            error_log('InterSoccer: Added parent attribute to cart item ' . $product_id . ': ' . $label . ' = ' . $value);
-        }
-    }
+    $product_type = intersoccer_get_product_type($product_id);
+    $cart_item_data['parent_attributes'] = intersoccer_get_parent_attributes($product, $product_type);
 
     $is_processing = false;
     return $cart_item_data;
@@ -666,8 +689,7 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         error_log('InterSoccer: Saved selected days to order item ' . $cart_item_key . ': ' . $days_display);
     }
 
-    // Check both $values and cart item for remaining_weeks
-    $remaining_weeks = isset($values['remaining_weeks']) ? intval($values['remaining_weeks']) : (isset($cart_item['remaining_weeks']) ? intval($cart_item['remaining_weeks']) : 0);
+    $remaining_weeks = isset($values['remaining_weeks']) ? intval($values['remaining_weeks']) : 0;
     if ($remaining_weeks > 0) {
         $weeks_display = esc_html($remaining_weeks . ' Weeks Remaining');
         $item->add_meta_data(__('Discount', 'intersoccer-player-management'), $weeks_display);
@@ -791,5 +813,205 @@ function intersoccer_display_event_cpt_data($item_data, $cart_item) {
         }
     }
     return $item_data;
+}
+
+// Add admin submenu for updating Processing orders
+add_action('admin_menu', 'intersoccer_add_update_orders_submenu');
+function intersoccer_add_update_orders_submenu() {
+    add_submenu_page(
+        'woocommerce',
+        __('Update Order Details', 'intersoccer-player-management'),
+        __('Update Order Details', 'intersoccer-player-management'),
+        'manage_woocommerce',
+        'intersoccer-update-orders',
+        'intersoccer_render_update_orders_page'
+    );
+}
+
+/**
+ * Render the admin page for updating Processing orders.
+ */
+function intersoccer_render_update_orders_page() {
+    if (!current_user_can('manage_woocommerce')) {
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+    }
+
+    // Get Processing orders
+    $orders = wc_get_orders([
+        'status' => 'processing',
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC',
+    ]);
+
+    ?>
+    <div class="wrap">
+        <h1><?php _e('Update Processing Orders with Parent Attributes', 'intersoccer-player-management'); ?></h1>
+        <p><?php _e('Select orders to update with visible, non-variation parent product attributes. Updated details will appear in the Completed Order email. Use "Fix Incorrect Attributes" to correct orders with unwanted attributes (e.g., all days of the week).', 'intersoccer-player-management'); ?></p>
+        <?php if (!empty($orders)) : ?>
+            <form id="intersoccer-update-orders-form">
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all-orders"></th>
+                            <th><?php _e('Order ID', 'intersoccer-player-management'); ?></th>
+                            <th><?php _e('Customer', 'intersoccer-player-management'); ?></th>
+                            <th><?php _e('Date', 'intersoccer-player-management'); ?></th>
+                            <th><?php _e('Total', 'intersoccer-player-management'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($orders as $order) : ?>
+                            <tr>
+                                <td><input type="checkbox" name="order_ids[]" value="<?php echo esc_attr($order->get_id()); ?>"></td>
+                                <td><?php echo esc_html($order->get_order_number()); ?></td>
+                                <td><?php echo esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()); ?></td>
+                                <td><?php echo esc_html($order->get_date_created()->date_i18n('Y-m-d')); ?></td>
+                                <td><?php echo wc_price($order->get_total()); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <p>
+                    <label>
+                        <input type="checkbox" id="fix-incorrect-attributes" name="fix_incorrect_attributes">
+                        <?php _e('Fix Incorrect Attributes (e.g., remove Days-of-week)', 'intersoccer-player-management'); ?>
+                    </label>
+                </p>
+                <p>
+                    <button type="button" id="intersoccer-update-orders-button" class="button button-primary"><?php _e('Update Selected Orders', 'intersoccer-player-management'); ?></button>
+                    <span id="intersoccer-update-status"></span>
+                </p>
+                <?php wp_nonce_field('intersoccer_update_orders_nonce', 'intersoccer_update_orders_nonce'); ?>
+            </form>
+        <?php else : ?>
+            <p><?php _e('No Processing orders found.', 'intersoccer-player-management'); ?></p>
+        <?php endif; ?>
+    </div>
+    <script>
+        jQuery(document).ready(function($) {
+            $('#select-all-orders').on('change', function() {
+                $('input[name="order_ids[]"]').prop('checked', $(this).prop('checked'));
+            });
+
+            $('#intersoccer-update-orders-button').on('click', function() {
+                var orderIds = $('input[name="order_ids[]"]:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                var nonce = $('#intersoccer_update_orders_nonce').val();
+                var fixIncorrect = $('#fix-incorrect-attributes').is(':checked');
+
+                if (orderIds.length === 0) {
+                    alert('<?php _e('Please select at least one order.', 'intersoccer-player-management'); ?>');
+                    return;
+                }
+
+                $('#intersoccer-update-status').text('<?php _e('Updating orders...', 'intersoccer-player-management'); ?>').removeClass('error');
+
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'intersoccer_update_processing_orders',
+                        nonce: nonce,
+                        order_ids: orderIds,
+                        fix_incorrect_attributes: fixIncorrect
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#intersoccer-update-status').text('<?php _e('Orders updated successfully!', 'intersoccer-player-management'); ?>');
+                        } else {
+                            $('#intersoccer-update-status').text('<?php _e('Error: ', 'intersoccer-player-management'); ?>' + response.data.message).addClass('error');
+                        }
+                    },
+                    error: function() {
+                        $('#intersoccer-update-status').text('<?php _e('An error occurred while updating orders.', 'intersoccer-player-management'); ?>').addClass('error');
+                    }
+                });
+            });
+        });
+    </script>
+    <style>
+        #intersoccer-update-status { margin-left: 10px; color: green; }
+        #intersoccer-update-status.error { color: red; }
+    </style>
+    <?php
+}
+
+/**
+ * AJAX handler to update Processing orders with parent attributes.
+ */
+add_action('wp_ajax_intersoccer_update_processing_orders', 'intersoccer_update_processing_orders_callback');
+function intersoccer_update_processing_orders_callback() {
+    check_ajax_referer('intersoccer_update_orders_nonce', 'nonce');
+
+    if (!current_user_can('manage_woocommerce')) {
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_die();
+    }
+
+    $order_ids = isset($_POST['order_ids']) && is_array($_POST['order_ids']) ? array_map('intval', $_POST['order_ids']) : [];
+    $fix_incorrect = isset($_POST['fix_incorrect_attributes']) && $_POST['fix_incorrect_attributes'] === 'true';
+
+    if (empty($order_ids)) {
+        wp_send_json_error(['message' => __('No orders selected.', 'intersoccer-player-management')]);
+        wp_die();
+    }
+
+    foreach ($order_ids as $order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order || $order->get_status() !== 'processing') {
+            error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
+            continue;
+        }
+
+        foreach ($order->get_items() as $item_id => $item) {
+            $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
+            $product = wc_get_product($variation_id ?: $product_id);
+
+            if (!$product) {
+                error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+                continue;
+            }
+
+            $product_type = intersoccer_get_product_type($product_id);
+
+            // Fix incorrect attributes if requested
+            if ($fix_incorrect && $product_type === 'camp') {
+                $item->delete_meta_data('Days-of-week');
+                error_log('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
+            }
+
+            // Get parent attributes
+            $parent_attributes = intersoccer_get_parent_attributes($product, $product_type);
+
+            // Add or update parent attributes to order item meta
+            foreach ($parent_attributes as $label => $value) {
+                // Check if meta exists to avoid duplicates
+                $existing_meta = $item->get_meta($label);
+                if (!$existing_meta) {
+                    $item->add_meta_data(esc_html($label), esc_html($value));
+                    error_log('InterSoccer: Added parent attribute to order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
+                } else {
+                    // Update if different
+                    if ($existing_meta !== $value) {
+                        $item->update_meta_data(esc_html($label), esc_html($value));
+                        error_log('InterSoccer: Updated parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
+                    } else {
+                        error_log('InterSoccer: Skipped duplicate parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label);
+                    }
+                }
+            }
+
+            $item->save();
+        }
+
+        $order->save();
+        error_log('InterSoccer: Updated order ' . $order_id . ' with parent attributes' . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
+    }
+
+    wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-player-management')]);
+    wp_die();
 }
 ?>
