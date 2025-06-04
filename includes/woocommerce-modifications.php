@@ -18,6 +18,7 @@
  * - Fixed syntax errors and ensured complete attribute inclusion in cart item data (2025-06-03).
  * - Added admin option to update existing Processing orders with parent product attributes (2025-06-03).
  * - Refined attribute filtering to exclude variation attributes and added safe backporting with fix option (2025-06-03).
+ * - Added support for event-specific downloadable PDFs for Camps, Courses, and Birthdays (2025-06-03).
  */
 
 // Prevent direct access
@@ -79,7 +80,7 @@ function intersoccer_calculate_price($product_id, $variation_id, $camp_days = []
  * Determine the product type server-side.
  *
  * @param int $product_id The product ID.
- * @return string The product type ('camp', 'course', or empty string).
+ * @return string The product type ('camp', 'course', 'birthday', or empty string).
  */
 function intersoccer_get_product_type($product_id) {
     $product = wc_get_product($product_id);
@@ -106,6 +107,8 @@ function intersoccer_get_product_type($product_id) {
         $product_type = 'camp';
     } elseif (in_array('courses', $categories, true)) {
         $product_type = 'course';
+    } elseif (in_array('birthdays', $categories, true)) {
+        $product_type = 'birthday';
     }
 
     // Fallback: Check attributes
@@ -122,6 +125,9 @@ function intersoccer_get_product_type($product_id) {
                             break;
                         } elseif ($term->slug === 'camp') {
                             $product_type = 'camp';
+                            break;
+                        } elseif ($term->slug === 'birthday') {
+                            $product_type = 'birthday';
                             break;
                         }
                     }
@@ -143,6 +149,8 @@ function intersoccer_get_product_type($product_id) {
             $product_type = 'course';
         } elseif (stripos($title, 'camp') !== false) {
             $product_type = 'camp';
+        } elseif (stripos($title, 'birthday') !== false) {
+            $product_type = 'birthday';
         }
         error_log('InterSoccer: Fallback to title for product type detection for product ' . $product_id . ', title: ' . $title . ', type: ' . ($product_type ?: 'none'));
     }
@@ -663,7 +671,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
     return $item_data;
 }
 
-// Save player, days, discount, and parent attributes to order
+// Save player, days, discount, parent attributes, and downloads to order
 add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_save_order_item_data', 300, 4);
 function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order) {
     error_log('InterSoccer: Saving order item data for cart item ' . $cart_item_key . ': ' . print_r($values, true));
@@ -705,6 +713,30 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
             error_log('InterSoccer: Saved parent attribute to order item ' . $cart_item_key . ': ' . $label . ' = ' . $value);
         }
     }
+
+    // Assign downloads
+    $product_id = $item->get_product_id();
+    $variation_id = $item->get_variation_id();
+    $product = wc_get_product($variation_id ?: $product_id);
+
+    if ($product) {
+        $product_type = intersoccer_get_product_type($product_id);
+        if (in_array($product_type, ['camp', 'course', 'birthday'])) {
+            $downloads = get_post_meta($product_id, '_intersoccer_downloads', true);
+            if (is_array($downloads) && !empty($downloads)) {
+                foreach ($downloads as $download) {
+                    $file_id = md5($download['file']);
+                    $item->add_meta_data('_downloadable_file_' . $file_id, [
+                        'name' => $download['name'],
+                        'file' => $download['file'],
+                        'limit' => $download['limit'],
+                        'expiry' => $download['expiry']
+                    ]);
+                    error_log('InterSoccer: Assigned downloadable file to order item ' . $cart_item_key . ': ' . $download['name']);
+                }
+            }
+        }
+    }
 }
 
 // Prevent quantity changes in cart for all products
@@ -731,7 +763,7 @@ add_action('woocommerce_before_cart', function () {
     error_log('InterSoccer: Cart contents before rendering: ' . print_r(WC()->cart->get_cart(), true));
 });
 
-// Add product type meta to identify Camps and Courses
+// Add product type meta to identify Camps, Courses, and Birthdays
 add_action('woocommerce_process_product_meta', 'intersoccer_save_product_type_meta', 100);
 function intersoccer_save_product_type_meta($product_id) {
     $product = wc_get_product($product_id);
@@ -798,7 +830,7 @@ add_filter('woocommerce_get_item_data', 'intersoccer_display_event_cpt_data', 32
 function intersoccer_display_event_cpt_data($item_data, $cart_item) {
     $product_id = $cart_item['product_id'];
     $post_type = get_post_meta($product_id, '_intersoccer_product_type', true);
-    if ($post_type && in_array($post_type, ['camp', 'course'])) {
+    if ($post_type && in_array($post_type, ['camp', 'course', 'birthday'])) {
         $event = get_posts([
             'post_type' => $post_type,
             'meta_key' => '_product_id',
@@ -807,7 +839,7 @@ function intersoccer_display_event_cpt_data($item_data, $cart_item) {
         ]);
         if ($event) {
             $item_data[] = [
-                'key' => __($post_type === 'camp' ? 'Camp' : 'Course', 'intersoccer-events-cpt'),
+                'key' => __($post_type === 'camp' ? 'Camp' : ($post_type === 'course' ? 'Course' : 'Birthday'), 'intersoccer-events-cpt'),
                 'value' => esc_html($event[0]->post_title),
             ];
         }
@@ -959,59 +991,252 @@ function intersoccer_update_processing_orders_callback() {
     }
 
     foreach ($order_ids as $order_id) {
-        $order = wc_get_order($order_id);
-        if (!$order || $order->get_status() !== 'processing') {
-            error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
+    $order = wc_get_order($order_id);
+    if (!$order || $order->get_status() !== 'processing') {
+        error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
+        continue;
+    }
+
+    foreach ($order->get_items() as $item_id => $item) {
+        $product_id = $item->get_product_id();
+        $variation_id = $item->get_variation_id();
+        $product = wc_get_product($variation_id ?: $product_id);
+
+        if (!$product) {
+            error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
             continue;
         }
 
-        foreach ($order->get_items() as $item_id => $item) {
-            $product_id = $item->get_product_id();
-            $variation_id = $item->get_variation_id();
-            $product = wc_get_product($variation_id ?: $product_id);
+        // Get parent attributes
+        $parent_attributes = intersoccer_get_parent_attributes($product, intersoccer_get_product_type($product_id));
 
-            if (!$product) {
-                error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
-                continue;
+        // Add only new parent attributes to order item meta
+        foreach ($parent_attributes as $label => $value) {
+            $existing_meta = $item->get_meta($label);
+            if (!$existing_meta) {
+                $item->add_meta_data(esc_html($label), esc_html($value));
+                error_log('InterSoccer: Added new parent attribute to order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
+            } else {
+                error_log('InterSoccer: Skipped existing parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label);
             }
-
-            $product_type = intersoccer_get_product_type($product_id);
-
-            // Fix incorrect attributes if requested
-            if ($fix_incorrect && $product_type === 'camp') {
-                $item->delete_meta_data('Days-of-week');
-                error_log('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
-            }
-
-            // Get parent attributes
-            $parent_attributes = intersoccer_get_parent_attributes($product, $product_type);
-
-            // Add or update parent attributes to order item meta
-            foreach ($parent_attributes as $label => $value) {
-                // Check if meta exists to avoid duplicates
-                $existing_meta = $item->get_meta($label);
-                if (!$existing_meta) {
-                    $item->add_meta_data(esc_html($label), esc_html($value));
-                    error_log('InterSoccer: Added parent attribute to order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
-                } else {
-                    // Update if different
-                    if ($existing_meta !== $value) {
-                        $item->update_meta_data(esc_html($label), esc_html($value));
-                        error_log('InterSoccer: Updated parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label . ' = ' . $value);
-                    } else {
-                        error_log('InterSoccer: Skipped duplicate parent attribute for order item ' . $item_id . ' in order ' . $order_id . ': ' . $label);
-                    }
-                }
-            }
-
-            $item->save();
         }
 
-        $order->save();
-        error_log('InterSoccer: Updated order ' . $order_id . ' with parent attributes' . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
+        $item->save();
     }
+
+    $order->save();
+    error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes');
+}
+
 
     wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-player-management')]);
     wp_die();
+}
+
+// Add metabox for downloadable documents
+add_action('add_meta_boxes', 'intersoccer_add_downloadable_documents_metabox');
+function intersoccer_add_downloadable_documents_metabox() {
+    $screen = get_current_screen();
+    if ($screen->id !== 'product') {
+        return;
+    }
+
+    global $post;
+    $product_type = intersoccer_get_product_type($post->ID);
+
+    if (in_array($product_type, ['camp', 'course', 'birthday'])) {
+        add_meta_box(
+            'intersoccer_downloadable_documents',
+            __('Event Documents', 'intersoccer-player-management'),
+            'intersoccer_render_downloadable_documents_metabox',
+            'product',
+            'normal',
+            'default'
+        );
+    }
+}
+
+/**
+ * Render the downloadable documents metabox.
+ */
+function intersoccer_render_downloadable_documents_metabox($post) {
+    $downloads = get_post_meta($post->ID, '_intersoccer_downloads', true);
+    $downloads = is_array($downloads) ? $downloads : [];
+    wp_nonce_field('intersoccer_save_downloads', 'intersoccer_downloads_nonce');
+    ?>
+    <div id="intersoccer-downloads-container">
+        <?php foreach ($downloads as $index => $download) : ?>
+            <div class="intersoccer-download-row" style="margin-bottom: 10px;">
+                <input type="text" name="intersoccer_downloads[<?php echo $index; ?>][name]" value="<?php echo esc_attr($download['name']); ?>" placeholder="<?php _e('Document Name', 'intersoccer-player-management'); ?>" style="width: 200px; margin-right: 10px;">
+                <input type="hidden" name="intersoccer_downloads[<?php echo $index; ?>][file]" value="<?php echo esc_attr($download['file']); ?>" class="intersoccer-download-file">
+                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-player-management'); ?></button>
+                <span class="intersoccer-file-name"><?php echo basename($download['file']); ?></span>
+                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][limit]" value="<?php echo esc_attr($download['limit']); ?>" placeholder="<?php _e('Download Limit', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
+                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][expiry]" value="<?php echo esc_attr($download['expiry']); ?>" placeholder="<?php _e('Days Until Expiry', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
+                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-player-management'); ?></button>
+            </div>
+        <?php endforeach; ?>
+        <div id="intersoccer-downloads-template" style="display: none;">
+            <div class="intersoccer-download-row" style="margin-bottom: 10px;">
+                <input type="text" name="intersoccer_downloads[{index}][name]" placeholder="<?php _e('Document Name', 'intersoccer-player-management'); ?>" style="width: 200px; margin-right: 10px;">
+                <input type="hidden" name="intersoccer_downloads[{index}][file]" class="intersoccer-download-file">
+                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-player-management'); ?></button>
+                <span class="intersoccer-file-name"></span>
+                <input type="number" name="intersoccer_downloads[{index}][limit]" placeholder="<?php _e('Download Limit', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
+                <input type="number" name="intersoccer_downloads[{index}][expiry]" placeholder="<?php _e('Days Until Expiry', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
+                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-player-management'); ?></button>
+            </div>
+        </div>
+        <p><button type="button" id="intersoccer-add-download" class="button"><?php _e('Add Document', 'intersoccer-player-management'); ?></button></p>
+    </div>
+    <script>
+        jQuery(document).ready(function($) {
+            var index = <?php echo count($downloads); ?>;
+            
+            // Add new download row
+            $('#intersoccer-add-download').on('click', function() {
+                var template = $('#intersoccer-downloads-template').html().replace(/{index}/g, index++);
+                $('#intersoccer-downloads-container').append(template);
+            });
+
+            // Remove download row
+            $(document).on('click', '.intersoccer-remove-download', function() {
+                $(this).closest('.intersoccer-download-row').remove();
+            });
+
+            // Upload file
+            $(document).on('click', '.intersoccer-upload-button', function(e) {
+                e.preventDefault();
+                var button = $(this);
+                var fileFrame = wp.media({
+                    title: '<?php _e('Select PDF Document', 'intersoccer-player-management'); ?>',
+                    button: { text: '<?php _e('Use this file', 'intersoccer-player-management'); ?>' },
+                    multiple: false,
+                    library: { type: 'application/pdf' }
+                });
+
+                fileFrame.on('select', function() {
+                    var attachment = fileFrame.state().get('selection').first().toJSON();
+                    button.siblings('.intersoccer-download-file').val(attachment.url);
+                    button.siblings('.intersoccer-file-name').text(attachment.filename);
+                });
+
+                fileFrame.open();
+            });
+        });
+    </script>
+    <?php
+}
+
+/**
+ * Save downloadable documents meta.
+ */
+add_action('save_post_product', 'intersoccer_save_downloadable_documents', 10, 2);
+function intersoccer_save_downloadable_documents($post_id, $post) {
+    if (!isset($_POST['intersoccer_downloads_nonce']) || !wp_verify_nonce($_POST['intersoccer_downloads_nonce'], 'intersoccer_save_downloads')) {
+        return;
+    }
+
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $downloads = isset($_POST['intersoccer_downloads']) && is_array($_POST['intersoccer_downloads']) ? $_POST['intersoccer_downloads'] : [];
+    $sanitized_downloads = [];
+
+    foreach ($downloads as $download) {
+        if (!empty($download['file']) && !empty($download['name'])) {
+            $sanitized_downloads[] = [
+                'name' => sanitize_text_field($download['name']),
+                'file' => esc_url_raw($download['file']),
+                'limit' => !empty($download['limit']) ? absint($download['limit']) : '',
+                'expiry' => !empty($download['expiry']) ? absint($download['expiry']) : ''
+            ];
+        }
+    }
+
+    update_post_meta($post_id, '_intersoccer_downloads', $sanitized_downloads);
+
+    // Update WooCommerce downloadable files
+    $wc_downloads = [];
+    foreach ($sanitized_downloads as $download) {
+        $file_id = md5($download['file']);
+        $wc_downloads[$file_id] = [
+            'name' => $download['name'],
+            'file' => $download['file'],
+            'download_limit' => $download['limit'],
+            'download_expiry' => $download['expiry']
+        ];
+    }
+
+    update_post_meta($post_id, '_downloadable_files', $wc_downloads);
+    update_post_meta($post_id, '_downloadable', 'yes');
+    error_log('InterSoccer: Saved downloadable documents for product ' . $post_id . ': ' . print_r($sanitized_downloads, true));
+}
+
+// Grant download permissions after order is processed
+add_action('woocommerce_order_status_completed', 'intersoccer_grant_download_permissions', 10, 1);
+function intersoccer_grant_download_permissions($order_id) {
+    $order = wc_get_order($order_id);
+    if (!$order) {
+        error_log('InterSoccer: Invalid order ID ' . $order_id . ' for granting download permissions');
+        return;
+    }
+
+    foreach ($order->get_items() as $item_id => $item) {
+        $product_id = $item->get_product_id();
+        $product = wc_get_product($product_id);
+
+        if (!$product) {
+            error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+            continue;
+        }
+
+        $product_type = intersoccer_get_product_type($product_id);
+        if (!in_array($product_type, ['camp', 'course', 'birthday'])) {
+            continue;
+        }
+
+        $downloads = get_post_meta($product_id, '_intersoccer_downloads', true);
+        if (!is_array($downloads) || empty($downloads)) {
+            continue;
+        }
+
+        foreach ($downloads as $download) {
+            $file_id = md5($download['file']);
+            $download_data = [
+                'product_id' => $product_id,
+                'order_id' => $order_id,
+                'user_id' => $order->get_customer_id(),
+                'download_id' => $file_id,
+                'downloads_remaining' => !empty($download['limit']) ? $download['limit'] : '',
+                'access_expires' => !empty($download['expiry']) ? date('Y-m-d H:i:s', strtotime('+' . $download['expiry'] . ' days')) : null,
+                'file' => [
+                    'name' => $download['name'],
+                    'file' => $download['file']
+                ]
+            ];
+
+            // Check if permission already exists
+            global $wpdb;
+            $exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT download_id FROM {$wpdb->prefix}woocommerce_downloadable_product_permissions WHERE order_id = %d AND product_id = %d AND download_id = %s",
+                $order_id,
+                $product_id,
+                $file_id
+            ));
+
+            if (!$exists) {
+                $download_obj = new WC_Customer_Download();
+                $download_obj->set_data($download_data);
+                $download_obj->save();
+                error_log('InterSoccer: Granted download permission for file ' . $download['name'] . ' to order ' . $order_id);
+            }
+        }
+    }
 }
 ?>
