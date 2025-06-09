@@ -1,10 +1,10 @@
 <?php
-
 /**
  * File: ajax-handlers.php
- * Description: Handles AJAX requests for player management operations in the InterSoccer Player Management plugin.
+ * Description: Handles AJAX requests for product variations operations in the InterSoccer Product Variations plugin.
  * Dependencies: None
  * Changes:
+ * - Removed player add/edit/delete handlers, retaining only read operations (2025-06-09).
  * - Added logging and fallback for missing pa_days-of-week (2025-05-25).
  * - Improved course metadata validation (2025-05-25).
  * - Relaxed user_id check in intersoccer_get_user_players (2025-05-26).
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 // Debugging to confirm handler is loaded
 error_log('InterSoccer: ajax-handlers.php loaded');
 
-// Get user players
+// Get user players (read-only for selection)
 add_action('wp_ajax_intersoccer_get_user_players', 'intersoccer_get_user_players');
 add_action('wp_ajax_nopriv_intersoccer_get_user_players', 'intersoccer_get_user_players');
 function intersoccer_get_user_players()
@@ -40,14 +40,14 @@ function intersoccer_get_user_players()
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         error_log('InterSoccer: Nonce verification failed for intersoccer_get_user_players. Provided nonce: ' . $nonce);
-        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-player-management')], 403);
+        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         return;
     }
 
     $user_id = get_current_user_id();
     if (!$user_id) {
         error_log('InterSoccer: User not logged in for intersoccer_get_user_players');
-        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
+        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-product-variations')], 403);
         return;
     }
 
@@ -60,139 +60,6 @@ function intersoccer_get_user_players()
     $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
     error_log('InterSoccer: Fetched players for user ID ' . $user_id . ': ' . print_r($players, true));
     wp_send_json_success(['players' => $players]);
-}
-
-// Add player
-add_action('wp_ajax_intersoccer_add_player', 'intersoccer_add_player');
-function intersoccer_add_player()
-{
-    if (ob_get_length()) {
-        ob_clean();
-    }
-
-    check_ajax_referer('intersoccer_nonce', 'nonce');
-    $user_id = get_current_user_id();
-    if (!$user_id) {
-        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
-    }
-
-    $first_name = sanitize_text_field($_POST['player_first_name'] ?? '');
-    $last_name = sanitize_text_field($_POST['player_last_name'] ?? '');
-    $dob = sanitize_text_field($_POST['player_dob'] ?? '');
-    $gender = sanitize_text_field($_POST['player_gender'] ?? '');
-    $medical = sanitize_textarea_field($_POST['player_medical'] ?? '');
-    $region = sanitize_text_field($_POST['player_region'] ?? '');
-
-    if (!$first_name || !$last_name) {
-        wp_send_json_error(['message' => __('First and last names are required.', 'intersoccer-player-management')], 400);
-    }
-
-    if ($dob && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob) || !strtotime($dob))) {
-        wp_send_json_error(['message' => __('Invalid date of birth format. Use YYYY-MM-DD.', 'intersoccer-player-management')], 400);
-    }
-
-    $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
-    foreach ($players as $player) {
-        if (strtolower($player['first_name']) === strtolower($first_name) && strtolower($player['last_name']) === strtolower($last_name)) {
-            wp_send_json_error(['message' => __('Player already exists.', 'intersoccer-player-management')], 400);
-        }
-    }
-
-    $player = [
-        'first_name' => $first_name,
-        'last_name' => $last_name,
-        'dob' => $dob,
-        'gender' => $gender,
-        'medical_conditions' => $medical,
-        'region' => $region,
-    ];
-
-    $players[] = $player;
-    update_user_meta($user_id, 'intersoccer_players', $players);
-    wp_send_json_success(['message' => __('Player added successfully.', 'intersoccer-player-management'), 'player' => $player]);
-}
-
-// Edit player
-add_action('wp_ajax_intersoccer_edit_player', 'intersoccer_edit_player');
-function intersoccer_edit_player()
-{
-    if (ob_get_length()) {
-        ob_clean();
-    }
-
-    check_ajax_referer('intersoccer_nonce', 'nonce');
-    $user_id = get_current_user_id();
-    $index = absint($_POST['player_index'] ?? -1);
-    if (!$user_id) {
-        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
-    }
-
-    $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
-    if (!isset($players[$index])) {
-        wp_send_json_error(['message' => __('Invalid player index.', 'intersoccer-player-management')], 400);
-    }
-
-    $first_name = sanitize_text_field($_POST['player_first_name'] ?? '');
-    $last_name = sanitize_text_field($_POST['player_last_name'] ?? '');
-    $dob = sanitize_text_field($_POST['player_dob'] ?? '');
-    $gender = sanitize_text_field($_POST['player_gender'] ?? '');
-    $medical = sanitize_textarea_field($_POST['player_medical'] ?? '');
-    $region = sanitize_text_field($_POST['player_region'] ?? '');
-
-    if (!$first_name || !$last_name) {
-        wp_send_json_error(['message' => __('First and last names are required.', 'intersoccer-player-management')], 400);
-    }
-
-    if ($dob && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob) || !strtotime($dob))) {
-        wp_send_json_error(['message' => __('Invalid date of birth format. Use YYYY-MM-DD.', 'intersoccer-player-management')], 400);
-    }
-
-    $other_players = array_filter($players, function ($p, $i) use ($index) {
-        return $i !== $index;
-    }, ARRAY_FILTER_USE_BOTH);
-    foreach ($other_players as $player) {
-        if (strtolower($player['first_name']) === strtolower($first_name) && strtolower($player['last_name']) === strtolower($last_name)) {
-            wp_send_json_error(['message' => __('Player already exists.', 'intersoccer-player-management')], 400);
-        }
-    }
-
-    $players[$index] = [
-        'first_name' => $first_name,
-        'last_name' => $last_name,
-        'dob' => $dob,
-        'gender' => $gender,
-        'medical_conditions' => $medical,
-        'region' => $region,
-    ];
-
-    update_user_meta($user_id, 'intersoccer_players', $players);
-    wp_send_json_success(['message' => __('Player updated successfully.', 'intersoccer-player-management'), 'player' => $players[$index]]);
-}
-
-// Delete player
-add_action('wp_ajax_intersoccer_delete_player', 'intersoccer_delete_player');
-function intersoccer_delete_player()
-{
-    if (ob_get_length()) {
-        ob_clean();
-    }
-
-    check_ajax_referer('intersoccer_nonce', 'nonce');
-    $user_id = get_current_user_id();
-    $index = absint($_POST['player_index'] ?? -1);
-    if (!$user_id) {
-        wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-player-management')], 403);
-    }
-
-    $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
-    if (!isset($players[$index])) {
-        wp_send_json_error(['message' => __('Invalid player index.', 'intersoccer-player-management')], 400);
-    }
-
-    unset($players[$index]);
-    $players = array_values($players);
-    update_user_meta($user_id, 'intersoccer_players', $players);
-    wp_send_json_success(['message' => __('Player deleted successfully.', 'intersoccer-player-management')]);
 }
 
 // Get days of the week for a product
@@ -211,13 +78,13 @@ function intersoccer_get_days_of_week()
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         error_log('InterSoccer: Nonce verification failed for intersoccer_get_days_of_week. Provided nonce: ' . $nonce);
-        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-player-management')], 403);
+        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         return;
     }
 
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
         error_log('InterSoccer: Invalid product or variation ID in intersoccer_get_days_of_week');
-        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-player-management')], 400);
+        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-product-variations')], 400);
         return;
     }
 
@@ -226,7 +93,7 @@ function intersoccer_get_days_of_week()
     $product = wc_get_product($variation_id);
     if (!$product) {
         error_log('InterSoccer: Product not found for ID: ' . $variation_id);
-        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
+        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-product-variations')], 404);
         return;
     }
 
@@ -239,7 +106,7 @@ function intersoccer_get_days_of_week()
 
     if (empty($days)) {
         error_log('InterSoccer: No days of the week found for parent product ID: ' . $parent_id);
-        wp_send_json_error(['message' => __('No days of the week defined for this product.', 'intersoccer-player-management')], 400);
+        wp_send_json_error(['message' => __('No days of the week defined for this product.', 'intersoccer-product-variations')], 400);
         return;
     }
 
@@ -270,14 +137,14 @@ function intersoccer_get_course_metadata()
 
     check_ajax_referer('intersoccer_nonce', 'nonce', false);
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
-        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-player-management')], 400);
+        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-product-variations')], 400);
     }
 
     $product_id = absint($_POST['product_id']);
     $variation_id = absint($_POST['variation_id']);
     $product = wc_get_product($variation_id);
     if (!$product) {
-        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-player-management')], 404);
+        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-product-variations')], 404);
     }
 
     $product_type = intersoccer_get_product_type($product_id);

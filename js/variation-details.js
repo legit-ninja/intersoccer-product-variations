@@ -4,12 +4,13 @@
  * Dependencies: jQuery
  * Author: Jeremy Lee
  * Changes (Summarized):
- * - Initial implementation with day selection, price updates, and player management (2025-05-26).
+ * - Initial implementation with day selection, price updates, and player selection (2025-06-09).
  * - Enhanced with MutationObserver, Elementor support, and improved logging (2025-05-26).
  * - Fixed price calculations, removed client-side price storage, and improved security (2025-05-27).
  * - Added dynamic price updates via AJAX, fixed button enabling, and resolved infinite loops (2025-05-27).
  * - Ensured days of week display for Camps and fixed player toggle issues (2025-05-27).
  * - Fixed Add to cart button disabling when changing days for Camps (2025-05-27).
+ * - Removed player management (add/edit/delete) logic, retaining only selection (2025-06-09).
  */
 
 jQuery(document).ready(function ($) {
@@ -151,21 +152,18 @@ jQuery(document).ready(function ($) {
           success: function (response) {
             if (response.success && response.data.price) {
               console.log("InterSoccer: Updated product price:", response.data.price);
-              // Log if price is zero due to no days selected
               if (campDays.length === 0 && response.data.raw_price === 0) {
                 console.log("InterSoccer: No days selected, price set to zero.");
               }
-              // Update the displayed price
               const $priceElement = $("form.cart .woocommerce-variation-price .price");
               if ($priceElement.length) {
                 $priceElement.html(response.data.price);
               } else {
                 console.warn("InterSoccer: Price element not found");
               }
-              // Update any subtotal field if it exists (e.g., price × quantity)
               const $subtotalElement = $("form.cart .single_variation_wrap .price-subtotal");
               if ($subtotalElement.length) {
-                $subtotalElement.html(response.data.price); // Quantity is 1, so price = subtotal
+                $subtotalElement.html(response.data.price);
               }
               resolve(response.data.raw_price);
             } else {
@@ -194,7 +192,7 @@ jQuery(document).ready(function ($) {
     function setupFormObserver() {
       let retryCount = 0;
       const maxRetries = 10;
-      const retryInterval = 1000; // Retry every 1 second
+      const retryInterval = 1000;
 
       formObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -209,7 +207,6 @@ jQuery(document).ready(function ($) {
         });
       });
 
-      // Initial check
       $form = $("form.cart");
       if ($form.length) {
         console.log("InterSoccer: Form found on initial check");
@@ -219,7 +216,6 @@ jQuery(document).ready(function ($) {
         console.log("InterSoccer: Product form not found, starting MutationObserver");
         formObserver.observe(document.body, { childList: true, subtree: true });
 
-        // Periodic retry
         const retryTimer = setInterval(() => {
           retryCount++;
           $form = $("form.cart");
@@ -237,7 +233,6 @@ jQuery(document).ready(function ($) {
       }
     }
 
-    // Listen for Elementor frontend initialization
     if (typeof elementorFrontend !== 'undefined') {
       elementorFrontend.on('init', function() {
         console.log("InterSoccer: Elementor frontend initialized, re-checking for form");
@@ -252,8 +247,8 @@ jQuery(document).ready(function ($) {
       let productType = "unknown";
       let currentVariation = null;
       let lastVariationId = null;
-      let lastBookingType = null; // Track the last booking type to detect changes
-      let lastValidPlayerId = ""; // Track the last valid player ID for form submission
+      let lastBookingType = null;
+      let lastValidPlayerId = "";
 
       function fetchProductType() {
         $.ajax({
@@ -285,15 +280,12 @@ jQuery(document).ready(function ($) {
       let availableDays = [];
       let currentVariationId = null;
       let isCheckboxUpdate = false;
-      let currentPlayerId = ""; // Store the current player ID persistently
 
       function updateFormData(playerId, days, remainingWeeks = null, variationId = null) {
-        // Remove all custom hidden fields
         $form.find('input[name="player_assignment"]').remove();
         $form.find('input[name="camp_days[]"]').remove();
         $form.find('input[name="remaining_weeks"]').remove();
 
-        // Add necessary data for server-side price calculation
         if (playerId) {
           $form.append(`<input type="hidden" name="player_assignment" value="${playerId}">`);
         }
@@ -322,14 +314,11 @@ jQuery(document).ready(function ($) {
         const hasPlayer = playerId && playerId !== "";
         let isValid = false;
 
-        // Update last valid player ID if a valid player is selected
         if (hasPlayer) {
           lastValidPlayerId = playerId;
         }
 
         if (bookingType === "single-days") {
-          // For single-days, enable the button if at least one day is selected
-          // Disable only if no days are selected
           isValid = selectedDaysCount > 0;
           $addToCartButton.prop("disabled", !isValid);
           console.log(
@@ -341,7 +330,6 @@ jQuery(document).ready(function ($) {
             isValid
           );
         } else {
-          // For other booking types (e.g., full-week), require a player
           isValid = hasPlayer;
           $addToCartButton.prop("disabled", !isValid);
           console.log(
@@ -406,7 +394,6 @@ jQuery(document).ready(function ($) {
             clearTimeout(window.intersoccerUpdateTimeout);
             window.intersoccerUpdateTimeout = setTimeout(() => {
               $form.find('input[name="quantity"]').val(quantity);
-              // Update price dynamically
               updateProductPrice(productId, variationId, selectedDays)
                 .then(() => {
                   const checkboxCount = $dayCheckboxes.find('input[type="checkbox"]').length;
@@ -467,7 +454,6 @@ jQuery(document).ready(function ($) {
           "";
         const variationId = variation?.variation_id || 0;
 
-        // Force render if booking type has changed, even if variation ID is the same
         const bookingTypeChanged = lastBookingType !== bookingType;
         if (variationId === lastVariationId && !forceRender && !bookingTypeChanged && retryCount === 0) {
           console.log("InterSoccer: Skipping duplicate variation handling for ID:", variationId);
@@ -487,9 +473,9 @@ jQuery(document).ready(function ($) {
           }
           console.log("InterSoccer: Booking type:", bookingType);
 
-          currentVariation = variation; // Store current variation
+          currentVariation = variation;
           lastVariationId = variationId;
-          lastBookingType = bookingType; // Update last booking type
+          lastBookingType = bookingType;
 
           const $addToCartButton = $form.find("button.single_add_to_cart_button");
           const $daySelection = $form.find(".intersoccer-day-selection");
@@ -497,9 +483,7 @@ jQuery(document).ready(function ($) {
           const $dayNotification = $form.find(".intersoccer-day-notification");
           const $errorMessage = $form.find(".intersoccer-day-selection .error-message");
 
-          // Ensure day selection is visible with !important to override theme styles
           $daySelection.css({ 'display': 'block !important', 'margin-top': '10px' });
-
           $addToCartButton.prop("disabled", true);
 
           if (productType === "camp" && bookingType.toLowerCase() === "single-days") {
@@ -517,7 +501,6 @@ jQuery(document).ready(function ($) {
                 availableDays = days;
                 console.log("InterSoccer: Rendering checkboxes for days:", days);
                 const playerId = $form.find(".player-select").val() || "";
-                currentPlayerId = playerId; // Update the current player ID
                 renderCheckboxes(
                   days,
                   $dayCheckboxes,
@@ -532,7 +515,6 @@ jQuery(document).ready(function ($) {
                 $form.find('input[name="quantity"]').val(quantity);
                 updateAddToCartButtonState(playerId, selectedDays.length, "single-days");
 
-                // Initial price update for Camps
                 updateProductPrice(productId, variationId, selectedDays)
                   .catch((error) => {
                     console.error("InterSoccer: Failed to update initial price for Camp:", error);
@@ -554,12 +536,10 @@ jQuery(document).ready(function ($) {
                   console.log("InterSoccer: Fetched metadata for course:", metadata);
                   const remainingWeeks = metadata.remaining_weeks || null;
                   const playerId = $form.find(".player-select").val() || "";
-                  currentPlayerId = playerId; // Update the current player ID
                   updateFormData(playerId, [], remainingWeeks, variationId);
 
                   updateAddToCartButtonState(playerId, 0, bookingType);
 
-                  // Update price for Courses
                   updateProductPrice(productId, variationId, [], remainingWeeks)
                     .catch((error) => {
                       console.error("InterSoccer: Failed to update price for Course:", error);
@@ -568,18 +548,15 @@ jQuery(document).ready(function ($) {
                 .catch((error) => {
                   console.error("InterSoccer: Failed to fetch course metadata:", error);
                   const playerId = $form.find(".player-select").val() || "";
-                  currentPlayerId = playerId; // Update the current player ID
                   updateFormData(playerId, [], null, variationId);
                   updateAddToCartButtonState(playerId, 0, bookingType);
                 });
             } else if (productType === "camp" && bookingType.toLowerCase() === "full-week") {
               const playerId = $form.find(".player-select").val() || "";
-              currentPlayerId = playerId; // Update the current player ID
               updateFormData(playerId, [], null, variationId);
               $form.find('input[name="quantity"]').val(1);
               updateAddToCartButtonState(playerId, 0, bookingType);
 
-              // Update price for Full Week Camps
               updateProductPrice(productId, variationId)
                 .catch((error) => {
                   console.error("InterSoccer: Failed to update price for Full Week Camp:", error);
@@ -608,11 +585,11 @@ jQuery(document).ready(function ($) {
         if (isVariationEventProcessed) return;
         isVariationEventProcessed = true;
         console.log("InterSoccer: woocommerce_variation_has_changed or reset_data event triggered");
-        selectedDays = []; // Clear selected days on reset
-        currentVariationId = null; // Reset current variation ID
-        lastBookingType = null; // Reset booking type to force re-render
+        selectedDays = [];
+        currentVariationId = null;
+        lastBookingType = null;
         const $daySelection = $form.find(".intersoccer-day-selection");
-        $daySelection.hide(); // Ensure day selection is hidden on reset
+        $daySelection.hide();
         if (currentVariation) {
           setTimeout(() => {
             console.log("InterSoccer: Re-rendering after form event");
@@ -624,17 +601,14 @@ jQuery(document).ready(function ($) {
         }
       });
 
-      // Trigger variation check on booking type change
       $form.find('select[name="attribute_pa_booking-type"], input[name="attribute_pa_booking-type"]').on("change", function () {
         console.log("InterSoccer: Booking type changed, triggering check_variations");
         $form.trigger("check_variations");
       });
 
-      // Debounce player selection updates
       let playerChangeTimeout;
       $form.find(".player-select").on("change", function () {
         const playerId = $(this).val() || "";
-        currentPlayerId = playerId; // Update the current player ID
         const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
         const selectedDaysCount = selectedDays.length;
 
@@ -652,7 +626,6 @@ jQuery(document).ready(function ($) {
 
           updateAddToCartButtonState(playerId, selectedDaysCount, bookingType);
 
-          // Update price after player selection if necessary
           if (currentVariation) {
             const variationId = currentVariation.variation_id;
             updateProductPrice(productId, variationId, selectedDays, remainingWeeks)
@@ -663,7 +636,6 @@ jQuery(document).ready(function ($) {
         }, 600);
       });
 
-      // Handle add-to-cart button click
       $(document).on("click", "button.single_add_to_cart_button, .elementor-add-to-cart button", function (e) {
         const $button = $(this);
         console.log("InterSoccer: Add to Cart button clicked, class:", $button.attr('class'));
@@ -676,7 +648,6 @@ jQuery(document).ready(function ($) {
         }
       });
 
-      // Handle form submission
       $form.on("submit", function (e) {
         console.log("InterSoccer: Form submitted");
         const playerId = $form.find(".player-select").val() || lastValidPlayerId;
@@ -691,7 +662,6 @@ jQuery(document).ready(function ($) {
         );
       });
 
-      // Handle adding_to_cart event
       $form.on("adding_to_cart", function (event, $button, data) {
         console.log("InterSoccer: adding_to_cart event triggered");
         const playerId = $form.find(".player-select").val() || lastValidPlayerId;
@@ -709,11 +679,9 @@ jQuery(document).ready(function ($) {
         );
       });
 
-      // Initial variation check
       $form.trigger("check_variations");
       console.log("InterSoccer: Triggered check_variations on form load");
 
-      // Retry variation check
       setTimeout(() => {
         console.log("InterSoccer: Re-triggering check_variations after delay");
         $form.trigger("check_variations");
@@ -721,10 +689,8 @@ jQuery(document).ready(function ($) {
     }
   }
 
-  // Initialize plugin with delay for Elementor
   setTimeout(initializePlugin, 2000);
 
-  // Reinitialize on dynamic content load
   document.addEventListener('DOMContentLoaded', initializePlugin);
   document.addEventListener('load', initializePlugin);
 });
