@@ -177,9 +177,10 @@ function intersoccer_modify_variation_prices($prices, $product, $for_display) {
 
     foreach ($prices['price'] as $variation_id => $price) {
         $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $selected_days, $remaining_weeks, $sibling_count);
-        $prices['price'][$variation_id] = $calculated_price;
-        $prices['regular_price'][$variation_id] = $calculated_price;
-        $prices['sale_price'][$variation_id] = $calculated_price;
+        $formatted_price = wc_price($calculated_price); // Format with currency
+        $prices['price'][$variation_id] = $for_display ? $formatted_price : $calculated_price;
+        $prices['regular_price'][$variation_id] = $for_display ? $formatted_price : $calculated_price;
+        $prices['sale_price'][$variation_id] = $for_display ? $formatted_price : $calculated_price;
     }
 
     return $prices;
@@ -205,7 +206,8 @@ function intersoccer_calculate_dynamic_price_callback() {
     }
 
     $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks, $sibling_count);
-    wp_send_json_success(['price' => $calculated_price, 'raw_price' => $calculated_price, 'sibling_count' => $sibling_count, 'discount' => intersoccer_get_sibling_discount($sibling_count, get_post_meta($product_id, '_intersoccer_product_type', true)) * 100]);
+    $formatted_price = wc_price($calculated_price); // Format with currency
+    wp_send_json_success(['price' => $formatted_price, 'raw_price' => $calculated_price, 'sibling_count' => $sibling_count, 'discount' => intersoccer_get_sibling_discount($sibling_count, get_post_meta($product_id, '_intersoccer_product_type', true)) * 100]);
     wp_die();
 }
 
