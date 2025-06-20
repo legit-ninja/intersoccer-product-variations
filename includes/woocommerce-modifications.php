@@ -5,11 +5,11 @@
  * Dependencies: WooCommerce
  * Author: Jeremy Lee
  * Changes (Summarized):
- * - Added sibling discount logic with notification (2025-06-17).
- * - Original changes preserved from production (2025-06-17).
+ * - Added dynamic sibling count based on unique player assignments for Camp products (2025-06-20).
+ * - Applied 20% discount for 2nd sibling and 25% for 3rd+ siblings in cart (2025-06-20).
+ * - Ensured price persistence with calculated values (2025-06-20).
  */
 
-// Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -22,8 +22,8 @@ if (!defined('ABSPATH')) {
  */
 function intersoccer_get_sibling_discount($sibling_count) {
     if ($sibling_count <= 1) return 0; // No discount for 1 child
-    elseif ($sibling_count == 2) return 0.10; // 10% discount for 2 siblings
-    else return 0.15; // 15% discount for 3+ siblings
+    elseif ($sibling_count == 2) return 0.20; // 20% discount for 2nd sibling
+    else return 0.25; // 25% discount for 3rd and additional siblings
 }
 
 /**
@@ -61,50 +61,42 @@ function intersoccer_calculate_price($product_id, $variation_id, $camp_days = []
         return 0;
     }
 
-    $price = floatval($product->get_price());
+    $base_price = floatval($product->get_price());
     $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
+    $price = $base_price;
 
     if ($product_type === 'camp') {
         $booking_type = get_post_meta($variation_id ? $variation_id : $product_id, 'attribute_pa_booking-type', true);
         if ($booking_type === 'single-days' && !empty($camp_days)) {
-            $price_per_day = $price;
-            $price = $price_per_day * count($camp_days);
-            error_log('InterSoccer: Calculated Camp price for ' . ($variation_id ?: $product_id) . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($camp_days) . ')');
+            $day_count = count($camp_days);
+            $price = $base_price * $day_count;
+            error_log("InterSoccer: Calculated Camp price for " . ($variation_id ?: $product_id) . ": " . $price . " (base: " . $base_price . ", days: " . $day_count . ")");
+        } elseif ($booking_type === 'full-week') {
+            $price = $base_price; // Full week price is the base price
+            error_log("InterSoccer: Calculated Full Week Camp price for " . ($variation_id ?: $product_id) . ": " . $price);
         }
     } elseif ($product_type === 'course' && $remaining_weeks !== null) {
         $total_weeks = (int) get_post_meta($variation_id ? $variation_id : $product_id, '_course_total_weeks', true);
         $weekly_discount = (float) get_post_meta($variation_id ? $variation_id : $product_id, '_course_weekly_discount', true);
         if ($total_weeks > 0 && $remaining_weeks > 0 && $remaining_weeks <= $total_weeks) {
-            $weekly_rate = $weekly_discount > 0 ? $weekly_discount : ($price / $total_weeks);
+            $weekly_rate = $weekly_discount > 0 ? $weekly_discount : ($base_price / $total_weeks);
             $price = $weekly_rate * $remaining_weeks;
             $price = max(0, $price);
-            error_log('InterSoccer: Calculated Course price for ' . ($variation_id ?: $product_id) . ': ' . $price . ' (weekly rate: ' . $weekly_rate . ', remaining weeks: ' . $remaining_weeks . ')');
+            error_log("InterSoccer: Calculated Course price for " . ($variation_id ?: $product_id) . ": " . $price . " (weekly rate: " . $weekly_rate . ", remaining weeks: " . $remaining_weeks . ")");
         } else {
-            error_log('InterSoccer: Invalid total_weeks or remaining_weeks for Course price calculation: ' . ($variation_id ?: $product_id) . ', total_weeks: ' . $total_weeks . ', remaining_weeks: ' . $remaining_weeks);
+            error_log("InterSoccer: Invalid total_weeks or remaining_weeks for Course price calculation: " . ($variation_id ?: $product_id) . ", total_weeks: " . $total_weeks . ", remaining_weeks: " . $remaining_weeks);
         }
     } else {
-        error_log('InterSoccer: No special pricing logic applied for product type: ' . ($product_type ?: 'unknown') . ', using base price: ' . $price);
+        error_log("InterSoccer: No special pricing logic applied for product type: " . ($product_type ?: "unknown") . ", using base price: " . $base_price);
     }
 
-    // Apply sibling discount if provided (frontend) or calculate from cart (backend)
+    // Apply sibling discount only if multiple attendees
     $discount = 0;
-    if ($sibling_count !== null) {
+    if ($sibling_count !== null && $sibling_count > 1) {
         $discount = intersoccer_get_sibling_discount($sibling_count);
-        error_log('InterSoccer: Applied frontend sibling discount for product ' . ($variation_id ?: $product_id) . ': Siblings=' . $sibling_count . ', Discount=' . ($discount * 100) . '%');
+        error_log("InterSoccer: Applied sibling discount for product " . ($variation_id ?: $product_id) . ": Siblings=" . $sibling_count . ", Discount=" . ($discount * 100) . "%");
     } else {
-        $cart = WC()->cart->get_cart();
-        $current_item_attributes = intersoccer_get_parent_attributes($product, $product_type);
-        $sibling_count = 1; // Include the current item
-
-        foreach ($cart as $cart_item) {
-            if ($cart_item['product_id'] == $product_id && $cart_item['variation_id'] != $variation_id) {
-                if (intersoccer_products_match_for_discount(['parent_attributes' => $current_item_attributes], $cart_item)) {
-                    $sibling_count++;
-                }
-            }
-        }
-        $discount = intersoccer_get_sibling_discount($sibling_count);
-        error_log('InterSoccer: Applied backend sibling discount for product ' . ($variation_id ?: $product_id) . ': Siblings=' . $sibling_count . ', Discount=' . ($discount * 100) . '%');
+        error_log("InterSoccer: No sibling discount applied for product " . ($variation_id ?: $product_id) . ": Sibling count=" . ($sibling_count ?? "not provided"));
     }
 
     $price = $price * (1 - $discount);
@@ -112,7 +104,7 @@ function intersoccer_calculate_price($product_id, $variation_id, $camp_days = []
 }
 
 /**
- * Adjust cart item prices to reflect sibling discount.
+ * Adjust cart item prices to reflect pre-calculated price and sibling discount.
  */
 add_action('woocommerce_before_calculate_totals', 'intersoccer_apply_sibling_discount_in_cart', 10, 1);
 function intersoccer_apply_sibling_discount_in_cart($cart) {
@@ -121,28 +113,39 @@ function intersoccer_apply_sibling_discount_in_cart($cart) {
     $cart_items = $cart->get_cart();
     $grouped_items = [];
 
+    // Group items by parent attributes to identify siblings
     foreach ($cart_items as $cart_item_key => $cart_item) {
-        $product_id = $cart_item['product_id'];
-        $variation_id = $cart_item['variation_id'];
-        $group_key = md5(json_encode($cart_item['parent_attributes']));
-
-        if (!isset($grouped_items[$group_key])) {
-            $grouped_items[$group_key] = [];
+        $product_type = get_post_meta($cart_item['product_id'], '_intersoccer_product_type', true);
+        if ($product_type === 'camp') {
+            $group_key = md5(json_encode($cart_item['parent_attributes']));
+            if (!isset($grouped_items[$group_key])) {
+                $grouped_items[$group_key] = [];
+            }
+            $grouped_items[$group_key][$cart_item_key] = $cart_item['player_assignment'];
         }
-        $grouped_items[$group_key][] = $cart_item_key;
     }
 
     foreach ($grouped_items as $group_key => $item_keys) {
-        $sibling_count = count($item_keys);
-        $discount = intersoccer_get_sibling_discount($sibling_count);
+        $unique_players = array_unique(array_filter($item_keys)); // Count unique player assignments
+        $sibling_count = count($unique_players);
 
-        foreach ($item_keys as $cart_item_key) {
+        $sorted_items = [];
+        foreach ($item_keys as $cart_item_key => $player_assignment) {
+            if (isset($cart_items[$cart_item_key]['intersoccer_calculated_price'])) {
+                $sorted_items[$cart_item_key] = $cart_items[$cart_item_key]['intersoccer_calculated_price'];
+            }
+        }
+        asort($sorted_items); // Sort by calculated price to apply discount to higher-priced items if needed
+
+        $item_index = 0;
+        foreach ($sorted_items as $cart_item_key => $calculated_price) {
             $cart_item = $cart_items[$cart_item_key];
-            $base_price = floatval($cart_item['data']->get_regular_price());
-            $discounted_price = $base_price * (1 - $discount);
-            $cart_item['data']->set_price($discounted_price);
+            $discount = intersoccer_get_sibling_discount($sibling_count - $item_index); // Apply discount based on position
+            $final_price = $calculated_price * (1 - $discount);
+            $cart_item['data']->set_price($final_price);
             $cart->cart_contents[$cart_item_key]['intersoccer_sibling_discount'] = $discount;
-            error_log('InterSoccer: Applied discount in cart for item ' . $cart_item_key . ': Base=' . $base_price . ', Discount=' . ($discount * 100) . '%, New=' . $discounted_price);
+            error_log('InterSoccer: Applied sibling discount in cart for item ' . $cart_item_key . ': Calculated=' . $calculated_price . ', Sibling count=' . $sibling_count . ', Discount=' . ($discount * 100) . '%, New=' . $final_price);
+            $item_index++;
         }
     }
 }
@@ -160,15 +163,13 @@ function intersoccer_get_product_type($product_id) {
         return '';
     }
 
-    // Check existing meta
     $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
     if ($product_type) {
         error_log('InterSoccer: Product type from meta for product ' . $product_id . ': ' . $product_type);
         return $product_type;
     }
 
-    // Check categories
-    $categories = wp_get_post_terms($product_id, 'product_cat', array('fields' => 'slugs'));
+    $categories = wp_get_post_terms($product_id, 'product_cat', ['fields' => 'slugs']);
     if (is_wp_error($categories)) {
         error_log('InterSoccer: Error fetching categories for product ' . $product_id . ': ' . $categories->get_error_message());
         $categories = [];
@@ -182,7 +183,6 @@ function intersoccer_get_product_type($product_id) {
         $product_type = 'birthday';
     }
 
-    // Fallback: Check attributes
     if (!$product_type) {
         $attributes = $product->get_attributes();
         if (isset($attributes['pa_activity-type']) && $attributes['pa_activity-type'] instanceof WC_Product_Attribute) {
@@ -213,7 +213,6 @@ function intersoccer_get_product_type($product_id) {
         }
     }
 
-    // Fallback: Check product title as a last resort
     if (!$product_type) {
         $title = $product->get_title();
         if (stripos($title, 'course') !== false) {
@@ -226,7 +225,6 @@ function intersoccer_get_product_type($product_id) {
         error_log('InterSoccer: Fallback to title for product type detection for product ' . $product_id . ', title: ' . $title . ', type: ' . ($product_type ?: 'none'));
     }
 
-    // Save the detected type to meta for future consistency
     if ($product_type) {
         update_post_meta($product_id, '_intersoccer_product_type', $product_type);
         error_log('InterSoccer: Determined and saved product type for product ' . $product_id . ': ' . $product_type);
@@ -247,7 +245,6 @@ function intersoccer_get_product_type($product_id) {
 function intersoccer_get_parent_attributes($product, $product_type = '') {
     $attributes = [];
 
-    // Get parent product for variations
     $parent_id = $product->get_type() === 'variation' ? $product->get_parent_id() : $product->get_id();
     $parent_product = wc_get_product($parent_id);
 
@@ -263,14 +260,12 @@ function intersoccer_get_parent_attributes($product, $product_type = '') {
         $label = wc_attribute_label($attribute_name);
         $value = '';
 
-        // Skip Days-of-week for camps to avoid overlap with Days Selected
         if ($product_type === 'camp' && $attribute_name === 'pa_days-of-week') {
             error_log('InterSoccer: Skipped attribute ' . $attribute_name . ' for camp product ' . $parent_id . ': overlaps with Days Selected meta');
             continue;
         }
 
         if (!is_object($attribute)) {
-            // Custom attribute
             $is_visible = isset($attribute['is_visible']) && $attribute['is_visible'];
             if ($is_visible) {
                 $value = $attribute['value'];
@@ -279,7 +274,6 @@ function intersoccer_get_parent_attributes($product, $product_type = '') {
                 error_log('InterSoccer: Skipped custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': not visible');
             }
         } else {
-            // Taxonomy-based attribute
             $is_visible = $attribute->get_visible();
             $is_variation = $attribute->get_variation();
             if ($is_visible && !$is_variation) {
@@ -307,19 +301,17 @@ add_filter('woocommerce_variation_prices', 'intersoccer_modify_variation_prices'
 function intersoccer_modify_variation_prices($prices, $product, $for_display) {
     $product_id = $product->get_id();
 
-    // During product rendering, session data isn't reliable; use defaults
-    // Session data will be applied during cart operations
-    $selected_days = []; // Default to empty array
-    $remaining_weeks = null; // Default to null
-    $sibling_count = 1; // Default to 1 sibling for initial display
+    $selected_days = [];
+    $remaining_weeks = null;
+    $sibling_count = 1;
 
     error_log('InterSoccer: Modifying variation prices for product ' . $product_id . ' during rendering, using defaults: selected_days: [], remaining_weeks: null, sibling_count: 1');
 
     foreach ($prices['price'] as $variation_id => $price) {
         $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $selected_days, $remaining_weeks, $sibling_count);
         $prices['price'][$variation_id] = $calculated_price;
-        $prices['regular_price'][$variation_id] = $calculated_price; // Update regular price to match
-        $prices['sale_price'][$variation_id] = $calculated_price; // Update sale price to match
+        $prices['regular_price'][$variation_id] = $calculated_price;
+        $prices['sale_price'][$variation_id] = $calculated_price;
     }
 
     return $prices;
@@ -345,7 +337,7 @@ function intersoccer_calculate_dynamic_price_callback() {
     }
 
     $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks, $sibling_count);
-    wp_send_json_success(['price' => wc_price($calculated_price), 'raw_price' => $calculated_price, 'sibling_count' => $sibling_count, 'discount' => intersoccer_get_sibling_discount($sibling_count) * 100]);
+    wp_send_json_success(['price' => $calculated_price, 'raw_price' => $calculated_price, 'sibling_count' => $sibling_count, 'discount' => intersoccer_get_sibling_discount($sibling_count) * 100]);
     wp_die();
 }
 
@@ -370,7 +362,6 @@ function intersoccer_update_session_on_variation_change() {
                 }).get();
                 var remainingWeeks = $(this).find('input[name="remaining_weeks"]').val() || null;
 
-                // Send AJAX request to update session
                 $.ajax({
                     url: intersoccerCheckout.ajax_url,
                     type: 'POST',
@@ -392,7 +383,6 @@ function intersoccer_update_session_on_variation_change() {
 
             $('form.cart').on('reset_data', function() {
                 var productId = <?php echo json_encode($product_id); ?>;
-                // Clear session data on reset
                 $.ajax({
                     url: intersoccerCheckout.ajax_url,
                     type: 'POST',
@@ -410,7 +400,6 @@ function intersoccer_update_session_on_variation_change() {
                 });
             });
 
-            // Trigger an initial check to ensure price reflects session data on page load
             $('form.cart').trigger('check_variations');
         });
     </script>
@@ -430,7 +419,6 @@ function intersoccer_update_session_data_callback() {
     $remaining_weeks = isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks']) ? (int) $_POST['remaining_weeks'] : null;
 
     if ($product_id) {
-        // Ensure session is initialized
         if (function_exists('WC') && WC()->session) {
             WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
             if ($remaining_weeks !== null) {
@@ -459,7 +447,6 @@ function intersoccer_clear_session_data_callback() {
     $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
 
     if ($product_id) {
-        // Ensure session is initialized
         if (function_exists('WC') && WC()->session) {
             WC()->session->set('intersoccer_selected_days_' . $product_id, []);
             WC()->session->set('intersoccer_remaining_weeks_' . $product_id, null);
@@ -487,7 +474,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
     }
     $is_processing = true;
 
-    // Get the product (variation or simple)
     $product = wc_get_product($variation_id ?: $product_id);
     if (!$product) {
         error_log('InterSoccer: Invalid product for cart item: product_id=' . $product_id . ', variation_id=' . $variation_id);
@@ -495,7 +481,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         return $cart_item_data;
     }
 
-    // Add player assignment
     if (isset($_POST['player_assignment'])) {
         $cart_item_data['player_assignment'] = sanitize_text_field($_POST['player_assignment']);
         error_log('InterSoccer: Added player to cart via POST: ' . $cart_item_data['player_assignment']);
@@ -504,7 +489,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         error_log('InterSoccer: Added player to cart via cart_item_data: ' . $cart_item_data['player_assignment']);
     }
 
-    // Add camp days for camps
     if (isset($_POST['camp_days']) && is_array($_POST['camp_days'])) {
         $cart_item_data['camp_days'] = array_unique(array_map('sanitize_text_field', $_POST['camp_days']));
         error_log('InterSoccer: Added unique camp days to cart via POST: ' . print_r($cart_item_data['camp_days'], true));
@@ -514,7 +498,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         error_log('InterSoccer: Added unique camp days to cart via cart_item_data: ' . print_r($cart_item_data['camp_days'], true));
     }
 
-    // Add remaining weeks for courses
     if (isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks'])) {
         $cart_item_data['remaining_weeks'] = intval($_POST['remaining_weeks']);
         error_log('InterSoccer: Added remaining weeks to cart via POST: ' . $cart_item_data['remaining_weeks']);
@@ -523,7 +506,6 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         error_log('InterSoccer: Added remaining weeks to cart via cart_item_data: ' . $cart_item_data['remaining_weeks']);
     }
 
-    // Fallback: Calculate remaining_weeks for courses if not provided
     if (!isset($cart_item_data['remaining_weeks']) && !isset($_POST['remaining_weeks'])) {
         $product_type = intersoccer_get_product_type($product_id);
         if ($product_type === 'course') {
@@ -538,7 +520,7 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
 
             if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) || !strtotime($start_date)) {
                 error_log('InterSoccer: Invalid or missing _course_start_date for course item ' . ($variation_id ?: $product_id) . ', raw value: ' . ($start_date ?: 'not set'));
-                $start_date = date('Y-m-d'); // Fallback to today
+                $start_date = date('Y-m-d');
             } else {
                 error_log('InterSoccer: Retrieved _course_start_date for course item ' . ($variation_id ?: $product_id) . ': ' . $start_date);
             }
@@ -553,13 +535,11 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         }
     }
 
-    // Add sibling count if provided
     if (isset($_POST['sibling_count']) && is_numeric($_POST['sibling_count'])) {
         $cart_item_data['sibling_count'] = intval($_POST['sibling_count']);
         error_log('InterSoccer: Added sibling count to cart via POST: ' . $cart_item_data['sibling_count']);
     }
 
-    // Add visible, non-variation parent attributes
     $product_type = intersoccer_get_product_type($product_id);
     $cart_item_data['parent_attributes'] = intersoccer_get_parent_attributes($product, $product_type);
 
@@ -572,13 +552,11 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
  */
 add_filter('woocommerce_add_cart_item', 'intersoccer_reinforce_cart_item_data', 10, 2);
 function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
-    // Validate cart item data
     if (!is_array($cart_item_data) || !isset($cart_item_data['product_id']) || !isset($cart_item_key)) {
         error_log('InterSoccer: Invalid cart item data in intersoccer_reinforce_cart_item_data: ' . print_r($cart_item_data, true));
         return $cart_item_data;
     }
 
-    // Validate product and variation IDs
     $product_id = $cart_item_data['product_id'];
     $variation_id = isset($cart_item_data['variation_id']) ? $cart_item_data['variation_id'] : 0;
     $product = wc_get_product($variation_id ?: $product_id);
@@ -587,7 +565,6 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
         return $cart_item_data;
     }
 
-    // Validate 'data' key and ensure it's a WC_Product object
     if (!isset($cart_item_data['data']) || !($cart_item_data['data'] instanceof WC_Product)) {
         error_log('InterSoccer: Missing or invalid "data" key in cart item ' . $cart_item_key . ': ' . print_r($cart_item_data, true));
         return $cart_item_data;
@@ -603,23 +580,20 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
         error_log('InterSoccer: Reinforced parent attributes for cart item ' . $cart_item_key . ': ' . print_r($cart_item_data['parent_attributes'], true));
     }
 
-    // Calculate the price server-side, including sibling discount
     $camp_days = isset($cart_item_data['camp_days']) ? $cart_item_data['camp_days'] : [];
     $remaining_weeks = isset($cart_item_data['remaining_weeks']) ? (int) $cart_item_data['remaining_weeks'] : null;
     $sibling_count = isset($cart_item_data['sibling_count']) ? (int) $cart_item_data['sibling_count'] : 1;
     $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks, $sibling_count);
 
-    // Set the cart item price
     $cart_item_data['data']->set_price($calculated_price);
-    $cart_item_data['intersoccer_calculated_price'] = $calculated_price; // Store for persistence
-    $cart_item_data['intersoccer_sibling_discount'] = intersoccer_get_sibling_discount($sibling_count); // Store discount for display
+    $cart_item_data['intersoccer_calculated_price'] = $calculated_price;
+    $cart_item_data['intersoccer_sibling_discount'] = intersoccer_get_sibling_discount($sibling_count);
     error_log('InterSoccer: Set server-side calculated price for cart item ' . $cart_item_key . ': ' . $calculated_price . ', Sibling Count: ' . $sibling_count);
 
-    // Ensure the price and data are persisted in the session
     if (isset(WC()->cart->cart_contents[$cart_item_key]) && isset(WC()->cart->cart_contents[$cart_item_key]['data']) && WC()->cart->cart_contents[$cart_item_key]['data'] instanceof WC_Product) {
         WC()->cart->cart_contents[$cart_item_key]['data']->set_price($calculated_price);
         WC()->cart->cart_contents[$cart_item_key]['parent_attributes'] = $cart_item_data['parent_attributes'];
-        WC()->cart->set_session(); // Persist the cart session
+        WC()->cart->set_session();
     } else {
         error_log('InterSoccer: Unable to persist price or data in cart session for item ' . $cart_item_key . ': invalid cart contents or data');
     }
@@ -689,7 +663,6 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
     error_log('InterSoccer: Entering intersoccer_display_cart_item_data for product ID: ' . ($cart_item['product_id'] ?? 'not set'));
     error_log('InterSoccer: Cart item data: ' . print_r($cart_item, true));
 
-    // Handle Assigned Attendee
     if (isset($cart_item['player_assignment'])) {
         try {
             $player = get_player_details($cart_item['player_assignment']);
@@ -711,7 +684,6 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         error_log('InterSoccer: No player_assignment in cart item ' . $cart_item['product_id']);
     }
 
-    // Handle Course-specific fields (Discount message only)
     $product = wc_get_product($cart_item['product_id']);
     if (!$product) {
         error_log('InterSoccer: Invalid product for item ' . $cart_item['product_id']);
@@ -720,7 +692,6 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
 
     $product_type = intersoccer_get_product_type($cart_item['product_id']);
     if ($product_type === 'course') {
-        error_log('InterSoccer: Identified course item ' . $cart_item['product_id']);
         if (isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
             $weeks_display = esc_html($cart_item['remaining_weeks'] . ' Weeks Remaining');
             $item_data[] = [
@@ -743,7 +714,6 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         error_log('InterSoccer: Added sibling discount for camp item ' . $cart_item['product_id'] . ': ' . $discount_message);
     }
 
-    // Handle Camp-specific fields (Days Selected message only)
     if ($product_type === 'camp' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
         $days = array_map('esc_html', $cart_item['camp_days']);
         $days_display = implode(', ', $days);
@@ -755,7 +725,6 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         error_log('InterSoccer: Added days selected for camp item ' . $cart_item['product_id'] . ': ' . $days_display);
     }
 
-    // Handle parent attributes
     if (isset($cart_item['parent_attributes']) && is_array($cart_item['parent_attributes'])) {
         foreach ($cart_item['parent_attributes'] as $label => $value) {
             $item_data[] = [
@@ -812,7 +781,6 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         error_log('InterSoccer: Saved sibling discount to order item ' . $cart_item_key . ': ' . $discount_message);
     }
 
-    // Save parent attributes
     if (isset($values['parent_attributes']) && is_array($values['parent_attributes'])) {
         foreach ($values['parent_attributes'] as $label => $value) {
             $item->add_meta_data(esc_html($label), esc_html($value));
@@ -820,7 +788,6 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         }
     }
 
-    // Assign downloads
     $product_id = $item->get_product_id();
     $variation_id = $item->get_variation_id();
     $product = wc_get_product($variation_id ?: $product_id);
@@ -845,31 +812,35 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
     }
 }
 
-// Prevent quantity changes in cart for all products
+/**
+ * Prevent quantity changes in cart for all products.
+ */
 add_filter('woocommerce_cart_item_quantity', 'intersoccer_cart_item_quantity', 10, 3);
 function intersoccer_cart_item_quantity($quantity_html, $cart_item_key, $cart_item) {
     return '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
 }
 
-// Prevent quantity changes in checkout
+/**
+ * Prevent quantity changes in checkout.
+ */
 add_filter('woocommerce_checkout_cart_item_quantity', 'intersoccer_checkout_cart_item_quantity', 10, 3);
 function intersoccer_checkout_cart_item_quantity($quantity_html, $cart_item, $cart_item_key) {
     return '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
 }
 
-// Helper function to retrieve player details
+/**
+ * Helper function to retrieve player details.
+ */
 function get_player_details($player_index) {
     $user_id = get_current_user_id();
     $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
     return $players[$player_index] ?? ['first_name' => 'Unknown', 'last_name' => 'Player'];
 }
 
-// Debug: Log cart contents before rendering
 add_action('woocommerce_before_cart', function () {
     error_log('InterSoccer: Cart contents before rendering: ' . print_r(WC()->cart->get_cart(), true));
 });
 
-// Add product type meta to identify Camps, Courses, and Birthdays
 add_action('woocommerce_process_product_meta', 'intersoccer_save_product_type_meta', 100);
 function intersoccer_save_product_type_meta($product_id) {
     $product = wc_get_product($product_id);
@@ -878,10 +849,8 @@ function intersoccer_save_product_type_meta($product_id) {
     }
 
     $product_type = intersoccer_get_product_type($product_id);
-    // Already saved in intersoccer_get_product_type
 }
 
-// Add Course metadata (total weeks, weekly discount) to variations
 add_action('woocommerce_save_product_variation', 'intersoccer_save_course_metadata', 10, 2);
 function intersoccer_save_course_metadata($variation_id, $i) {
     $product_id = wp_get_post_parent_id($variation_id);
@@ -896,7 +865,6 @@ function intersoccer_save_course_metadata($variation_id, $i) {
     }
 }
 
-// AJAX handler for intersoccer_get_product_type
 add_action('wp_ajax_intersoccer_get_product_type', 'intersoccer_get_product_type_callback');
 add_action('wp_ajax_nopriv_intersoccer_get_product_type', 'intersoccer_get_product_type_callback');
 function intersoccer_get_product_type_callback() {
@@ -913,10 +881,8 @@ function intersoccer_get_product_type_callback() {
     wp_die();
 }
 
-// One-time script to update product type meta for all existing products
 add_action('init', 'intersoccer_update_existing_product_types', 1);
 function intersoccer_update_existing_product_types() {
-    // Run only once by checking a flag
     $has_run = get_option('intersoccer_product_type_update_20250527', false);
     if ($has_run) {
         return;
@@ -925,7 +891,7 @@ function intersoccer_update_existing_product_types() {
     $products = wc_get_products(['limit' => -1]);
     foreach ($products as $product) {
         $product_id = $product->get_id();
-        intersoccer_get_product_type($product_id); // This will also save the meta
+        intersoccer_get_product_type($product_id);
     }
 
     update_option('intersoccer_product_type_update_20250527', true);
@@ -953,7 +919,6 @@ function intersoccer_display_event_cpt_data($item_data, $cart_item) {
     return $item_data;
 }
 
-// Add admin submenu for updating Processing orders
 add_action('admin_menu', 'intersoccer_add_update_orders_submenu');
 function intersoccer_add_update_orders_submenu() {
     add_submenu_page(
@@ -966,15 +931,11 @@ function intersoccer_add_update_orders_submenu() {
     );
 }
 
-/**
- * Render the admin page for updating Processing orders.
- */
 function intersoccer_render_update_orders_page() {
     if (!current_user_can('manage_woocommerce')) {
         wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
     }
 
-    // Get Processing orders
     $orders = wc_get_orders([
         'status' => 'processing',
         'limit' => -1,
@@ -1084,9 +1045,6 @@ function intersoccer_render_update_orders_page() {
     <?php
 }
 
-/**
- * AJAX handler to update Processing orders with parent attributes and remove unwanted fields.
- */
 add_action('wp_ajax_intersoccer_update_processing_orders', 'intersoccer_update_processing_orders_callback');
 function intersoccer_update_processing_orders_callback() {
     check_ajax_referer('intersoccer_update_orders_nonce', 'nonce');
@@ -1124,22 +1082,18 @@ function intersoccer_update_processing_orders_callback() {
 
             $product_type = intersoccer_get_product_type($product_id);
 
-            // Remove assigned_player if requested
             if ($remove_assigned_player) {
                 $item->delete_meta_data('assigned_player');
                 error_log('InterSoccer: Removed assigned_player from order item ' . $item_id . ' in order ' . $order_id);
             }
 
-            // Fix incorrect attributes if requested
             if ($fix_incorrect && $product_type === 'camp') {
                 $item->delete_meta_data('Days-of-week');
                 error_log('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
             }
 
-            // Get parent attributes
             $parent_attributes = intersoccer_get_parent_attributes($product, $product_type);
 
-            // Add only new parent attributes to order item meta
             foreach ($parent_attributes as $label => $value) {
                 $existing_meta = $item->get_meta($label);
                 if (!$existing_meta) {
@@ -1161,7 +1115,6 @@ function intersoccer_update_processing_orders_callback() {
     wp_die();
 }
 
-// Add metabox for downloadable documents
 add_action('add_meta_boxes', 'intersoccer_add_downloadable_documents_metabox');
 function intersoccer_add_downloadable_documents_metabox() {
     $screen = get_current_screen();
@@ -1184,9 +1137,6 @@ function intersoccer_add_downloadable_documents_metabox() {
     }
 }
 
-/**
- * Render the downloadable documents metabox.
- */
 function intersoccer_render_downloadable_documents_metabox($post) {
     $downloads = get_post_meta($post->ID, '_intersoccer_downloads', true);
     $downloads = is_array($downloads) ? $downloads : [];
@@ -1221,18 +1171,15 @@ function intersoccer_render_downloadable_documents_metabox($post) {
         jQuery(document).ready(function($) {
             var index = <?php echo count($downloads); ?>;
             
-            // Add new download row
             $('#intersoccer-add-download').on('click', function() {
                 var template = $('#intersoccer-downloads-template').html().replace(/{index}/g, index++);
                 $('#intersoccer-downloads-container').append(template);
             });
 
-            // Remove download row
             $(document).on('click', '.intersoccer-remove-download', function() {
                 $(this).closest('.intersoccer-download-row').remove();
             });
 
-            // Upload file
             $(document).on('click', '.intersoccer-upload-button', function(e) {
                 e.preventDefault();
                 var button = $(this);
@@ -1256,9 +1203,6 @@ function intersoccer_render_downloadable_documents_metabox($post) {
     <?php
 }
 
-/**
- * Save downloadable documents meta.
- */
 add_action('save_post_product', 'intersoccer_save_downloadable_documents', 10, 2);
 function intersoccer_save_downloadable_documents($post_id, $post) {
     if (!isset($_POST['intersoccer_downloads_nonce']) || !wp_verify_nonce($_POST['intersoccer_downloads_nonce'], 'intersoccer_save_downloads')) {
@@ -1289,7 +1233,6 @@ function intersoccer_save_downloadable_documents($post_id, $post) {
 
     update_post_meta($post_id, '_intersoccer_downloads', $sanitized_downloads);
 
-    // Update WooCommerce downloadable files
     $wc_downloads = [];
     foreach ($sanitized_downloads as $download) {
         $file_id = md5($download['file']);
@@ -1306,9 +1249,6 @@ function intersoccer_save_downloadable_documents($post_id, $post) {
     error_log('InterSoccer: Saved downloadable documents for product ' . $post_id . ': ' . print_r($sanitized_downloads, true));
 }
 
-/**
- * Grant download permissions after order is processed.
- */
 add_action('woocommerce_order_status_completed', 'intersoccer_grant_download_permissions', 10, 1);
 function intersoccer_grant_download_permissions($order_id) {
     $order = wc_get_order($order_id);
@@ -1351,7 +1291,6 @@ function intersoccer_grant_download_permissions($order_id) {
                 ]
             ];
 
-            // Check if permission already exists
             global $wpdb;
             $exists = $wpdb->get_var($wpdb->prepare(
                 "SELECT download_id FROM {$wpdb->prefix}woocommerce_downloadable_product_permissions WHERE order_id = %d AND product_id = %d AND download_id = %s",
