@@ -7,22 +7,15 @@ if (!defined('ABSPATH')) {
  * Get sibling discount percentage based on number of siblings and product type.
  *
  * @param int $sibling_count Number of siblings in the cart for the same event.
- * @param string $product_type Type of product ('camp' or 'course').
- * @param bool $same_child Whether the discount is for the same child (Courses only).
+ * @param string $product_type Type of product (e.g., 'camp' or 'course').
+ * @param bool $same_child Whether the discount is for the same child (currently unused, but retained for future flexibility).
  * @return float Discount percentage (0 to 1).
  */
 function intersoccer_get_sibling_discount($sibling_count, $product_type, $same_child = false) {
-    if ($product_type === 'camp') {
-        if ($sibling_count <= 1) return 0;
-        elseif ($sibling_count == 2) return 0.20; // 20% for 2nd sibling
-        else return 0.25; // 25% for 3rd and additional siblings
-    } elseif ($product_type === 'course') {
-        if ($same_child && $sibling_count == 2) return 0.50; // 50% for 2nd Course same child/same Season
-        elseif ($sibling_count <= 1) return 0;
-        elseif ($sibling_count == 2) return 0.20; // 20% for 2nd sibling
-        else return 0.30; // 30% for 3rd and additional siblings
-    }
-    return 0;
+    // Unified discount based on pa_program-season, 20% for 2nd, 25% for 3rd+
+    if ($sibling_count <= 1) return 0;
+    elseif ($sibling_count == 2) return 0.20; // 20% discount for 2nd product
+    else return 0.25; // 25% discount for 3rd and additional products
 }
 
 /**
@@ -1186,12 +1179,13 @@ function intersoccer_apply_sibling_discount_in_cart($cart) {
     $cart_items = $cart->get_cart();
     $grouped_items = [];
 
-    // Group items by parent attributes and player assignment to identify siblings
+    // Group items by pa_program-season and player assignment to identify siblings
     foreach ($cart_items as $cart_item_key => $cart_item) {
         $product_type = get_post_meta($cart_item['product_id'], '_intersoccer_product_type', true);
         if (in_array($product_type, ['camp', 'course'])) {
-            $group_key = md5(json_encode($cart_item['parent_attributes']));
+            $season = isset($cart_item['parent_attributes']['Program Season']) ? $cart_item['parent_attributes']['Program Season'] : 'unknown';
             $player_key = $cart_item['player_assignment'] ?? 'unknown';
+            $group_key = md5($season . $player_key); // Group by season and player
             if (!isset($grouped_items[$group_key])) {
                 $grouped_items[$group_key] = [];
             }
@@ -1206,17 +1200,6 @@ function intersoccer_apply_sibling_discount_in_cart($cart) {
     foreach ($grouped_items as $group_key => $items) {
         $unique_players = array_unique(array_column($items, 'player_assignment'));
         $sibling_count = count($unique_players);
-        $same_child_count = []; // Track Courses for the same child
-
-        foreach ($items as $cart_item_key => $item_data) {
-            if ($item_data['product_type'] === 'course') {
-                $player = $item_data['player_assignment'];
-                if (!isset($same_child_count[$player])) {
-                    $same_child_count[$player] = 0;
-                }
-                $same_child_count[$player]++;
-            }
-        }
 
         $sorted_items = [];
         foreach ($items as $cart_item_key => $item_data) {
@@ -1227,22 +1210,12 @@ function intersoccer_apply_sibling_discount_in_cart($cart) {
         $item_index = 0;
         foreach ($sorted_items as $cart_item_key => $calculated_price) {
             $cart_item = $cart_items[$cart_item_key];
-            $product_type = $items[$cart_item_key]['product_type'];
-            $player_assignment = $items[$cart_item_key]['player_assignment'];
-            $discount = 0;
-
-            if ($product_type === 'camp') {
-                $discount = intersoccer_get_sibling_discount($sibling_count - $item_index, $product_type);
-            } elseif ($product_type === 'course') {
-                $same_child_discount = ($same_child_count[$player_assignment] > 1) ? intersoccer_get_sibling_discount($same_child_count[$player_assignment], $product_type, true) : 0;
-                $sibling_discount = intersoccer_get_sibling_discount($sibling_count - $item_index, $product_type);
-                $discount = max($sibling_discount, $same_child_discount);
-            }
+            $discount = intersoccer_get_sibling_discount($sibling_count - $item_index, $items[$cart_item_key]['product_type']);
 
             $final_price = $calculated_price * (1 - $discount);
             $cart_item['data']->set_price($final_price);
             $cart->cart_contents[$cart_item_key]['intersoccer_sibling_discount'] = $discount;
-            error_log('InterSoccer: Applied sibling discount in cart for item ' . $cart_item_key . ': Calculated=' . $calculated_price . ', Sibling count=' . $sibling_count . ', Same child count=' . ($same_child_count[$player_assignment] ?? 1) . ', Discount=' . ($discount * 100) . '%, New=' . $final_price);
+            error_log('InterSoccer: Applied sibling discount in cart for item ' . $cart_item_key . ': Calculated=' . $calculated_price . ', Sibling count=' . $sibling_count . ', Discount=' . ($discount * 100) . '%, New=' . $final_price);
             $item_index++;
         }
     }
