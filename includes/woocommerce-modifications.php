@@ -285,7 +285,6 @@ function intersoccer_update_session_on_variation_change() {
     <?php
 }
 
-
 /**
  * Adjust cart item prices to reflect combo discounts based on season and product type.
  */
@@ -297,65 +296,74 @@ function intersoccer_apply_discounts($cart) {
 
     $cart_items = $cart->get_cart();
 
-    // Group items by pa_program-season
+    // Group items by season
     $grouped_items = [];
     foreach ($cart_items as $cart_item_key => $cart_item) {
         $product_id = $cart_item['product_id'];
         $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
-        if (in_array($product_type, ['camp', 'course'])) {
-            $season = isset($cart_item['parent_attributes']['Program Season']) ? $cart_item['parent_attributes']['Program Season'] : 'unknown';
+        if ($product_type === 'camp') { // Focus only on Camps
+            $season = get_post_meta($cart_item['variation_id'] ?: $product_id, 'attribute_pa_program-season', true) ?: 'unknown';
             $grouped_items[$season][$cart_item_key] = $cart_item;
         }
     }
 
-    // Apply discounts and set messages per season group
+    // Apply discounts per season group
     foreach ($grouped_items as $season => $items) {
-        $camp_index = 0;
-        $course_index = 0;
+        $camp_index = 0; // Reset camp index per season
 
         foreach ($items as $cart_item_key => $cart_item) {
             $product_id = $cart_item['product_id'];
-            $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
             $variation_id = $cart_item['variation_id'] ?: $product_id;
             $base_price = floatval($cart_item['data']->get_regular_price());
             $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $cart_item['camp_days'] ?? [], $cart_item['remaining_weeks'] ?? null);
             $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true) ?: 'full-week';
+            $age_group = get_post_meta($variation_id, 'attribute_pa_age-group', true) ?: 'unknown';
 
             $discount = 0;
-            $original_price = $calculated_price; // Base price before combo discount
+            $original_price = $calculated_price;
 
-            // Apply discount based on product type and position within season
-            if ($product_type === 'camp' && in_array($booking_type, ['full-week', 'single-days'])) {
-                $camp_index++;
-                if ($camp_index >= 2) { // Discount starts from the second camp
-                    $discount = ($camp_index == 2) ? 0.20 : 0.25; // 20% for second, 25% for third and beyond
+            // Apply discount only for full-week camps
+            if ($product_type === 'camp' && $booking_type === 'full-week') {
+                $camp_index++; // Increment only for full-week camps in this season
+                if ($camp_index == 2) {
+                    $discount = 0.20; // 20% for the second item
+                } elseif ($camp_index >= 3) {
+                    $discount = 0.25; // 25% for the third and beyond
                 }
-            } elseif ($product_type === 'course') {
-                $course_index++;
-                if ($course_index == 2) {
-                    $discount = 0.50; // 50% off second course
+                if ($discount > 0) {
+                    $is_half_day = strpos($age_group, 'Half-Day') !== false;
+                    $reference_item = reset(array_filter($items, function($item) {
+                        return get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_booking-type', true) === 'full-week';
+                    }));
+                    $reference_age_group = $reference_item ? get_post_meta($reference_item['variation_id'] ?: $reference_item['product_id'], 'attribute_pa_age-group', true) : 'unknown';
+                    $is_reference_half_day = strpos($reference_age_group, 'Half-Day') !== false;
+
+                    if ($is_half_day && !$is_reference_half_day) {
+                        $discount_amount = $base_price * $discount;
+                    } elseif (!$is_half_day && $is_reference_half_day) {
+                        $reference_base_price = $reference_item ? intersoccer_calculate_price($reference_item['product_id'], $reference_item['variation_id'], $reference_item['camp_days'] ?? []) : $base_price;
+                        $discount_amount = min($base_price, $reference_base_price) * $discount;
+                    } else {
+                        $discount_amount = $base_price * $discount;
+                    }
+                    $final_price = $calculated_price - $discount_amount;
                 }
             }
 
             $final_price = $calculated_price * (1 - $discount);
             $cart_item['data']->set_price($final_price);
 
-            // Set discount message only if a discount is applied
+            // Set discount message and store in cart item for later order meta
             if ($discount > 0) {
-                if ($product_type === 'camp') {
-                    $discount_percent = round($discount * 100);
-                    $cart->cart_contents[$cart_item_key]['combo_discount_note'] = "$discount_percent% Combo Discount";
-                    error_log("InterSoccer: Applied $discount_percent% combo discount for camp $cart_item_key (Season: $season, Booking Type: $booking_type, Camp Index: $camp_index)");
-                } elseif ($product_type === 'course' && $course_index == 2) {
-                    $cart->cart_contents[$cart_item_key]['combo_discount_note'] = "50% Course Combo Discount";
-                    error_log("InterSoccer: Applied 50% course combo discount for $cart_item_key (Season: $season, Course Index: $course_index)");
-                }
+                $discount_percent = round($discount * 100);
+                $discount_message = sprintf(__('%d%% Combo Discount', 'intersoccer-player-management'), $discount_percent);
+                $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_message;
+                $cart->cart_contents[$cart_item_key]['discount_applied'] = $discount_message; // Store for order meta
+                error_log("InterSoccer: Applied $discount_message for camp $cart_item_key (Season: $season, Booking Type: $booking_type, Camp Index: $camp_index) at " . date('Y-m-d H:i:s', time()));
             } else {
-                // Only clear the note if no discount applies, otherwise retain it
-                if (isset($cart->cart_contents[$cart_item_key]['combo_discount_note']) && $discount == 0) {
-                    unset($cart->cart_contents[$cart_item_key]['combo_discount_note']);
-                    error_log("InterSoccer: No discount applied for $cart_item_key (Season: $season, Type: $product_type, Booking Type: $booking_type, Camp Index: $camp_index, Course Index: $course_index), cleared combo_discount_note");
-                }
+                unset($cart->cart_contents[$cart_item_key]['combo_discount_note']);
+                unset($cart->cart_contents[$cart_item_key]['discount_applied']);
+                error_log("InterSoccer: No discount applied for $cart_item_key (Season: $season, Booking Type: $booking_type, Camp Index: $camp_index) at " . date('Y-m-d H:i:s', time()));
             }
         }
     }

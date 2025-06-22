@@ -21,7 +21,7 @@ function intersoccer_render_discount_checkout($cart_item, $cart_item_key, $value
     $product_type = intersoccer_get_product_type($product_id);
 
     $discount_display = '';
-    if (isset($cart_item['combo_discount_note'])) {
+    if (isset($cart_item['combo_discount_note']) && !empty($cart_item['combo_discount_note'])) {
         $discount_display = $cart_item['combo_discount_note'];
     } elseif ($product_type === 'course' && isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
         $discount_display = esc_html($cart_item['remaining_weeks'] . ' Weeks Remaining');
