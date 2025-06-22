@@ -15,6 +15,7 @@
  * - Fixed start_date retrieval to use get_post_meta for _course_start_date (2025-05-27).
  * - Removed fallback in intersoccer_get_days_of_week, relying on pa_days-of-week attribute (2025-05-27).
  * - Updated to ensure consistent 'days' response key (2025-06-22).
+ * - Added support for combo discount logging (2025-06-22).
  */
 
 // Prevent direct access
@@ -204,5 +205,102 @@ function intersoccer_get_course_metadata()
 
     error_log('InterSoccer: Course metadata for variation ' . $variation_id . ': ' . print_r($metadata, true));
     wp_send_json_success($metadata);
+}
+
+
+/**
+ * Apply combo discounts based on cart contents.
+ *
+ * @param string $cart_item_key The cart item key.
+ * @param string $product_type The product type ('camp' or 'course').
+ * @param string $player_id The player assignment index.
+ * @param string $season The season attribute (for courses).
+ * @param float $base_price The base price of the item.
+ * @return float The discount amount.
+ */
+function apply_combo_discounts($cart_item_key, $product_type, $player_id, $season, $base_price) {
+    $discount = 0;
+    $cart = WC()->cart->get_cart();
+
+    // Group cart items by player and product type
+    $player_items = [];
+    foreach ($cart as $key => $item) {
+        $item_product_type = intersoccer_get_product_type($item['product_id']);
+        $item_player_id = isset($item['player_assignment']) ? $item['player_assignment'] : null;
+        $item_season = get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_season', true);
+
+        if ($item_product_type === $product_type) {
+            $player_items[$item_player_id][] = $key;
+        }
+    }
+
+    // Apply discounts
+    if ($product_type === 'camp') {
+        foreach ($player_items as $player => $item_keys) {
+            $item_count = count($item_keys);
+            if ($item_count > 1) {
+                foreach ($item_keys as $index => $key) {
+                    if ($index === 0) continue; // Skip the first item (no discount)
+                    $item = $cart[$key];
+                    $item_base_price = isset($item['intersoccer_base_price']) ? $item['intersoccer_base_price'] : intersoccer_calculate_price($item['product_id'], $item['variation_id'], $item['camp_days']);
+                    $age_group = get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_age-group', true);
+                    $discount_rate = ($index === 1) ? 0.20 : 0.25; // 20% for 2nd, 25% for 3rd+
+
+                    // Check for half-day vs full-day
+                    $is_half_day = strpos($age_group, 'Half-Day') !== false;
+                    $reference_item = $cart[$item_keys[0]]; // First item as reference
+                    $reference_age_group = get_post_meta($reference_item['variation_id'] ?: $reference_item['product_id'], 'attribute_pa_age-group', true);
+                    $is_reference_half_day = strpos($reference_age_group, 'Half-Day') !== false;
+
+                    if ($is_half_day && !$is_reference_half_day) {
+                        $discount_amount = $item_base_price * $discount_rate;
+                    } elseif (!$is_half_day && $is_reference_half_day) {
+                        $reference_base_price = isset($reference_item['intersoccer_base_price']) ? $reference_item['intersoccer_base_price'] : intersoccer_calculate_price($reference_item['product_id'], $reference_item['variation_id'], $reference_item['camp_days']);
+                        $discount_amount = min($item_base_price, $reference_base_price) * $discount_rate;
+                    } else {
+                        $discount_amount = $item_base_price * $discount_rate;
+                    }
+
+                    $discount += $discount_amount;
+                    error_log('InterSoccer: Applied camp combo discount for item ' . $key . ': Player ' . $player . ', Index ' . $index . ', Discount: ' . $discount_amount . ' (Rate: ' . ($discount_rate * 100) . '%)');
+                }
+            }
+        }
+    } elseif ($product_type === 'course') {
+        foreach ($player_items as $player => $item_keys) {
+            $item_count = count($item_keys);
+            if ($item_count > 1) {
+                foreach ($item_keys as $index => $key) {
+                    if ($index === 0) continue; // Skip the first item (no discount)
+                    $item = $cart[$key];
+                    $item_base_price = isset($item['intersoccer_base_price']) ? $item['intersoccer_base_price'] : intersoccer_calculate_price($item['product_id'], $item['variation_id'], [], $item['remaining_weeks']);
+                    $discount_rate = ($index === 1) ? 0.20 : 0.30; // 20% for 2nd, 30% for 3rd+
+                    $discount_amount = $item_base_price * $discount_rate;
+                    $discount += $discount_amount;
+                    error_log('InterSoccer: Applied course combo discount for item ' . $key . ': Player ' . $player . ', Index ' . $index . ', Discount: ' . $discount_amount . ' (Rate: ' . ($discount_rate * 100) . '%)');
+                }
+            }
+
+            // Check for same player, same season discount
+            $first_season = null;
+            foreach ($item_keys as $index => $key) {
+                $item = $cart[$key];
+                $item_season = get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_season', true);
+                if ($index === 0) {
+                    $first_season = $item_season;
+                    continue;
+                }
+                if ($item_season === $first_season) {
+                    $item_base_price = isset($item['intersoccer_base_price']) ? $item['intersoccer_base_price'] : intersoccer_calculate_price($item['product_id'], $item['variation_id'], [], $item['remaining_weeks']);
+                    $discount_rate = 0.50; // 50% discount
+                    $discount_amount = $item_base_price * $discount_rate;
+                    $discount += $discount_amount;
+                    error_log('InterSoccer: Applied same-season course discount for item ' . $key . ': Player ' . $player . ', Season ' . $item_season . ', Discount: ' . $discount_amount . ' (Rate: 50%)');
+                }
+            }
+        }
+    }
+
+    return $discount;
 }
 ?>

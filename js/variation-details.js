@@ -12,6 +12,7 @@
  * - Fixed Add to cart button disabling when changing days for Camps (2025-05-27).
  * - Removed player management (add/edit/delete) logic, retaining only selection (2025-06-09).
  * - Updated to fix AJAX response mismatch and ensure multi-day selection (2025-06-22).
+ * - Adjusted to reflect combo discount updates (2025-06-22).
  */
 
 jQuery(document).ready(function ($) {

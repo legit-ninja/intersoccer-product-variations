@@ -489,7 +489,7 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
     return $cart_item_data;
 }
 
-// Reinforce cart item data
+// Reinforce cart item data and apply combo discounts
 add_filter('woocommerce_add_cart_item', 'intersoccer_reinforce_cart_item_data', 10, 2);
 function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
     // Validate cart item data
@@ -526,12 +526,30 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
     // Calculate the price server-side
     $camp_days = isset($cart_item_data['camp_days']) ? $cart_item_data['camp_days'] : [];
     $remaining_weeks = isset($cart_item_data['remaining_weeks']) ? (int) $cart_item_data['remaining_weeks'] : null;
-    $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks);
+    $base_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks);
+
+    // Apply combo discounts
+    $product_type = intersoccer_get_product_type($product_id);
+    $player_id = isset($cart_item_data['player_assignment']) ? $cart_item_data['player_assignment'] : null;
+    $discount = 0;
+    $season = get_post_meta($variation_id ?: $product_id, 'attribute_pa_season', true);
+
+    if ($product_type === 'camp' || $product_type === 'course') {
+        $discount = apply_combo_discounts($cart_item_key, $product_type, $player_id, $season, $base_price);
+    }
+
+    $calculated_price = $base_price - $discount;
+    $calculated_price = max(0, $calculated_price); // Ensure price doesn't go negative
 
     // Set the cart item price
     $cart_item_data['data']->set_price($calculated_price);
     $cart_item_data['intersoccer_calculated_price'] = $calculated_price; // Store for persistence
-    error_log('InterSoccer: Set server-side calculated price for cart item ' . $cart_item_key . ': ' . $calculated_price);
+    $cart_item_data['intersoccer_base_price'] = $base_price; // Store base price for reference
+    $cart_item_data['intersoccer_discount'] = $discount; // Store discount amount
+    error_log('InterSoccer: Set server-side calculated price for cart item ' . $cart_item_key . ': ' . $calculated_price . ' (Base: ' . $base_price . ', Discount: ' . $discount . ')');
+
+    // Recalculate cart totals to reflect discount
+    WC()->cart->calculate_totals();
 
     // Ensure the price is persisted in the session
     if (isset(WC()->cart->cart_contents[$cart_item_key]) && isset(WC()->cart->cart_contents[$cart_item_key]['data']) && WC()->cart->cart_contents[$cart_item_key]['data'] instanceof WC_Product) {
@@ -543,7 +561,6 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
 
     return $cart_item_data;
 }
-
 // Ensure the adjusted price and attributes are retained when loading cart from session
 add_filter('woocommerce_get_cart_item_from_session', 'intersoccer_restore_cart_item_price', 10, 3);
 function intersoccer_restore_cart_item_price($cart_item_data, $cart_item_session_data, $cart_item_key) {
@@ -659,6 +676,36 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         error_log('InterSoccer: Added days selected for camp item ' . $cart_item['product_id'] . ': ' . $days_display);
     }
 
+    // Handle discount display
+    if (isset($cart_item['intersoccer_discount']) && $cart_item['intersoccer_discount'] > 0) {
+        $discount_display = wc_price($cart_item['intersoccer_discount']);
+        $product_type = intersoccer_get_product_type($cart_item['product_id']);
+        $discount_message = '';
+        if ($product_type === 'camp') {
+            $index = array_search($cart_item_key, array_keys(WC()->cart->get_cart()));
+            if ($index !== false && $index > 0) {
+                $discount_message = ($index === 1) ? '20% Sibling Discount' : '25% Additional Sibling Discount';
+            }
+        } elseif ($product_type === 'course') {
+            $index = array_search($cart_item_key, array_keys(WC()->cart->get_cart()));
+            if ($index !== false && $index > 0) {
+                $season = get_post_meta($cart_item['variation_id'] ?: $cart_item['product_id'], 'attribute_pa_season', true);
+                $first_item = WC()->cart->get_cart()[array_keys(WC()->cart->get_cart())[0]];
+                $first_season = get_post_meta($first_item['variation_id'] ?: $first_item['product_id'], 'attribute_pa_season', true);
+                $discount_message = ($index === 1) ? '20% Sibling Discount' : '30% Additional Sibling Discount';
+                if ($season === $first_season) {
+                    $discount_message = '50% Same Season Discount';
+                }
+            }
+        }
+        $item_data[] = [
+            'key' => __('Combo Discount', 'intersoccer-player-management'),
+            'value' => '-' . $discount_display . ($discount_message ? ' (' . $discount_message . ')' : ''),
+            'display' => '-' . $discount_display . ($discount_message ? ' (' . $discount_message . ')' : '')
+        ];
+        error_log('InterSoccer: Added combo discount for item ' . $cart_item['product_id'] . ': ' . $discount_display . ($discount_message ? ' (' . $discount_message . ')' : ''));
+    }
+
     // Handle parent attributes
     if (isset($cart_item['parent_attributes']) && is_array($cart_item['parent_attributes'])) {
         foreach ($cart_item['parent_attributes'] as $label => $value) {
@@ -707,6 +754,32 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         error_log('InterSoccer: Saved discount weeks to order item ' . $cart_item_key . ': ' . $weeks_display);
     } else {
         error_log('InterSoccer: No remaining_weeks for order item ' . $cart_item_key);
+    }
+
+    // Save combo discount
+    if (isset($values['intersoccer_discount']) && $values['intersoccer_discount'] > 0) {
+        $discount_display = wc_price($values['intersoccer_discount']);
+        $product_type = intersoccer_get_product_type($values['product_id']);
+        $discount_message = '';
+        if ($product_type === 'camp') {
+            $index = array_search($cart_item_key, array_keys(WC()->cart->get_cart()));
+            if ($index !== false && $index > 0) {
+                $discount_message = ($index === 1) ? '20% Sibling Discount' : '25% Additional Sibling Discount';
+            }
+        } elseif ($product_type === 'course') {
+            $index = array_search($cart_item_key, array_keys(WC()->cart->get_cart()));
+            if ($index !== false && $index > 0) {
+                $season = get_post_meta($values['variation_id'] ?: $values['product_id'], 'attribute_pa_season', true);
+                $first_item = WC()->cart->get_cart()[array_keys(WC()->cart->get_cart())[0]];
+                $first_season = get_post_meta($first_item['variation_id'] ?: $first_item['product_id'], 'attribute_pa_season', true);
+                $discount_message = ($index === 1) ? '20% Sibling Discount' : '30% Additional Sibling Discount';
+                if ($season === $first_season) {
+                    $discount_message = '50% Same Season Discount';
+                }
+            }
+        }
+        $item->add_meta_data(__('Combo Discount', 'intersoccer-player-management'), '-' . $discount_display . ($discount_message ? ' (' . $discount_message . ')' : ''));
+        error_log('InterSoccer: Saved combo discount to order item ' . $cart_item_key . ': ' . $discount_display . ($discount_message ? ' (' . $discount_message . ')' : ''));
     }
 
     // Save parent attributes
