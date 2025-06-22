@@ -5,6 +5,7 @@
  * Author: Jeremy Lee
  * Changes:
  * - Removed inline CSS to allow inheritance of base widget formatting (2025-05-26).
+ * - Removed player assignment section, added discount display under product price (2025-06-20).
  */
 
 defined('ABSPATH') or die('No script kiddies please!');
@@ -12,73 +13,23 @@ defined('ABSPATH') or die('No script kiddies please!');
 // Diagnostic log to confirm file inclusion
 error_log('InterSoccer: checkout.php file loaded');
 
-// Render player assignment section on checkout
-add_action('woocommerce_checkout_after_customer_details', 'intersoccer_render_player_assignment_checkout');
-function intersoccer_render_player_assignment_checkout() {
-    // Check if user is logged in
-    $user_id = get_current_user_id();
-    if (!$user_id) {
-        error_log('InterSoccer: User not logged in, skipping player assignment section');
-        return;
+// Render discount section under product price on checkout
+add_action('woocommerce_review_order_before_cart_item', 'intersoccer_render_discount_checkout', 10, 3);
+function intersoccer_render_discount_checkout($cart_item, $cart_item_key, $value) {
+    $product = $cart_item['data'];
+    $product_id = $product->get_id();
+    $product_type = intersoccer_get_product_type($product_id);
+
+    $discount_display = '';
+    if (isset($cart_item['combo_discount_note'])) {
+        $discount_display = $cart_item['combo_discount_note'];
+    } elseif ($product_type === 'course' && isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
+        $discount_display = esc_html($cart_item['remaining_weeks'] . ' Weeks Remaining');
     }
 
-    // Get cart items
-    $cart = WC()->cart->get_cart();
-    if (empty($cart)) {
-        error_log('InterSoccer: Cart is empty, skipping player assignment section');
-        return;
-    }
-
-    error_log('InterSoccer: Rendering player assignment section for user ID: ' . $user_id);
-    error_log('InterSoccer: Cart items: ' . print_r(array_keys($cart), true));
-
-    // Loop through cart items and render player assignment for each event product
-    foreach ($cart as $cart_item_key => $cart_item) {
-        $product = $cart_item['data'];
-        $product_id = $product->get_id();
-        $quantity = $cart_item['quantity'];
-
-        // Check if this is an event product (e.g., Camp or Course)
-        $terms = wp_get_post_terms($product->get_parent_id(), 'product_cat', ['fields' => 'slugs']);
-        if (!in_array('camps', $terms, true) && !in_array('courses', $terms, true)) {
-            error_log('InterSoccer: Product ID ' . $product_id . ' is not a Camp or Course, skipping');
-            continue;
-        }
-
-        error_log('InterSoccer: Rendering player assignment for cart item key: ' . $cart_item_key . ', product ID: ' . $product_id);
-
-        // Get players from user meta
-        $players = get_user_meta($user_id, 'intersoccer_players', true);
-        $players = is_array($players) ? $players : [];
-
-        if (empty($players)) {
-            error_log('InterSoccer: No players found for user ID: ' . $user_id . ', cart item key: ' . $cart_item_key);
-            continue;
-        }
-
-        // Render player assignment section
-?>
-        <div class="intersoccer-player-assignment" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>">
-            <h3><?php echo esc_html__('Assign Player to Event: ', 'intersoccer-player-management') . esc_html($product->get_name()); ?></h3>
-            <label for="player-select-<?php echo esc_attr($cart_item_key); ?>"><?php esc_html_e('Select Player', 'intersoccer-player-management'); ?></label>
-            <select id="player-select-<?php echo esc_attr($cart_item_key); ?>" class="player-select" name="player_assignments[<?php echo esc_attr($cart_item_key); ?>]">
-                <option value=""><?php esc_html_e('Select an attendee', 'intersoccer-player-management'); ?></option>
-                <?php
-                foreach ($players as $index => $player) {
-                    $player_name = trim($player['first_name'] . ' ' . $player['last_name']);
-                    if (empty($player_name)) {
-                        continue;
-                    }
-                    echo '<option value="' . esc_attr($index) . '">' . esc_html($player_name) . '</option>';
-                }
-                ?>
-            </select>
-            <span class="error-message" style="color: red; display: none;" aria-live="assertive"></span>
-            <input type="hidden" class="player-assignments-validated" name="player_assignments_validated[<?php echo esc_attr($cart_item_key); ?>]" value="">
-        </div>
-    <?php
+    if ($discount_display) {
+        echo '<tr class="intersoccer-discount-row"><td colspan="2"></td><td class="product-price" style="padding-top: 0;"><div class="intersoccer-discount">' . esc_html($discount_display) . '</div></td></tr>';
+        error_log('InterSoccer: Added discount display for checkout item ' . $cart_item_key . ': ' . $discount_display);
     }
 }
-
-// Save player assignments to cart meta (already handled in woocommerce-modifications.php)
 ?>
