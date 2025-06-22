@@ -1,12 +1,17 @@
 /**
  * File: variation-details.js
- * Description: Manages day selection, dynamic price updates, and sibling discount notification for camps, and pro-rated pricing for courses on WooCommerce product pages.
+ * Description: Manages day selection and dynamic price updates for camps, and pro-rated pricing for courses on WooCommerce product pages.
  * Dependencies: jQuery
  * Author: Jeremy Lee
  * Changes (Summarized):
- * - Fixed wc_price undefined error by using raw price and formatting client-side with fallback (2025-06-20).
- * - Ensured correct price scaling for multiple days based on base price from server (2025-06-20).
- * - Improved error handling and logging for price updates (2025-06-20).
+ * - Initial implementation with day selection, price updates, and player selection (2025-06-09).
+ * - Enhanced with MutationObserver, Elementor support, and improved logging (2025-05-26).
+ * - Fixed price calculations, removed client-side price storage, and improved security (2025-05-27).
+ * - Added dynamic price updates via AJAX, fixed button enabling, and resolved infinite loops (2025-05-27).
+ * - Ensured days of week display for Camps and fixed player toggle issues (2025-05-27).
+ * - Fixed Add to cart button disabling when changing days for Camps (2025-05-27).
+ * - Removed player management (add/edit/delete) logic, retaining only selection (2025-06-09).
+ * - Updated to fix AJAX response mismatch and ensure multi-day selection (2025-06-22).
  */
 
 jQuery(document).ready(function ($) {
@@ -20,6 +25,7 @@ jQuery(document).ready(function ($) {
       select_days: "Select days",
     };
 
+    // Refresh nonce if needed
     function refreshNonce() {
       return new Promise((resolve, reject) => {
         $.ajax({
@@ -45,31 +51,45 @@ jQuery(document).ready(function ($) {
     }
 
     function fetchDaysOfWeek(productId, variationId) {
-        return new Promise((resolve, reject) => {
-            jQuery.ajax({
-                url: intersoccerCheckout.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'intersoccer_get_days_of_week',
-                    nonce: intersoccerCheckout.nonce,
-                    product_id: productId,
-                    variation_id: variationId
-                },
-                success: function(response) {
-                    if (response.success && response.data.days_of_week) {
-                        console.log('InterSoccer: Successfully fetched days of week:', response.data.days_of_week);
-                        resolve(response.data.days_of_week);
-                    } else {
-                        console.error('InterSoccer: Failed to fetch days:', response.data ? response.data.message : 'Unknown error');
-                        reject(new Error(response.data ? response.data.message : 'Failed to fetch days'));
-                    }
-                },
-                error: function(xhr) {
-                    console.error('InterSoccer: Failed to fetch days:', xhr.status, xhr.responseText);
-                    reject(new Error('Failed to fetch days: ' + xhr.status));
-                }
-            });
+      return new Promise((resolve, reject) => {
+        console.log("InterSoccer: Fetching days for product ID:", productId, "variation ID:", variationId);
+        $.ajax({
+          url: intersoccerCheckout.ajax_url,
+          type: "POST",
+          data: {
+            action: "intersoccer_get_days_of_week",
+            nonce: intersoccerCheckout.nonce,
+            product_id: productId,
+            variation_id: variationId,
+          },
+          success: function (response) {
+            console.log("InterSoccer: intersoccer_get_days_of_week response:", response);
+            if (response.success && response.data && Array.isArray(response.data.days)) {
+              console.log("InterSoccer: Days fetched:", response.data.days);
+              resolve(response.data.days);
+            } else {
+              console.warn("InterSoccer: No days in response, using fallback:", response.data.message || "Unknown error");
+              // Fallback to default days
+              const fallbackDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+              resolve(fallbackDays);
+            }
+          },
+          error: function (xhr) {
+            console.error("InterSoccer: AJAX error fetching days:", xhr.status, xhr.responseText);
+            if (xhr.status === 403) {
+              refreshNonce()
+                .then(() => fetchDaysOfWeek(productId, variationId))
+                .then(resolve)
+                .catch(reject);
+            } else {
+              // Fallback on error
+              const fallbackDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+              console.warn("InterSoccer: Using fallback days due to error:", xhr.statusText);
+              resolve(fallbackDays);
+            }
+          },
         });
+      });
     }
 
     function fetchCourseMetadata(productId, variationId) {
@@ -122,50 +142,54 @@ jQuery(document).ready(function ($) {
       });
     }
 
-    function updateProductPrice(productId, variationId, campDays = [], remainingWeeks = null, siblingCount = 1) {
-        return new Promise((resolve, reject) => {
-            $.ajax({
-                url: intersoccerCheckout.ajax_url,
-                type: "POST",
-                data: {
-                    action: "intersoccer_calculate_dynamic_price",
-                    nonce: intersoccerCheckout.nonce,
-                    product_id: productId,
-                    variation_id: variationId,
-                    camp_days: campDays,
-                    remaining_weeks: remainingWeeks,
-                    sibling_count: siblingCount,
-                },
-                success: function (response) {
-                    if (response.success && typeof response.data.price === 'number') {
-                        const rawPrice = response.data.price;
-                        console.log("InterSoccer: Updated product price raw:", rawPrice);
-                        const $form = $('.variations_form.cart');
-                        const $priceElement = $form.find(".woocommerce-variation-price .price");
-                        if ($priceElement.length) {
-                            const formattedPrice = typeof wc_price === "function"
-                                ? wc_price(rawPrice)
-                                : `CHF ${rawPrice.toFixed(2)}`;
-                            $priceElement.html(formattedPrice);
-                            // Force Elementor to refresh the price
-                            if (typeof elementorFrontend !== 'undefined') {
-                                elementorFrontend.hooks.doAction('refresh_preview', { action: 'refresh' });
-                            }
-                        } else {
-                            console.warn("InterSoccer: Price element not found");
-                        }
-                        resolve(rawPrice);
-                    } else {
-                        console.error("InterSoccer: Failed to update price:", response.data.message || "No price data");
-                        reject(new Error(response.data.message || "Invalid price data"));
-                    }
-                },
-                error: function (xhr, status, error) {
-                    console.error("InterSoccer: AJAX error updating price:", xhr.status, status, error, xhr.responseText);
-                    reject(new Error("Failed to update price: " + status));
-                },
-            });
+    function updateProductPrice(productId, variationId, campDays = [], remainingWeeks = null) {
+      return new Promise((resolve, reject) => {
+        $.ajax({
+          url: intersoccerCheckout.ajax_url,
+          type: "POST",
+          data: {
+            action: "intersoccer_calculate_dynamic_price",
+            nonce: intersoccerCheckout.nonce,
+            product_id: productId,
+            variation_id: variationId,
+            camp_days: campDays,
+            remaining_weeks: remainingWeeks,
+          },
+          success: function (response) {
+            if (response.success && response.data.price) {
+              console.log("InterSoccer: Updated product price:", response.data.price);
+              if (campDays.length === 0 && response.data.raw_price === 0) {
+                console.log("InterSoccer: No days selected, price set to zero.");
+              }
+              const $priceElement = $("form.cart .woocommerce-variation-price .price");
+              if ($priceElement.length) {
+                $priceElement.html(response.data.price);
+              } else {
+                console.warn("InterSoccer: Price element not found");
+              }
+              const $subtotalElement = $("form.cart .single_variation_wrap .price-subtotal");
+              if ($subtotalElement.length) {
+                $subtotalElement.html(response.data.price);
+              }
+              resolve(response.data.raw_price);
+            } else {
+              console.error("InterSoccer: Failed to update price:", response.data.message);
+              reject(new Error(response.data.message || "Failed to update price"));
+            }
+          },
+          error: function (xhr) {
+            console.error("InterSoccer: AJAX error updating price:", xhr.status, xhr.responseText);
+            if (xhr.status === 403) {
+              refreshNonce()
+                .then(() => updateProductPrice(productId, variationId, campDays, remainingWeeks))
+                .then(resolve)
+                .catch(reject);
+            } else {
+              reject(new Error("Failed to update price: " + xhr.statusText));
+            }
+          },
         });
+      });
     }
 
     let $form = $("form.cart");
@@ -215,8 +239,8 @@ jQuery(document).ready(function ($) {
       }
     }
 
-    if (typeof elementorFrontend !== "undefined") {
-      elementorFrontend.on("init", function () {
+    if (typeof elementorFrontend !== 'undefined') {
+      elementorFrontend.on('init', function() {
         console.log("InterSoccer: Elementor frontend initialized, re-checking for form");
         setupFormObserver();
       });
@@ -262,7 +286,6 @@ jQuery(document).ready(function ($) {
       let availableDays = [];
       let currentVariationId = null;
       let isCheckboxUpdate = false;
-      let selectedAttendees = new Set();
 
       function updateFormData(playerId, days, remainingWeeks = null, variationId = null) {
         $form.find('input[name="player_assignment"]').remove();
@@ -292,18 +315,39 @@ jQuery(document).ready(function ($) {
         );
       }
 
-      function updateAddToCartButtonState(playerId, dayCount, bookingType) {
-          const $addToCartButton = $form.find("button.single_add_to_cart_button");
-          if (bookingType.toLowerCase() === "single-days" && dayCount > 0) {
-              $addToCartButton.prop("disabled", false);
-              console.log("InterSoccer: Enabled Add to Cart for single-day camp, days selected:", dayCount);
-          } else if (playerId && (bookingType.toLowerCase() === "full-week" || bookingType.toLowerCase() === "")) {
-              $addToCartButton.prop("disabled", false);
-              console.log("InterSoccer: Enabled Add to Cart for full-week or default, player:", playerId);
-          } else {
-              $addToCartButton.prop("disabled", true);
-              console.log("InterSoccer: Disabled Add to Cart, player:", playerId, "days:", dayCount, "bookingType:", bookingType);
+      function updateAddToCartButtonState(playerId, selectedDaysCount, bookingType) {
+        const $addToCartButton = $form.find("button.single_add_to_cart_button");
+        const hasPlayer = playerId && playerId !== "";
+        let isValid = false;
+
+        if (hasPlayer) {
+          lastValidPlayerId = playerId;
+        }
+
+        if (bookingType === "single-days") {
+          isValid = selectedDaysCount > 0;
+          $addToCartButton.prop("disabled", !isValid);
+          console.log(
+            "InterSoccer: Updated button state - Player:",
+            playerId,
+            "Days selected:",
+            selectedDaysCount,
+            "Enabled:",
+            isValid
+          );
+        } else {
+          isValid = hasPlayer;
+          $addToCartButton.prop("disabled", !isValid);
+          console.log(
+            "InterSoccer: Updated button state - Player:",
+            playerId,
+            "Enabled:",
+            isValid
+          );
+          if (isValid) {
+            $addToCartButton.removeClass('disabled');
           }
+        }
       }
 
       function renderCheckboxes(
@@ -392,6 +436,7 @@ jQuery(document).ready(function ($) {
                   }
 
                   updateAddToCartButtonState(playerId, selectedDays.length, "single-days");
+
                   $dayCheckboxes.find('input[type="checkbox"]').prop("disabled", false);
                 })
                 .catch((error) => {
@@ -405,87 +450,122 @@ jQuery(document).ready(function ($) {
       }
 
       let variationTimeout;
-     function handleVariation(variation, retryCount = 0, maxRetries = 12, forceRender = false) {
-          if (isProcessing || isCheckboxUpdate) return;
+      function handleVariation(variation, retryCount = 0, maxRetries = 12, forceRender = false) {
+        if (isProcessing || isCheckboxUpdate) return;
 
-          const bookingType = variation?.attributes?.attribute_pa_booking_type ||
-              $form.find('select[name="attribute_pa_booking-type"]').val() ||
-              $form.find('input[name="attribute_pa_booking-type"]').val() || "";
-          const variationId = variation?.variation_id || 0;
+        const bookingType =
+          variation?.attributes?.attribute_pa_booking_type ||
+          $form.find('select[name="attribute_pa_booking-type"]').val() ||
+          $form.find('input[name="attribute_pa_booking-type"]').val() ||
+          "";
+        const variationId = variation?.variation_id || 0;
 
-          const bookingTypeChanged = lastBookingType !== bookingType;
-          if (variationId === lastVariationId && !forceRender && !bookingTypeChanged && retryCount === 0) {
-              console.log("InterSoccer: Skipping duplicate variation handling for ID:", variationId);
+        const bookingTypeChanged = lastBookingType !== bookingType;
+        if (variationId === lastVariationId && !forceRender && !bookingTypeChanged && retryCount === 0) {
+          console.log("InterSoccer: Skipping duplicate variation handling for ID:", variationId);
+          return;
+        }
+
+        isProcessing = true;
+
+        console.log("InterSoccer: handleVariation triggered for variation ID:", variationId, "Retry:", retryCount, "Force:", forceRender, "Booking Type Changed:", bookingTypeChanged);
+
+        clearTimeout(variationTimeout);
+        variationTimeout = setTimeout(() => {
+          if (!variationId) {
+            console.error("InterSoccer: Invalid variation ID:", variationId);
+            isProcessing = false;
+            return;
+          }
+          console.log("InterSoccer: Booking type:", bookingType);
+
+          currentVariation = variation;
+          lastVariationId = variationId;
+          lastBookingType = bookingType;
+
+          const $addToCartButton = $form.find("button.single_add_to_cart_button");
+          const $daySelection = $form.find(".intersoccer-day-selection");
+          const $dayCheckboxes = $form.find(".intersoccer-day-checkboxes");
+          const $dayNotification = $form.find(".intersoccer-day-notification");
+          const $errorMessage = $form.find(".intersoccer-day-selection .error-message");
+
+          $daySelection.css({ "display": "block !important", "margin-top": "10px" });
+          $addToCartButton.prop("disabled", true);
+
+          if (productType === "camp" && bookingType.toLowerCase() === "single-days") {
+            if (!$daySelection.length && retryCount < maxRetries) {
+              console.log("InterSoccer: Day selection not found, retrying", retryCount + 1, "/", maxRetries);
+              setTimeout(() => handleVariation(variation, retryCount + 1, maxRetries, forceRender), 3500);
+              isProcessing = false;
               return;
+            }
+            $daySelection.show();
+            console.log("InterSoccer: Showing day selection row for Single Day(s) camp");
+            fetchDaysOfWeek(productId, variationId).then((days) => {
+              availableDays = days;
+              console.log("InterSoccer: Rendering checkboxes for days:", days);
+              const playerId = $form.find(".player-select").val() || "";
+              renderCheckboxes(days, $dayCheckboxes, $dayNotification, $errorMessage, playerId, variationId);
+              currentVariationId = variationId;
+
+              // Update selectedDays and form data immediately
+              selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() {
+                return $(this).val();
+              }).get();
+              updateFormData(playerId, selectedDays, null, variationId);
+
+              const quantity = 1;
+              $form.find('input[name="quantity"]').val(quantity);
+              updateAddToCartButtonState(playerId, selectedDays.length, "single-days");
+
+              updateProductPrice(productId, variationId, selectedDays)
+                .catch((error) => {
+                  console.error("InterSoccer: Failed to update initial price for Camp:", error);
+                });
+            }).catch((error) => {
+              console.error("InterSoccer: Failed to load days:", error);
+              $daySelection.hide();
+              $errorMessage.text("Failed to load days. Please try again.").show();
+              setTimeout(() => $errorMessage.hide(), 5000);
+            });
+          } else {
+            $daySelection.hide();
+            selectedDays = [];
+            currentVariationId = null;
+            if (productType === "course") {
+              fetchCourseMetadata(productId, variationId).then((metadata) => {
+                console.log("InterSoccer: Fetched metadata for course:", metadata);
+                const remainingWeeks = metadata.remaining_weeks || null;
+                const playerId = $form.find(".player-select").val() || "";
+                updateFormData(playerId, [], remainingWeeks, variationId);
+
+                updateAddToCartButtonState(playerId, 0, bookingType);
+
+                updateProductPrice(productId, variationId, [], remainingWeeks)
+                  .catch((error) => {
+                    console.error("InterSoccer: Failed to update price for Course:", error);
+                  });
+              }).catch((error) => {
+                console.error("InterSoccer: Failed to fetch course metadata:", error);
+                const playerId = $form.find(".player-select").val() || "";
+                updateFormData(playerId, [], null, variationId);
+                updateAddToCartButtonState(playerId, 0, bookingType);
+              });
+            } else if (productType === "camp" && bookingType.toLowerCase() === "full-week") {
+              const playerId = $form.find(".player-select").val() || "";
+              updateFormData(playerId, [], null, variationId);
+              $form.find('input[name="quantity"]').val(1);
+              updateAddToCartButtonState(playerId, 0, bookingType);
+
+              updateProductPrice(productId, variationId)
+                .catch((error) => {
+                  console.error("InterSoccer: Failed to update price for Full Week Camp:", error);
+                });
+            }
           }
 
-          isProcessing = true;
-
-          console.log("InterSoccer: handleVariation triggered for variation ID:", variationId, "Retry:", retryCount, "Force:", forceRender, "Booking Type Changed:", bookingTypeChanged);
-
-          clearTimeout(variationTimeout);
-          variationTimeout = setTimeout(() => {
-              if (!variationId) {
-                  console.error("InterSoccer: Invalid variation ID:", variationId);
-                  isProcessing = false;
-                  return;
-              }
-              console.log("InterSoccer: Booking type:", bookingType);
-
-              currentVariation = variation;
-              lastVariationId = variationId;
-              lastBookingType = bookingType;
-
-              const $addToCartButton = $form.find("button.single_add_to_cart_button");
-              const $daySelection = $form.find(".intersoccer-day-selection");
-              const $dayCheckboxes = $form.find(".intersoccer-day-checkboxes");
-              const $dayNotification = $form.find(".intersoccer-day-notification");
-              const $errorMessage = $form.find(".intersoccer-day-selection .error-message");
-
-              $daySelection.css({ "display": "block !important", "margin-top": "10px" });
-              $addToCartButton.prop("disabled", true);
-
-              if (productType === "camp" && bookingType.toLowerCase() === "single-days") {
-                  if (!$daySelection.length && retryCount < maxRetries) {
-                      setTimeout(() => handleVariation(variation, retryCount + 1, maxRetries, forceRender), 3500);
-                      isProcessing = false;
-                      return;
-                  }
-                  $daySelection.show();
-                  fetchDaysOfWeek(productId, variationId).then((days) => {
-                      availableDays = days;
-                      renderCheckboxes(days, $dayCheckboxes, $dayNotification, $errorMessage, "", variationId);
-                      selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() { return $(this).val(); }).get();
-                      updateFormData("", selectedDays, null, variationId);
-                      updateAddToCartButtonState("", selectedDays.length, "single-days");
-                      updateProductPrice(productId, variationId, selectedDays, null, 1);
-                  }).catch((error) => {
-                      console.error("InterSoccer: Failed to load days:", error);
-                      $daySelection.hide();
-                      $errorMessage.text("Failed to load days.").show().delay(5000).fadeOut();
-                  });
-              } else if (productType === "course") {
-                  $daySelection.hide();
-                  fetchCourseMetadata(productId, variationId).then((metadata) => {
-                      const remainingWeeks = metadata.remaining_weeks || null;
-                      updateFormData("", [], remainingWeeks, variationId);
-                      updateAddToCartButtonState("", 0, bookingType);
-                      updateProductPrice(productId, variationId, [], remainingWeeks, 1);
-                  }).catch((error) => {
-                      console.error("InterSoccer: Failed to fetch course metadata:", error);
-                      updateFormData("", [], null, variationId);
-                      updateAddToCartButtonState("", 0, bookingType);
-                  });
-              } else if (productType === "camp" && bookingType.toLowerCase() === "full-week") {
-                  $daySelection.hide();
-                  updateFormData("", [], null, variationId);
-                  $form.find('input[name="quantity"]').val(1);
-                  updateAddToCartButtonState("", 0, bookingType);
-                  updateProductPrice(productId, variationId, null, null, 1);
-              }
-
-              isProcessing = false;
-          }, 100);
+          isProcessing = false;
+        }, 100);
       }
 
       let debounceTimeout;
@@ -508,7 +588,6 @@ jQuery(document).ready(function ($) {
         selectedDays = [];
         currentVariationId = null;
         lastBookingType = null;
-        selectedAttendees.clear();
         const $daySelection = $form.find(".intersoccer-day-selection");
         $daySelection.hide();
         if (currentVariation) {
@@ -522,37 +601,19 @@ jQuery(document).ready(function ($) {
         }
       });
 
-      $form
-        .find('select[name="attribute_pa_booking-type"], input[name="attribute_pa_booking-type"]')
-        .on("change", function () {
-          console.log("InterSoccer: Booking type changed, triggering check_variations");
-          $form.trigger("check_variations");
-        });
+      $form.find('select[name="attribute_pa_booking-type"], input[name="attribute_pa_booking-type"]').on("change", function () {
+        console.log("InterSoccer: Booking type changed, triggering check_variations");
+        $form.trigger("check_variations");
+      });
 
       let playerChangeTimeout;
       $form.find(".player-select").on("change", function () {
         const playerId = $(this).val() || "";
-        const bookingType =
-          $form.find('select[name="attribute_pa_booking-type"]').val() ||
-          $form.find('input[name="attribute_pa_booking-type"]').val();
+        const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
         const selectedDaysCount = selectedDays.length;
 
-        console.log(
-          "InterSoccer: Player selected:",
-          playerId,
-          "Booking type:",
-          bookingType,
-          "Current variation:",
-          currentVariation?.variation_id
-        );
+        console.log("InterSoccer: Player selected:", playerId, "Booking type:", bookingType, "Current variation:", currentVariation?.variation_id);
 
-        if (playerId && !selectedAttendees.has(playerId)) {
-          selectedAttendees.add(playerId);
-        } else if (!playerId && selectedAttendees.has(lastValidPlayerId)) {
-          selectedAttendees.delete(lastValidPlayerId);
-        }
-
-        const siblingCount = selectedAttendees.size;
         const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
         updateFormData(playerId, selectedDays, remainingWeeks, currentVariation?.variation_id);
 
@@ -567,7 +628,7 @@ jQuery(document).ready(function ($) {
 
           if (currentVariation) {
             const variationId = currentVariation.variation_id;
-            updateProductPrice(productId, variationId, selectedDays, remainingWeeks, siblingCount)
+            updateProductPrice(productId, variationId, selectedDays, remainingWeeks)
               .catch((error) => {
                 console.error("InterSoccer: Failed to update price after player selection:", error);
               });
@@ -577,60 +638,44 @@ jQuery(document).ready(function ($) {
 
       $(document).on("click", "button.single_add_to_cart_button, .elementor-add-to-cart button", function (e) {
         const $button = $(this);
-        console.log("InterSoccer: Add to Cart button clicked, class:", $button.attr("class"));
+        console.log("InterSoccer: Add to Cart button clicked, class:", $button.attr('class'));
         if ($button.hasClass("buy-now")) {
           console.log("InterSoccer: Buy Now button clicked");
           const playerId = $form.find(".player-select").val() || lastValidPlayerId;
           const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
-          const siblingCount = selectedAttendees.size || (playerId ? 1 : 0);
           updateFormData(playerId, selectedDays, remainingWeeks, currentVariation?.variation_id);
           $form.append('<input type="hidden" name="buy_now" value="1">');
-          updateProductPrice(productId, currentVariation?.variation_id, selectedDays, remainingWeeks, siblingCount);
         }
+      });
+
+      $form.on("submit", function (e) {
+        console.log("InterSoccer: Form submitted");
+        const playerId = $form.find(".player-select").val() || lastValidPlayerId;
+        const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
+        console.log(
+          "InterSoccer: Adding to cart via submit - Player:",
+          playerId,
+          "Days:",
+          selectedDays,
+          "Remaining weeks:",
+          remainingWeeks
+        );
       });
 
       $form.on("adding_to_cart", function (event, $button, data) {
         console.log("InterSoccer: adding_to_cart event triggered");
         const playerId = $form.find(".player-select").val() || lastValidPlayerId;
-        const selectedDays = $form.find('input[name="camp_days[]"]:checked').map(function() {
-            return $(this).val();
-        }).get();
         const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
-        const siblingCount = selectedAttendees.size || (playerId ? 1 : 0);
         if (playerId) data.player_assignment = playerId;
         if (selectedDays.length) data.camp_days = selectedDays;
         if (remainingWeeks !== undefined && remainingWeeks !== null) data.remaining_weeks = remainingWeeks;
-        data.sibling_count = siblingCount;
-        console.log(
-            "InterSoccer: Adding to cart - Player:",
-            playerId,
-            "Days:",
-            selectedDays,
-            "Remaining weeks:",
-            remainingWeeks,
-            "Sibling Count:",
-            siblingCount
-        );
-    });
-
-      $form.on("adding_to_cart", function (event, $button, data) {
-        console.log("InterSoccer: adding_to_cart event triggered");
-        const playerId = $form.find(".player-select").val() || lastValidPlayerId;
-        const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
-        const siblingCount = selectedAttendees.size || (playerId ? 1 : 0);
-        if (playerId) data.player_assignment = playerId;
-        if (selectedDays.length) data.camp_days = selectedDays;
-        if (remainingWeeks !== undefined && remainingWeeks !== null) data.remaining_weeks = remainingWeeks;
-        data.sibling_count = siblingCount;
         console.log(
           "InterSoccer: Adding to cart - Player:",
           playerId,
           "Days:",
           selectedDays,
           "Remaining weeks:",
-          remainingWeeks,
-          "Sibling Count:",
-          siblingCount
+          remainingWeeks
         );
       });
 
@@ -646,6 +691,6 @@ jQuery(document).ready(function ($) {
 
   setTimeout(initializePlugin, 2000);
 
-  document.addEventListener("DOMContentLoaded", initializePlugin);
-  document.addEventListener("load", initializePlugin);
+  document.addEventListener('DOMContentLoaded', initializePlugin);
+  document.addEventListener('load', initializePlugin);
 });
