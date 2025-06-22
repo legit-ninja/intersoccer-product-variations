@@ -870,6 +870,39 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
     }
 }
 
+/**
+ * Display base price in the cart's "Price" column.
+ */
+add_filter('woocommerce_cart_item_price', 'intersoccer_display_base_price_in_cart', 10, 3);
+function intersoccer_display_base_price_in_cart($price_html, $cart_item, $cart_item_key) {
+    $product = $cart_item['data'];
+    $base_price = floatval($product->get_regular_price());
+    return wc_price($base_price);
+}
+
+/**
+ * Display discounted subtotal in the cart with green text for discount message.
+ */
+add_filter('woocommerce_cart_item_subtotal', 'intersoccer_cart_item_subtotal', 10, 3);
+function intersoccer_cart_item_subtotal($subtotal_html, $cart_item, $cart_item_key) {
+    $product = $cart_item['data'];
+    $quantity = $cart_item['quantity'];
+    $discounted_price = floatval($product->get_price());
+    $subtotal = $discounted_price * $quantity;
+    $subtotal_html = wc_price($subtotal);
+
+    if (isset($cart_item['combo_discount_note'])) {
+        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . esc_html($cart_item['combo_discount_note']) . '</div>';
+        error_log('InterSoccer: Added green discount message to subtotal for cart item ' . $cart_item_key . ': ' . $cart_item['combo_discount_note']);
+    } elseif (intersoccer_get_product_type($cart_item['product_id']) === 'course' && isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
+        $discount_message = esc_html($cart_item['remaining_weeks'] . ' Weeks Remaining');
+        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . $discount_message . '</div>';
+        error_log('InterSoccer: Added green pro-rated discount message to subtotal for cart item ' . $cart_item_key . ': ' . $discount_message);
+    }
+
+    return $subtotal_html;
+}
+
 // Prevent quantity changes in cart for all products
 add_filter('woocommerce_cart_item_quantity', 'intersoccer_cart_item_quantity', 10, 3);
 function intersoccer_cart_item_quantity($quantity_html, $cart_item_key, $cart_item) {
