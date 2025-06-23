@@ -787,10 +787,17 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
 /**
  * Save player, days, discount, parent attributes, and downloads to order.
  */
-add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_save_order_item_data', 300, 4);
+add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_save_order_item_data', 10, 4);
 function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order) {
+    // Initial validation of $item
+    if (!is_a($item, 'WC_Order_Item_Product')) {
+        error_log('InterSoccer: Initial invalid item type in intersoccer_save_order_item_data for cart item ' . $cart_item_key . ': ' . print_r($item, true));
+        return;
+    }
+
     error_log('InterSoccer: Saving order item data for cart item ' . $cart_item_key . ': ' . print_r($values, true));
 
+    // Save player assignment
     if (isset($values['player_assignment'])) {
         $user_id = get_current_user_id();
         $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
@@ -798,25 +805,39 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         if (isset($players[$player_index])) {
             $player = $players[$player_index];
             $player_name = esc_html($player['first_name'] . ' ' . $player['last_name']);
-            $item->add_meta_data(__('Assigned Attendee', 'intersoccer-player-management'), $player_name);
-            error_log('InterSoccer: Saved player to order item ' . $cart_item_key . ': ' . $player_name);
+            if (is_a($item, 'WC_Order_Item_Product')) {
+                $item->add_meta_data(__('Assigned Attendee', 'intersoccer-player-management'), $player_name);
+                error_log('InterSoccer: Saved player to order item ' . $cart_item_key . ': ' . $player_name);
+            } else {
+                error_log('InterSoccer: Invalid item type for player assignment in ' . $cart_item_key . ': ' . gettype($item));
+            }
         } else {
             error_log('InterSoccer: Invalid player index ' . $player_index . ' for order item ' . $cart_item_key);
         }
     }
 
+    // Save camp days
     if (isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
         $days = array_map('sanitize_text_field', $values['camp_days']);
         $days_display = implode(', ', $days);
-        $item->add_meta_data(__('Days Selected', 'intersoccer-player-management'), $days_display);
-        error_log('InterSoccer: Saved selected days to order item ' . $cart_item_key . ': ' . $days_display);
+        if (is_a($item, 'WC_Order_Item_Product')) {
+            $item->add_meta_data(__('Days Selected', 'intersoccer-player-management'), $days_display);
+            error_log('InterSoccer: Saved selected days to order item ' . $cart_item_key . ': ' . $days_display);
+        } else {
+            error_log('InterSoccer: Invalid item type for days selection in ' . $cart_item_key . ': ' . gettype($item));
+        }
     }
 
+    // Save remaining weeks discount
     $remaining_weeks = isset($values['remaining_weeks']) ? intval($values['remaining_weeks']) : 0;
     if ($remaining_weeks > 0) {
         $weeks_display = esc_html($remaining_weeks . ' Weeks Remaining');
-        $item->add_meta_data(__('Discount', 'intersoccer-player-management'), $weeks_display);
-        error_log('InterSoccer: Saved discount weeks to order item ' . $cart_item_key . ': ' . $weeks_display);
+        if (is_a($item, 'WC_Order_Item_Product')) {
+            $item->add_meta_data(__('Discount', 'intersoccer-player-management'), $weeks_display);
+            error_log('InterSoccer: Saved discount weeks to order item ' . $cart_item_key . ': ' . $weeks_display);
+        } else {
+            error_log('InterSoccer: Invalid item type for weeks discount in ' . $cart_item_key . ': ' . gettype($item));
+        }
     }
 
     // Save combo discount with fallback
@@ -840,25 +861,41 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
             $discount_note = '50% Course Combo Discount';
         }
     }
-    if ($discount_note) {
+    if ($discount_note && is_a($item, 'WC_Order_Item_Product')) {
         $item->add_meta_data(__('Discount Applied', 'intersoccer-player-management'), $discount_note);
         error_log('InterSoccer: Saved combo discount note to order item ' . $cart_item_key . ': ' . $discount_note);
+    } elseif (!is_a($item, 'WC_Order_Item_Product')) {
+        error_log('InterSoccer: Invalid item type for combo discount in ' . $cart_item_key . ': ' . gettype($item));
     }
 
-    // Save parent attributes
+    // Save parent attributes with item validation
     if (isset($values['parent_attributes']) && is_array($values['parent_attributes'])) {
+        if (!is_a($item, 'WC_Order_Item_Product')) {
+            error_log('InterSoccer: Invalid item type for parent attributes in ' . $cart_item_key . ': ' . gettype($item) . ', attempting to reinitialize');
+            $item_id = $item['item_id'] ?? $cart_item_key; // Fallback to cart_item_key if item_id is not set
+            $order_id = $order->get_id();
+            $item = new WC_Order_Item_Product();
+            $item->set_order_id($order_id);
+            $item->set_product_id($values['product_id']);
+            $item->set_quantity($values['quantity']);
+            // Note: This is a simplified reinitialization; full restoration may require more data
+        }
         foreach ($values['parent_attributes'] as $label => $value) {
-            $item->add_meta_data(esc_html($label), esc_html($value));
-            error_log('InterSoccer: Saved parent attribute to order item ' . $cart_item_key . ': ' . $label . ' = ' . $value);
+            if (is_a($item, 'WC_Order_Item_Product')) {
+                $item->add_meta_data(esc_html($label), esc_html($value));
+                error_log('InterSoccer: Saved parent attribute to order item ' . $cart_item_key . ': ' . $label . ' = ' . $value);
+            } else {
+                error_log('InterSoccer: Failed to save parent attribute ' . $label . ' for order item ' . $cart_item_key . ': item not a WC_Order_Item_Product');
+            }
         }
     }
 
-    // Assign downloads
-    $product_id = $item->get_product_id();
-    $variation_id = $item->get_variation_id();
+    // Assign downloads with item validation
+    $product_id = $item->get_product_id() ?: $values['product_id'];
+    $variation_id = $item->get_variation_id() ?: ($values['variation_id'] ?? 0);
     $product = wc_get_product($variation_id ?: $product_id);
 
-    if ($product) {
+    if ($product && is_a($item, 'WC_Order_Item_Product')) {
         $product_type = intersoccer_get_product_type($product_id);
         if (in_array($product_type, ['camp', 'course', 'birthday'])) {
             $downloads = get_post_meta($product_id, '_intersoccer_downloads', true);
@@ -875,6 +912,8 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
                 }
             }
         }
+    } else {
+        error_log('InterSoccer: Invalid product or item type for downloads in ' . $cart_item_key . ': ' . ($product ? 'Valid product' : 'Invalid product') . ', item type: ' . gettype($item));
     }
 }
 
