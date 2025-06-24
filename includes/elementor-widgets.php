@@ -17,6 +17,7 @@
  * - Delayed injection until window.load to ensure page is fully loaded (2025-05-27).
  * - Dynamically reposition .intersoccer-custom-price on found_variation event for variable products (2025-05-27).
  * - Removed .intersoccer-custom-price injection, using WooCommerce native price display (2025-05-27).
+ * - Updated to support multi-day selection validation and combo discount logging (2025-06-22).
  */
 
 // Prevent direct access
@@ -241,14 +242,31 @@ add_action('wp_footer', function () {
                     }
                     var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
                     if (bookingType === 'single-days') {
-                        var selectedDays = $form.find('input[name="camp_days[]"]').length;
-                        if (!selectedDays) {
+                        var selectedDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                        if (selectedDays.length === 0) {
                             e.preventDefault();
                             $form.find('.intersoccer-day-selection .error-message').text('Please select at least one day.').show();
                             setTimeout(() => $form.find('.intersoccer-day-selection .error-message').hide(), 5000);
+                        } else {
+                            console.log('InterSoccer: Submitting with selected days:', selectedDays);
                         }
                     }
                 });
+
+                // Handle booking type change to reset days
+                $form.find('select[name="attribute_pa_booking-type"]').on('change', function() {
+                    var bookingType = $(this).val();
+                    if (bookingType !== 'single-days') {
+                        $form.find('.intersoccer-day-selection').hide();
+                        $form.find('input[name="camp_days[]"]').remove();
+                        console.log('InterSoccer: Reset days selection for booking type: ' + bookingType);
+                    } else {
+                        $form.find('.intersoccer-day-selection').show();
+                        // Trigger variation check to update days
+                        $form.trigger('check_variations');
+                        console.log('InterSoccer: Enabled days selection for single-days booking type');
+                    }
+                }).trigger('change'); // Trigger on page load to set initial state
             } else {
                 console.error('InterSoccer: Product form not found for validation');
             }
