@@ -686,7 +686,8 @@ function intersoccer_handle_buy_now($cart_item_key, $product_id, $quantity, $var
  */
 add_filter('woocommerce_get_item_data', 'intersoccer_display_cart_item_data', 300, 2);
 function intersoccer_display_cart_item_data($item_data, $cart_item) {
-    error_log('InterSoccer: Entering intersoccer_display_cart_item_data for product ID: ' . ($cart_item['product_id'] ?? 'not set'));
+    $cart_item_key = isset($cart_item['key']) ? $cart_item['key'] : 'unknown'; // Fallback to 'unknown' if key is missing
+    error_log('InterSoccer: Entering intersoccer_display_cart_item_data for product ID: ' . ($cart_item['product_id'] ?? 'not set') . ', cart_item_key: ' . $cart_item_key);
     error_log('InterSoccer: Cart item data: ' . print_r($cart_item, true));
 
     // Handle Assigned Attendee
@@ -700,19 +701,19 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
                     'value' => $player_name,
                     'display' => $player_name
                 ];
-                error_log('InterSoccer: Added Assigned Attendee for item ' . ($cart_item['product_id'] ?? 'not set') . ': ' . $player_name);
+                error_log('InterSoccer: Added Assigned Attendee for item ' . ($cart_item['product_id'] ?? 'not set') . ' (key: ' . $cart_item_key . '): ' . $player_name);
             } else {
-                error_log('InterSoccer: Invalid player data for index ' . $cart_item['player_assignment'] . ': ' . print_r($player, true));
+                error_log('InterSoccer: Invalid player data for index ' . $cart_item['player_assignment'] . ' in item ' . ($cart_item['product_id'] ?? 'not set') . ' (key: ' . $cart_item_key . '): ' . print_r($player, true));
             }
         } catch (Exception $e) {
-            error_log('InterSoccer: Error in get_player_details for item ' . ($cart_item['product_id'] ?? 'not set') . ': ' . $e->getMessage());
+            error_log('InterSoccer: Error in get_player_details for item ' . ($cart_item['product_id'] ?? 'not set') . ' (key: ' . $cart_item_key . '): ' . $e->getMessage());
         }
     }
 
     // Handle Camp-specific fields (Days Selected message only)
     $product = wc_get_product($cart_item['product_id']);
     if (!$product) {
-        error_log('InterSoccer: Invalid product for item ' . ($cart_item['product_id'] ?? 'not set'));
+        error_log('InterSoccer: Invalid product for item ' . ($cart_item['product_id'] ?? 'not set') . ' (key: ' . $cart_item_key . ')');
         return $item_data;
     }
 
@@ -725,7 +726,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             'value' => $days_display,
             'display' => $days_display
         ];
-        error_log('InterSoccer: Added days selected for camp item ' . $cart_item['product_id'] . ': ' . $days_display);
+        error_log('InterSoccer: Added days selected for camp item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $days_display);
     }
 
     // Handle Course-specific fields (Discount message only)
@@ -736,7 +737,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             'value' => $weeks_display,
             'display' => $weeks_display
         ];
-        error_log('InterSoccer: Added discount attribute for course item ' . $cart_item['product_id'] . ': ' . $weeks_display);
+        error_log('InterSoccer: Added discount attribute for course item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $weeks_display);
     }
 
     // Handle combo discount display with fallback
@@ -766,7 +767,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             'value' => $discount_note,
             'display' => $discount_note
         ];
-        error_log('InterSoccer: Added combo discount note for item ' . $cart_item['product_id'] . ': ' . $discount_note);
+        error_log('InterSoccer: Added combo discount note for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $discount_note);
     }
 
     // Handle parent attributes
@@ -777,7 +778,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
                 'value' => esc_html($value),
                 'display' => esc_html($value)
             ];
-            error_log('InterSoccer: Added parent attribute for item ' . $cart_item['product_id'] . ': ' . $label . ' = ' . $value);
+            error_log('InterSoccer: Added parent attribute for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $label . ' = ' . $value);
         }
     }
 
