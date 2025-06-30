@@ -19,6 +19,7 @@
  * - Removed .intersoccer-custom-price injection, using WooCommerce native price display (2025-05-27).
  * - Updated to support multi-day selection validation and combo discount logging (2025-06-22).
  * - Added server-side preloading of days-of-week for Camps to speed up checkbox rendering (2025-06-26).
+ * - Updated button state logic to require player selection for all types and day selection for single-day camps (2025-10-15).
  */
 
 // Prevent direct access
@@ -171,6 +172,21 @@ add_action('wp_footer', function () {
                     console.log('InterSoccer: Add to Cart button disabled by default');
                 }
 
+                // Function to check form validity and update button state
+                function updateButtonState() {
+                    var playerSelected = $form.find('.player-select').val() !== '' && $form.find('.player-select').val() !== null;
+                    var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
+                    var daysSelected = bookingType === 'single-days' ? $form.find('.intersoccer-day-checkboxes input:checked').length > 0 : true;
+
+                    if (playerSelected && daysSelected) {
+                        $addToCartButton.prop('disabled', false);
+                        console.log('InterSoccer: Add to Cart button enabled - player selected:', playerSelected, ', days selected:', daysSelected);
+                    } else {
+                        $addToCartButton.prop('disabled', true);
+                        console.log('InterSoccer: Add to Cart button disabled - player selected:', playerSelected, ', days selected:', daysSelected);
+                    }
+                }
+
                 // Fetch player content for logged-in users
                 if (intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0') {
                     var $playerContent = $form.find('.intersoccer-player-content');
@@ -201,18 +217,19 @@ add_action('wp_footer', function () {
                                     $playerContent.html($select);
                                     $playerContent.append('<span class="error-message" style="color: red; display: none;"></span>');
 
-                                    // Enable Add to Cart button on player selection
+                                    // Update button state on player selection change
                                     $select.on('change', function() {
-                                        if (jQuery(this).val()) {
-                                            $addToCartButton.prop('disabled', false);
-                                            console.log('InterSoccer: Add to Cart button enabled');
-                                        } else {
-                                            $addToCartButton.prop('disabled', true);
-                                            console.log('InterSoccer: Add to Cart button disabled');
-                                        }
+                                        updateButtonState();
                                     });
+                                    // Update button state on day selection change
+                                    $form.find('.intersoccer-day-checkboxes input').on('change', function() {
+                                        updateButtonState();
+                                    });
+                                    // Initial check
+                                    updateButtonState();
                                 } else {
                                     $playerContent.html('<p>No players registered. <a href="<?php echo esc_url(wc_get_account_endpoint_url('manage-players')); ?>">Add a player</a>.</p>');
+                                    updateButtonState();
                                 }
                                 // Parse HTML for links
                                 $playerContent.find('p').each(function() {
@@ -222,14 +239,18 @@ add_action('wp_footer', function () {
                                 });
                             } else {
                                 $playerContent.html('<p>Error loading players: ' + (response.data ? response.data.message : 'Unknown error') + '</p>');
+                                updateButtonState();
                             }
                         },
                         error: function(xhr) {
                             clearTimeout(loadingTimeout);
                             console.error('InterSoccer: Failed to fetch players:', xhr.status, xhr.responseText);
                             $playerContent.html('<p>Error loading players: ' + (xhr.responseJSON && xhr.responseJSON.data ? xhr.responseJSON.data.message : 'Request failed') + '</p>');
+                            updateButtonState();
                         }
                     });
+                } else {
+                    updateButtonState();
                 }
             }
 
