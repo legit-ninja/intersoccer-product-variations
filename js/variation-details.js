@@ -13,6 +13,8 @@
  * - Removed player management (add/edit/delete) logic, retaining only selection (2025-06-09).
  * - Updated to fix AJAX response mismatch and ensure multi-day selection (2025-06-22).
  * - Adjusted to reflect combo discount updates (2025-06-22).
+ * - Added pre-population of days-of-week for Camps to improve load time and Cypress test reliability (2025-06-26).
+ * - Updated quantity to increment by the number of selected days for single-day Camps in the cart (2025-06-26).
  */
 
 jQuery(document).ready(function ($) {
@@ -256,6 +258,7 @@ jQuery(document).ready(function ($) {
       let lastVariationId = null;
       let lastBookingType = null;
       let lastValidPlayerId = "";
+      let availableDays = []; // Preload days for Camps
 
       function fetchProductType() {
         $.ajax({
@@ -270,6 +273,15 @@ jQuery(document).ready(function ($) {
             if (response.success && response.data.product_type) {
               productType = response.data.product_type;
               console.log("InterSoccer: Product type:", productType);
+              // Pre-fetch days if it's a Camp
+              if (productType === "camp") {
+                fetchDaysOfWeek(productId, 0).then((days) => {
+                  availableDays = days;
+                  console.log("InterSoccer: Pre-fetched days for Camp:", availableDays);
+                }).catch((error) => {
+                  console.error("InterSoccer: Failed to pre-fetch days:", error);
+                });
+              }
             }
           },
           error: function (xhr) {
@@ -284,7 +296,6 @@ jQuery(document).ready(function ($) {
 
       let selectedDays = [];
       let isProcessing = false;
-      let availableDays = [];
       let currentVariationId = null;
       let isCheckboxUpdate = false;
 
@@ -395,7 +406,7 @@ jQuery(document).ready(function ($) {
               })
               .get();
 
-            const quantity = 1;
+            const quantity = selectedDays.length || 1; // Set quantity based on selected days for single-days
             updateFormData(playerId, selectedDays, null, variationId);
 
             clearTimeout(window.intersoccerUpdateTimeout);
@@ -502,33 +513,39 @@ jQuery(document).ready(function ($) {
             }
             $daySelection.show();
             console.log("InterSoccer: Showing day selection row for Single Day(s) camp");
-            fetchDaysOfWeek(productId, variationId).then((days) => {
-              availableDays = days;
-              console.log("InterSoccer: Rendering checkboxes for days:", days);
-              const playerId = $form.find(".player-select").val() || "";
-              renderCheckboxes(days, $dayCheckboxes, $dayNotification, $errorMessage, playerId, variationId);
+
+            // Use pre-loaded days if available, otherwise fetch
+            const daysToUse = availableDays.length > 0 ? availableDays : [];
+            if (daysToUse.length === 0) {
+              fetchDaysOfWeek(productId, variationId).then((days) => {
+                availableDays = days;
+                renderCheckboxes(days, $dayCheckboxes, $dayNotification, $errorMessage, "", variationId);
+                currentVariationId = variationId;
+              }).catch((error) => {
+                console.error("InterSoccer: Failed to load days:", error);
+                $daySelection.hide();
+                $errorMessage.text("Failed to load days. Please try again.").show();
+                setTimeout(() => $errorMessage.hide(), 5000);
+              });
+            } else {
+              renderCheckboxes(daysToUse, $dayCheckboxes, $dayNotification, $errorMessage, "", variationId);
               currentVariationId = variationId;
+            }
 
-              // Update selectedDays and form data immediately
-              selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() {
-                return $(this).val();
-              }).get();
-              updateFormData(playerId, selectedDays, null, variationId);
+            // Update selectedDays and form data immediately
+            selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() {
+              return $(this).val();
+            }).get();
+            const quantity = selectedDays.length || 1; // Set quantity based on selected days
+            updateFormData("", selectedDays, null, variationId);
+            $form.find('input[name="quantity"]').val(quantity);
 
-              const quantity = 1;
-              $form.find('input[name="quantity"]').val(quantity);
-              updateAddToCartButtonState(playerId, selectedDays.length, "single-days");
+            updateAddToCartButtonState("", selectedDays.length, "single-days");
 
-              updateProductPrice(productId, variationId, selectedDays)
-                .catch((error) => {
-                  console.error("InterSoccer: Failed to update initial price for Camp:", error);
-                });
-            }).catch((error) => {
-              console.error("InterSoccer: Failed to load days:", error);
-              $daySelection.hide();
-              $errorMessage.text("Failed to load days. Please try again.").show();
-              setTimeout(() => $errorMessage.hide(), 5000);
-            });
+            updateProductPrice(productId, variationId, selectedDays)
+              .catch((error) => {
+                console.error("InterSoccer: Failed to update initial price for Camp:", error);
+              });
           } else {
             $daySelection.hide();
             selectedDays = [];
@@ -670,13 +687,20 @@ jQuery(document).ready(function ($) {
         if (playerId) data.player_assignment = playerId;
         if (selectedDays.length) data.camp_days = selectedDays;
         if (remainingWeeks !== undefined && remainingWeeks !== null) data.remaining_weeks = remainingWeeks;
+        // Set quantity based on selected days for single-day Camps
+        const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
+        if (bookingType === "single-days" && selectedDays.length > 0) {
+          data.quantity = selectedDays.length;
+        }
         console.log(
           "InterSoccer: Adding to cart - Player:",
           playerId,
           "Days:",
           selectedDays,
           "Remaining weeks:",
-          remainingWeeks
+          remainingWeeks,
+          "Quantity:",
+          data.quantity
         );
       });
 

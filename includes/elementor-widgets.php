@@ -18,6 +18,7 @@
  * - Dynamically reposition .intersoccer-custom-price on found_variation event for variable products (2025-05-27).
  * - Removed .intersoccer-custom-price injection, using WooCommerce native price display (2025-05-27).
  * - Updated to support multi-day selection validation and combo discount logging (2025-06-22).
+ * - Added server-side preloading of days-of-week for Camps to speed up checkbox rendering (2025-06-26).
  */
 
 // Prevent direct access
@@ -40,6 +41,29 @@ add_action('wp_footer', function () {
     $product_id = $product->get_id();
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
+    $product_type = intersoccer_get_product_type($product_id);
+
+    // Preload days-of-week for Camps
+    $preloaded_days = [];
+    if ($product_type === 'camp') {
+        $attributes = $product->get_attributes();
+        if (isset($attributes['pa_days-of-week']) && $attributes['pa_days-of-week'] instanceof WC_Product_Attribute) {
+            $terms = wc_get_product_terms($product_id, 'pa_days-of-week', ['fields' => 'names']);
+            if (!empty($terms)) {
+                $day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                usort($terms, function ($a, $b) use ($day_order) {
+                    $pos_a = array_search($a, $day_order);
+                    $pos_b = array_search($b, $day_order);
+                    if ($pos_a === false) $pos_a = count($day_order);
+                    if ($pos_b === false) $pos_b = count($day_order);
+                    return $pos_a - $pos_b;
+                });
+                $preloaded_days = $terms;
+            } else {
+                $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']; // Fallback
+            }
+        }
+    }
 
     // Player selection HTML
     ob_start();
@@ -59,12 +83,12 @@ add_action('wp_footer', function () {
     <?php
     $player_selection_html = ob_get_clean();
 
-    // Day selection HTML
+    // Day selection HTML with preloaded days
     $day_selection_html = '';
     if ($is_variable) {
         ob_start();
     ?>
-        <tr class="intersoccer-day-selection intersoccer-injected" style="display: none;">
+        <tr class="intersoccer-day-selection intersoccer-injected" style="display: none;" data-preloaded-days="<?php echo esc_attr(json_encode($preloaded_days)); ?>">
             <th><label><?php esc_html_e('Select Days', 'intersoccer-player-management'); ?></label></th>
             <td>
                 <div class="intersoccer-day-checkboxes"></div>
@@ -253,18 +277,48 @@ add_action('wp_footer', function () {
                     }
                 });
 
-                // Handle booking type change to reset days
+                // Handle booking type change to reset days and render preloaded checkboxes
                 $form.find('select[name="attribute_pa_booking-type"]').on('change', function() {
                     var bookingType = $(this).val();
+                    var $daySelection = $form.find('.intersoccer-day-selection');
+                    var $dayCheckboxes = $form.find('.intersoccer-day-checkboxes');
+                    var $dayNotification = $form.find('.intersoccer-day-notification');
+                    var $errorMessage = $form.find('.intersoccer-day-selection .error-message');
+                    var preloadedDays = JSON.parse($daySelection.attr('data-preloaded-days') || '[]');
+
                     if (bookingType !== 'single-days') {
-                        $form.find('.intersoccer-day-selection').hide();
+                        $daySelection.hide();
                         $form.find('input[name="camp_days[]"]').remove();
                         console.log('InterSoccer: Reset days selection for booking type: ' + bookingType);
                     } else {
-                        $form.find('.intersoccer-day-selection').show();
-                        // Trigger variation check to update days
-                        $form.trigger('check_variations');
-                        console.log('InterSoccer: Enabled days selection for single-days booking type');
+                        $daySelection.show();
+                        console.log('InterSoccer: Enabled days selection for single-days booking type with preloaded days:', preloadedDays);
+
+                        // Render preloaded checkboxes immediately
+                        if (preloadedDays.length > 0) {
+                            $dayCheckboxes.empty();
+                            preloadedDays.forEach((day) => {
+                                $dayCheckboxes.append(`
+                                    <label style="margin-right: 10px; display: inline-block;">
+                                        <input type="checkbox" name="camp_days_temp[]" value="${day}"> ${day}
+                                    </label>
+                                `);
+                            });
+                            $dayCheckboxes.find('input[type="checkbox"]').on('change', function() {
+                                var selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() {
+                                    return $(this).val();
+                                }).get();
+                                $form.find('input[name="camp_days[]"]').remove();
+                                selectedDays.forEach((day) => {
+                                    $form.append(`<input type="hidden" name="camp_days[]" value="${day}">`);
+                                });
+                                console.log('InterSoccer: Updated selected days:', selectedDays);
+                                $form.trigger('check_variations');
+                            });
+                        } else {
+                            console.warn('InterSoccer: No preloaded days available, triggering AJAX fetch');
+                            $form.trigger('check_variations'); // Fallback to AJAX
+                        }
                     }
                 }).trigger('change'); // Trigger on page load to set initial state
             } else {

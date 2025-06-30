@@ -4,24 +4,6 @@
  * Description: Customizes WooCommerce functionality for the InterSoccer Player Management plugin.
  * Dependencies: WooCommerce
  * Author: Jeremy Lee
- * Changes (Summarized):
- * - Initial implementation with price calculations, session management, and cart item handling (2025-05-26).
- * - Enhanced security, fixed price display, and improved product type detection (2025-05-27).
- * - Added dynamic price calculation via AJAX and removed manual subtotal adjustments (2025-05-27).
- * - Persisted adjusted price in cart session for correct totals (2025-05-27).
- * - Added defensive checks to prevent fatal error when adding Courses to cart (2025-05-27).
- * - Added all product attributes to order email details (2025-06-03).
- * - Fixed attribute retrieval to use parent product attributes and prevent duplication (2025-06-03).
- * - Fixed multiple attribute/meta repetitions in order emails using static flag (2025-06-03).
- * - Updated to append visible, non-variation parent attributes to cart item data (2025-06-03).
- * - Enhanced attribute retrieval to include all visible, non-variation parent attributes and debug missing attributes (2025-06-03).
- * - Fixed syntax errors and ensured complete attribute inclusion in cart item data (2025-06-03).
- * - Added admin option to update existing Processing orders with parent product attributes (2025-06-03).
- * - Refined attribute filtering to exclude variation attributes and added safe backporting with fix option (2025-06-03).
- * - Added support for event-specific downloadable PDFs for Camps, Courses, and Birthdays (2025-06-03).
- * - Removed product type filtering for order updates to process all orders (2025-06-03).
- * - Removed assigned_player from order details and added option to delete it from existing orders (2025-06-03).
- * - Updated validation to handle multi-day selection for Single Day(s) camps and ensured consistent camp_days processing (2025-06-22).
  */
 
 // Prevent direct access
@@ -954,13 +936,39 @@ function intersoccer_cart_item_subtotal($subtotal_html, $cart_item, $cart_item_k
 // Prevent quantity changes in cart for all products
 add_filter('woocommerce_cart_item_quantity', 'intersoccer_cart_item_quantity', 10, 3);
 function intersoccer_cart_item_quantity($quantity_html, $cart_item_key, $cart_item) {
-    return '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+    $product_id = $cart_item['product_id'];
+    $product_type = intersoccer_get_product_type($product_id);
+    $variation_id = $cart_item['variation_id'] ?: $product_id;
+    $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true) ?: 'full-week';
+
+    if ($product_type === 'camp' && $booking_type === 'single-days' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
+        $days_count = count($cart_item['camp_days']);
+        $quantity_html = '<span class="cart-item-quantity">' . esc_html($days_count) . ' day(s)</span>';
+        error_log('InterSoccer: Updated quantity for single-day Camp ' . $cart_item_key . ' to ' . $days_count . ' day(s)');
+    } else {
+        $quantity_html = '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+    }
+
+    return $quantity_html;
 }
 
 // Prevent quantity changes in checkout
 add_filter('woocommerce_checkout_cart_item_quantity', 'intersoccer_checkout_cart_item_quantity', 10, 3);
 function intersoccer_checkout_cart_item_quantity($quantity_html, $cart_item, $cart_item_key) {
-    return '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+    $product_id = $cart_item['product_id'];
+    $product_type = intersoccer_get_product_type($product_id);
+    $variation_id = $cart_item['variation_id'] ?: $product_id;
+    $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true) ?: 'full-week';
+
+    if ($product_type === 'camp' && $booking_type === 'single-days' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
+        $days_count = count($cart_item['camp_days']);
+        $quantity_html = '<span class="cart-item-quantity">' . esc_html($days_count) . ' day(s)</span>';
+        error_log('InterSoccer: Updated quantity for single-day Camp ' . $cart_item_key . ' in checkout to ' . $days_count . ' day(s)');
+    } else {
+        $quantity_html = '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+    }
+
+    return $quantity_html;
 }
 
 // Helper function to retrieve player details
