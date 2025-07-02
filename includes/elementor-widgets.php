@@ -20,6 +20,7 @@ add_action('wp_footer', function () {
     // Get current product
     global $product;
     if (!is_a($product, 'WC_Product')) {
+        error_log('InterSoccer: No valid product found on product page');
         return;
     }
 
@@ -27,6 +28,7 @@ add_action('wp_footer', function () {
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = intersoccer_get_product_type($product_id);
+    error_log("InterSoccer: Initializing first wp_footer for product ID: $product_id, product type: $product_type");
 
     // Preload days-of-week for Camps
     $preloaded_days = [];
@@ -49,6 +51,7 @@ add_action('wp_footer', function () {
             }
         }
     }
+    error_log('InterSoccer: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
 
     // Player selection HTML
     ob_start();
@@ -74,7 +77,7 @@ add_action('wp_footer', function () {
     if ($is_variable) {
         ob_start();
     ?>
-        <tr class="intersoccer-day-selection intersoccer-injected" style="display: none;" data-preloaded-days="<?php echo esc_attr(json_encode($preloaded_days)); ?>">
+        <tr class="intersoccer-day-selection intersoccer-injected" style="display: none;" data-preloaded-days="<?php echo esc_attr(json_encode($preloaded_days, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS)); ?>">
             <th><label><?php esc_html_e('Select Days', 'intersoccer-player-management'); ?></label></th>
             <td>
                 <div class="intersoccer-day-checkboxes"></div>
@@ -231,9 +234,20 @@ add_action('wp_footer', function () {
         return;
     }
     global $product;
+    if (!is_a($product, 'WC_Product')) {
+        error_log('InterSoccer: No valid product found for second wp_footer');
+        return;
+    }
     $product_id = $product->get_id();
     $product_type = intersoccer_get_product_type($product_id);
+    error_log("InterSoccer: Initializing second wp_footer for product ID: $product_id, product type: $product_type");
 ?>
+    <style>
+        .intersoccer-day-checkboxes input[type="checkbox"] {
+            pointer-events: auto !important;
+            opacity: 1 !important;
+        }
+    </style>
     <script>
         jQuery(document).ready(function($) {
             // Find the product form
@@ -242,6 +256,9 @@ add_action('wp_footer', function () {
                 $form = $('.woocommerce-product-details form.cart, .product form.cart, .single-product form.cart');
             }
             if ($form.length) {
+                // Store selected days globally
+                var selectedDays = [];
+
                 // Handle form submission
                 $form.on('submit', function(e) {
                     var playerId = $form.find('.player-select').val();
@@ -255,19 +272,19 @@ add_action('wp_footer', function () {
                     }
                     var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
                     if (bookingType === 'single-days') {
-                        var selectedDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
-                        if (selectedDays.length === 0) {
+                        var formDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                        if (formDays.length === 0) {
                             e.preventDefault();
                             $form.find('.intersoccer-day-selection .error-message').text('Please select at least one day.').show();
                             setTimeout(() => $form.find('.intersoccer-day-selection .error-message').hide(), 5000);
                             console.log('InterSoccer: Form submission blocked - no days selected');
                             return false;
                         } else {
-                            console.log('InterSoccer: Submitting with selected days:', selectedDays);
+                            console.log('InterSoccer: Submitting with selected days:', formDays);
                         }
                     }
                     // Ensure quantity is 1 for camps and courses
-                    var productType = '<?php echo $product_type; ?>';
+                    var productType = '<?php echo esc_js($product_type); ?>';
                     if (productType === 'camp' || productType === 'course') {
                         var $quantityInput = $form.find('input[name="quantity"], .quantity input[type="number"], .qty');
                         if ($quantityInput.val() !== '1') {
@@ -289,65 +306,86 @@ add_action('wp_footer', function () {
                     }
                 });
 
-                // Handle booking type change to reset days and render preloaded checkboxes
+                // Function to render day selection checkboxes
+                function renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form) {
+                    var preloadedDays = JSON.parse($daySelection.attr('data-preloaded-days') || '[]');
+                    console.log('InterSoccer: renderDayCheckboxes called, bookingType:', bookingType, 'preloadedDays:', preloadedDays, 'current selectedDays:', selectedDays);
+
+                    if (bookingType === 'single-days' && preloadedDays.length > 0) {
+                        $daySelection.show();
+                        // Preserve existing checked states
+                        var currentChecked = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() {
+                            return $(this).val();
+                        }).get();
+                        $dayCheckboxes.empty();
+                        preloadedDays.forEach((day) => {
+                            var isChecked = currentChecked.includes(day) || selectedDays.includes(day) ? 'checked' : '';
+                            $dayCheckboxes.append(`
+                                <label style="margin-right: 10px; display: inline-block;">
+                                    <input type="checkbox" name="camp_days_temp[]" value="${day}" class="intersoccer-day-checkbox" ${isChecked}> ${day}
+                                </label>
+                            `);
+                        });
+                        // Ensure checkboxes are not disabled
+                        $dayCheckboxes.find('input.intersoccer-day-checkbox').prop('disabled', false);
+                        console.log('InterSoccer: Ensured day checkboxes are not disabled');
+
+                        $dayCheckboxes.find('input.intersoccer-day-checkbox').off('change').on('change', function() {
+                            var $checkbox = $(this);
+                            console.log('InterSoccer: Checkbox change for day:', $checkbox.val(), 'checked:', $checkbox.prop('checked'));
+
+                            selectedDays = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() {
+                                return $(this).val();
+                            }).get();
+                            $form.find('input[name="camp_days[]"]').remove();
+                            selectedDays.forEach((day) => {
+                                $form.append(`<input type="hidden" name="camp_days[]" value="${day}" class="intersoccer-camp-day-input">`);
+                            });
+                            console.log('InterSoccer: Updated selected days:', selectedDays);
+                            console.log('InterSoccer: Hidden camp_days inputs:', $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get());
+
+                            // Trigger price update
+                            updatePrice(selectedDays);
+                            // Update button state
+                            $form.trigger('intersoccer_update_button_state');
+                        });
+                        console.log('InterSoccer: Rendered day selection checkboxes for single-days booking type');
+                    } else {
+                        $daySelection.hide();
+                        $form.find('input[name="camp_days[]"]').remove();
+                        selectedDays = [];
+                        console.log('InterSoccer: Hid day selection, bookingType:', bookingType, 'preloadedDays length:', preloadedDays.length);
+                    }
+                }
+
+                // Handle booking type change
                 $form.find('select[name="attribute_pa_booking-type"]').on('change', function() {
                     var bookingType = $(this).val();
                     var $daySelection = $form.find('.intersoccer-day-selection');
                     var $dayCheckboxes = $form.find('.intersoccer-day-checkboxes');
-                    var $dayNotification = $form.find('.intersoccer-day-notification');
-                    var $errorMessage = $form.find('.intersoccer-day-selection .error-message');
-                    var preloadedDays = JSON.parse($daySelection.attr('data-preloaded-days') || '[]');
                     console.log('InterSoccer: Booking type changed to:', bookingType);
 
-                    if (bookingType !== 'single-days') {
-                        $daySelection.hide();
-                        $form.find('input[name="camp_days[]"]').remove();
-                        console.log('InterSoccer: Reset days selection for booking type: ' + bookingType);
-                        // Trigger price update with no days
-                        updatePrice([]);
-                    } else {
-                        $daySelection.show();
-                        console.log('InterSoccer: Enabled days selection for single-days booking type with preloaded days:', preloadedDays);
-
-                        // Render preloaded checkboxes immediately
-                        if (preloadedDays.length > 0) {
-                            $dayCheckboxes.empty();
-                            preloadedDays.forEach((day) => {
-                                $dayCheckboxes.append(`
-                                    <label style="margin-right: 10px; display: inline-block;">
-                                        <input type="checkbox" name="camp_days_temp[]" value="${day}"> ${day}
-                                    </label>
-                                `);
-                            });
-                            $dayCheckboxes.find('input[type="checkbox"]').on('change', function() {
-                                var selectedDays = $dayCheckboxes.find('input[type="checkbox"]:checked').map(function() {
-                                    return $(this).val();
-                                }).get();
-                                $form.find('input[name="camp_days[]"]').remove();
-                                selectedDays.forEach((day) => {
-                                    $form.append(`<input type="hidden" name="camp_days[]" value="${day}">`);
-                                });
-                                console.log('InterSoccer: Updated selected days:', selectedDays);
-                                $form.trigger('check_variations');
-                                // Trigger price update
-                                updatePrice(selectedDays);
-                            });
-                        } else {
-                            console.warn('InterSoccer: No preloaded days available, triggering AJAX fetch');
-                            $form.trigger('check_variations');
-                        }
-                    }
-                    // Update button state and notification
+                    renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
+                    // Trigger price update
+                    updatePrice(selectedDays);
+                    // Update button state
                     $form.trigger('intersoccer_update_button_state');
-                }).trigger('change'); // Trigger on page load to set initial state
+                });
 
-                // Handle variation change to update price
+                // Handle variation change to update price and day selection
                 $form.on('found_variation', function(event, variation) {
                     console.log('InterSoccer: found_variation event triggered, variation:', variation);
-                    var selectedDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
-                    var variationId = variation ? variation.variation_id : 0;
+                    var variationId = variation && variation.variation_id ? variation.variation_id : 0;
                     var productId = <?php echo json_encode($product_id); ?>;
-                    console.log('InterSoccer: Triggering price update with variation_id:', variationId, 'selected days:', selectedDays);
+                    var bookingType = variation && variation.attributes['attribute_pa_booking-type'] ? variation.attributes['attribute_pa_booking-type'] : ($form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val() || '');
+                    var $daySelection = $form.find('.intersoccer-day-selection');
+                    var $dayCheckboxes = $form.find('.intersoccer-day-checkboxes');
+                    console.log('InterSoccer: Variation data - variation_id:', variationId, 'bookingType:', bookingType, 'selectedDays:', selectedDays);
+
+                    // Only render checkboxes if booking type changes to single-days
+                    if (bookingType === 'single-days') {
+                        renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
+                    }
                     updatePrice(selectedDays, variationId);
                     // Update button state
                     $form.trigger('intersoccer_update_button_state');
@@ -377,12 +415,15 @@ add_action('wp_footer', function () {
                             success: function(response) {
                                 console.log('InterSoccer: Price update response:', response);
                                 if (response.success && response.data.price) {
-                                    var $priceContainer = $form.find('.woocommerce-variation-price .amount, .product-price .amount, .price .amount');
-                                    if ($priceContainer.length) {
-                                        $priceContainer.html(response.data.price);
+                                    var $priceContainers = $form.find('.woocommerce-variation-price .amount, .product-price .amount, .price .amount, .single_variation .amount, .woocommerce-Price-amount.amount, .price');
+                                    console.log('InterSoccer: Found price containers:', $priceContainers.length, 'elements:', $priceContainers.get());
+                                    if ($priceContainers.length) {
+                                        $priceContainers.each(function() {
+                                            $(this).html(response.data.price);
+                                        });
                                         console.log('InterSoccer: Updated price display to:', response.data.price);
                                     } else {
-                                        console.error('InterSoccer: Price container not found for update. Tried selectors: .woocommerce-variation-price .amount, .product-price .amount, .price .amount');
+                                        console.error('InterSoccer: Price container not found. Tried selectors: .woocommerce-variation-price .amount, .product-price .amount, .price .amount, .single_variation .amount, .woocommerce-Price-amount.amount, .price');
                                     }
                                 } else {
                                     console.error('InterSoccer: Failed to update price:', response.data ? response.data.message : 'Unknown error');
@@ -402,8 +443,11 @@ add_action('wp_footer', function () {
                     var $addToCartButton = $form.find('button.single_add_to_cart_button');
                     var playerSelected = $form.find('.player-select').val() !== '' && $form.find('.player-select').val() !== null;
                     var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
-                    var daysSelected = bookingType === 'single-days' ? $form.find('.intersoccer-day-checkboxes input:checked').length > 0 : true;
+                    var formDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                    var daysSelected = bookingType === 'single-days' ? formDays.length > 0 : true;
                     var isLoggedIn = intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0';
+
+                    console.log('InterSoccer: updateButtonState called - playerSelected:', playerSelected, 'daysSelected:', daysSelected, 'selectedDays:', selectedDays, 'formDays:', formDays);
 
                     if (playerSelected && daysSelected) {
                         $addToCartButton.prop('disabled', false);
@@ -429,17 +473,32 @@ add_action('wp_footer', function () {
                 $form.on('intersoccer_update_button_state', updateButtonState);
 
                 // Update button state on player selection change
-                $form.find('.player-select').on('change', function() {
+                $form.find('.player-select').off('change').on('change', function() {
                     console.log('InterSoccer: Player selection changed, updating button state');
                     $form.trigger('intersoccer_update_button_state');
                 });
 
                 // Update button state on day selection change
-                $form.find('.intersoccer-day-checkboxes input').on('change', function() {
+                $form.find('.intersoccer-day-checkboxes input').off('change').on('change', function() {
                     console.log('InterSoccer: Day selection changed, updating button state');
                     $form.trigger('intersoccer_update_button_state');
                 });
 
+                // Initial check for booking type and render day checkboxes
+                var productType = '<?php echo esc_js($product_type); ?>';
+                var initialBookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val() || '';
+                var $daySelection = $form.find('.intersoccer-day-selection');
+                var $dayCheckboxes = $form.find('.intersoccer-day-checkboxes');
+                console.log('InterSoccer: Initial booking type on page load:', initialBookingType, 'productType:', productType);
+                if (productType === 'camp' && initialBookingType === 'single-days') {
+                    renderDayCheckboxes(initialBookingType, $daySelection, $dayCheckboxes, $form);
+                }
+
+                // Trigger initial variation check with delay to ensure form initialization
+                setTimeout(function() {
+                    $form.trigger('check_variations');
+                    console.log('InterSoccer: Triggered check_variations after 500ms delay');
+                }, 500);
                 // Initial button state check
                 $form.trigger('intersoccer_update_button_state');
             } else {

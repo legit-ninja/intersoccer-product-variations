@@ -85,7 +85,7 @@ function intersoccer_get_days_of_week()
     }
 
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
-        error_log('InterSoccer: Invalid product or variation ID in intersoccer_get_days_of_week');
+        error_log('InterSoccer: Invalid or missing product_id or variation_id in intersoccer_get_days_of_week. product_id: ' . ($_POST['product_id'] ?? 'not set') . ', variation_id: ' . ($_POST['variation_id'] ?? 'not set'));
         wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-product-variations')], 400);
         return;
     }
@@ -94,7 +94,7 @@ function intersoccer_get_days_of_week()
     $variation_id = absint($_POST['variation_id']);
     $product = wc_get_product($variation_id);
     if (!$product) {
-        error_log('InterSoccer: Product not found for ID: ' . $variation_id);
+        error_log('InterSoccer: Product not found for variation_id: ' . $variation_id . ', product_id: ' . $product_id);
         wp_send_json_error(['message' => __('Product not found.', 'intersoccer-product-variations')], 404);
         return;
     }
@@ -106,8 +106,8 @@ function intersoccer_get_days_of_week()
     $days = wc_get_product_terms($parent_id, $attribute_name, ['fields' => 'names']);
 
     if (empty($days)) {
-        error_log('InterSoccer: No days of the week found for parent product ID: ' . $parent_id . '. Ensure pa_days-of-week attribute is set.');
-        $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]; // Fallback
+        error_log('InterSoccer: No days of the week found for parent product ID: ' . $parent_id . '. Returning fallback days.');
+        $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     } else {
         $day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         usort($days, function ($a, $b) use ($day_order) {
@@ -207,7 +207,6 @@ function intersoccer_get_course_metadata()
     wp_send_json_success($metadata);
 }
 
-
 /**
  * Apply combo discounts based on cart contents.
  *
@@ -302,5 +301,71 @@ function apply_combo_discounts($cart_item_key, $product_type, $player_id, $seaso
     }
 
     return $discount;
+}
+
+// Calculate dynamic price for a variation
+add_action('wp_ajax_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price');
+add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price');
+function intersoccer_calculate_dynamic_price() {
+    if (ob_get_length()) {
+        ob_clean();
+    }
+
+    error_log('InterSoccer: intersoccer_calculate_dynamic_price called');
+    error_log('InterSoccer: POST data: ' . print_r($_POST, true));
+
+    $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
+    if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
+        error_log('InterSoccer: Nonce verification failed for intersoccer_calculate_dynamic_price. Provided nonce: ' . $nonce);
+        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
+        return;
+    }
+
+    if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
+        error_log('InterSoccer: Invalid or missing product_id or variation_id in intersoccer_calculate_dynamic_price. product_id: ' . ($_POST['product_id'] ?? 'not set') . ', variation_id: ' . ($_POST['variation_id'] ?? 'not set'));
+        wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-product-variations')], 400);
+        return;
+    }
+
+    $product_id = absint($_POST['product_id']);
+    $variation_id = absint($_POST['variation_id']);
+    $selected_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
+    $remaining_weeks = isset($_POST['remaining_weeks']) ? absint($_POST['remaining_weeks']) : null;
+
+    error_log('InterSoccer: Calculating price for product_id: ' . $product_id . ', variation_id: ' . $variation_id . ', selected_days: ' . json_encode($selected_days) . ', remaining_weeks: ' . $remaining_weeks);
+
+    $product = wc_get_product($variation_id);
+    if (!$product) {
+        error_log('InterSoccer: Product not found for variation_id: ' . $variation_id);
+        wp_send_json_error(['message' => __('Product not found.', 'intersoccer-product-variations')], 404);
+        return;
+    }
+
+    $product_type = intersoccer_get_product_type($product_id);
+    $base_price = floatval($product->get_price());
+    $price = $base_price;
+
+    if ($product_type === 'camp' && !empty($selected_days)) {
+        $price_per_day = $base_price; // Base price is per day for single-days
+        $price = $price_per_day * count($selected_days);
+        error_log('InterSoccer: Calculated Camp price for ' . $variation_id . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($selected_days) . ', selected_days: ' . json_encode($selected_days) . ')');
+    } elseif ($product_type === 'course' && $remaining_weeks !== null) {
+        $weekly_discount = floatval(get_post_meta($variation_id, 'weekly_discount', true));
+        $price = $base_price * $remaining_weeks * (1 - ($weekly_discount / 100));
+        error_log('InterSoccer: Calculated Course price for ' . $variation_id . ': ' . $price . ' (base price: ' . $base_price . ', remaining weeks: ' . $remaining_weeks . ', discount: ' . $weekly_discount . '%)');
+    }
+
+    $formatted_price = wc_price($price);
+    $response = [
+        'price' => $formatted_price,
+        'raw_price' => $price
+    ];
+
+    // Store in session for cart consistency
+    WC()->session->set('intersoccer_selected_days_' . $variation_id, $selected_days);
+    WC()->session->set('intersoccer_calculated_price_' . $variation_id, $price);
+    error_log('InterSoccer: Session data updated for product ' . $product_id . ', selected_days: ' . json_encode($selected_days) . ', price: ' . $price);
+
+    wp_send_json_success($response);
 }
 ?>
