@@ -489,7 +489,10 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         return $cart_item_data;
     }
 
-    // Add player assignment (use player_assignment, not assigned_player)
+    // Log incoming POST data for debugging
+    error_log('InterSoccer: intersoccer_add_cart_item_data POST data: ' . print_r($_POST, true));
+
+    // Add player assignment
     if (isset($_POST['player_assignment'])) {
         $cart_item_data['player_assignment'] = sanitize_text_field($_POST['player_assignment']);
         error_log('InterSoccer: Added player to cart via POST: ' . $cart_item_data['player_assignment']);
@@ -547,9 +550,21 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
         }
     }
 
-    // Add visible, non-variation parent attributes
+    // Enforce quantity of 1 for single-days camps
     $product_type = intersoccer_get_product_type($product_id);
+    if ($product_type === 'camp') {
+        $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
+        if ($booking_type === 'single-days') {
+            $cart_item_data['quantity'] = 1;
+            error_log('InterSoccer: Enforced quantity of 1 for single-days camp: product_id=' . $product_id . ', variation_id=' . $variation_id . ', camp_days=' . print_r($cart_item_data['camp_days'] ?? [], true));
+        }
+    }
+
+    // Add visible, non-variation parent attributes
     $cart_item_data['parent_attributes'] = intersoccer_get_parent_attributes($product, $product_type);
+
+    // Log final cart item data
+    error_log('InterSoccer: Final cart item data for product_id=' . $product_id . ', variation_id=' . $variation_id . ': ' . print_r($cart_item_data, true));
 
     $is_processing = false;
     return $cart_item_data;
@@ -581,6 +596,17 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
         return $cart_item_data;
     }
 
+    // Enforce quantity of 1 for single-days camps
+    $product_type = intersoccer_get_product_type($product_id);
+    if ($product_type === 'camp') {
+        $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
+        if ($booking_type === 'single-days') {
+            $cart_item_data['quantity'] = 1;
+            WC()->cart->cart_contents[$cart_item_key]['quantity'] = 1;
+            error_log('InterSoccer: Enforced quantity of 1 for single-days camp in cart item ' . $cart_item_key . ': product_id=' . $product_id . ', variation_id=' . $variation_id . ', camp_days=' . print_r($cart_item_data['camp_days'] ?? [], true));
+        }
+    }
+
     if (isset($cart_item_data['remaining_weeks'])) {
         WC()->cart->cart_contents[$cart_item_key]['remaining_weeks'] = intval($cart_item_data['remaining_weeks']);
         error_log('InterSoccer: Reinforced remaining weeks for cart item ' . $cart_item_key . ': ' . $cart_item_data['remaining_weeks']);
@@ -600,14 +626,16 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
     $cart_item_data['data']->set_price($base_price);
     $cart_item_data['intersoccer_calculated_price'] = $base_price; // Store base price for reference
     $cart_item_data['intersoccer_base_price'] = $base_price; // Store base price for reference
-    error_log('InterSoccer: Set server-side base price for cart item ' . $cart_item_key . ': ' . $base_price);
+    error_log('InterSoccer: Set server-side base price for cart item ' . $cart_item_key . ': ' . $base_price . ', quantity: ' . $cart_item_data['quantity']);
 
-    // Ensure the price is persisted in the session
+    // Ensure the price and quantity are persisted in the session
     if (isset(WC()->cart->cart_contents[$cart_item_key]) && isset(WC()->cart->cart_contents[$cart_item_key]['data']) && WC()->cart->cart_contents[$cart_item_key]['data'] instanceof WC_Product) {
         WC()->cart->cart_contents[$cart_item_key]['data']->set_price($base_price);
+        WC()->cart->cart_contents[$cart_item_key]['quantity'] = $cart_item_data['quantity'];
         WC()->cart->set_session(); // Persist the cart session
+        error_log('InterSoccer: Persisted price ' . $base_price . ' and quantity ' . $cart_item_data['quantity'] . ' in cart session for item ' . $cart_item_key);
     } else {
-        error_log('InterSoccer: Unable to persist price in cart session for item ' . $cart_item_key . ': invalid cart contents or data');
+        error_log('InterSoccer: Unable to persist price or quantity in cart session for item ' . $cart_item_key . ': invalid cart contents or data');
     }
 
     return $cart_item_data;
@@ -943,10 +971,11 @@ function intersoccer_cart_item_quantity($quantity_html, $cart_item_key, $cart_it
 
     if ($product_type === 'camp' && $booking_type === 'single-days' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
         $days_count = count($cart_item['camp_days']);
-        $quantity_html = '<span class="cart-item-quantity">' . esc_html($days_count) . ' day(s)</span>';
-        error_log('InterSoccer: Updated quantity for single-day Camp ' . $cart_item_key . ' to ' . $days_count . ' day(s)');
+        $quantity_html = '<span class="cart-item-quantity">1 (' . esc_html($days_count) . ' day(s))</span>';
+        error_log('InterSoccer: Updated quantity display for single-day camp ' . $cart_item_key . ': 1 item, ' . $days_count . ' day(s), camp_days=' . print_r($cart_item['camp_days'], true));
     } else {
         $quantity_html = '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+        error_log('InterSoccer: Quantity display for non-single-day item ' . $cart_item_key . ': ' . $cart_item['quantity']);
     }
 
     return $quantity_html;
@@ -962,10 +991,11 @@ function intersoccer_checkout_cart_item_quantity($quantity_html, $cart_item, $ca
 
     if ($product_type === 'camp' && $booking_type === 'single-days' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
         $days_count = count($cart_item['camp_days']);
-        $quantity_html = '<span class="cart-item-quantity">' . esc_html($days_count) . ' day(s)</span>';
-        error_log('InterSoccer: Updated quantity for single-day Camp ' . $cart_item_key . ' in checkout to ' . $days_count . ' day(s)');
+        $quantity_html = '<span class="cart-item-quantity">1 (' . esc_html($days_count) . ' day(s))</span>';
+        error_log('InterSoccer: Updated checkout quantity display for single-day camp ' . $cart_item_key . ': 1 item, ' . $days_count . ' day(s), camp_days=' . print_r($cart_item['camp_days'], true));
     } else {
         $quantity_html = '<span class="cart-item-quantity">' . esc_html($cart_item['quantity']) . '</span>';
+        error_log('InterSoccer: Checkout quantity display for non-single-day item ' . $cart_item_key . ': ' . $cart_item['quantity']);
     }
 
     return $quantity_html;
