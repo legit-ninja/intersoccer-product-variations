@@ -446,14 +446,19 @@ add_action('wp_footer', function () {
                     var formDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
                     var daysSelected = bookingType === 'single-days' ? formDays.length > 0 : true;
                     var isLoggedIn = intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0';
-
+                    // Handle Stripe Express Checkout container visibility
+                    var $expressContainer = jQuery('.wc-stripe-product-checkout-container');
                     console.log('InterSoccer: updateButtonState called - playerSelected:', playerSelected, 'daysSelected:', daysSelected, 'selectedDays:', selectedDays, 'formDays:', formDays);
 
                     if (playerSelected && daysSelected) {
                         $addToCartButton.prop('disabled', false);
                         $form.find('.intersoccer-attendee-notification').hide();
+                        $expressContainer.show();
+                        console.log('InterSoccer: Showing Express Checkout container - conditions met');
                         console.log('InterSoccer: Add to Cart button enabled - player selected:', playerSelected, ', days selected:', daysSelected);
                     } else {
+                        $expressContainer.hide();
+                        console.log('InterSoccer: Hiding Express Checkout container - attendee or days not selected');
                         $addToCartButton.prop('disabled', true);
                         if (!playerSelected) {
                             if (isLoggedIn) {
@@ -468,7 +473,7 @@ add_action('wp_footer', function () {
                         }
                     }
                 }
-
+                
                 // Custom event to update button state
                 $form.on('intersoccer_update_button_state', updateButtonState);
 
