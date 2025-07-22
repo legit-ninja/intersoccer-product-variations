@@ -88,32 +88,37 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
     ?>
     <div class="form-row form-row-full">
         <label><?php esc_html_e('Holiday/Skip Dates', 'intersoccer-player-management'); ?></label>
-        <div id="intersoccer-holiday-dates-container">
+        <div id="intersoccer-holiday-dates-container-<?php echo esc_attr($loop); ?>">
             <?php foreach ($holiday_dates as $index => $date) : ?>
                 <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
                     <input type="date" name="intersoccer_holiday_dates[<?php echo esc_attr($loop); ?>][<?php echo esc_attr($index); ?>]" value="<?php echo esc_attr($date); ?>" style="margin-right: 10px;">
-                    <button type="button" class="button intersoccer-remove-holiday"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                    <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
                 </div>
             <?php endforeach; ?>
         </div>
-        <button type="button" id="intersoccer-add-holiday" class="button"><?php esc_html_e('Add Holiday Date', 'intersoccer-player-management'); ?></button>
+        <button type="button" class="button intersoccer-add-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Add Holiday Date', 'intersoccer-player-management'); ?></button>
     </div>
     <script>
         jQuery(document).ready(function($) {
-            var holidayIndex = <?php echo count($holiday_dates); ?>;
-            var loop = <?php echo esc_js($loop); ?>;
+            // Initialize holiday index per variation
+            var holidayIndices = {};
+            holidayIndices[<?php echo esc_js($loop); ?>] = <?php echo count($holiday_dates); ?>;
 
-            $('#intersoccer-add-holiday').on('click', function() {
-                $('#intersoccer-holiday-dates-container').append(`
+            // Add holiday date for specific variation
+            $('.intersoccer-add-holiday[data-variation-loop="<?php echo esc_js($loop); ?>"]').on('click', function() {
+                var loop = $(this).data('variation-loop');
+                var index = holidayIndices[loop] || 0;
+                $('#intersoccer-holiday-dates-container-' + loop).append(`
                     <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
-                        <input type="date" name="intersoccer_holiday_dates[${loop}][${holidayIndex}]" style="margin-right: 10px;">
-                        <button type="button" class="button intersoccer-remove-holiday"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                        <input type="date" name="intersoccer_holiday_dates[${loop}][${index}]" style="margin-right: 10px;">
+                        <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="${loop}"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
                     </div>
                 `);
-                holidayIndex++;
+                holidayIndices[loop] = index + 1;
             });
 
-            $(document).on('click', '.intersoccer-remove-holiday', function() {
+            // Remove holiday date for specific variation
+            $(document).on('click', '.intersoccer-remove-holiday[data-variation-loop="<?php echo esc_js($loop); ?>"]', function() {
                 $(this).closest('.intersoccer-holiday-row').remove();
             });
         });
