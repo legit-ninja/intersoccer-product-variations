@@ -58,7 +58,7 @@ function calculate_total_sessions($product_id, $total_weeks) {
  * @param int $remaining_weeks Remaining sessions for Courses (if applicable).
  * @return float The calculated price.
  */
-function intersoccer_calculate_price($product_id, $variation_id, $camp_days = [], $remaining_weeks = null) {
+function intersoccer_calculate_price($product_id, $variation_id, $camp_days = [], $remaining_sessions = null) {
     $product = wc_get_product($variation_id ? $variation_id : $product_id);
     if (!$product) {
         error_log('InterSoccer: Invalid product for price calculation: ' . ($variation_id ?: $product_id));
@@ -78,19 +78,19 @@ function intersoccer_calculate_price($product_id, $variation_id, $camp_days = []
             error_log('InterSoccer: Calculated Camp price for ' . ($variation_id ?: $product_id) . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($camp_days) . ')');
         }
         // Full-week Camps use the base price as-is
-    } elseif ($product_type === 'course' && $remaining_weeks !== null) {
-        // Course pricing logic with pro-rated discount
+    } elseif ($product_type === 'course' && $remaining_sessions !== null) {
+        // Course pricing logic with pro-rated discount only if remaining < total
         $total_weeks = (int) get_post_meta($variation_id ? $variation_id : $product_id, '_course_total_weeks', true);
         $session_rate = (float) get_post_meta($variation_id ? $variation_id : $product_id, '_course_weekly_discount', true); // Treated as per-session rate
 
         $total_sessions = calculate_total_sessions($variation_id ? $variation_id : $product_id, $total_weeks);
-        $remaining_sessions = $remaining_weeks; // Now represents remaining_sessions from metadata
 
         if ($total_sessions > 0 && $remaining_sessions > 0 && $remaining_sessions <= $total_sessions) {
-            $rate = $session_rate > 0 ? $session_rate : ($price / $total_sessions);
-            $price = $rate * $remaining_sessions;
+            if ($remaining_sessions < $total_sessions && $session_rate > 0) {
+                $price = $session_rate * $remaining_sessions;
+            } // Else, use the base $price if remaining == total or no session_rate
             $price = max(0, $price); // Ensure price doesn't go below 0
-            error_log('InterSoccer: Calculated Course price for ' . ($variation_id ?: $product_id) . ': ' . $price . ' (rate: ' . $rate . ', remaining sessions: ' . $remaining_sessions . ')');
+            error_log('InterSoccer: Calculated Course price for ' . ($variation_id ?: $product_id) . ': ' . $price . ' (session_rate: ' . $session_rate . ', remaining sessions: ' . $remaining_sessions . ', total sessions: ' . $total_sessions . ')');
         } else {
             error_log('InterSoccer: Invalid total_sessions or remaining_sessions for Course price calculation: ' . ($variation_id ?: $product_id) . ', total_sessions: ' . $total_sessions . ', remaining_sessions: ' . $remaining_sessions);
         }
@@ -319,77 +319,146 @@ function intersoccer_apply_discounts($cart) {
 
     $cart_items = $cart->get_cart();
 
-    // Group items by season
+    // Group items by season and player
     $grouped_items = [];
+    $player_seasons = []; // For course same-season discounts
     foreach ($cart_items as $cart_item_key => $cart_item) {
         $product_id = $cart_item['product_id'];
         $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
-        if ($product_type === 'camp') { // Focus only on Camps
-            $season = get_post_meta($cart_item['variation_id'] ?: $product_id, 'attribute_pa_program-season', true) ?: 'unknown';
-            $grouped_items[$season][$cart_item_key] = $cart_item;
+        $player_id = isset($cart_item['player_assignment']) ? $cart_item['player_assignment'] : null;
+        $season = get_post_meta($cart_item['variation_id'] ?: $product_id, 'attribute_pa_program-season', true) ?: 'unknown';
+
+        if (in_array($product_type, ['camp', 'course']) && $player_id) {
+            $grouped_items[$season][$player_id][] = [
+                'key' => $cart_item_key,
+                'item' => $cart_item
+            ];
+            if ($product_type === 'course') {
+                $player_seasons[$season][$player_id][] = $cart_item_key;
+            }
         }
     }
 
     // Apply discounts per season group
-    foreach ($grouped_items as $season => $items) {
-        $camp_index = 0; // Reset camp index per season
+    foreach ($grouped_items as $season => $players) {
+        // Camp Family Discounts
+        if (!empty($players)) {
+            $unique_players = array_keys($players);
+            $player_count = count($unique_players);
+            if ($player_count > 1) {
+                foreach ($players as $player_id => $items) {
+                    $player_index = array_search($player_id, $unique_players);
+                    foreach ($items as $item_data) {
+                        $cart_item_key = $item_data['key'];
+                        $cart_item = $item_data['item'];
+                        $product_id = $cart_item['product_id'];
+                        $variation_id = $cart_item['variation_id'] ?: $product_id;
+                        $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
+                        if ($product_type !== 'camp') {
+                            continue;
+                        }
+                        $base_price = floatval($cart_item['data']->get_regular_price());
+                        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $cart_item['camp_days'] ?? [], $cart_item['remaining_weeks'] ?? null);
+                        $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true) ?: 'full-week';
+                        $age_group = get_post_meta($variation_id, 'attribute_pa_age-group', true) ?: 'unknown';
 
-        foreach ($items as $cart_item_key => $cart_item) {
-            $product_id = $cart_item['product_id'];
-            $variation_id = $cart_item['variation_id'] ?: $product_id;
-            $base_price = floatval($cart_item['data']->get_regular_price());
-            $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $cart_item['camp_days'] ?? [], $cart_item['remaining_weeks'] ?? null);
-            $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true) ?: 'full-week';
-            $age_group = get_post_meta($variation_id, 'attribute_pa_age-group', true) ?: 'unknown';
+                        $discount = 0;
+                        $discount_note = '';
+                        if ($booking_type === 'full-week' && $player_index > 0) {
+                            $discount_rate = ($player_index == 1) ? 0.20 : 0.25; // 20% for 2nd child, 25% for 3rd+
+                            $is_half_day = strpos($age_group, 'Half-Day') !== false;
+                            $reference_item = null;
+                            foreach ($players[$unique_players[0]] as $ref_item) {
+                                if (get_post_meta($ref_item['item']['variation_id'] ?: $ref_item['item']['product_id'], 'attribute_pa_booking-type', true) === 'full-week') {
+                                    $reference_item = $ref_item['item'];
+                                    break;
+                                }
+                            }
+                            $reference_age_group = $reference_item ? get_post_meta($reference_item['variation_id'] ?: $reference_item['product_id'], 'attribute_pa_age-group', true) : 'unknown';
+                            $is_reference_half_day = strpos($reference_age_group, 'Half-Day') !== false;
 
-            $discount = 0;
-            $original_price = $calculated_price;
+                            if ($is_half_day && !$is_reference_half_day) {
+                                $discount = $base_price * $discount_rate;
+                            } elseif (!$is_half_day && $is_reference_half_day) {
+                                $reference_base_price = $reference_item ? intersoccer_calculate_price($reference_item['product_id'], $reference_item['variation_id'], $reference_item['camp_days'] ?? []) : $base_price;
+                                $discount = min($base_price, $reference_base_price) * $discount_rate;
+                            } else {
+                                $discount = $base_price * $discount_rate;
+                            }
+                            $discount_note = sprintf(__('%d%% Family Discount (%s Child)', 'intersoccer-player-management'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
+                        }
 
-            // Apply discount only for full-week camps
-            if ($booking_type === 'full-week') {
-                $camp_index++; // Increment only for full-week camps in this season
-                if ($camp_index == 2) {
-                    $discount = 0.20; // 20% for the second item
-                } elseif ($camp_index >= 3) {
-                    $discount = 0.25; // 25% for the third and beyond
-                }
-                if ($discount > 0) {
-                    $is_half_day = strpos($age_group, 'Half-Day') !== false;
-                    $reference_item = reset(array_filter($items, function($item) {
-                        return get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_booking-type', true) === 'full-week';
-                    }));
-                    $reference_age_group = $reference_item ? get_post_meta($reference_item['variation_id'] ?: $reference_item['product_id'], 'attribute_pa_age-group', true) : 'unknown';
-                    $is_reference_half_day = strpos($reference_age_group, 'Half-Day') !== false;
-
-                    if ($is_half_day && !$is_reference_half_day) {
-                        $discount_amount = $base_price * $discount;
-                    } elseif (!$is_half_day && $is_reference_half_day) {
-                        $reference_base_price = $reference_item ? intersoccer_calculate_price($reference_item['product_id'], $reference_item['variation_id'], $reference_item['camp_days'] ?? []) : $base_price;
-                        $discount_amount = min($base_price, $reference_base_price) * $discount;
-                    } else {
-                        $discount_amount = $base_price * $discount;
+                        if ($discount > 0) {
+                            $final_price = $calculated_price - $discount;
+                            $cart_item['data']->set_price($final_price);
+                            $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_note;
+                            $cart->cart_contents[$cart_item_key]['discount_applied'] = $discount_note;
+                            error_log("InterSoccer: Applied $discount_note for camp $cart_item_key (Season: $season, Player: $player_id, Player Index: $player_index) at " . date('Y-m-d H:i:s', time()));
+                        } else {
+                            $cart_item['data']->set_price($calculated_price);
+                            unset($cart->cart_contents[$cart_item_key]['combo_discount_note']);
+                            unset($cart->cart_contents[$cart_item_key]['discount_applied']);
+                            error_log("InterSoccer: No discount applied for $cart_item_key (Season: $season, Player: $player_id, Player Index: $player_index, Booking Type: $booking_type) at " . date('Y-m-d H:i:s', time()));
+                        }
                     }
-                    $final_price = $calculated_price - $discount_amount;
-                    $cart_item['data']->set_price($final_price);
-
-                    // Set discount message
-                    $discount_percent = round($discount * 100);
-                    $discount_message = sprintf(__('%d%% Combo Discount', 'intersoccer-player-management'), $discount_percent);
-                    $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_message;
-                    $cart->cart_contents[$cart_item_key]['discount_applied'] = $discount_message;
-                    error_log("InterSoccer: Applied $discount_message for camp $cart_item_key (Season: $season, Booking Type: $booking_type, Camp Index: $camp_index) at " . date('Y-m-d H:i:s', time()));
-                } else {
-                    $cart_item['data']->set_price($calculated_price);
-                    unset($cart->cart_contents[$cart_item_key]['combo_discount_note']);
-                    unset($cart->cart_contents[$cart_item_key]['discount_applied']);
-                    error_log("InterSoccer: No discount applied for $cart_item_key (Season: $season, Booking Type: $booking_type, Camp Index: $camp_index) at " . date('Y-m-d H:i:s', time()));
                 }
-            } else {
-                // Explicitly no discount for single-days camps
-                $cart_item['data']->set_price($calculated_price);
-                unset($cart->cart_contents[$cart_item_key]['combo_discount_note']);
-                unset($cart->cart_contents[$cart_item_key]['discount_applied']);
-                error_log("InterSoccer: Skipped combo discount for $cart_item_key (Season: $season, Booking Type: $booking_type - single-days not eligible) at " . date('Y-m-d H:i:s', time()));
+            }
+        }
+
+        // Course Combo Discounts
+        if (!empty($player_seasons[$season])) {
+            $unique_players = array_keys($player_seasons[$season]);
+            $player_count = count($unique_players);
+            if ($player_count > 1) {
+                foreach ($player_seasons[$season] as $player_id => $item_keys) {
+                    $player_index = array_search($player_id, $unique_players);
+                    foreach ($item_keys as $cart_item_key) {
+                        $cart_item = $cart_items[$cart_item_key];
+                        $product_id = $cart_item['product_id'];
+                        $variation_id = $cart_item['variation_id'] ?: $product_id;
+                        $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
+                        if ($product_type !== 'course') {
+                            continue;
+                        }
+                        $base_price = floatval($cart_item['data']->get_regular_price());
+                        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], $cart_item['remaining_weeks'] ?? null);
+
+                        $discount = 0;
+                        $discount_note = '';
+                        if ($player_index > 0) { // Skip first child
+                            $discount_rate = ($player_index == 1) ? 0.20 : 0.30; // 20% for 2nd child, 30% for 3rd+
+                            $discount = $calculated_price * $discount_rate;
+                            $discount_note = sprintf(__('%d%% Combo Discount (%s Child)', 'intersoccer-player-management'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
+                            $final_price = $calculated_price - $discount;
+                            $cart_item['data']->set_price($final_price);
+                            $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_note;
+                            $cart->cart_contents[$cart_item_key]['discount_applied'] = $discount_note;
+                            error_log("InterSoccer: Applied $discount_note for course $cart_item_key (Season: $season, Player: $player_id, Player Index: $player_index) at " . date('Y-m-d H:i:s', time()));
+                        }
+                    }
+                }
+            }
+
+            // Same player, same season discount
+            foreach ($player_seasons[$season] as $player_id => $item_keys) {
+                if (count($item_keys) > 1) {
+                    foreach ($item_keys as $index => $cart_item_key) {
+                        if ($index == 0) {
+                            continue; // Skip first course
+                        }
+                        $cart_item = $cart_items[$cart_item_key];
+                        $product_id = $cart_item['product_id'];
+                        $variation_id = $cart_item['variation_id'] ?: $product_id;
+                        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], $cart_item['remaining_weeks'] ?? null);
+                        $discount = $calculated_price * 0.50; // 50% for 2nd+ course
+                        $discount_note = __('50% Same-Season Course Discount', 'intersoccer-player-management');
+                        $final_price = $calculated_price - $discount;
+                        $cart_item['data']->set_price($final_price);
+                        $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_note;
+                        $cart->cart_contents[$cart_item_key]['discount_applied'] = $discount_note;
+                        error_log("InterSoccer: Applied $discount_note for course $cart_item_key (Season: $season, Player: $player_id, Item Index: $index) at " . date('Y-m-d H:i:s', time()));
+                    }
+                }
             }
         }
     }
@@ -758,7 +827,7 @@ function intersoccer_handle_buy_now($cart_item_key, $product_id, $quantity, $var
 }
 
 /**
- * Display player, days, discount, holidays, and parent attributes in cart and checkout, including combo discount.
+ * Display player, days, sessions, holidays, and parent attributes in cart and checkout, including combo discount.
  */
 add_filter('woocommerce_get_item_data', 'intersoccer_display_cart_item_data', 300, 2);
 function intersoccer_display_cart_item_data($item_data, $cart_item) {
@@ -805,16 +874,19 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         error_log('InterSoccer: Added days selected for camp item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $days_display);
     }
 
-    // Handle Course-specific fields (Discount and Holidays)
+    // Handle Course-specific fields (Sessions and Holidays)
     if ($product_type === 'course') {
         if (isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
-            $weeks_display = esc_html($cart_item['remaining_weeks'] . ' Sessions Remaining');
+            $variation_id = $cart_item['variation_id'] ?: $cart_item['product_id'];
+            $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+            $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
+            $sessions_display = esc_html(sprintf(__('%d of %d', 'intersoccer-player-management'), $cart_item['remaining_weeks'], $total_sessions));
             $item_data[] = [
-                'key' => __('Discount', 'intersoccer-player-management'),
-                'value' => $weeks_display,
-                'display' => $weeks_display
+                'key' => __('Sessions Remaining', 'intersoccer-player-management'),
+                'value' => $sessions_display,
+                'display' => $sessions_display
             ];
-            error_log('InterSoccer: Added discount attribute for course item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $weeks_display);
+            error_log('InterSoccer: Added sessions remaining for course item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $sessions_display);
         }
 
         // Handle Holiday Dates
@@ -824,7 +896,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             $formatted_dates = array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));
             }, $holiday_dates);
-            $holidays_display = esc_html('(no session): ' . implode(', ', $formatted_dates));
+            $holidays_display = esc_html('Holiday (no session): ' . implode(', ', $formatted_dates));
             $item_data[] = [
                 'key' => __('Holidays', 'intersoccer-player-management'),
                 'value' => $holidays_display,
@@ -865,10 +937,13 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
                 $discount_note = '50% Course Combo Discount';
                 $item_data[] = [
                     'key' => __('Discount', 'intersoccer-player-management'),
-                'value' => $discount_note,
-                'display' => $discount_note
-            ];
-            error_log('InterSoccer: Added combo discount note for course item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $discount_note);
+                    'value' => $discount_note,
+                    'display' => $discount_note
+                ];
+                error_log('InterSoccer: Added combo discount note for course item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $discount_note);
+            }
+        } else {
+            error_log('InterSoccer: No combo discount note added for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . ', product_type: ' . $product_type . ', booking_type: ' . $booking_type . ')');
         }
     } else {
         $item_data[] = [
@@ -878,28 +953,25 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         ];
         error_log('InterSoccer: Used existing combo discount note for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $discount_note);
     }
-} else {
-    error_log('InterSoccer: No combo discount note added for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . ', product_type: ' . $product_type . ', booking_type: ' . $booking_type . ')');
-}
 
-// Handle parent attributes
-if (isset($cart_item['parent_attributes']) && is_array($cart_item['parent_attributes'])) {
-    foreach ($cart_item['parent_attributes'] as $label => $value) {
-        $item_data[] = [
-            'key' => esc_html($label),
-            'value' => esc_html($value),
-            'display' => esc_html($value)
-        ];
-        error_log('InterSoccer: Added parent attribute for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $label . ' = ' . $value);
+    // Handle parent attributes
+    if (isset($cart_item['parent_attributes']) && is_array($cart_item['parent_attributes'])) {
+        foreach ($cart_item['parent_attributes'] as $label => $value) {
+            $item_data[] = [
+                'key' => esc_html($label),
+                'value' => esc_html($value),
+                'display' => esc_html($value)
+            ];
+            error_log('InterSoccer: Added parent attribute for item ' . $cart_item['product_id'] . ' (key: ' . $cart_item_key . '): ' . $label . ' = ' . $value);
+        }
     }
-}
 
-return $item_data;
+    return $item_data;
 }
 
 
 /**
- * Save player, days, discount, holidays, parent attributes, and downloads to order.
+ * Save player, days, sessions, holidays, parent attributes, and downloads to order.
  */
 add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_save_order_item_data', 10, 4);
 function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order) {
@@ -942,28 +1014,31 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         }
     }
 
-    // Save remaining weeks discount
-    $remaining_weeks = isset($values['remaining_weeks']) ? intval($values['remaining_weeks']) : 0;
-    if ($remaining_weeks > 0) {
-        $weeks_display = esc_html($remaining_weeks . ' Sessions Remaining');
-        if (is_a($item, 'WC_Order_Item_Product')) {
-            $item->add_meta_data(__('Discount', 'intersoccer-player-management'), $weeks_display);
-            error_log('InterSoccer: Saved discount weeks to order item ' . $cart_item_key . ': ' . $weeks_display);
-        } else {
-            error_log('InterSoccer: Invalid item type for weeks discount in ' . $cart_item_key . ': ' . gettype($item));
-        }
-    }
-
-    // Save holiday dates for courses
+    // Save remaining sessions for courses
     $product_type = intersoccer_get_product_type($values['product_id']);
     if ($product_type === 'course') {
+        $remaining_weeks = isset($values['remaining_weeks']) ? intval($values['remaining_weeks']) : 0;
+        if ($remaining_weeks > 0) {
+            $variation_id = $values['variation_id'] ?: $values['product_id'];
+            $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+            $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
+            $sessions_display = esc_html(sprintf(__('%d of %d', 'intersoccer-player-management'), $remaining_weeks, $total_sessions));
+            if (is_a($item, 'WC_Order_Item_Product')) {
+                $item->add_meta_data(__('Sessions Remaining', 'intersoccer-player-management'), $sessions_display);
+                error_log('InterSoccer: Saved sessions remaining to order item ' . $cart_item_key . ': ' . $sessions_display);
+            } else {
+                error_log('InterSoccer: Invalid item type for sessions remaining in ' . $cart_item_key . ': ' . gettype($item));
+            }
+        }
+
+        // Save holiday dates
         $variation_id = $values['variation_id'] ?: $values['product_id'];
         $holiday_dates = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
         if (!empty($holiday_dates)) {
             $formatted_dates = array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));
             }, $holiday_dates);
-            $holidays_display = esc_html('(no session): ' . implode(', ', $formatted_dates));
+            $holidays_display = esc_html('Holiday (no session): ' . implode(', ', $formatted_dates));
             if (is_a($item, 'WC_Order_Item_Product')) {
                 $item->add_meta_data(__('Holidays', 'intersoccer-player-management'), $holidays_display);
                 error_log('InterSoccer: Saved holiday dates to order item ' . $cart_item_key . ': ' . $holidays_display);
@@ -1075,9 +1150,12 @@ function intersoccer_cart_item_subtotal($subtotal_html, $cart_item, $cart_item_k
         $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . esc_html($cart_item['combo_discount_note']) . '</div>';
         error_log('InterSoccer: Added green discount message to subtotal for cart item ' . $cart_item_key . ': ' . $cart_item['combo_discount_note']);
     } elseif (intersoccer_get_product_type($cart_item['product_id']) === 'course' && isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) > 0) {
-        $discount_message = esc_html($cart_item['remaining_weeks'] . ' Sessions Remaining');
-        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . $discount_message . '</div>';
-        error_log('InterSoccer: Added green pro-rated discount message to subtotal for cart item ' . $cart_item_key . ': ' . $discount_message);
+        $variation_id = $cart_item['variation_id'] ?: $cart_item['product_id'];
+        $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+        $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
+        $discount_message = esc_html(sprintf(__('%d of %d', 'intersoccer-player-management'), $cart_item['remaining_weeks'], $total_sessions));
+        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . __('Sessions Remaining: ', 'intersoccer-player-management') . $discount_message . '</div>';
+        error_log('InterSoccer: Added green sessions remaining message to subtotal for cart item ' . $cart_item_key . ': ' . $discount_message);
     }
 
     return $subtotal_html;
