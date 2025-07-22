@@ -67,7 +67,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_total_weeks[' . $loop . ']',
-        'label' => __('Total Weeks', 'intersoccer-player-management'),
+        'label' => __('Total Weeks Duration', 'intersoccer-player-management'),
         'value' => get_post_meta($variation_id, '_course_total_weeks', true),
         'wrapper_class' => 'form-row form-row-first',
         'type' => 'number',
@@ -76,12 +76,49 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_weekly_discount[' . $loop . ']',
-        'label' => __('Weekly Discount (CHF)', 'intersoccer-player-management'),
+        'label' => __('Session Rate (CHF per day/session)', 'intersoccer-player-management'),
         'value' => get_post_meta($variation_id, '_course_weekly_discount', true),
         'wrapper_class' => 'form-row form-row-last',
         'type' => 'number',
         'custom_attributes' => ['step' => '0.01', 'min' => 0],
     ]);
+
+    // Holiday dates repeater
+    $holiday_dates = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
+    ?>
+    <div class="form-row form-row-full">
+        <label><?php esc_html_e('Holiday/Skip Dates', 'intersoccer-player-management'); ?></label>
+        <div id="intersoccer-holiday-dates-container">
+            <?php foreach ($holiday_dates as $index => $date) : ?>
+                <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
+                    <input type="date" name="intersoccer_holiday_dates[<?php echo esc_attr($loop); ?>][<?php echo esc_attr($index); ?>]" value="<?php echo esc_attr($date); ?>" style="margin-right: 10px;">
+                    <button type="button" class="button intersoccer-remove-holiday"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <button type="button" id="intersoccer-add-holiday" class="button"><?php esc_html_e('Add Holiday Date', 'intersoccer-player-management'); ?></button>
+    </div>
+    <script>
+        jQuery(document).ready(function($) {
+            var holidayIndex = <?php echo count($holiday_dates); ?>;
+            var loop = <?php echo esc_js($loop); ?>;
+
+            $('#intersoccer-add-holiday').on('click', function() {
+                $('#intersoccer-holiday-dates-container').append(`
+                    <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
+                        <input type="date" name="intersoccer_holiday_dates[${loop}][${holidayIndex}]" style="margin-right: 10px;">
+                        <button type="button" class="button intersoccer-remove-holiday"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                    </div>
+                `);
+                holidayIndex++;
+            });
+
+            $(document).on('click', '.intersoccer-remove-holiday', function() {
+                $(this).closest('.intersoccer-holiday-row').remove();
+            });
+        });
+    </script>
+    <?php
 }
 
 // Save custom fields
@@ -141,4 +178,20 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
         $weekly_discount = floatval($_POST['_course_weekly_discount'][$loop]);
         update_post_meta($variation_id, '_course_weekly_discount', $weekly_discount);
     }
+
+    // Save holiday dates
+    $holiday_dates = [];
+    if (isset($_POST['intersoccer_holiday_dates'][$loop]) && is_array($_POST['intersoccer_holiday_dates'][$loop])) {
+        foreach ($_POST['intersoccer_holiday_dates'][$loop] as $date) {
+            $sanitized_date = sanitize_text_field($date);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $sanitized_date) && strtotime($sanitized_date)) {
+                $holiday_dates[] = $sanitized_date;
+            } else {
+                error_log('InterSoccer: Invalid holiday date for variation ID ' . $variation_id . ': ' . $sanitized_date);
+            }
+        }
+    }
+    update_post_meta($variation_id, '_course_holiday_dates', array_unique($holiday_dates)); // Unique to avoid duplicates
+    error_log('InterSoccer: Saved holiday dates for variation ID ' . $variation_id . ': ' . print_r($holiday_dates, true));
 }
+?>

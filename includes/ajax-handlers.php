@@ -350,9 +350,11 @@ function intersoccer_calculate_dynamic_price() {
         $price = $price_per_day * count($selected_days);
         error_log('InterSoccer: Calculated Camp price for ' . $variation_id . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($selected_days) . ', selected_days: ' . json_encode($selected_days) . ')');
     } elseif ($product_type === 'course' && $remaining_weeks !== null) {
-        $weekly_discount = floatval(get_post_meta($variation_id, 'weekly_discount', true));
-        $price = $base_price * $remaining_weeks * (1 - ($weekly_discount / 100));
-        error_log('InterSoccer: Calculated Course price for ' . $variation_id . ': ' . $price . ' (base price: ' . $base_price . ', remaining weeks: ' . $remaining_weeks . ', discount: ' . $weekly_discount . '%)');
+        $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+        $weekly_discount = floatval(get_post_meta($variation_id, '_course_weekly_discount', true));
+        $weekly_rate = $weekly_discount > 0 ? $weekly_discount : ($base_price / max(1, $total_weeks));
+        $price = $weekly_rate * $remaining_weeks;
+        error_log('InterSoccer: Calculated Course price for ' . $variation_id . ': ' . $price . ' (base price: ' . $base_price . ', weekly rate: ' . $weekly_rate . ', remaining weeks: ' . $remaining_weeks . ')');
     }
 
     $formatted_price = wc_price($price);
