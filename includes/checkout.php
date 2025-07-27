@@ -23,7 +23,7 @@ function intersoccer_render_discount_checkout($cart_item, $cart_item_key, $value
 
     $display_items = [];
 
-    // Handle combo discount (e.g., Family or Combo Offer discounts)
+    // Handle combo discount
     if (isset($cart_item['combo_discount_note']) && !empty($cart_item['combo_discount_note'])) {
         $display_items[] = $cart_item['combo_discount_note'];
         error_log('InterSoccer: Added combo discount display for checkout item ' . $cart_item_key . ': ' . $cart_item['combo_discount_note']);

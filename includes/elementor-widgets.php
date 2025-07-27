@@ -387,6 +387,17 @@ add_action('wp_footer', function () {
                         renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
                     }
                     updatePrice(selectedDays, variationId);
+                    var startDate = variation.course_start_date || ''; // Assume added to variation data via PHP filter
+                    var endDate = variation.end_date || '';
+                    if (startDate && endDate) {
+                        // Append to .woocommerce-variation-description or custom div
+                        var $dateDisplay = $form.find('.intersoccer-dates');
+                        if (!$dateDisplay.length) {
+                            $form.find('.woocommerce-variation-description').after('<p class="intersoccer-dates"></p>');
+                            $dateDisplay = $form.find('.intersoccer-dates');
+                        }
+                        $dateDisplay.html('Start: ' + startDate + ' - End: ' + endDate);
+                    }
                     // Update button state
                     $form.trigger('intersoccer_update_button_state');
                 });

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.2.120
+ * Version: 1.3.4
  * Author: Jeremy Lee
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -145,4 +145,15 @@ add_filter('woocommerce_ajax_variation_threshold', 'custom_wc_ajax_variation_thr
 add_filter('woocommerce_show_variation_price', function () {
     return true;
 });
+
+// Found Variation Show Start and End dates
+add_filter('woocommerce_available_variation', function($data, $product, $variation) {
+    $product_type = intersoccer_get_product_type($variation->get_parent_id() ?: $variation->get_id());
+    if ($product_type === 'course') {
+        $data['course_start_date'] = get_post_meta($variation->get_id(), '_course_start_date', true) ? date_i18n('F j, Y', strtotime(get_post_meta($variation->get_id(), '_course_start_date', true))) : '';
+        $data['end_date'] = get_post_meta($variation->get_id(), '_end_date', true) ? date_i18n('F j, Y', strtotime(get_post_meta($variation->get_id(), '_end_date', true))) : '';
+        error_log('Added dates to variation ' . $variation->get_id() . ': start=' . $data['course_start_date'] . ', end=' . $data['end_date']);
+    }
+    return $data;
+}, 10, 3);
 ?>
