@@ -387,6 +387,19 @@ add_action('wp_footer', function () {
                         renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
                     }
                     updatePrice(selectedDays, variationId);
+                    // Display start/end dates if course and dates available (independent of player)
+                    if (variation.course_start_date && variation.end_date) {
+                        // Use stable location: after variations table
+                        var $dateDisplay = $form.find('.intersoccer-dates');
+                        if (!$dateDisplay.length) {
+                            $form.find('.variations').after('<p class="intersoccer-dates" style="margin-top: 10px; font-weight: bold;"></p>');
+                            $dateDisplay = $form.find('.intersoccer-dates');
+                        }
+                        $dateDisplay.html('Start Date: ' + variation.course_start_date + ' - End Date: ' + variation.end_date);
+                        console.log('InterSoccer: (Re)displayed dates in stable location: start=' + variation.course_start_date + ', end=' + variation.end_date);
+                    } else {
+                        $form.find('.intersoccer-dates').remove();
+                    }
                     var startDate = variation.course_start_date || ''; // Assume added to variation data via PHP filter
                     var endDate = variation.end_date || '';
                     if (startDate && endDate) {

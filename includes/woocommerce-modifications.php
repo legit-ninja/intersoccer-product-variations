@@ -548,39 +548,31 @@ function intersoccer_get_parent_attributes($product, $product_type = '') {
         $label = wc_attribute_label($attribute_name);
         $value = '';
 
-        // Skip Days-of-week for camps to avoid overlap with Days Selected
-        if ($product_type === 'camp' && $attribute_name === 'pa_days-of-week') {
-            error_log('InterSoccer: Skipped attribute ' . $attribute_name . ' for camp product ' . $parent_id . ': overlaps with Days Selected meta');
-            continue;
-        }
+        // Skip camp-specific if overlap, but include all visible non-variation
+        if ($product_type === 'camp' && $attribute_name === 'pa_days-of-week') continue;
 
-        if (!is_object($attribute)) {
-            // Custom attribute
-            $is_visible = isset($attribute['is_visible']) && $attribute['is_visible'];
-            if ($is_visible) {
-                $value = $attribute['value'];
-                error_log('InterSoccer: Processing custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
-            } else {
-                error_log('InterSoccer: Skipped custom attribute ' . $attribute_name . ' for product ' . $parent_id . ': not visible');
-            }
-        } else {
-            // Taxonomy-based attribute
+        if (!is_object($attribute)) { // Custom
+        if (isset($attribute['is_visible']) && $attribute['is_visible']) {
+            $value = $attribute['value'];}
+        } else { // Taxonomy
             $is_visible = $attribute->get_visible();
             $is_variation = $attribute->get_variation();
-            if ($is_visible && !$is_variation) {
+            if ($is_visible && !$is_variation) { // Force non-variation
                 $terms = wc_get_product_terms($parent_id, $attribute_name, ['fields' => 'names']);
                 $value = !empty($terms) ? implode(', ', $terms) : '';
-                error_log('InterSoccer: Processing taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false') . ', value=' . ($value ?: 'empty'));
-            } else {
-                error_log('InterSoccer: Skipped taxonomy attribute ' . $attribute_name . ' for product ' . $parent_id . ': visible=' . ($is_visible ? 'true' : 'false') . ', variation=' . ($is_variation ? 'true' : 'false'));
             }
         }
 
         if (!empty($value)) {
             $attributes[$label] = $value;
         }
-    }
 
+        if (!empty($value)) {
+            $attributes[$label] = $value;
+        }
+    }
+    error_log('Fetched parent attributes: ' . print_r($attributes, true));
+    
     return $attributes;
 }
 
@@ -749,7 +741,11 @@ function intersoccer_reinforce_cart_item_data($cart_item_data, $cart_item_key) {
 
     if (isset($cart_item_data['parent_attributes']) && is_array($cart_item_data['parent_attributes'])) {
         WC()->cart->cart_contents[$cart_item_key]['parent_attributes'] = $cart_item_data['parent_attributes'];
-        error_log('InterSoccer: Reinforced parent attributes for cart item ' . $cart_item_key . ': ' . print_r($cart_item_data['parent_attributes'], true));
+    } else {
+        // Refetch if missing
+        $product_type = intersoccer_get_product_type($product_id);
+        WC()->cart->cart_contents[$cart_item_key]['parent_attributes'] = intersoccer_get_parent_attributes($product, $product_type);
+        error_log('Refetched missing parent_attributes for cart item ' . $cart_item_key);
     }
 
     // Calculate the base price server-side (discounts applied in woocommerce_before_calculate_totals)
@@ -1113,25 +1109,10 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
     }
 
     // Save parent attributes with item validation
-    if (isset($values['parent_attributes']) && is_array($values['parent_attributes'])) {
-        if (!is_a($item, 'WC_Order_Item_Product')) {
-            error_log('InterSoccer: Invalid item type for parent attributes in ' . $cart_item_key . ': ' . gettype($item) . ', attempting to reinitialize');
-            $item_id = $item['item_id'] ?? $cart_item_key; // Fallback to cart_item_key if item_id is not set
-            $order_id = $order->get_id();
-            $item = new WC_Order_Item_Product();
-            $item->set_order_id($order_id);
-            $item->set_product_id($values['product_id']);
-            $item->set_quantity($values['quantity']);
-            // Note: This is a simplified reinitialization; full restoration may require more data
-        }
-        foreach ($values['parent_attributes'] as $label => $value) {
-            if (is_a($item, 'WC_Order_Item_Product')) {
-                $item->add_meta_data(esc_html($label), esc_html($value));
-                error_log('InterSoccer: Saved parent attribute to order item ' . $cart_item_key . ': ' . $label . ' = ' . $value);
-            } else {
-                error_log('InterSoccer: Failed to save parent attribute ' . $label . ' for order item ' . $cart_item_key . ': item not a WC_Order_Item_Product');
-            }
-        }
+    if (!isset($values['parent_attributes']) || empty($values['parent_attributes'])) {
+        $product_type = intersoccer_get_product_type($product_id);
+        $values['parent_attributes'] = intersoccer_get_parent_attributes($product, $product_type);
+        error_log('Refetched parent_attributes for order save: ' . print_r($values['parent_attributes'], true));
     }
 
     // Assign downloads with item validation
