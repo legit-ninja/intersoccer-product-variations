@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.3.25
+ * Version: 1.3.26
  * Author: Jeremy Lee
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -192,38 +192,6 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
     }
     return $data;
 }, 10, 3);
-
-function calculate_remaining_sessions($variation_id, $total_weeks) {
-    $start_date = get_post_meta($variation_id, '_course_start_date', true);
-    if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) || !strtotime($start_date)) {
-        error_log('InterSoccer: Invalid/missing _course_start_date for variation ' . $variation_id . ': ' . ($start_date ?: 'not set'));
-        return 0;
-    }
-
-    $parent_id = wp_get_post_parent_id($variation_id) ?: $variation_id;
-    $days_of_week = wc_get_product_terms($parent_id, 'pa_days-of-week', ['fields' => 'names']) ?: 
-                    wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names']) ?: ['Monday'];
-    $holidays = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
-    $holiday_set = array_flip($holidays);
-
-    $start = new DateTime($start_date);
-    $current = new DateTime(current_time('Y-m-d'));
-    $end = clone $start;
-    $end->add(new DateInterval('P' . ($total_weeks * 7) . 'D'));
-
-    $remaining_sessions = 0;
-    $date = max($current, $start);
-    while ($date <= $end) {
-        $day_name = $date->format('l');
-        if (in_array($day_name, $days_of_week) && !isset($holiday_set[$date->format('Y-m-d')])) {
-            $remaining_sessions++;
-        }
-        $date->add(new DateInterval('P1D'));
-    }
-
-    error_log('InterSoccer: Calculated remaining_sessions for variation ' . $variation_id . ': ' . $remaining_sessions);
-    return $remaining_sessions;
-}
 
 function calculate_discount_note($variation_id, $remaining_sessions) {
     $discount_note = '';
