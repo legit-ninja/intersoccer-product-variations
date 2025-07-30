@@ -1,0 +1,113 @@
+/**
+ * Camp Day Select CSS
+ * Purpose: Styles the day selection dropdown for Single Day(s) Camp products.
+ * Key Changes:
+ * - Initial styling for day selection container (2025-05-26).
+ * - Enhanced to match Elementor/WooCommerce form styling (2025-06-07).
+ * Testing:
+ * - Verify day selection dropdown matches the styling of other form elements (e.g., Booking Type dropdown).
+ * - Confirm Select2 styling aligns with site design.
+ * - Check responsiveness on mobile devices.
+ */
+
+/* Container styling to match Elementor/WooCommerce form fields */
+.intersoccer-camp-day-selection {
+  margin-top: 15px;
+  margin-bottom: 20px;
+  width: 100%;
+  max-width: 100%; /* Match Elementor form field width */
+}
+
+/* Label styling to match Elementor/WooCommerce labels */
+.intersoccer-camp-day-selection label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333; /* Common label color */
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* Select2 container styling to match other dropdowns */
+.intersoccer-camp-day-selection .select2-container {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+/* Select2 selection box styling */
+.intersoccer-camp-day-selection .select2-selection--multiple {
+  border: 1px solid #e0e0e0; /* Match typical Elementor/WooCommerce border */
+  border-radius: 4px;
+  background-color: #1b1a1a;
+  padding: 5px;
+  min-height: 40px; /* Match typical input height */
+  font-size: 14px;
+  line-height: 1.5;
+  box-shadow: none;
+  transition: border-color 0.3s ease;
+}
+
+/* Focus state */
+.intersoccer-camp-day-selection .select2-selection--multiple:focus {
+  border-color: #708840; /* Elementor/WooCommerce focus color */
+  outline: none;
+}
+
+/* Selected items (tags) inside the Select2 box */
+.intersoccer-camp-day-selection .select2-selection__choice {
+  background-color: #1b1a1a;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  color: #333;
+  font-size: 13px;
+  padding: 2px 6px;
+  margin: 2px 4px 2px 0;
+}
+
+/* Remove button for selected items */
+.intersoccer-camp-day-selection .select2-selection__choice__remove {
+  color: #999;
+  margin-right: 5px;
+}
+
+/* Placeholder text */
+.intersoccer-camp-day-selection .select2-selection__placeholder {
+  color: #999;
+}
+
+/* Dropdown menu styling */
+.intersoccer-camp-day-selection .select2-dropdown {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Dropdown options */
+.intersoccer-camp-day-selection .select2-results__option {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Highlighted option */
+.intersoccer-camp-day-selection .select2-results__option--highlighted {
+  background-color: #1b1a1a;
+  color: #333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767px) {
+  .intersoccer-camp-day-selection {
+    margin-top: 10px;
+    margin-bottom: 15px;
+  }
+
+  .intersoccer-camp-day-selection label {
+    font-size: 13px;
+  }
+
+  .intersoccer-camp-day-selection .select2-selection--multiple {
+    min-height: 36px;
+    font-size: 13px;
+  }
+}
