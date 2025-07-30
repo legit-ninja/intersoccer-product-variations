@@ -33,14 +33,20 @@ function calculate_end_date($variation_id, $total_weeks) {
 
     try {
         $start = new DateTime($start_date);
+        $holiday_set = array_flip($holidays);
         $sessions_needed = $total_weeks;
         $current_date = clone $start;
         $sessions_counted = 0;
         $days_checked = 0;
-        $max_days = $total_weeks * 7 * 2; // Safety limit to prevent infinite loop
+        $max_days = $total_weeks * 7 + (count($holidays) * 7) + 7; // Extend max by holidays + buffer
         while ($sessions_counted < $sessions_needed && $days_checked < $max_days) {
-            if ($current_date->format('l') === $course_day && !isset($holiday_set[$current_date->format('Y-m-d')])) {
-                $sessions_counted++;
+            $day = $current_date->format('Y-m-d');
+            if ($current_date->format('l') === $course_day) {
+                if (!isset($holiday_set[$day])) {
+                    $sessions_counted++;
+                } else {
+                    error_log('InterSoccer: Extended for holiday on ' . $day);
+                }
             }
             $current_date->add(new DateInterval('P1D'));
             $days_checked++;
@@ -261,14 +267,21 @@ function calculate_remaining_sessions($variation_id, $total_weeks) {
     $end = new DateTime($end_date);
     $remaining = 0;
     $date = max($current, $start);
+    $skipped_holidays = 0;
     while ($date <= $end) {
-        if ($date->format('l') === $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
-            $remaining++;
+        $day = $date->format('Y-m-d');
+        if ($date->format('l') === $course_day) {
+            if (isset($holiday_set[$day])) {
+                $skipped_holidays++;
+                error_log('InterSoccer: Skipped holiday on course day: ' . $day);
+            } else {
+                $remaining++;
+            }
         }
         $date->add(new DateInterval('P1D'));
     }
 
-    error_log('InterSoccer: Remaining sessions for variation ' . $variation_id . ': ' . $remaining . ' (from ' . $date->format('Y-m-d') . ' to ' . $end_date . ')');
+    error_log('InterSoccer: Remaining sessions for variation ' . $variation_id . ': ' . $remaining . ' (skipped holidays: ' . $skipped_holidays . ', from ' . $current->format('Y-m-d') . ' to ' . $end_date . ')');
     return $remaining;
 }
 
@@ -1163,12 +1176,15 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
             $item->add_meta_data(__('Holidays', 'intersoccer-player-management'), $holidays_display);
             error_log('InterSoccer: Saved holidays to order item ' . $cart_item_key . ': ' . $holidays_display);
         }
+        error_log('InterSoccer: Calculating remaining_sessions for order item ' . $cart_item_key . ' - total_weeks: ' . $total_weeks);
         $remaining_sessions = calculate_remaining_sessions($variation_id, $total_weeks);
-        if ($remaining_sessions) {
+        if ($remaining_sessions > 0) {  // Relaxed to >0 to include if calc succeeds
             $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
             $sessions_display = sprintf(__('%d of %d', 'intersoccer-player-management'), $remaining_sessions, $total_sessions);
             $item->add_meta_data(__('Sessions Remaining', 'intersoccer-player-management'), $sessions_display);
             error_log('InterSoccer: Saved sessions remaining to order item ' . $cart_item_key . ': ' . $sessions_display);
+        } else {
+            error_log('InterSoccer: Skipped saving sessions remaining for order item ' . $cart_item_key . ' - calculated 0');
         }
         $discount_note = calculate_discount_note($variation_id, $remaining_sessions);
         if ($discount_note) {
