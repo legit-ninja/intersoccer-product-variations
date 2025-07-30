@@ -1136,29 +1136,7 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         $course_day = wc_get_product_terms($product_id, 'pa_course-day', ['fields' => 'names'])[0] ?? 'Monday';
 
         // Calculate end date
-        $end_date = get_post_meta($variation_id, '_end_date', true);
-        if (!$end_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) || !strtotime($end_date)) {
-            if ($start_date && $total_weeks > 0) {
-                $start = new DateTime($start_date);
-                $holiday_set = array_flip($holidays);
-                $sessions_needed = $total_weeks;
-                $current_date = clone $start;
-                $weeks_counted = 0;
-                $days_checked = 0;
-                while ($weeks_counted < $sessions_needed && $days_checked < ($total_weeks * 7 * 2)) {
-                    if ($current_date->format('l') === $course_day && !isset($holiday_set[$current_date->format('Y-m-d')])) {
-                        $weeks_counted++;
-                    }
-                    $current_date->add(new DateInterval('P1D'));
-                    $days_checked++;
-                }
-                $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
-                error_log('InterSoccer: Calculated end_date for order item ' . $cart_item_key . ': ' . $end_date);
-            } else {
-                $end_date = '';
-                error_log('InterSoccer: Cannot calculate end_date for order item ' . $cart_item_key . ': missing start_date or total_weeks');
-            }
-        }
+        $end_date = calculate_end_date($variation_id, $total_weeks);
 
         // Save course metadata
         if ($start_date) {
@@ -1176,16 +1154,15 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
             $item->add_meta_data(__('Holidays', 'intersoccer-player-management'), $holidays_display);
             error_log('InterSoccer: Saved holidays to order item ' . $cart_item_key . ': ' . $holidays_display);
         }
+
+        // Always calculate and save remaining sessions (even if 0 for completeness)
         error_log('InterSoccer: Calculating remaining_sessions for order item ' . $cart_item_key . ' - total_weeks: ' . $total_weeks);
         $remaining_sessions = calculate_remaining_sessions($variation_id, $total_weeks);
-        if ($remaining_sessions > 0) {  // Relaxed to >0 to include if calc succeeds
-            $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
-            $sessions_display = sprintf(__('%d of %d', 'intersoccer-player-management'), $remaining_sessions, $total_sessions);
-            $item->add_meta_data(__('Sessions Remaining', 'intersoccer-player-management'), $sessions_display);
-            error_log('InterSoccer: Saved sessions remaining to order item ' . $cart_item_key . ': ' . $sessions_display);
-        } else {
-            error_log('InterSoccer: Skipped saving sessions remaining for order item ' . $cart_item_key . ' - calculated 0');
-        }
+        $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
+        $sessions_display = sprintf(__('%d of %d', 'intersoccer-player-management'), $remaining_sessions, $total_sessions);
+        $item->add_meta_data(__('Sessions Remaining', 'intersoccer-player-management'), $sessions_display);
+        error_log('InterSoccer: Saved sessions remaining to order item ' . $cart_item_key . ': ' . $sessions_display);
+
         $discount_note = calculate_discount_note($variation_id, $remaining_sessions);
         if ($discount_note) {
             $item->add_meta_data(__('Discount Applied', 'intersoccer-player-management'), $discount_note);
