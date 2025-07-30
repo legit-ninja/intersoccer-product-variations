@@ -29,46 +29,47 @@ error_log('InterSoccer: ajax-handlers.php loaded');
 // Get user players (read-only for selection)
 add_action('wp_ajax_intersoccer_get_user_players', 'intersoccer_get_user_players');
 add_action('wp_ajax_nopriv_intersoccer_get_user_players', 'intersoccer_get_user_players');
-function intersoccer_get_user_players()
-{
-    if (ob_get_length()) {
-        ob_clean();
+function intersoccer_get_user_players() {
+    // Clear all output buffers
+    while (ob_get_level()) {
+        ob_end_clean();
     }
+    ob_start(); // Start fresh buffer
 
-    error_log('InterSoccer: intersoccer_get_user_players called');
-    error_log('InterSoccer: POST data: ' . print_r($_POST, true));
+    error_log('InterSoccer: intersoccer_get_user_players called, POST: ' . print_r($_POST, true));
 
-    // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        error_log('InterSoccer: Nonce verification failed for intersoccer_get_user_players. Provided nonce: ' . $nonce);
+        error_log('InterSoccer: Nonce verification failed, nonce: ' . $nonce);
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
-        return;
+        wp_die();
     }
 
     $user_id = get_current_user_id();
     if (!$user_id) {
-        error_log('InterSoccer: User not logged in for intersoccer_get_user_players');
+        error_log('InterSoccer: User not logged in');
         wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-product-variations')], 403);
-        return;
+        wp_die();
     }
 
-    // Relaxed user_id check: Log mismatch but don't fail
     if (isset($_POST['user_id']) && absint($_POST['user_id']) !== $user_id) {
-        error_log('InterSoccer: User ID mismatch in intersoccer_get_user_players. POST user_id: ' . absint($_POST['user_id']) . ', Server user_id: ' . $user_id);
-        // Proceed with server-side user_id
+        error_log('InterSoccer: User ID mismatch, POST user_id: ' . absint($_POST['user_id']) . ', server user_id: ' . $user_id);
     }
 
     $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
-    error_log('InterSoccer: Fetched players for user ID ' . $user_id . ': ' . print_r($players, true));
-    wp_send_json_success(['players' => $players]);
+    $response = ['players' => array_values($players)];
+    error_log('InterSoccer: Sent players response for user ' . $user_id . ': ' . json_encode($response));
+    
+    header('Content-Type: application/json');
+    wp_send_json_success($response);
+    ob_end_flush();
+    wp_die();
 }
 
 // Get days of the week for a product
 add_action('wp_ajax_intersoccer_get_days_of_week', 'intersoccer_get_days_of_week');
 add_action('wp_ajax_nopriv_intersoccer_get_days_of_week', 'intersoccer_get_days_of_week');
-function intersoccer_get_days_of_week()
-{
+function intersoccer_get_days_of_week(){
     if (ob_get_length()) {
         ob_clean();
     }
@@ -126,8 +127,7 @@ function intersoccer_get_days_of_week()
 // Get course metadata
 add_action('wp_ajax_intersoccer_get_course_metadata', 'intersoccer_get_course_metadata');
 add_action('wp_ajax_nopriv_intersoccer_get_course_metadata', 'intersoccer_get_course_metadata');
-function intersoccer_get_course_metadata()
-{
+function intersoccer_get_course_metadata(){
     if (ob_get_length()) {
         ob_clean();
     }
@@ -350,24 +350,28 @@ function apply_combo_discounts($cart_item_key, $product_type, $player_id, $seaso
 add_action('wp_ajax_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price');
 add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price');
 function intersoccer_calculate_dynamic_price() {
-    if (ob_get_length()) {
-        ob_clean();
+    while (ob_get_level()) {
+        ob_end_clean();
     }
+    ob_start();
 
-    error_log('InterSoccer: intersoccer_calculate_dynamic_price called');
-    error_log('InterSoccer: POST data: ' . print_r($_POST, true));
+    error_log('InterSoccer: intersoccer_calculate_dynamic_price called, POST: ' . print_r($_POST, true));
 
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        error_log('InterSoccer: Nonce verification failed for intersoccer_calculate_dynamic_price. Provided nonce: ' . $nonce);
+        error_log('InterSoccer: Nonce verification failed, nonce: ' . $nonce);
+        header('Content-Type: application/json');
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
-        return;
+        ob_end_flush();
+        wp_die();
     }
 
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id']) || !isset($_POST['variation_id']) || !is_numeric($_POST['variation_id'])) {
-        error_log('InterSoccer: Invalid or missing product_id or variation_id in intersoccer_calculate_dynamic_price. product_id: ' . ($_POST['product_id'] ?? 'not set') . ', variation_id: ' . ($_POST['variation_id'] ?? 'not set'));
+        error_log('InterSoccer: Invalid product_id or variation_id: product_id=' . ($_POST['product_id'] ?? 'not set') . ', variation_id=' . ($_POST['variation_id'] ?? 'not set'));
+        header('Content-Type: application/json');
         wp_send_json_error(['message' => __('Invalid product or variation ID.', 'intersoccer-product-variations')], 400);
-        return;
+        ob_end_flush();
+        wp_die();
     }
 
     $product_id = absint($_POST['product_id']);
@@ -380,8 +384,10 @@ function intersoccer_calculate_dynamic_price() {
     $product = wc_get_product($variation_id);
     if (!$product) {
         error_log('InterSoccer: Product not found for variation_id: ' . $variation_id);
+        header('Content-Type: application/json');
         wp_send_json_error(['message' => __('Product not found.', 'intersoccer-product-variations')], 404);
-        return;
+        ob_end_flush();
+        wp_die();
     }
 
     $product_type = intersoccer_get_product_type($product_id);
@@ -389,17 +395,16 @@ function intersoccer_calculate_dynamic_price() {
     $price = $base_price;
 
     if ($product_type === 'camp' && !empty($selected_days)) {
-        $price_per_day = $base_price; // Base price is per day for single-days
+        $price_per_day = $base_price;
         $price = $price_per_day * count($selected_days);
-        error_log('InterSoccer: Calculated Camp price for ' . $variation_id . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($selected_days) . ', selected_days: ' . json_encode($selected_days) . ')');
+        error_log('InterSoccer: Camp price for ' . $variation_id . ': ' . $price . ' (per day: ' . $price_per_day . ', days: ' . count($selected_days) . ')');
     } elseif ($product_type === 'course' && $remaining_sessions !== null) {
         $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
         $session_rate = floatval(get_post_meta($variation_id, '_course_weekly_discount', true));
-        $total_sessions = calculate_total_sessions($variation_id, $total_weeks); // Add this function similar to woocommerce-modifications.php
-        if ($remaining_sessions < $total_sessions && $session_rate > 0) {
+        if ($remaining_sessions < $total_weeks && $session_rate > 0) {
             $price = $session_rate * $remaining_sessions;
-        } // Else, use the base $price if remaining == total or no session_rate
-        error_log('InterSoccer: Calculated Course price for ' . $variation_id . ': ' . $price . ' (base price: ' . $base_price . ', session_rate: ' . $session_rate . ', remaining sessions: ' . $remaining_sessions . ', total sessions: ' . $total_sessions . ')');
+        }
+        error_log('InterSoccer: Course price for ' . $variation_id . ': ' . $price . ' (base price: ' . $base_price . ', session_rate: ' . $session_rate . ', remaining sessions: ' . $remaining_sessions . ', total weeks: ' . $total_weeks . ')');
     }
 
     $formatted_price = wc_price($price);
@@ -408,11 +413,13 @@ function intersoccer_calculate_dynamic_price() {
         'raw_price' => $price
     ];
 
-    // Store in session for cart consistency
     WC()->session->set('intersoccer_selected_days_' . $variation_id, $selected_days);
     WC()->session->set('intersoccer_calculated_price_' . $variation_id, $price);
     error_log('InterSoccer: Session data updated for product ' . $product_id . ', selected_days: ' . json_encode($selected_days) . ', price: ' . $price);
 
+    header('Content-Type: application/json');
     wp_send_json_success($response);
+    ob_end_flush();
+    wp_die();
 }
 ?>
