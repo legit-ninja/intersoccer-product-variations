@@ -17,6 +17,7 @@ error_log('InterSoccer: checkout.php file loaded');
 // Render discount and sessions section under product price on checkout
 add_action('woocommerce_review_order_before_cart_item', 'intersoccer_render_discount_checkout', 10, 3);
 function intersoccer_render_discount_checkout($cart_item, $cart_item_key, $value) {
+    error_log('InterSoccer: intersoccer_render_discount_checkout called during checkout refresh - cart_item_key: ' . $cart_item_key . ', product_type: ' . $product_type);
     $product = $cart_item['data'];
     $product_id = $product->get_id();
     $product_type = intersoccer_get_product_type($product_id);
