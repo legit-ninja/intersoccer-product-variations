@@ -908,7 +908,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             $formatted_dates = array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));
             }, $holiday_dates);
-            $holidays_display = esc_html('(no session): ' . implode(', ', $formatted_dates));
+            $holidays_display = esc_html('(no session) ' . implode(', ', $formatted_dates));
             $item_data[] = [
                 'key' => __('Holidays', 'intersoccer-player-management'),
                 'value' => $holidays_display,
@@ -1060,7 +1060,7 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
             $formatted_dates = array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));
             }, $holiday_dates);
-            $holidays_display = esc_html('Holiday (no session): ' . implode(', ', $formatted_dates));
+            $holidays_display = esc_html('(no session) ' . implode(', ', $formatted_dates));
             if (is_a($item, 'WC_Order_Item_Product')) {
                 $item->add_meta_data(__('Holidays', 'intersoccer-player-management'), $holidays_display);
                 error_log('InterSoccer: Saved holiday dates to order item ' . $cart_item_key . ': ' . $holidays_display);

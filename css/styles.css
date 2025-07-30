@@ -1,22 +1,73 @@
-.intersoccer-custom-price {
-    margin-top: 5px;
+.woocommerce-variation-add-to-cart {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important; /* Align left, not stretch */
+    gap: 10px;
+}
+.intersoccer-attributes {
+    width: 100% !important;
+    font-size: 14px;
+    color: #333;
+    margin: 0 !important;
+    padding: 10px;
+    display: block !important;
+    order: -1; /* Above button */
+}
+.intersoccer-attributes p {
+    margin: 5px 0;
+}
+.intersoccer-attributes strong {
+    font-weight: bold;
+}
+.single_add_to_cart_button {
+    width: auto !important; /* Preserve default/theme width */
+    align-self: flex-start; /* Prevent stretch */
+}
+.quantity {
+    align-self: flex-start; /* Prevent quantity stretch */
 }
 .intersoccer-player-selection, .intersoccer-day-selection {
     margin: 10px 0;
+    width: 100%;
 }
 .intersoccer-player-selection select, .intersoccer-day-selection input[type="checkbox"] {
     width: 100%;
 }
-
-.intersoccer-custom-price .total-price {
-  margin-top: 10px;
-  font-size: 0.5em;
-  color: #eec432;
+.intersoccer-camp-day-selection {
+    margin: 15px 0;
+    width: 100%;
 }
-
-.intersoccer-custom-price {
-    display: block !important;
-    margin-top: 5px;
+.intersoccer-camp-day-selection label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
 }
-
-.intersoccer-dates { font-weight: bold; color: #333; }
+.intersoccer-camp-day-selection .select2-container {
+    width: 100% !important;
+}
+.intersoccer-camp-day-selection .select2-selection--multiple {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: #fff;
+    padding: 5px;
+    min-height: 40px;
+    font-size: 14px;
+}
+.intersoccer-camp-day-selection .select2-selection--multiple:focus {
+    border-color: #708840;
+    outline: none;
+}
+@media (max-width: 767px) {
+    .woocommerce-variation-add-to-cart {
+        gap: 5px;
+    }
+    .intersoccer-attributes {
+        padding: 8px;
+    }
+    .single_add_to_cart_button, .quantity {
+        width: auto !important;
+        align-self: flex-start;
+    }
+}
