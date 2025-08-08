@@ -51,18 +51,20 @@ class InterSoccer_Course {
 
         try {
             $start = new DateTime($start_date);
-            $sessions_needed = $total_weeks + $holiday_count_on_course_day;
+            $sessions_needed = $total_weeks; // Fixed: count only total_weeks good sessions
             $current_date = clone $start;
             $sessions_counted = 0;
             $days_checked = 0;
-            $max_days = ($total_weeks + $holiday_count_on_course_day) * 7 + 7;
+            $max_days = ($total_weeks + $holiday_count_on_course_day) * 7 + 7; // Buffer for skips
 
             while ($sessions_counted < $sessions_needed && $days_checked < $max_days) {
                 $day = $current_date->format('Y-m-d');
                 error_log('InterSoccer: Checking date ' . $day . ' for course day ' . $course_day . ', holiday: ' . (isset($holiday_set[$day]) ? 'yes' : 'no'));
-                if ($current_date->format('l') === $course_day && !isset($holiday_set[$day])) {
-                    $sessions_counted++;
-                    error_log('InterSoccer: Counted session ' . $sessions_counted . ' on ' . $day);
+                if ($current_date->format('l') === $course_day) {
+                    if (!isset($holiday_set[$day])) {
+                        $sessions_counted++;
+                        error_log('InterSoccer: Counted session ' . $sessions_counted . ' on ' . $day);
+                    }
                 }
                 $current_date->add(new DateInterval('P1D'));
                 $days_checked++;
@@ -71,15 +73,16 @@ class InterSoccer_Course {
             if ($sessions_counted == $sessions_needed) {
                 $end_date_obj = clone $current_date;
                 $end_date_obj->sub(new DateInterval('P1D'));
-                while ($end_date_obj->format('l') !== $course_day) {
+                // Ensure end date lands on course day and is not a holiday
+                while ($end_date_obj->format('l') !== $course_day || isset($holiday_set[$end_date_obj->format('Y-m-d')])) {
                     $end_date_obj->sub(new DateInterval('P1D'));
                 }
                 $end_date = $end_date_obj->format('Y-m-d');
-                error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date . ', sessions: ' . $sessions_counted . ', holidays: ' . $holiday_count_on_course_day);
+                error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date . ', sessions: ' . $sessions_counted . ', holidays on course day: ' . $holiday_count_on_course_day);
                 update_post_meta($variation_id, '_end_date', $end_date);
                 return $end_date;
             } else {
-                error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ' - insufficient sessions: ' . $sessions_counted . '/' . $sessions_needed);
+                error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ' - insufficient sessions found: ' . $sessions_counted . ', needed: ' . $sessions_needed);
                 return '';
             }
         } catch (Exception $e) {
