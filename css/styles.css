@@ -71,3 +71,117 @@
         align-self: flex-start;
     }
 }
+
+/* Checkout metadata list styling */
+.intersoccer-meta-list {
+    list-style: none;
+    margin: 0.5em 0;
+    padding: 0;
+}
+
+/* Checkout metadata list styling */
+.intersoccer-meta-list {
+    list-style: none;
+    margin: 0.5em 0;
+    padding: 0;
+}
+
+.intersoccer-meta-item {
+    display: block;
+    margin-bottom: 0.5em;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.intersoccer-meta-item strong {
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .intersoccer-meta-list {
+        margin: 0.75em 0;
+    }
+    .intersoccer-meta-item {
+        font-size: 13px;
+        margin-bottom: 0.75em;
+    }
+}/* Checkout metadata list styling */
+.intersoccer-meta-list {
+    list-style: none;
+    margin: 0.5em 0;
+    padding: 0;
+}
+
+.intersoccer-meta-item {
+    display: block;
+    margin-bottom: 0.5em;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.intersoccer-meta-item strong {
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .intersoccer-meta-list {
+        margin: 0.75em 0;
+    }
+    .intersoccer-meta-item {
+        font-size: 13px;
+        margin-bottom: 0.75em;
+    }
+}/* Checkout metadata list styling */
+.intersoccer-meta-list {
+    list-style: none;
+    margin: 0.5em 0;
+    padding: 0;
+}
+
+.intersoccer-meta-item {
+    display: block;
+    margin-bottom: 0.5em;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.intersoccer-meta-item strong {
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .intersoccer-meta-list {
+        margin: 0.75em 0;
+    }
+    .intersoccer-meta-item {
+        font-size: 13px;
+        margin-bottom: 0.75em;
+    }
+}-meta-item {
+    display: block;
+    margin-bottom: 0.5em;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.intersoccer-meta-item strong {
+    font-weight: 600;
+    margin-right: 0.5em;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .intersoccer-meta-list {
+        margin: 0.75em 0;
+    }
+    .intersoccer-meta-item {
+        font-size: 13px;
+        margin-bottom: 0.75em;
+    }
+}
