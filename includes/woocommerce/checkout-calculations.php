@@ -1,3 +1,4 @@
+```php
 <?php
 /**
  * File: checkout-calculations.php
@@ -93,64 +94,133 @@ error_log('InterSoccer: Loaded checkout-calculations.php');
  */
 add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_add_order_item_meta', 10, 4);
 function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Adding custom meta to order item for product ' . $values['product_id'] . ' / variation ' . $values['variation_id'] . '. Cart values: ' . json_encode($values));
+    }
+
+    $product_id = $values['product_id'];
+    $variation_id = $values['variation_id'];
+    $product_type = intersoccer_get_product_type($product_id);
+
     $user_id = $order->get_user_id();
     if (!$user_id) {
         error_log('InterSoccer: No user ID for order ' . $order->get_id() . ' - Cannot resolve player name');
     }
 
-    // Resolve and add assigned attendee
-    if (isset($values['assigned_attendee'])) {
-        $assigned_index = $values['assigned_attendee'];
+    // Assigned Attendee (name + index)
+    if (isset($values['assigned_player'])) {
         $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
-        if (isset($players[$assigned_index])) {
-            $player = $players[$assigned_index];
-            $assigned_name = $player['first_name'] . ' ' . $player['last_name'];
-            $item->add_meta_data(__('Assigned Attendee', 'intersoccer-product-variations'), $assigned_name, true);
-            $item->add_meta_data('_assigned_player_index', $assigned_index, true); // Hidden meta for reference
-            error_log('InterSoccer: Resolved and added Assigned Attendee to order item metadata for order ' . $order->get_id() . ': Index ' . $assigned_index . ' -> ' . $assigned_name);
-        } else {
-            $item->add_meta_data(__('Assigned Attendee', 'intersoccer-product-variations'), __('Unknown Player (Index: ' . $assigned_index . ')'), true);
-            $item->add_meta_data('_assigned_player_index', $assigned_index, true);
-            error_log('InterSoccer: Failed to resolve player index ' . $assigned_index . ' for user ' . $user_id . ' in order ' . $order->get_id() . ' - Players count: ' . count($players) . ' - Cart values: ' . print_r($values, true));
+        $index = absint($values['assigned_player']);
+        if (isset($players[$index]['name'])) {
+            $item->add_meta_data('Assigned Attendee', sanitize_text_field($players[$index]['name']));
+            $item->add_meta_data('assigned_player', $index); // Store index for reference
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Assigned Attendee: ' . $players[$index]['name'] . ', index: ' . $index);
+            }
         }
-    } else {
-        error_log('InterSoccer: No assigned_attendee found in cart values for item ' . $cart_item_key . ' in order ' . $order->get_id() . ' - Values: ' . print_r($values, true));
     }
 
-    // Add camp days and discount note for camps
-    if (isset($values['camp_days'])) {
-        $days_selected = implode(', ', $values['camp_days']);
-        $item->add_meta_data(__('Days Selected', 'intersoccer-product-variations'), $days_selected, true);
+    // Load product and parent
+    $product = wc_get_product($variation_id ?: $product_id);
+    $parent_id = $variation_id ? $product->get_parent_id() : $product_id;
+    $parent = wc_get_product($parent_id);
+    if (!$product || !$parent) {
+        error_log('InterSoccer: Invalid product/parent for item ' . $cart_item_key . ': product_id=' . $product_id . ', variation_id=' . $variation_id);
+        return;
+    }
+
+    // Get existing meta keys to avoid duplicates
+    $existing_meta = $item->get_meta_data();
+    $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Existing meta keys: ' . json_encode($existing_keys));
+    }
+
+    // Add all attributes (parent + variation)
+    $attributes = array_merge($parent->get_attributes(), $product->get_attributes());
+    foreach ($attributes as $attr_slug => $attribute) {
+        $label = wc_attribute_label($attr_slug);
+        if (in_array($label, $existing_keys)) {
+            continue;
+        }
+
+        $value = $product->get_attribute($attr_slug);
+        if (empty($value) && $variation_id) {
+            $value = $parent->get_attribute($attr_slug); // Fallback to parent
+        }
+        if (!empty($value)) {
+            $item->add_meta_data($label, sanitize_text_field($value));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added attribute meta: ' . $label . ' = ' . $value);
+            }
+        }
+    }
+
+    // Add custom meta based on product type
+    if ($product_type === 'camp') {
+        if (isset($values['camp_days']) && is_array($values['camp_days'])) {
+            $days_selected = implode(', ', array_map('sanitize_text_field', $values['camp_days']));
+            $item->add_meta_data('Days Selected', $days_selected);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Days Selected: ' . $days_selected);
+            }
+        }
         if (isset($values['discount_note'])) {
-            $item->add_meta_data(__('Discount', 'intersoccer-product-variations'), $values['discount_note'], true);
+            $item->add_meta_data('Discount', sanitize_text_field($values['discount_note']));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Discount: ' . $values['discount_note']);
+            }
         }
-        error_log('InterSoccer: Added camp days to order item metadata for order ' . $order->get_id() . ': ' . $days_selected);
-    }
-
-    // Add remaining weeks and discount note for courses
-    if (isset($values['remaining_weeks'])) {
-        $item->add_meta_data(__('Remaining Weeks', 'intersoccer-product-variations'), $values['remaining_weeks'], true);
+        $camp_times = get_post_meta($variation_id ?: $product_id, '_camp_times', true);
+        if ($camp_times) {
+            $item->add_meta_data('Camp Times', sanitize_text_field($camp_times));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Camp Times: ' . $camp_times);
+            }
+        }
+    } elseif ($product_type === 'course') {
+        $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
+        if ($start_date) {
+            $item->add_meta_data('Start Date', sanitize_text_field($start_date));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Start Date: ' . $start_date);
+            }
+        }
+        $end_date = get_post_meta($variation_id ?: $product_id, '_end_date', true);
+        if ($end_date) {
+            $item->add_meta_data('End Date', sanitize_text_field($end_date));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added End Date: ' . $end_date);
+            }
+        }
+        $holidays = get_post_meta($variation_id ?: $product_id, '_course_holiday_dates', true) ?: [];
+        if (!empty($holidays)) {
+            $holidays_str = implode(', ', array_map('sanitize_text_field', $holidays));
+            $item->add_meta_data('Holidays', $holidays_str);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Holidays: ' . $holidays_str);
+            }
+        }
+        if (isset($values['remaining_sessions'])) {
+            $item->add_meta_data('Remaining Weeks', absint($values['remaining_sessions']));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Remaining Weeks: ' . $values['remaining_sessions']);
+            }
+        }
         if (isset($values['discount_note'])) {
-            $item->add_meta_data(__('Discount', 'intersoccer-product-variations'), $values['discount_note'], true);
+            $item->add_meta_data('Discount', sanitize_text_field($values['discount_note']));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Added Discount: ' . $values['discount_note']);
+            }
         }
-        error_log('InterSoccer: Added remaining weeks to order item metadata for order ' . $order->get_id() . ': ' . $values['remaining_weeks']);
     }
 
-    // Add course-specific details
-    if (isset($values['course_start_date']) && $values['course_start_date']) {
-        $item->add_meta_data(__('Start Date', 'intersoccer-product-variations'), $values['course_start_date'], true);
-    }
-    if (isset($values['course_end_date']) && $values['course_end_date']) {
-        $item->add_meta_data(__('End Date', 'intersoccer-product-variations'), $values['course_end_date'], true);
-    }
-    if (isset($values['course_holidays']) && $values['course_holidays']) {
-        $item->add_meta_data(__('Holidays', 'intersoccer-product-variations'), $values['course_holidays'], true);
-    }
-    error_log('InterSoccer: Added course details to order item metadata for order ' . $order->get_id() . ': Start=' . ($values['course_start_date'] ?? 'N/A') . ', End=' . ($values['course_end_date'] ?? 'N/A') . ', Holidays=' . ($values['course_holidays'] ?? 'None'));
-
-    // Add other common metadata (e.g., base price if needed)
-    if (isset($values['intersoccer_base_price'])) {
-        $item->add_meta_data('_intersoccer_base_price', $values['intersoccer_base_price'], true); // Hidden meta
+    // Variation ID (for reference, if not already added)
+    if ($variation_id && !in_array('Variation ID', $existing_keys)) {
+        $item->add_meta_data('Variation ID', $variation_id);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Added Variation ID: ' . $variation_id);
+        }
     }
 }
 
@@ -186,3 +256,4 @@ function intersoccer_display_order_item_meta_admin($product, $item, $item_id) {
     }
 }
 ?>
+```

@@ -185,3 +185,14 @@
         margin-bottom: 0.75em;
     }
 }
+
+.intersoccer-discount-note {
+    display: block;
+    color: #e2401c; /* Red for visibility */
+    font-size: 0.85em;
+    margin-top: 5px;
+}
+.woocommerce-cart table.cart td.product-price,
+.woocommerce-checkout-review-order-table td.product-total {
+    position: relative; /* Ensure note positions under price */
+}
