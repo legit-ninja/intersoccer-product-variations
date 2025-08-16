@@ -126,6 +126,10 @@ function intersoccer_calculate_dynamic_price_callback() {
         wp_die();
     }
 
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Dynamic price params - product_id: ' . $product_id . ', variation_id: ' . $variation_id . ', camp_days: ' . json_encode($camp_days));
+    }
+
     $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks);
     wp_send_json_success(['price' => wc_price($calculated_price), 'raw_price' => $calculated_price]);
     wp_die();
@@ -142,37 +146,160 @@ function intersoccer_update_session_on_variation_change() {
 
     global $post;
     $product_id = $post->ID;
+    
+    // Pass debug state to JavaScript
+    $debug_enabled = defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false';
     ?>
     <script>
         jQuery(document).ready(function($) {
+            var currentVariationId = null;
+            var debugEnabled = <?php echo $debug_enabled; ?>;
+
+            // Function to calculate and update price
+            function updateCampPrice() {
+                var campDays = $('form.cart').find('input[name="camp_days[]"]:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                
+                if (debugEnabled) {
+                    console.log('InterSoccer: Updating price, camp_days:', campDays, 'variation_id:', currentVariationId);
+                }
+
+                if (!currentVariationId) return;
+
+                $.ajax({
+                    url: intersoccerCheckout.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'intersoccer_calculate_dynamic_price',
+                        nonce: intersoccerCheckout.nonce,
+                        product_id: <?php echo json_encode($product_id); ?>,
+                        variation_id: currentVariationId,
+                        camp_days: campDays
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            if (debugEnabled) {
+                                console.log('InterSoccer: Price updated to', response.data.price);
+                            }
+                            // Update price display
+                            $('.woocommerce-variation-price .price').html(response.data.price);
+                        } else {
+                            if (debugEnabled) {
+                                console.log('InterSoccer: Price update failed', response);
+                            }
+                        }
+                    },
+                    error: function(err) {
+                        if (debugEnabled) {
+                            console.log('InterSoccer: Price AJAX error', err);
+                        }
+                    }
+                });
+            }
+
+            // On variation found
             $('form.cart').on('found_variation', function(event, variation) {
-                var productId = <?php echo json_encode($product_id); ?>;
+                currentVariationId = variation.variation_id;
+                if (debugEnabled) {
+                    console.log('InterSoccer: Variation found, id:', currentVariationId);
+                }
+
+                // Update session (existing)
                 var campDays = $(this).find('input[name="camp_days[]"]:checked').map(function() {
                     return $(this).val();
                 }).get();
-                var remainingWeeks = variation.remaining_sessions || null;
-
+                
                 $.ajax({
                     url: intersoccerCheckout.ajax_url,
                     type: 'POST',
                     data: {
                         action: 'intersoccer_update_session_data',
                         nonce: intersoccerCheckout.nonce,
-                        product_id: productId,
+                        product_id: <?php echo json_encode($product_id); ?>,
                         variation_id: variation.variation_id,
                         camp_days: campDays,
-                        remaining_weeks: remainingWeeks
+                        remaining_weeks: variation.remaining_sessions || null
                     },
                     success: function(response) {
-                        if (response.success) {
+                        if (response.success && debugEnabled) {
                             console.log('InterSoccer: Session data updated');
                         }
                     }
                 });
+
+                // Trigger price update
+                updateCampPrice();
+            });
+
+            // On day checkbox change
+            $('form.cart').on('change', 'input[name="camp_days[]"]', function() {
+                if (debugEnabled) {
+                    console.log('InterSoccer: Camp day checkbox changed');
+                }
+                updateCampPrice();
             });
         });
     </script>
     <?php
+}
+
+/**
+ * AJAX handler to update session data.
+ */
+add_action('wp_ajax_intersoccer_update_session_data', 'intersoccer_update_session_data_callback');
+add_action('wp_ajax_nopriv_intersoccer_update_session_data', 'intersoccer_update_session_data_callback');
+function intersoccer_update_session_data_callback() {
+    check_ajax_referer('intersoccer_nonce', 'nonce');
+
+    $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
+    $camp_days = isset($_POST['camp_days']) ? (array) $_POST['camp_days'] : [];
+    $remaining_weeks = isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks']) ? (int) $_POST['remaining_weeks'] : null;
+
+    if ($product_id) {
+        // Ensure session is initialized
+        if (function_exists('WC') && WC()->session) {
+            WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
+            if ($remaining_weeks !== null) {
+                WC()->session->set('intersoccer_remaining_weeks_' . $product_id, $remaining_weeks);
+            }
+            error_log('InterSoccer: Session data updated for product ' . $product_id . ', selected_days: ' . print_r($camp_days, true) . ', remaining_weeks: ' . ($remaining_weeks ?? 'null'));
+            wp_send_json_success(['message' => 'Session data updated']);
+        } else {
+            error_log('InterSoccer: WooCommerce session not available during intersoccer_update_session_data_callback');
+            wp_send_json_error(['message' => 'Session not available']);
+        }
+    } else {
+        wp_send_json_error(['message' => 'Invalid product ID']);
+        wp_die();
+    }
+}
+
+/**
+ * AJAX handler to clear session data.
+ */
+add_action('wp_ajax_intersoccer_clear_session_data', 'intersoccer_clear_session_data_callback');
+add_action('wp_ajax_nopriv_intersoccer_clear_session_data', 'intersoccer_clear_session_data_callback');
+function intersoccer_clear_session_data_callback() {
+    check_ajax_referer('intersoccer_nonce', 'nonce');
+
+    $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
+
+    if ($product_id) {
+        // Ensure session is initialized
+        if (function_exists('WC') && WC()->session) {
+            WC()->session->set('intersoccer_selected_days_' . $product_id, []);
+            WC()->session->set('intersoccer_remaining_weeks_' . $product_id, null);
+            error_log('InterSoccer: Session data cleared for product ' . $product_id);
+            wp_send_json_success(['message' => 'Session data cleared']);
+        } else {
+            error_log('InterSoccer: WooCommerce session not available during intersoccer_clear_session_data_callback');
+            wp_send_json_error(['message' => 'Session not available']);
+        }
+    } else {
+        wp_send_json_error(['message' => 'Invalid product ID']);
+        wp_die();
+    }
 }
 
 error_log('InterSoccer: Loaded cart-calculations.php');

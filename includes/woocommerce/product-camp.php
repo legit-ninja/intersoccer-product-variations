@@ -37,7 +37,9 @@ class InterSoccer_Camp {
         if ($booking_type === 'single-days' && !empty($camp_days)) {
             $price_per_day = $price; // CHF 100/day as base price
             $price = $price_per_day * count($camp_days);
-            error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (days: ' . count($camp_days) . ')');
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (days: ' . count($camp_days) . ', per_day: ' . $price_per_day . ')');
+            }
         } else {
             // Full-week price (e.g., CHF 500/week)
             error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (full-week)');

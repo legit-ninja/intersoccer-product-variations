@@ -16,8 +16,7 @@ if (!defined('ABSPATH')) {
  */
 function intersoccer_get_discount_rates() {
     $rules = get_option('intersoccer_discount_rules', []);
-    error_log('InterSoccer: Fetched discount rules from database: ' . print_r($rules, true));
-
+    
     $rates = [
         'camp' => [],
         'course' => []
@@ -29,12 +28,27 @@ function intersoccer_get_discount_rates() {
         }
         $type = $rule['type'] ?? 'general';
         $condition = $rule['condition'] ?? 'none';
-        $rate = floatval($rule['rate'] ?? 0) / 100; // Convert % to decimal
+        $rate = floatval($rule['rate'] ?? 0) / 100;
 
         if (in_array($type, ['camp', 'course']) && $condition !== 'none') {
             $rates[$type][$condition] = $rate;
-            error_log('InterSoccer: Mapped discount rule - Type: ' . $type . ', Condition: ' . $condition . ', Rate: ' . $rate);
         }
+    }
+
+    // Add default rates if no rules exist
+    if (empty($rates['camp'])) {
+        $rates['camp'] = [
+            '2nd_child' => 0.20,
+            '3rd_plus_child' => 0.25
+        ];
+    }
+    
+    if (empty($rates['course'])) {
+        $rates['course'] = [
+            '2nd_child' => 0.20,
+            '3rd_plus_child' => 0.30,
+            'same_season_course' => 0.50
+        ];
     }
 
     return $rates;
@@ -120,18 +134,24 @@ function intersoccer_get_applicable_discounts($cart_item) {
  * Clear cart fees before recalculation to prevent duplication
  * Note: WooCommerce doesn't have remove_fee() method, so we use session storage
  */
-add_action('woocommerce_before_calculate_totals', function() {
+add_action('woocommerce_before_calculate_totals', function($cart) {
     if (is_admin() && !defined('DOING_AJAX')) {
         return;
     }
     
-    // Store a flag to prevent duplicate fee additions
-    $session_key = 'intersoccer_fees_cleared_' . md5(serialize(WC()->cart->get_cart()));
-    
-    if (!WC()->session->get($session_key)) {
-        // Mark that we've processed this cart state
-        WC()->session->set($session_key, true);
-        error_log('InterSoccer: Marked cart for fee processing: ' . $session_key);
+    static $fees_cleared = false;
+    if (!$fees_cleared) {
+        $existing_fees = $cart->get_fees();
+        foreach ($existing_fees as $fee_key => $fee) {
+            if (strpos($fee->name, 'Camp') !== false || 
+                strpos($fee->name, 'Course') !== false || 
+                strpos($fee->name, 'Sibling') !== false ||
+                strpos($fee->name, 'Multi-Child') !== false ||
+                strpos($fee->name, 'Season') !== false) {
+                error_log('InterSoccer: Removing existing fee: ' . $fee->name);
+            }
+        }
+        $fees_cleared = true;
     }
 }, 5);
 
@@ -178,17 +198,6 @@ function intersoccer_apply_combo_discounts() {
         return;
     }
     
-    // Prevent duplicate fee calculation using cart hash
-    $cart_hash = md5(serialize(WC()->cart->get_cart_contents()));
-    $session_key = 'intersoccer_fees_applied_' . $cart_hash;
-    
-    if (WC()->session->get($session_key)) {
-        error_log('InterSoccer: Fees already applied for this cart state');
-        return;
-    }
-    
-    error_log('InterSoccer: Starting combo discount calculation for cart hash: ' . $cart_hash);
-    
     $cart_items = WC()->cart->get_cart();
     $camps_by_child = [];
     $courses_by_child = [];
@@ -198,10 +207,10 @@ function intersoccer_apply_combo_discounts() {
     foreach ($cart_items as $cart_item_key => $cart_item) {
         $product_id = $cart_item['product_id'];
         $product_type = intersoccer_get_product_type($product_id);
-        $assigned_player = isset($cart_item['assigned_attendee']) ? $cart_item['assigned_attendee'] : null;
+        
+        $assigned_player = $cart_item['assigned_player'] ?? $cart_item['assigned_attendee'] ?? null;
         
         if ($assigned_player === null) {
-            error_log('InterSoccer: Skipping item without assigned player: ' . $product_id);
             continue;
         }
         
@@ -244,19 +253,10 @@ function intersoccer_apply_combo_discounts() {
         }
     }
     
-    // Apply camp combo discounts (multi-child)
+    // Apply discounts
     intersoccer_apply_camp_combo_discounts($camps_by_child);
-    
-    // Apply course combo discounts (multi-child)
     intersoccer_apply_course_combo_discounts($courses_by_child);
-    
-    // Apply same-season course discounts (same child, multiple courses)
     intersoccer_apply_same_season_course_discounts($courses_by_season_child);
-    
-    // Mark fees as applied for this cart state
-    WC()->session->set($session_key, true);
-    
-    error_log('InterSoccer: Finished combo discount calculation and marked as applied');
 }
 
 /**
@@ -266,8 +266,8 @@ function intersoccer_apply_combo_discounts() {
  */
 function intersoccer_apply_camp_combo_discounts($camps_by_child) {
     $rates = intersoccer_get_discount_rates()['camp'];
-    $second_child_rate = $rates['2nd_child'] ?? 0.20; // Default 20%
-    $third_plus_rate = $rates['3rd_plus_child'] ?? 0.25; // Default 25%
+    $second_child_rate = $rates['2nd_child'] ?? 0.20;
+    $third_plus_rate = $rates['3rd_plus_child'] ?? 0.25;
     
     $all_camps = [];
     
@@ -280,19 +280,15 @@ function intersoccer_apply_camp_combo_discounts($camps_by_child) {
             // Check booking type - only apply discounts to full-week camps
             $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
             
-            if ($booking_type === 'full-week' || empty($booking_type)) { // Default to full-week if not set
+            if ($booking_type === 'full-week' || empty($booking_type)) {
                 $camp['child_id'] = $child_id;
                 $all_camps[] = $camp;
-                error_log('InterSoccer: Including full-week camp for discount - Product: ' . $product_id . ', Booking Type: ' . ($booking_type ?: 'default'));
-            } else {
-                error_log('InterSoccer: Excluding single-day camp from discount - Product: ' . $product_id . ', Booking Type: ' . $booking_type);
             }
         }
     }
     
     if (count($all_camps) < 2) {
-        error_log('InterSoccer: Less than 2 eligible full-week camps - no combo discount applicable');
-        return; // No combo discount applicable
+        return;
     }
     
     // Sort by price (descending) to apply discounts to cheaper items
@@ -300,27 +296,25 @@ function intersoccer_apply_camp_combo_discounts($camps_by_child) {
         return $b['price'] <=> $a['price'];
     });
     
-    error_log('InterSoccer: Applying camp combo discounts to ' . count($all_camps) . ' full-week camps');
-    
     for ($i = 1; $i < count($all_camps); $i++) {
         $camp = $all_camps[$i];
         $discount_percentage = ($i === 1) ? ($second_child_rate * 100) : ($third_plus_rate * 100);
         $discount_rate = ($i === 1) ? $second_child_rate : $third_plus_rate;
         $discount_amount = $camp['price'] * $discount_rate;
         
-        $discount_label = sprintf(
-            __('%d%% Camp Combo Discount (Child %d)', 'intersoccer-product-variations'),
-            $discount_percentage,
-            $camp['child_id'] + 1
-        );
+        // Improved discount label without child index
+        if ($i === 1) {
+            $discount_label = sprintf(__('%d%% Sibling Camp Discount', 'intersoccer-product-variations'), $discount_percentage);
+        } else {
+            $discount_label = sprintf(__('%d%% Multi-Child Camp Discount', 'intersoccer-product-variations'), $discount_percentage);
+        }
         
         WC()->cart->add_fee($discount_label, -$discount_amount);
         
         error_log(sprintf(
-            'InterSoccer: Applied %d%% camp discount: -CHF %.2f for child %d (full-week only)',
-            $discount_percentage,
-            $discount_amount,
-            $camp['child_id']
+            'InterSoccer: Applied %s: -CHF %.2f',
+            $discount_label,
+            $discount_amount
         ));
     }
 }
@@ -332,54 +326,16 @@ function intersoccer_apply_camp_combo_discounts($camps_by_child) {
  */
 function intersoccer_apply_course_combo_discounts($courses_by_child) {
     $rates = intersoccer_get_discount_rates()['course'];
-    $second_child_rate = $rates['2nd_child'] ?? 0.20; // Default 20%
-    $third_plus_rate = $rates['3rd_plus_child'] ?? 0.30; // Default 30%
+    $second_child_rate = $rates['2nd_child'] ?? 0.20;
+    $third_plus_rate = $rates['3rd_plus_child'] ?? 0.30;
     
     $children_with_courses = array_keys($courses_by_child);
     
     if (count($children_with_courses) < 2) {
-        return; // No multi-child discount applicable
+        return;
     }
     
-    error_log('InterSoccer: Applying course combo discounts for ' . count($children_with_courses) . ' children');
-    
-    // Calculate prorated prices first, then apply discounts
-    foreach ($courses_by_child as $child_id => $courses) {
-        foreach ($courses as &$course) {
-            $product_id = $course['item']['product_id'];
-            $variation_id = $course['item']['variation_id'] ?? 0;
-            
-            // Get course details for proration calculation
-            $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
-            $total_weeks = (int) get_post_meta($variation_id ?: $product_id, '_course_total_weeks', true);
-            $original_price = (float) $course['item']['data']->get_regular_price();
-            
-            if ($start_date && $total_weeks > 0) {
-                $current_date = current_time('Y-m-d');
-                
-                if (strtotime($current_date) > strtotime($start_date)) {
-                    // Course has started - calculate proration
-                    if (class_exists('InterSoccer_Course')) {
-                        $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id ?: $product_id, $total_weeks);
-                        $prorated_price = InterSoccer_Course::calculate_price($product_id, $variation_id ?: $product_id, $remaining_sessions);
-                        
-                        // Update the price to prorated amount
-                        $course['price'] = $prorated_price;
-                        error_log('InterSoccer: Prorated course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price . ', Remaining Sessions: ' . $remaining_sessions);
-                    } else {
-                        error_log('InterSoccer: InterSoccer_Course class not available for proration calculation');
-                    }
-                } else {
-                    error_log('InterSoccer: Course has not started yet - using full price - Product: ' . $product_id);
-                }
-            } else {
-                error_log('InterSoccer: Missing course start date or total weeks for proration - Product: ' . $product_id);
-            }
-        }
-        unset($course); // Break reference
-    }
-    
-    // Sort children by total course value (descending) to apply discounts to cheaper ones
+    // Sort children by total course value (descending)
     $children_totals = [];
     foreach ($courses_by_child as $child_id => $courses) {
         $total = array_sum(array_column($courses, 'price'));
@@ -395,22 +351,21 @@ function intersoccer_apply_course_combo_discounts($courses_by_child) {
         $discount_rate = ($i === 1) ? $second_child_rate : $third_plus_rate;
         
         foreach ($courses_by_child[$child_id] as $course) {
-            // Apply discount to the (potentially prorated) price
             $discount_amount = $course['price'] * $discount_rate;
             
-            $discount_label = sprintf(
-                __('%d%% Course Multi-Child Discount (Child %d)', 'intersoccer-product-variations'),
-                $discount_percentage,
-                $child_id + 1
-            );
+            // Improved discount label without child index
+            if ($i === 1) {
+                $discount_label = sprintf(__('%d%% Sibling Course Discount', 'intersoccer-product-variations'), $discount_percentage);
+            } else {
+                $discount_label = sprintf(__('%d%% Multi-Child Course Discount', 'intersoccer-product-variations'), $discount_percentage);
+            }
             
             WC()->cart->add_fee($discount_label, -$discount_amount);
             
             error_log(sprintf(
-                'InterSoccer: Applied %d%% course multi-child discount: -CHF %.2f for child %d (after proration)',
-                $discount_percentage,
-                $discount_amount,
-                $child_id
+                'InterSoccer: Applied %s: -CHF %.2f',
+                $discount_label,
+                $discount_amount
             ));
         }
     }
@@ -423,78 +378,42 @@ function intersoccer_apply_course_combo_discounts($courses_by_child) {
  */
 function intersoccer_apply_same_season_course_discounts($courses_by_season_child) {
     $rates = intersoccer_get_discount_rates()['course'];
-    $combo_rate = $rates['same_season_course'] ?? 0.50; // Default 50%
+    $combo_rate = $rates['same_season_course'] ?? 0.50;
     
     foreach ($courses_by_season_child as $season => $children_courses) {
         foreach ($children_courses as $child_id => $courses) {
             if (count($courses) < 2) {
-                continue; // Need at least 2 courses for same-season discount
+                continue;
             }
-            
-            error_log("InterSoccer: Applying same-season discount for child {$child_id} in {$season}");
-            
-            // Calculate prorated prices first
-            foreach ($courses as &$course) {
-                $product_id = $course['item']['product_id'];
-                $variation_id = $course['item']['variation_id'] ?? 0;
-                
-                // Get course details for proration calculation
-                $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
-                $total_weeks = (int) get_post_meta($variation_id ?: $product_id, '_course_total_weeks', true);
-                $original_price = (float) $course['item']['data']->get_regular_price();
-                
-                if ($start_date && $total_weeks > 0) {
-                    $current_date = current_time('Y-m-d');
-                    
-                    if (strtotime($current_date) > strtotime($start_date)) {
-                        // Course has started - calculate proration
-                        if (class_exists('InterSoccer_Course')) {
-                            $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id ?: $product_id, $total_weeks);
-                            $prorated_price = InterSoccer_Course::calculate_price($product_id, $variation_id ?: $product_id, $remaining_sessions);
-                            
-                            // Update the price to prorated amount
-                            $course['price'] = $prorated_price;
-                            error_log('InterSoccer: Prorated same-season course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price);
-                        } else {
-                            error_log('InterSoccer: InterSoccer_Course class not available for same-season proration calculation');
-                        }
-                    } else {
-                        error_log('InterSoccer: Same-season course has not started yet - using full price - Product: ' . $product_id);
-                    }
-                } else {
-                    error_log('InterSoccer: Missing course start date or total weeks for same-season proration - Product: ' . $product_id);
-                }
-            }
-            unset($course); // Break reference
             
             // Sort by price (descending) to apply discount to cheaper course
             usort($courses, function($a, $b) {
                 return $b['price'] <=> $a['price'];
             });
             
-            // Apply 50% discount to 2nd course (and any additional courses) - after proration
+            // Apply 50% discount to 2nd course (and any additional courses)
             for ($i = 1; $i < count($courses); $i++) {
                 $course = $courses[$i];
                 $discount_amount = $course['price'] * $combo_rate;
                 
+                // Improved discount label
                 $discount_label = sprintf(
-                    __('50%% Same Season Course Discount (Child %d, %s)', 'intersoccer-product-variations'),
-                    $child_id + 1,
+                    __('50%% Same Season Course Discount (%s)', 'intersoccer-product-variations'),
                     $season
                 );
                 
                 WC()->cart->add_fee($discount_label, -$discount_amount);
                 
                 error_log(sprintf(
-                    'InterSoccer: Applied 50%% same-season discount: -CHF %.2f for child %d in %s (after proration)',
-                    $discount_amount,
-                    $child_id,
-                    $season
+                    'InterSoccer: Applied %s: -CHF %.2f',
+                    $discount_label,
+                    $discount_amount
                 ));
             }
         }
     }
 }
+
 
 /**
  * Add discount information to cart item data
@@ -554,5 +473,41 @@ function intersoccer_clear_discount_session() {
     }
 }
 
-error_log('InterSoccer: Loaded discounts.php with database-driven rules and session-based fee management');
+
+/**
+ * Debug function to log cart state for discount troubleshooting
+ */
+function intersoccer_debug_discount_cart() {
+    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+        return;
+    }
+    
+    error_log('=== InterSoccer Discount Debug ===');
+    
+    if (WC()->cart && !WC()->cart->is_empty()) {
+        $cart_items = WC()->cart->get_cart();
+        foreach ($cart_items as $cart_item_key => $cart_item) {
+            $product_id = $cart_item['product_id'];
+            $product_type = intersoccer_get_product_type($product_id);
+            $assigned_player = $cart_item['assigned_player'] ?? $cart_item['assigned_attendee'] ?? 'not set';
+            $price = $cart_item['data']->get_price();
+            
+            error_log("Cart Item: {$cart_item_key}");
+            error_log("  Product ID: {$product_id}");
+            error_log("  Product Type: {$product_type}");
+            error_log("  Assigned Player: {$assigned_player}");
+            error_log("  Price: {$price}");
+        }
+        
+        $fees = WC()->cart->get_fees();
+        error_log('Current fees: ' . print_r($fees, true));
+    }
+    
+    error_log('=== End Discount Debug ===');
+}
+
+// Add debug hook
+add_action('woocommerce_cart_calculate_fees', 'intersoccer_debug_discount_cart', 999);
+
+error_log('InterSoccer: Loaded FIXED discounts.php with improved multi-child and same-season logic');
 ?>

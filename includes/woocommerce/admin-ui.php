@@ -395,6 +395,337 @@ function intersoccer_bulk_discounts_callback() {
 }
 
 /**
+ * Register admin submenu for Discounts and Messages
+ */
+add_action('admin_menu', 'intersoccer_add_enhanced_admin_submenus');
+function intersoccer_add_enhanced_admin_submenus() {
+    // Combined Discounts and Messages submenu
+    add_submenu_page(
+        'woocommerce',
+        __('Manage Discounts & Messages', 'intersoccer-product-variations'),
+        __('Discounts & Messages', 'intersoccer-product-variations'),
+        'manage_woocommerce',
+        'intersoccer-discounts',
+        'intersoccer_render_enhanced_discounts_page'
+    );
+
+    // Keep existing submenus
+    add_submenu_page(
+        'woocommerce',
+        __('Update Order Details', 'intersoccer-product-variations'),
+        __('Update Order Details', 'intersoccer-product-variations'),
+        'manage_woocommerce',
+        'intersoccer-update-orders',
+        'intersoccer_render_update_orders_page'
+    );
+
+    add_submenu_page(
+        'woocommerce',
+        __('Variation Health Checker', 'intersoccer-product-variations'),
+        __('Variation Health', 'intersoccer-product-variations'),
+        'manage_woocommerce',
+        'intersoccer-variation-health',
+        'intersoccer_render_variation_health_page'
+    );
+}
+
+/**
+ * Register enhanced settings for Discounts and Messages
+ */
+add_action('admin_init', 'intersoccer_register_enhanced_discount_settings');
+function intersoccer_register_enhanced_discount_settings() {
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_discount_rules',
+        [
+            'type' => 'array',
+            'sanitize_callback' => 'intersoccer_sanitize_enhanced_discount_rules',
+            'default' => []
+        ]
+    );
+
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_discount_messages',
+        [
+            'type' => 'array',
+            'sanitize_callback' => 'intersoccer_sanitize_discount_messages',
+            'default' => []
+        ]
+    );
+}
+
+/**
+ * Enhanced sanitization for discount rules
+ */
+function intersoccer_sanitize_enhanced_discount_rules($rules) {
+    if (!is_array($rules)) {
+        return [];
+    }
+    
+    $sanitized = [];
+    foreach ($rules as $rule) {
+        $sanitized_rule = [
+            'id' => isset($rule['id']) ? sanitize_key($rule['id']) : wp_generate_uuid4(),
+            'name' => isset($rule['name']) ? sanitize_text_field($rule['name']) : '',
+            'type' => in_array($rule['type'], ['camp', 'course', 'general']) ? $rule['type'] : 'general',
+            'condition' => in_array($rule['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'none']) ? $rule['condition'] : 'none',
+            'rate' => min(max(floatval($rule['rate']), 0), 100),
+            'active' => isset($rule['active']) ? (bool) $rule['active'] : true,
+            'message_key' => isset($rule['message_key']) ? sanitize_key($rule['message_key']) : $rule['id']
+        ];
+        
+        if (!empty($sanitized_rule['name'])) {
+            $sanitized[$sanitized_rule['id']] = $sanitized_rule;
+        }
+    }
+    
+    return $sanitized;
+}
+
+/**
+ * Sanitize discount messages with WPML support
+ */
+function intersoccer_sanitize_discount_messages($messages) {
+    if (!is_array($messages)) {
+        return [];
+    }
+    
+    $sanitized = [];
+    foreach ($messages as $message_key => $languages) {
+        if (!is_array($languages)) {
+            continue;
+        }
+        
+        $sanitized_languages = [];
+        foreach ($languages as $lang_code => $message_data) {
+            $sanitized_languages[sanitize_key($lang_code)] = [
+                'cart_message' => sanitize_text_field($message_data['cart_message'] ?? ''),
+                'admin_description' => sanitize_textarea_field($message_data['admin_description'] ?? ''),
+                'customer_note' => sanitize_textarea_field($message_data['customer_note'] ?? '')
+            ];
+        }
+        
+        $sanitized[sanitize_key($message_key)] = $sanitized_languages;
+    }
+    
+    return $sanitized;
+}
+
+    /**
+ * Get all available languages
+ * Returns array of language codes and names
+ * 
+ * @return array Array of language_code => language_name
+ */
+function intersoccer_get_available_languages() {
+    error_log('InterSoccer: intersoccer_get_available_languages() called');
+    
+    // Check for WPML
+    if (function_exists('icl_get_languages')) {
+        $languages = icl_get_languages('skip_missing=0');
+        $available = [];
+        
+        foreach ($languages as $lang_code => $lang_info) {
+            $available[$lang_code] = $lang_info['native_name'];
+        }
+        
+        error_log('InterSoccer: WPML languages: ' . print_r($available, true));
+        return $available;
+    }
+    
+    // Check for Polylang
+    if (function_exists('pll_languages_list')) {
+        $lang_codes = pll_languages_list();
+        $available = [];
+        
+        foreach ($lang_codes as $lang_code) {
+            $lang_obj = pll_get_language($lang_code);
+            $available[$lang_code] = $lang_obj ? $lang_obj->name : $lang_code;
+        }
+        
+        if (!empty($available)) {
+            error_log('InterSoccer: Polylang languages: ' . print_r($available, true));
+            return $available;
+        }
+    }
+    
+    // Fallback to common languages
+    $fallback = [
+        'en' => 'English',
+        'de' => 'Deutsch',
+        'fr' => 'Français'
+    ];
+    
+    error_log('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
+    return $fallback;
+}
+
+    /**
+     * Render combined Discounts and Messages admin page
+     */
+    function intersoccer_render_enhanced_discounts_page() {
+        $rules = get_option('intersoccer_discount_rules', []);
+        $messages = get_option('intersoccer_discount_messages', []);
+        $languages = intersoccer_get_available_languages();
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Manage Discounts & Messages', 'intersoccer-product-variations'); ?></h1>
+            <form method="post" action="options.php">
+                <?php settings_fields('intersoccer_discounts_group'); ?>
+                <?php do_settings_sections('intersoccer_discounts_group'); ?>
+                
+                <table class="wp-list-table widefat striped">
+                    <thead>
+                        <tr>
+                            <th><?php _e('Name', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Type', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Condition', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Rate (%)', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Active', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Messages', 'intersoccer-product-variations'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($rules as $rule_id => $rule): ?>
+                            <tr>
+                                <td>
+                                    <input type="text" name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][name]" 
+                                        value="<?php echo esc_attr($rule['name']); ?>" class="regular-text" />
+                                    <input type="hidden" name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][id]" 
+                                        value="<?php echo esc_attr($rule_id); ?>" />
+                                </td>
+                                <td>
+                                    <select name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][type]">
+                                        <option value="camp" <?php selected($rule['type'], 'camp'); ?>><?php _e('Camp', 'intersoccer-product-variations'); ?></option>
+                                        <option value="course" <?php selected($rule['type'], 'course'); ?>><?php _e('Course', 'intersoccer-product-variations'); ?></option>
+                                        <option value="general" <?php selected($rule['type'], 'general'); ?>><?php _e('General', 'intersoccer-product-variations'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][condition]">
+                                        <option value="2nd_child" <?php selected($rule['condition'], '2nd_child'); ?>><?php _e('2nd Child', 'intersoccer-product-variations'); ?></option>
+                                        <option value="3rd_plus_child" <?php selected($rule['condition'], '3rd_plus_child'); ?>><?php _e('3rd+ Child', 'intersoccer-product-variations'); ?></option>
+                                        <option value="same_season_course" <?php selected($rule['condition'], 'same_season_course'); ?>><?php _e('Same Season Course', 'intersoccer-product-variations'); ?></option>
+                                        <option value="none" <?php selected($rule['condition'], 'none'); ?>><?php _e('None', 'intersoccer-product-variations'); ?></option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" max="100" 
+                                        name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][rate]" 
+                                        value="<?php echo esc_attr($rule['rate']); ?>" class="small-text" />
+                                </td>
+                                <td>
+                                    <input type="checkbox" name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][active]" 
+                                        value="1" <?php checked($rule['active'], true); ?> />
+                                </td>
+                                <td>
+                                    <?php foreach ($languages as $lang_code => $lang_name): ?>
+                                        <div class="intersoccer-message-group" style="margin-bottom: 15px;">
+                                            <strong><?php echo esc_html($lang_name); ?></strong><br>
+                                            <label><?php _e('Cart Message:', 'intersoccer-product-variations'); ?></label><br>
+                                            <input type="text" class="regular-text" 
+                                                name="intersoccer_discount_messages[<?php echo esc_attr($rule['message_key'] ?? $rule_id); ?>][<?php echo esc_attr($lang_code); ?>][cart_message]" 
+                                                value="<?php echo esc_attr($messages[$rule['message_key'] ?? $rule_id][$lang_code]['cart_message'] ?? ''); ?>" /><br>
+                                            <label><?php _e('Admin Description:', 'intersoccer-product-variations'); ?></label><br>
+                                            <textarea class="regular-text" rows="2" 
+                                                    name="intersoccer_discount_messages[<?php echo esc_attr($rule['message_key'] ?? $rule_id); ?>][<?php echo esc_attr($lang_code); ?>][admin_description]"><?php echo esc_textarea($messages[$rule['message_key'] ?? $rule_id][$lang_code]['admin_description'] ?? ''); ?></textarea><br>
+                                            <label><?php _e('Customer Note:', 'intersoccer-product-variations'); ?></label><br>
+                                            <textarea class="regular-text" rows="2" 
+                                                    name="intersoccer_discount_messages[<?php echo esc_attr($rule['message_key'] ?? $rule_id); ?>][<?php echo esc_attr($lang_code); ?>][customer_note]"><?php echo esc_textarea($messages[$rule['message_key'] ?? $rule_id][$lang_code]['customer_note'] ?? ''); ?></textarea>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                
+                <p>
+                    <button type="submit" class="button button-primary"><?php _e('Save All', 'intersoccer-product-variations'); ?></button>
+                </p>
+                <?php wp_nonce_field('intersoccer_save_discounts', 'intersoccer_discounts_nonce'); ?>
+            </form>
+            
+            <div id="intersoccer-messages-status"></div>
+            
+            <script>
+                jQuery(document).ready(function($) {
+                    $('form').on('submit', function(e) {
+                        const $form = $(this);
+                        const $button = $form.find('button[type="submit"]');
+                        
+                        $button.prop('disabled', true).text('<?php esc_js_e('Saving...', 'intersoccer-product-variations'); ?>');
+                        
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: {
+                                action: 'intersoccer_save_discounts',
+                                nonce: $form.find('input[name="intersoccer_discounts_nonce"]').val(),
+                                rules: $form.find('[name^="intersoccer_discount_rules"]').serialize(),
+                                messages: $form.find('[name^="intersoccer_discount_messages"]').serialize()
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    $('#intersoccer-messages-status').html('<div class="notice notice-success"><p><?php esc_js_e('Discounts and messages saved successfully!', 'intersoccer-product-variations'); ?></p></div>');
+                                    setTimeout(() => $('#intersoccer-messages-status').empty(), 3000);
+                                } else {
+                                    $('#intersoccer-messages-status').html('<div class="notice notice-error"><p>' + (response.data?.message || '<?php esc_js_e('Error saving data', 'intersoccer-product-variations'); ?>') + '</p></div>');
+                                }
+                            },
+                            error: function() {
+                                $('#intersoccer-messages-status').html('<div class="notice notice-error"><p><?php esc_js_e('Network error occurred', 'intersoccer-product-variations'); ?></p></div>');
+                            },
+                            complete: function() {
+                                $button.prop('disabled', false).text('<?php esc_js_e('Save All', 'intersoccer-product-variations'); ?>');
+                            }
+                        });
+                        
+                        e.preventDefault(); // Prevent default form submission
+                    });
+                });
+            </script>
+        </div>
+        <?php
+    }
+
+    /**
+     * AJAX handler to save discount rules and messages
+     */
+    add_action('wp_ajax_intersoccer_save_discounts', 'intersoccer_save_discounts_callback');
+    function intersoccer_save_discounts_callback() {
+        check_ajax_referer('intersoccer_save_discounts', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
+            return;
+        }
+
+        // Parse rules
+        $rules_data = [];
+        if (isset($_POST['rules'])) {
+            parse_str($_POST['rules'], $rules_data);
+            $rules_data = $rules_data['intersoccer_discount_rules'] ?? [];
+            $rules_data = intersoccer_sanitize_enhanced_discount_rules($rules_data);
+        }
+
+        // Parse messages
+        $messages_data = [];
+        if (isset($_POST['messages'])) {
+            parse_str($_POST['messages'], $messages_data);
+            $messages_data = $messages_data['intersoccer_discount_messages'] ?? [];
+            $messages_data = intersoccer_sanitize_discount_messages($messages_data);
+        }
+
+        // Save to database
+        update_option('intersoccer_discount_rules', $rules_data);
+        update_option('intersoccer_discount_messages', $messages_data);
+
+        wp_send_json_success(['message' => __('Discounts and messages saved successfully.', 'intersoccer-product-variations')]);
+    }
+
+/**
  * Render the Update Orders page.
  */
 function intersoccer_render_update_orders_page() {
