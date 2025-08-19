@@ -103,14 +103,16 @@ function intersoccer_get_player_details($user_id, $player_index) {
 }
 
 /**
- * Helper function to get all parent product attributes (non-variation)
+ * Helper function to get parent product attributes (excluding variation attributes)
  */
 function intersoccer_get_parent_product_attributes($product_id, $variation_id = null) {
     $parent_product = wc_get_product($product_id);
     $variation_product = $variation_id ? wc_get_product($variation_id) : null;
     
     if (!$parent_product) {
-        error_log('InterSoccer: Invalid parent product ID: ' . $product_id);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Invalid parent product ID: ' . $product_id);
+        }
         return [];
     }
     
@@ -118,15 +120,41 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     $parent_attributes = $parent_product->get_attributes();
     $variation_attributes = $variation_product ? $variation_product->get_variation_attributes() : [];
     
+    // Normalize variation attribute keys (remove 'attribute_' prefix)
+    $variation_attribute_keys = array_map(function($key) {
+        return str_replace('attribute_', '', $key);
+    }, array_keys($variation_attributes));
+    
     if (defined('WP_DEBUG') && WP_DEBUG) {
         error_log('InterSoccer: Parent attributes for product ' . $product_id . ': ' . print_r($parent_attributes, true));
-        error_log('InterSoccer: Variation attributes for variation ' . $variation_id . ': ' . print_r($variation_attributes, true));
+        error_log('InterSoccer: Variation attributes for variation ' . ($variation_id ?: 'none') . ': ' . print_r($variation_attributes, true));
+        error_log('InterSoccer: Normalized variation attribute keys: ' . print_r($variation_attribute_keys, true));
     }
     
+    // Define chronological order for days of the week
+    $days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
     foreach ($parent_attributes as $attribute_name => $attribute) {
+        // Skip if attribute is used in variation
+        if (in_array($attribute_name, $variation_attribute_keys)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Skipping variation attribute: ' . $attribute_name);
+            }
+            continue;
+        }
+        
         if ($attribute->is_taxonomy()) {
             $terms = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'names']);
-            $value = !empty($terms) ? implode(', ', $terms) : '';
+            if ($attribute_name === 'pa_days-of-week' && !empty($terms)) {
+                // Sort days of the week chronologically
+                $terms = array_intersect($days_order, $terms);
+                $value = !empty($terms) ? implode(', ', array_values($terms)) : '';
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('InterSoccer: Sorted Days of Week for product ' . $product_id . ': ' . $value);
+                }
+            } else {
+                $value = !empty($terms) ? implode(', ', $terms) : '';
+            }
         } else {
             $value = $attribute->get_options() ? implode(', ', $attribute->get_options()) : '';
         }
@@ -134,7 +162,14 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
         if ($value) {
             $label = wc_attribute_label($attribute_name);
             $attributes[$label] = $value;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value);
+            }
         }
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Final attributes returned for product ' . $product_id . ': ' . print_r($attributes, true));
     }
     
     return $attributes;
@@ -148,6 +183,10 @@ function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order)
     $product_id = $values['product_id'];
     $variation_id = $values['variation_id'] ?? 0;
     $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Adding custom meta to order item for product ' . $product_id . ' / variation ' . $variation_id . '. Cart values: ' . json_encode($values));
+    }
 
     // 1. Add player details
     if (isset($values['assigned_player']) && $values['assigned_player'] !== '') {
@@ -170,9 +209,25 @@ function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order)
         }
     }
 
-    // 2. Add parent product attributes
+    // 2. Add parent product attributes (excluding variation attributes)
+    $product = wc_get_product($variation_id ?: $product_id);
+    $parent_id = $variation_id ? $product->get_parent_id() : $product_id;
+    $parent = wc_get_product($parent_id);
     $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-    foreach ($attributes as $label => $value) {
+    
+    // Get existing meta keys to avoid duplicates
+    $existing_meta = $item->get_meta_data();
+    $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
+
+    foreach ($attributes as $attr_slug => $value) {
+        $label = wc_attribute_label($attr_slug);
+        // Skip if attribute is already in order meta
+        if (in_array($label, $existing_keys)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Skipping attribute ' . $label . ' (already exists)');
+            }
+            continue;
+        }
         $item->add_meta_data($label, $value);
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('InterSoccer: Added parent attribute: ' . $label . ' = ' . $value);
@@ -183,7 +238,9 @@ function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order)
     if ($product_type === 'camp') {
         // Camp-specific metadata
         if (isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
-            $days_selected = implode(', ', array_map('sanitize_text_field', $values['camp_days']));
+            $days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            $sorted_days = array_intersect($days_order, array_map('sanitize_text_field', $values['camp_days']));
+            $days_selected = implode(', ', array_values($sorted_days));
             $item->add_meta_data('Days Selected', $days_selected);
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('InterSoccer: Added Days Selected: ' . $days_selected);
@@ -265,7 +322,6 @@ function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order)
         error_log('InterSoccer: Checkout metadata - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none') . ', Discount: ' . ($values['discount_note'] ?? 'none'));
     }
 }
-
 /**
  * Display custom metadata in checkout review order table
  */
@@ -302,26 +358,26 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
 /**
  * Display custom order item metadata in admin order details.
  */
-add_action('woocommerce_admin_order_item_values', 'intersoccer_display_order_item_meta_admin', 10, 3);
-function intersoccer_display_order_item_meta_admin($product, $item, $item_id) {
-    $important_meta = [
-        'Assigned Attendee',
-        'Days Selected',
-        'Remaining Sessions',
-        'Start Date',
-        'End Date',
-        'Season',
-        'Activity Type',
-        'Discount'
-    ];
+// add_action('woocommerce_admin_order_item_values', 'intersoccer_display_order_item_meta_admin', 10, 3);
+// function intersoccer_display_order_item_meta_admin($product, $item, $item_id) {
+//     $important_meta = [
+//         'Assigned Attendee',
+//         'Days Selected',
+//         'Remaining Sessions',
+//         'Start Date',
+//         'End Date',
+//         'Season',
+//         'Activity Type',
+//         'Discount'
+//     ];
     
-    foreach ($important_meta as $meta_key) {
-        $meta_value = $item->get_meta($meta_key);
-        if (!empty($meta_value)) {
-            echo '<div class="intersoccer-order-meta"><strong>' . esc_html($meta_key) . ':</strong> ' . esc_html($meta_value) . '</div>';
-        }
-    }
-}
+//     foreach ($important_meta as $meta_key) {
+//         $meta_value = $item->get_meta($meta_key);
+//         if (!empty($meta_value)) {
+//             echo '<div class="intersoccer-order-meta"><strong>' . esc_html($meta_key) . ':</strong> ' . esc_html($meta_value) . '</div>';
+//         }
+//     }
+// }
 
 /**
  * Ensure cart item data includes assigned_player in the correct format
