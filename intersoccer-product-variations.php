@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.4.45
+ * Version: 1.4.52
  * Author: Jeremy Lee
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -161,6 +161,7 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
         $parent_id = $variation->get_parent_id() ?: $variation_id;
         $course_day = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names'])[0] ?? 'Monday';
 
+        // Calculate end date if not set or invalid
         if (!$end_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) || !strtotime($end_date)) {
             if ($data['course_start_date'] && $total_weeks > 0) {
                 $start = new DateTime(get_post_meta($variation_id, '_course_start_date', true));
@@ -169,15 +170,27 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                 $current_date = clone $start;
                 $weeks_counted = 0;
                 $days_checked = 0;
-                while ($weeks_counted < $sessions_needed && $days_checked < ($total_weeks * 7 * 2)) {
+                $max_days = $total_weeks * 7 * 2; // Safety limit to prevent infinite loops
+
+                while ($weeks_counted < $sessions_needed && $days_checked < $max_days) {
                     if ($current_date->format('l') === $course_day && !isset($holiday_set[$current_date->format('Y-m-d')])) {
                         $weeks_counted++;
+                        if ($weeks_counted === $sessions_needed) {
+                            // End date is the current date, as it’s the last valid session
+                            $end_date = $current_date->format('Y-m-d');
+                            break;
+                        }
                     }
                     $current_date->add(new DateInterval('P1D'));
                     $days_checked++;
                 }
-                $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
-                error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
+
+                if ($weeks_counted < $sessions_needed) {
+                    $end_date = '';
+                    error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ': not enough valid sessions found');
+                } else {
+                    error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date . ' (course_day: ' . $course_day . ')');
+                }
             } else {
                 $end_date = '';
                 error_log('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');

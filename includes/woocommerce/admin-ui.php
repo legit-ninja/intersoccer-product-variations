@@ -59,7 +59,6 @@ function intersoccer_add_admin_submenus() {
     error_log('InterSoccer: Registered admin submenus including Variation Health Checker');
 }
 
-
 /**
  * Register settings for Discounts.
  */
@@ -489,7 +488,7 @@ function intersoccer_sanitize_discount_messages($messages) {
     return $sanitized;
 }
 
-    /**
+/**
  * Get all available languages
  * Returns array of language codes and names
  * 
@@ -1899,6 +1898,12 @@ function intersoccer_render_variation_health_page() {
         wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
     }
 
+    // Handle recalc form submission
+    if (isset($_POST['intersoccer_recalc_end_dates']) && check_admin_referer('intersoccer_recalc_nonce')) {
+        intersoccer_run_course_end_date_update_callback();
+        echo '<div class="notice notice-success is-dismissible"><p>' . __('Course end dates recalculated successfully.', 'intersoccer-player-management') . '</p></div>';
+    }
+
     $show_unhealthy = isset($_GET['show_unhealthy']) && $_GET['show_unhealthy'] == 1;
         if ($show_unhealthy) {
             // Query and display only unhealthy variations (add your logic here)
@@ -1911,6 +1916,13 @@ function intersoccer_render_variation_health_page() {
     $table->prepare_items();
     ?>
     <div class="wrap">
+        <h1><?php _e('InterSoccer Variation Health Dashboard', 'intersoccer-player-management'); ?></h1>
+        <p><?php _e('Use this dashboard to check and fix variation issues, such as recalculating course end dates.', 'intersoccer-player-management'); ?></p>
+
+        <form method="post" action="">
+            <?php wp_nonce_field('intersoccer_recalc_nonce'); ?>
+            <input type="submit" name="intersoccer_recalc_end_dates" class="button button-primary" value="<?php _e('Recalculate Course End Dates', 'intersoccer-player-management'); ?>">
+        </form>
         <h1><?php _e('Variation Health Checker', 'intersoccer-player-management'); ?></h1>
         <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-player-management'); ?></p>
 
@@ -2493,7 +2505,7 @@ function intersoccer_ajax_scripts() {
 //     wp_die();
 // }
 
-// 1. Enhanced AJAX handler for automated batch processing
+// Enhanced AJAX handler for automated batch processing
 add_action('wp_ajax_intersoccer_automated_batch_update', 'intersoccer_automated_batch_update_callback');
 function intersoccer_automated_batch_update_callback() {
     // Extend time limits for batch processing
@@ -2603,7 +2615,7 @@ function intersoccer_automated_batch_update_callback() {
     ]);
 }
 
-// 2. Function to get all orders that need updates (efficient version)
+// Function to get all orders that need updates (efficient version)
 function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
     error_log('InterSoccer: Scanning for orders needing updates, limit: ' . $limit);
     
@@ -2653,7 +2665,7 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
     return $orders_needing_updates;
 }
 
-// 3. Enhanced UI with automated processing controls
+// Enhanced UI with automated processing controls
 function intersoccer_render_automated_update_orders_page() {
     if (!current_user_can('manage_woocommerce')) {
         wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));

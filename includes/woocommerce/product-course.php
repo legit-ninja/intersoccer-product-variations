@@ -17,6 +17,31 @@ if (!defined('ABSPATH')) {
 class InterSoccer_Course {
 
     /**
+     * Get the course day name from variation attribute.
+     *
+     * @param int $variation_id Variation ID.
+     * @return string Course day name (e.g., 'Wednesday') or empty.
+     */
+    public static function get_course_day($variation_id) {
+        $attribute_slug = get_post_meta($variation_id, 'attribute_pa_course-day', true);
+        if (!$attribute_slug) {
+            error_log('InterSoccer: Missing attribute_pa_course-day for variation ' . $variation_id);
+            return '';
+        }
+        error_log('InterSoccer: Attribute slug for pa_course-day: ' . $attribute_slug . ' for variation ' . $variation_id);
+
+        $term = get_term_by('slug', $attribute_slug, 'pa_course-day');
+        if ($term && !is_wp_error($term)) {
+            $course_day = $term->name;
+            error_log('InterSoccer: Resolved course_day from term name: ' . $course_day . ' for variation ' . $variation_id);
+        } else {
+            $course_day = ucfirst($attribute_slug); // Fallback capitalize slug (e.g., 'wednesday' -> 'Wednesday')
+            error_log('InterSoccer: Fallback to capitalized slug for course_day: ' . $course_day . ' for variation ' . $variation_id . ' (term not found)');
+        }
+        return $course_day;
+    }
+
+    /**
      * Calculate the end date for a course, accounting for holidays.
      *
      * @param int $variation_id Variation ID.
@@ -30,55 +55,53 @@ class InterSoccer_Course {
             return '';
         }
 
-        $parent_id = wp_get_post_parent_id($variation_id) ?: $variation_id;
-        $course_day = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names'])[0] ?? '';
+        $course_day = self::get_course_day($variation_id);
         if (empty($course_day)) {
-            error_log('InterSoccer: Missing pa_course-day for variation ' . $variation_id);
             return '';
         }
-        error_log('InterSoccer: Using pa_course-day for variation ' . $variation_id . ': ' . $course_day);
 
         $holidays = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
         $holiday_set = array_flip($holidays);
         $holiday_count_on_course_day = 0;
         foreach ($holidays as $holiday) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
+                error_log('InterSoccer: Invalid holiday date format for variation ' . $variation_id . ': ' . $holiday);
+                continue;
+            }
             $holiday_date = new DateTime($holiday);
             if ($holiday_date->format('l') === $course_day) {
                 $holiday_count_on_course_day++;
-                error_log('InterSoccer: Holiday on course day ' . $course_day . ': ' . $holiday);
+                error_log('InterSoccer: Holiday on course day ' . $course_day . ' for variation ' . $variation_id . ': ' . $holiday);
             }
         }
 
         try {
             $start = new DateTime($start_date);
-            $sessions_needed = $total_weeks; // Fixed: count only total_weeks good sessions
+            $sessions_needed = $total_weeks;
             $current_date = clone $start;
             $sessions_counted = 0;
             $days_checked = 0;
             $max_days = ($total_weeks + $holiday_count_on_course_day) * 7 + 7; // Buffer for skips
+            $end_date = '';
 
             while ($sessions_counted < $sessions_needed && $days_checked < $max_days) {
                 $day = $current_date->format('Y-m-d');
-                error_log('InterSoccer: Checking date ' . $day . ' for course day ' . $course_day . ', holiday: ' . (isset($holiday_set[$day]) ? 'yes' : 'no'));
-                if ($current_date->format('l') === $course_day) {
-                    if (!isset($holiday_set[$day])) {
-                        $sessions_counted++;
-                        error_log('InterSoccer: Counted session ' . $sessions_counted . ' on ' . $day);
+                error_log('InterSoccer: Checking date ' . $day . ' for course day ' . $course_day . ', holiday: ' . (isset($holiday_set[$day]) ? 'yes' : 'no') . ', sessions_counted: ' . $sessions_counted);
+                if ($current_date->format('l') === $course_day && !isset($holiday_set[$day])) {
+                    $sessions_counted++;
+                    error_log('InterSoccer: Counted session ' . $sessions_counted . ' on ' . $day . ' for variation ' . $variation_id);
+                    if ($sessions_counted === $sessions_needed) {
+                        $end_date = $day;
+                        error_log('InterSoccer: Set end_date to ' . $end_date . ' for variation ' . $variation_id);
+                        break;
                     }
                 }
                 $current_date->add(new DateInterval('P1D'));
                 $days_checked++;
             }
 
-            if ($sessions_counted == $sessions_needed) {
-                $end_date_obj = clone $current_date;
-                $end_date_obj->sub(new DateInterval('P1D'));
-                // Ensure end date lands on course day and is not a holiday
-                while ($end_date_obj->format('l') !== $course_day || isset($holiday_set[$end_date_obj->format('Y-m-d')])) {
-                    $end_date_obj->sub(new DateInterval('P1D'));
-                }
-                $end_date = $end_date_obj->format('Y-m-d');
-                error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date . ', sessions: ' . $sessions_counted . ', holidays on course day: ' . $holiday_count_on_course_day);
+            if ($sessions_counted == $sessions_needed && $end_date) {
+                error_log('InterSoccer: Final end_date for variation ' . $variation_id . ': ' . $end_date . ', sessions: ' . $sessions_counted . ', holidays on course day: ' . $holiday_count_on_course_day);
                 update_post_meta($variation_id, '_end_date', $end_date);
                 return $end_date;
             } else {
@@ -110,10 +133,8 @@ class InterSoccer_Course {
             return 0;
         }
 
-        $parent_id = wp_get_post_parent_id($variation_id) ?: $variation_id;
-        $course_day = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names'])[0] ?? '';
+        $course_day = self::get_course_day($variation_id);
         if (empty($course_day)) {
-            error_log('InterSoccer: Missing pa_course-day in calculate_total_sessions for variation ' . $variation_id);
             return 0;
         }
 
@@ -154,10 +175,8 @@ class InterSoccer_Course {
             return 0;
         }
 
-        $parent_id = wp_get_post_parent_id($variation_id) ?: $variation_id;
-        $course_day = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names'])[0] ?? '';
+        $course_day = self::get_course_day($variation_id);
         if (empty($course_day)) {
-            error_log('InterSoccer: Missing pa_course-day in calculate_remaining_sessions for variation ' . $variation_id);
             return 0;
         }
 
@@ -170,20 +189,24 @@ class InterSoccer_Course {
         $remaining = 0;
         $date = max($current, $start);
         $skipped_holidays = 0;
+        $start_log = $date->format('Y-m-d');
+        error_log('InterSoccer: Calculating remaining sessions from ' . $start_log . ' (current: ' . $current->format('Y-m-d') . ', start: ' . $start_date . ') to ' . $end_date . ' for variation ' . $variation_id);
+
         while ($date <= $end) {
             $day = $date->format('Y-m-d');
             if ($date->format('l') === $course_day) {
                 if (isset($holiday_set[$day])) {
                     $skipped_holidays++;
-                    error_log('InterSoccer: Skipped holiday on course day: ' . $day);
+                    error_log('InterSoccer: Skipped holiday on course day: ' . $day . ' for variation ' . $variation_id);
                 } else {
                     $remaining++;
+                    error_log('InterSoccer: Counted remaining session on ' . $day . ' for variation ' . $variation_id);
                 }
             }
             $date->add(new DateInterval('P1D'));
         }
 
-        error_log('InterSoccer: Remaining sessions for variation ' . $variation_id . ': ' . $remaining . ' (skipped holidays: ' . $skipped_holidays . ', from ' . $current->format('Y-m-d') . ' to ' . $end_date . ')');
+        error_log('InterSoccer: Remaining sessions for variation ' . $variation_id . ': ' . $remaining . ' (skipped holidays: ' . $skipped_holidays . ', reduction applied if current > start)');
         return $remaining;
     }
 
@@ -198,7 +221,7 @@ class InterSoccer_Course {
     public static function calculate_price($product_id, $variation_id, $remaining_sessions = null) {
         $product = wc_get_product($variation_id ?: $product_id);
         if (!$product) {
-            error_log('InterSoccer: Invalid product for course price calculation: ' . $variation_id ?: $product_id);
+            error_log('InterSoccer: Invalid product for course price calculation: ' . ($variation_id ?: $product_id));
             return 0;
         }
 
@@ -232,8 +255,6 @@ class InterSoccer_Course {
      */
     public static function calculate_discount_note($variation_id, $remaining_sessions) {
         $discount_note = '';
-        // Logic for combo discounts, to be expanded when discounts.php is implemented
-        // For now, placeholder based on remaining sessions
         if ($remaining_sessions > 0) {
             $discount_note = ($remaining_sessions . ' Weeks Remaining');
         }
@@ -262,7 +283,7 @@ error_log('InterSoccer: Defined course functions in product-course.php');
  */
 add_action('init', 'intersoccer_recalculate_course_end_dates');
 function intersoccer_recalculate_course_end_dates() {
-    $flag = 'intersoccer_end_date_recalc_20250805';
+    $flag = 'intersoccer_end_date_recalc_20250825'; // Updated flag to force recalc
     if (get_option($flag, false)) {
         return;
     }
