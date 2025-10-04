@@ -176,87 +176,46 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
 }
 
 /**
- * Add custom metadata to order items during checkout
+ * Add custom order item metadata during checkout.
  */
-add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_add_order_item_meta', 10, 4);
-function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order) {
+add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_add_order_item_metadata', 10, 4);
+function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $order) {
     $product_id = $values['product_id'];
-    $variation_id = $values['variation_id'] ?? 0;
-    $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+    $variation_id = $values['variation_id'];
+    $quantity = $values['quantity'];
+    $product_type = intersoccer_get_product_type($product_id);
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Adding custom meta to order item for product ' . $product_id . ' / variation ' . $variation_id . '. Cart values: ' . json_encode($values));
+    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday'])) {
+        return;
     }
 
-    // 1. Add player details
-    if (isset($values['assigned_player']) && $values['assigned_player'] !== '') {
-        $user_id = $order->get_customer_id();
-        $player_details = intersoccer_get_player_details($user_id, $values['assigned_player']);
-        
-        $item->add_meta_data('Assigned Attendee', $player_details['name']);
-        if (!empty($player_details['dob'])) {
-            $item->add_meta_data('Attendee DOB', $player_details['dob']);
-        }
-        if (!empty($player_details['gender'])) {
-            $item->add_meta_data('Attendee Gender', $player_details['gender']);
-        }
-        if (!empty($player_details['medical_conditions'])) {
-            $item->add_meta_data('Medical Conditions', $player_details['medical_conditions']);
-        }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Added player meta for cart item ' . $cart_item_key . ': ' . $player_details['name']);
+    // 1. Add Assigned Attendee
+    if (isset($values['assigned_attendee']) && !empty($values['assigned_attendee'])) {
+        $item->add_meta_data('Assigned Attendee', sanitize_text_field($values['assigned_attendee']));
+        if ($values['assigned_player'] !== null) {
+            $item->add_meta_data('Player Index', absint($values['assigned_player']));
         }
     }
 
-    // 2. Add parent product attributes (excluding variation attributes)
-    $product = wc_get_product($variation_id ?: $product_id);
-    $parent_id = $variation_id ? $product->get_parent_id() : $product_id;
-    $parent = wc_get_product($parent_id);
-    $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-    
-    // Get existing meta keys to avoid duplicates
-    $existing_meta = $item->get_meta_data();
-    $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
-
-    foreach ($attributes as $attr_slug => $value) {
-        $label = wc_attribute_label($attr_slug);
-        // Skip if attribute is already in order meta
-        if (in_array($label, $existing_keys)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Skipping attribute ' . $label . ' (already exists)');
-            }
-            continue;
-        }
-        $item->add_meta_data($label, $value);
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Added parent attribute: ' . $label . ' = ' . $value);
-        }
-    }
-
-    // 3. Add product type specific metadata
+    // 2. Add Camp-specific metadata
     if ($product_type === 'camp') {
-        // Camp-specific metadata
         if (isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
-            $days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-            $sorted_days = array_intersect($days_order, array_map('sanitize_text_field', $values['camp_days']));
-            $days_selected = implode(', ', array_values($sorted_days));
-            $item->add_meta_data('Days Selected', $days_selected);
+            $item->add_meta_data('Days Selected', implode(', ', array_map('sanitize_text_field', $values['camp_days'])));
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Added Days Selected: ' . $days_selected);
+                error_log('InterSoccer: Added camp_days metadata: ' . implode(', ', $values['camp_days']) . ' for quantity ' . $quantity);
             }
         }
-        
-        if (isset($values['discount_note']) && !empty($values['discount_note'])) {
-            $item->add_meta_data('Discount', sanitize_text_field($values['discount_note']));
+
+        // Add late pickup metadata
+        if (isset($values['late_pickup_type']) && $values['late_pickup_type'] !== 'none') {
+            $item->add_meta_data('Late Pickup Type', $values['late_pickup_type'] === 'full-week' ? 'Full Week' : 'Single Day(s)');
+            if ($values['late_pickup_type'] === 'single-days' && isset($values['late_pickup_days']) && is_array($values['late_pickup_days'])) {
+                $item->add_meta_data('Late Pickup Days', implode(', ', array_map('sanitize_text_field', $values['late_pickup_days'])));
+            }
+            if (isset($values['late_pickup_cost']) && $values['late_pickup_cost'] > 0) {
+                $item->add_meta_data('Late Pickup Cost', wc_price($values['late_pickup_cost']));
+            }
         }
-        
-        // Camp times from meta
-        $camp_times = get_post_meta($variation_id ?: $product_id, '_camp_times', true);
-        if ($camp_times) {
-            $item->add_meta_data('Camp Times', sanitize_text_field($camp_times));
-        }
-        
     } elseif ($product_type === 'course') {
         // Course-specific metadata
         $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
@@ -318,10 +277,11 @@ function intersoccer_add_order_item_meta($item, $cart_item_key, $values, $order)
     $item->add_meta_data('Activity Type', $activity_type);
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key);
-        error_log('InterSoccer: Checkout metadata - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none') . ', Discount: ' . ($values['discount_note'] ?? 'none'));
+        error_log('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
+        error_log('InterSoccer: Checkout metadata - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none') . ', Discount: ' . ($values['discount_note'] ?? 'none') . ', Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
     }
 }
+
 /**
  * Display custom metadata in checkout review order table
  */
@@ -356,38 +316,14 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
 }
 
 /**
- * Display custom order item metadata in admin order details.
- */
-// add_action('woocommerce_admin_order_item_values', 'intersoccer_display_order_item_meta_admin', 10, 3);
-// function intersoccer_display_order_item_meta_admin($product, $item, $item_id) {
-//     $important_meta = [
-//         'Assigned Attendee',
-//         'Days Selected',
-//         'Remaining Sessions',
-//         'Start Date',
-//         'End Date',
-//         'Season',
-//         'Activity Type',
-//         'Discount'
-//     ];
-    
-//     foreach ($important_meta as $meta_key) {
-//         $meta_value = $item->get_meta($meta_key);
-//         if (!empty($meta_value)) {
-//             echo '<div class="intersoccer-order-meta"><strong>' . esc_html($meta_key) . ':</strong> ' . esc_html($meta_value) . '</div>';
-//         }
-//     }
-// }
-
-/**
  * Ensure cart item data includes assigned_player in the correct format
  */
-add_filter('woocommerce_add_cart_item_data', 'intersoccer_ensure_player_assignment_format', 5, 3);
-function intersoccer_ensure_player_assignment_format($cart_item_data, $product_id, $variation_id) {
+add_filter('woocommerce_add_cart_item_data', 'intersoccer_ensure_player_assignment_format', 5, 4);
+function intersoccer_ensure_player_assignment_format($cart_item_data, $product_id, $variation_id, $quantity) {
     if (isset($_POST['player_assignment']) && !isset($cart_item_data['assigned_player'])) {
         $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Normalized player_assignment to assigned_player: ' . $cart_item_data['assigned_player']);
+            error_log('InterSoccer: Normalized player_assignment to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
         }
     }
     

@@ -17,14 +17,15 @@ if (!defined('ABSPATH')) {
 class InterSoccer_Camp {
 
     /**
-     * Calculate camp price based on booking type and selected days.
+     * Calculate camp price based on booking type and quantity.
      *
      * @param int $product_id Product ID.
      * @param int $variation_id Variation ID.
      * @param array $camp_days Selected days for single-day camps.
+     * @param int $quantity Cart item quantity.
      * @return float Calculated price.
      */
-    public static function calculate_price($product_id, $variation_id, $camp_days = []) {
+    public static function calculate_price($product_id, $variation_id, $camp_days = [], $quantity = 1) {
         $product = wc_get_product($variation_id ?: $product_id);
         if (!$product) {
             error_log('InterSoccer: Invalid product for camp price calculation: ' . ($variation_id ?: $product_id));
@@ -34,11 +35,17 @@ class InterSoccer_Camp {
         $price = floatval($product->get_price());
         $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
 
-        if ($booking_type === 'single-days' && !empty($camp_days)) {
-            $price_per_day = $price; // CHF 100/day as base price
-            $price = $price_per_day * count($camp_days);
+        if ($booking_type === 'single-days') {
+            $price_per_day = $price; // CHF 55/day as base price
+            $num_days = count($camp_days);
+            if ($num_days > 0) {
+                $price = $price_per_day * $num_days;
+            } else {
+                // Fallback to quantity if no days selected (shouldn't happen in normal flow)
+                $price = $price_per_day * $quantity;
+            }
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (days: ' . count($camp_days) . ', per_day: ' . $price_per_day . ')');
+                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (' . $num_days . ' days selected, per_day: ' . $price_per_day . ')');
             }
         } else {
             // Full-week price (e.g., CHF 500/week)
@@ -66,8 +73,12 @@ class InterSoccer_Camp {
                     $passed = false;
                     wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
                     error_log('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ': ' . print_r($_POST, true));
+                } elseif (count($camp_days) !== $quantity) {
+                    $passed = false;
+                    wc_add_notice(__('The number of selected days must match the quantity.', 'intersoccer-product-variations'), 'error');
+                    error_log('InterSoccer: Validation failed - camp_days count (' . count($camp_days) . ') does not match quantity (' . $quantity . ') for product ' . $product_id);
                 } else {
-                    error_log('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days for product ' . $product_id . ': ' . print_r($camp_days, true));
+                    error_log('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days and quantity ' . $quantity . ' for product ' . $product_id . ': ' . print_r($camp_days, true));
                 }
             }
         }
@@ -83,7 +94,6 @@ class InterSoccer_Camp {
      */
     public static function calculate_discount_note($variation_id, $camp_days = []) {
         $discount_note = '';
-        // Placeholder for discount logic (to be expanded in discounts.php)
         if (!empty($camp_days)) {
             $discount_note = count($camp_days) . ' Day(s) Selected';
         }
@@ -93,8 +103,8 @@ class InterSoccer_Camp {
 }
 
 // Procedural wrappers for backward compatibility
-function intersoccer_calculate_camp_price($product_id, $variation_id, $camp_days = []) {
-    return InterSoccer_Camp::calculate_price($product_id, $variation_id, $camp_days);
+function intersoccer_calculate_camp_price($product_id, $variation_id, $camp_days = [], $quantity = 1) {
+    return InterSoccer_Camp::calculate_price($product_id, $variation_id, $camp_days, $quantity);
 }
 
 function intersoccer_validate_single_day_camp($passed, $product_id, $quantity) {

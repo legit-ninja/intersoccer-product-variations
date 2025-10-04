@@ -213,3 +213,18 @@
     /* margin-top: 8px; */
     padding-left: 10px;
 }
+
+.intersoccer-camp-price,
+.intersoccer-late-pickup-price,
+.intersoccer-total-price {
+    font-weight: bold;
+    color: #333; /* Match WooCommerce theme or adjust per Jonas's UI/UX */
+    display: inline-block;
+}
+
+.intersoccer-camp-cost,
+.intersoccer-late-pickup-total,
+.intersoccer-total-cost {
+    margin-top: 10px;
+    font-size: 1.1em;
+}

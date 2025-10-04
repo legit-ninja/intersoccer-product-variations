@@ -421,12 +421,14 @@ add_action('wp_footer', function () {
                         dataType: 'json',
                         success: function(response) {
                             if (response.success && response.data.price) {
-                                var $priceContainers = $form.find('.woocommerce-variation-price .amount, .product-price .amount, .price .amount, .single_variation .amount, .woocommerce-Price-amount.amount, .price');
-                                if ($priceContainers.length) {
-                                    $priceContainers.each(function() { $(this).html(response.data.price); });
+                                var $priceContainer = $form.find('.woocommerce-variation-price .price');
+                                if ($priceContainer.length) {
+                                    $priceContainer.html(response.data.price);
                                 } else {
-                                    console.error('InterSoccer: Price container not found');
+                                    console.error('InterSoccer: Variation price container not found');
                                 }
+                                // Trigger event for late pickup integration
+                                $(document).trigger('intersoccer_price_updated');
                             }
                         },
                         error: function(xhr, textStatus, errorThrown) {

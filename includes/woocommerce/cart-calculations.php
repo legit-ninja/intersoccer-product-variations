@@ -20,7 +20,7 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         error_log('InterSoccer: Adding custom data to cart for product ' . $product_id . ' / variation ' . $variation_id . '. POST data: ' . json_encode($_POST));
     }
 
-    // Assigned player (index from select)
+    // Assigned player
     if (isset($_POST['player_assignment'])) {
         $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
         $user_id = get_current_user_id();
@@ -31,7 +31,7 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         }
     }
 
-    // Camp days selected
+    // Camp days
     if (isset($_POST['camp_days']) && is_array($_POST['camp_days'])) {
         $cart_item_data['camp_days'] = array_map('sanitize_text_field', $_POST['camp_days']);
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -39,11 +39,42 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         }
     }
 
+    // Late pickup data
+    if (intersoccer_is_camp($product_id) && isset($_POST['late_pickup_type'])) {
+        $cart_item_data['late_pickup_type'] = sanitize_text_field($_POST['late_pickup_type']);
+        if ($cart_item_data['late_pickup_type'] === 'single-days' && isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days'])) {
+            $cart_item_data['late_pickup_days'] = array_map('sanitize_text_field', $_POST['late_pickup_days']);
+        } else {
+            $cart_item_data['late_pickup_days'] = [];
+        }
+        // Validate late pickup cost server-side
+        $per_day_cost = floatval(get_option('intersoccer_late_pickup_per_day', 25));
+        $full_week_cost = floatval(get_option('intersoccer_late_pickup_full_week', 90));
+        $late_pickup_cost = ($cart_item_data['late_pickup_type'] === 'full-week') ? $full_week_cost : ($cart_item_data['late_pickup_type'] === 'single-days' ? count($cart_item_data['late_pickup_days']) * $per_day_cost : 0);
+        $cart_item_data['late_pickup_cost'] = $late_pickup_cost;
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Added late pickup data to cart: type=' . $cart_item_data['late_pickup_type'] . ', days=' . json_encode($cart_item_data['late_pickup_days']) . ', cost=' . $late_pickup_cost);
+        }
+    }
+
+    // Validate base price server-side
+    if (isset($cart_item_data['camp_days']) && intersoccer_is_camp($product_id)) {
+        $cart_item_data['base_price'] = InterSoccer_Camp::calculate_price($product_id, $variation_id, $cart_item_data['camp_days']);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Server-validated base price: ' . $cart_item_data['base_price']);
+        }
+    } else {
+        $cart_item_data['base_price'] = floatval(wc_get_product($variation_id ?: $product_id)->get_price());
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Server-validated base price (no camp days): ' . $cart_item_data['base_price']);
+        }
+    }
+
     return $cart_item_data;
 }
 
 /**
- * Add derived data (e.g., discount_note) to cart item after initial data.
+ * Add derived data to cart item
  */
 add_filter('woocommerce_add_cart_item', 'intersoccer_add_derived_cart_item_data', 10, 1);
 function intersoccer_add_derived_cart_item_data($cart_item) {
@@ -51,7 +82,13 @@ function intersoccer_add_derived_cart_item_data($cart_item) {
     $variation_id = $cart_item['variation_id'];
     $product_type = intersoccer_get_product_type($product_id);
 
-    $calculated_price = intersoccer_calculate_price($product_id, $variation_id, $cart_item['camp_days'] ?? [], null);
+    $calculated_price = isset($cart_item['base_price']) ? floatval($cart_item['base_price']) : 0;
+    if ($product_type === 'camp' && isset($cart_item['late_pickup_cost'])) {
+        $calculated_price += floatval($cart_item['late_pickup_cost']);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Added late pickup cost ' . $cart_item['late_pickup_cost'] . ' to price for product ' . $product_id);
+        }
+    }
     $cart_item['data']->set_price($calculated_price);
     $cart_item['base_price'] = $calculated_price;
 
@@ -65,8 +102,7 @@ function intersoccer_add_derived_cart_item_data($cart_item) {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Set base price for item ' . $product_id . ': ' . $calculated_price . ', Note: ' . ($cart_item['discount_note'] ?? 'none'));
-        error_log('InterSoccer: Cart item metadata - Assigned Attendee: ' . ($cart_item['assigned_attendee'] ?? 'none') . ', Discount Note: ' . ($cart_item['discount_note'] ?? 'none'));
+        error_log('InterSoccer: Set base price for item ' . $product_id . ': ' . $calculated_price . ', Note: ' . ($cart_item['discount_note'] ?? 'none') . ', Late Pickup Cost: ' . ($cart_item['late_pickup_cost'] ?? 'none'));
     }
 
     return $cart_item;
@@ -96,6 +132,20 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
                 'key' => __('Discount', 'intersoccer-product-variations'),
                 'value' => esc_html($cart_item['discount_note']),
                 'display' => '<span class="intersoccer-cart-meta intersoccer-discount">' . esc_html($cart_item['discount_note']) . '</span>'
+            ];
+        }
+
+        // Late Pickup Details
+        if ($product_type === 'camp' && isset($cart_item['late_pickup_type']) && $cart_item['late_pickup_type'] !== 'none') {
+            $item_data[] = [
+                'key' => __('Late Pickup', 'intersoccer-product-variations'),
+                'value' => $cart_item['late_pickup_type'] === 'full-week' ? __('Full Week', 'intersoccer-product-variations') : implode(', ', $cart_item['late_pickup_days']),
+                'display' => '<span class="intersoccer-cart-meta">' . esc_html($cart_item['late_pickup_type'] === 'full-week' ? __('Full Week', 'intersoccer-product-variations') : implode(', ', $cart_item['late_pickup_days'])) . '</span>'
+            ];
+            $item_data[] = [
+                'key' => __('Late Pickup Cost', 'intersoccer-product-variations'),
+                'value' => wc_price($cart_item['late_pickup_cost']),
+                'display' => '<span class="intersoccer-cart-meta">' . wp_kses_post(wc_price($cart_item['late_pickup_cost'])) . '</span>'
             ];
         }
     }
@@ -176,95 +226,116 @@ add_action('woocommerce_single_product_summary', 'intersoccer_add_price_update_s
 function intersoccer_add_price_update_script() {
     if (!is_product()) return;
     $product_id = get_the_ID();
+    $nonce = wp_create_nonce('intersoccer_price_calc');
     ?>
     <script>
         jQuery(document).ready(function($) {
             var debugEnabled = <?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>;
             var currentVariationId = null;
+            var currentVariation = null;
 
             function updateCampPrice() {
-                var campDays = $('input[name="camp_days[]"]:checked').map(function() {
-                    return $(this).val();
-                }).get();
-
-                if (!currentVariationId) {
+                if (!currentVariation) {
                     if (debugEnabled) {
                         console.log('InterSoccer: No variation selected for price update');
+                    }
+                    $('#intersoccer_base_price').val('0.00');
+                    $('.camp-cost .intersoccer-camp-price').html('<?php echo wp_kses_post(wc_price(0)); ?>');
+                    if (typeof updateTotalCost === 'function') {
+                        updateTotalCost();
                     }
                     return;
                 }
 
+                var bookingType = currentVariation.attributes.attribute_pa_booking_type || '';
+                var campDays = $('input[name="camp_days_temp[]"]:checked').map(function() {
+                    return $(this).val();
+                }).get();
+
+                // Fetch price from server
                 $.ajax({
-                    url: intersoccerCheckout.ajax_url,
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
                     type: 'POST',
                     data: {
-                        action: 'intersoccer_calculate_dynamic_price',
-                        nonce: intersoccerCheckout.nonce,
-                        product_id: <?php echo json_encode($product_id); ?>,
+                        action: 'intersoccer_calculate_camp_price',
+                        nonce: '<?php echo esc_js($nonce); ?>',
                         variation_id: currentVariationId,
                         camp_days: campDays
                     },
                     success: function(response) {
                         if (response.success) {
+                            var campCost = parseFloat(response.data.price).toFixed(2);
+                            $('.camp-cost .intersoccer-camp-price').html('<?php echo wp_kses_post(wc_price(0)); ?>'.replace('0.00', campCost));
+                            $('#intersoccer_base_price').val(campCost);
                             if (debugEnabled) {
-                                console.log('InterSoccer: Price updated to', response.data.price);
+                                console.log('InterSoccer: Server-side camp cost updated to ' + campCost + ' (Days: ' + campDays.length + ', Booking Type: ' + bookingType + ', Variation ID: ' + currentVariationId + ', HTML: ' + $('.camp-cost').html());
                             }
-                            $('.woocommerce-variation-price .price').html(response.data.price);
+                            if (typeof updateTotalCost === 'function') {
+                                updateTotalCost();
+                            }
                         } else {
-                            if (debugEnabled) {
-                                console.log('InterSoccer: Price update failed', response);
+                            console.error('InterSoccer: Server price fetch failed', response.data);
+                            $('.camp-cost .intersoccer-camp-price').html('<?php echo wp_kses_post(wc_price(0)); ?>');
+                            $('#intersoccer_base_price').val('0.00');
+                            if (typeof updateTotalCost === 'function') {
+                                updateTotalCost();
                             }
                         }
                     },
                     error: function(err) {
-                        if (debugEnabled) {
-                            console.log('InterSoccer: Price AJAX error', err);
+                        console.error('InterSoccer: AJAX error', err);
+                        $('.camp-cost .intersoccer-camp-price').html('<?php echo wp_kses_post(wc_price(0)); ?>');
+                        $('#intersoccer_base_price').val('0.00');
+                        if (typeof updateTotalCost === 'function') {
+                            updateTotalCost();
                         }
                     }
+                });
+
+                // Update hidden inputs for camp days
+                $('input.intersoccer-camp-day-input').remove();
+                campDays.forEach(function(day) {
+                    $('form.cart').append('<input type="hidden" name="camp_days[]" value="' + day + '" class="intersoccer-camp-day-input">');
                 });
             }
 
             // On variation found
             $('form.cart').on('found_variation', function(event, variation) {
                 currentVariationId = variation.variation_id;
+                currentVariation = variation;
                 if (debugEnabled) {
-                    console.log('InterSoccer: Variation found, id:', currentVariationId);
+                    console.log('InterSoccer: Variation found, id: ' + currentVariationId + ', booking_type: ' + (variation.attributes.attribute_pa_booking_type || 'none'));
                 }
 
-                // Update session
-                var campDays = $(this).find('input[name="camp_days[]"]:checked').map(function() {
-                    return $(this).val();
-                }).get();
-
-                $.ajax({
-                    url: intersoccerCheckout.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'intersoccer_update_session_data',
-                        nonce: intersoccerCheckout.nonce,
-                        product_id: <?php echo json_encode($product_id); ?>,
-                        variation_id: variation.variation_id,
-                        camp_days: campDays,
-                        remaining_weeks: variation.remaining_sessions || null
-                    },
-                    success: function(response) {
-                        if (response.success && debugEnabled) {
-                            console.log('InterSoccer: Session data updated');
-                        }
-                    }
-                });
+                // Show/hide day selection based on booking type
+                var bookingType = variation.attributes.attribute_pa_booking_type || '';
+                if (bookingType === 'single-days') {
+                    $('.intersoccer-day-selection').show();
+                } else {
+                    $('.intersoccer-day-selection').hide();
+                    $('input[name="camp_days_temp[]"]').prop('checked', false);
+                }
 
                 // Trigger price update
                 updateCampPrice();
             });
 
-            // On day checkbox change
-            $('form.cart').on('change', 'input[name="camp_days[]"]', function() {
+            // Debounce update on camp day checkbox change
+            var debounceCampUpdate = debounce(updateCampPrice, 200);
+            $('form.cart').on('change', 'input[name="camp_days_temp[]"]', function() {
                 if (debugEnabled) {
                     console.log('InterSoccer: Camp day checkbox changed');
                 }
-                updateCampPrice();
+                debounceCampUpdate();
             });
+
+            function debounce(func, wait) {
+                var timeout;
+                return function() {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(func, wait);
+                };
+            }
         });
     </script>
     <?php
@@ -273,32 +344,27 @@ function intersoccer_add_price_update_script() {
 /**
  * AJAX handler to update session data.
  */
-add_action('wp_ajax_intersoccer_update_session_data', 'intersoccer_update_session_data_callback');
-add_action('wp_ajax_nopriv_intersoccer_update_session_data', 'intersoccer_update_session_data_callback');
-function intersoccer_update_session_data_callback() {
-    check_ajax_referer('intersoccer_nonce', 'nonce');
+add_action('wp_ajax_intersoccer_calculate_camp_price', 'intersoccer_calculate_camp_price_callback');
+add_action('wp_ajax_nopriv_intersoccer_calculate_camp_price', 'intersoccer_calculate_camp_price_callback');
+function intersoccer_calculate_camp_price_callback() {
+    check_ajax_referer('intersoccer_price_calc', 'nonce');
 
-    $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
-    $camp_days = isset($_POST['camp_days']) ? (array) $_POST['camp_days'] : [];
-    $remaining_weeks = isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks']) ? (int) $_POST['remaining_weeks'] : null;
+    $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
+    $camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
 
-    if ($product_id) {
-        // Ensure session is initialized
-        if (function_exists('WC') && WC()->session) {
-            WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
-            if ($remaining_weeks !== null) {
-                WC()->session->set('intersoccer_remaining_weeks_' . $product_id, $remaining_weeks);
-            }
-            error_log('InterSoccer: Session data updated for product ' . $product_id . ', selected_days: ' . print_r($camp_days, true) . ', remaining_weeks: ' . ($remaining_weeks ?? 'null'));
-            wp_send_json_success(['message' => 'Session data updated']);
-        } else {
-            error_log('InterSoccer: WooCommerce session not available during intersoccer_update_session_data_callback');
-            wp_send_json_error(['message' => 'Session not available']);
-        }
-    } else {
-        wp_send_json_error(['message' => 'Invalid product ID']);
+    if (!$variation_id) {
+        wp_send_json_error(['message' => 'Invalid variation ID']);
         wp_die();
     }
+
+    $price = InterSoccer_Camp::calculate_price(0, $variation_id, $camp_days);
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: AJAX camp price calculated - Variation ID: ' . $variation_id . ', Days: ' . count($camp_days) . ', Price: ' . $price);
+    }
+
+    wp_send_json_success(['price' => $price]);
+    wp_die();
 }
 
 /**
