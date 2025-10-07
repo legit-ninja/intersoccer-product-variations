@@ -36,11 +36,6 @@ This plugin enhances the WooCommerce booking system for InterSoccer’s Camps, C
 - Use SSH/SCP for file access if activation fails.
 - Review browser console logs and server logs on Dev.
 
-## Team Roles
-- **Jonas Glond (JG, Designer)**: UI/UX feedback, CSS tweaks.
-- **Tony Muller (Toni, Office Manager)**: Simplified roster exports, admin usability.
-- **Steve Long (Steve, CEO)**: Analytics reports, business alignment.
-
 ## Future Enhancements
 - Add weekly discount for multiple Summer Camps.
 - Integrate with Google Sheets and Office365 for exports.

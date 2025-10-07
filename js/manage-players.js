@@ -245,17 +245,13 @@ jQuery(document).ready(function ($) {
     e.preventDefault();
     const $form = $(this);
     const index = $form.find(".update-player").data("index");
-    const updatedPlayer = {
-      name: $form.find('input[name="name"]').val(),
-      dob: $form.find('input[name="dob"]').val(),
-      gender: $form.find('select[name="gender"]').val(),
-      medical_conditions: $form
-        .find('textarea[name="medical_conditions"]')
-        .val(),
-    };
+    const nameValue = $form.find('input[name="name"]').val();
+    const nameParts = nameValue.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
 
     // Validate required fields
-    if (!updatedPlayer.name) {
+    if (!nameValue.trim()) {
       alert("Player name is required.");
       return;
     }
@@ -264,24 +260,34 @@ jQuery(document).ready(function ($) {
       url: intersoccerCheckout.ajax_url,
       type: "POST",
       data: {
-        action: "intersoccer_update_player",
+        action: "intersoccer_edit_player",
         nonce: intersoccerCheckout.nonce,
         user_id: intersoccerCheckout.user_id,
         player_index: index,
-        player_data: JSON.stringify(updatedPlayer), // Properly encode player_data as a JSON string
+        player_first_name: firstName,
+        player_last_name: lastName,
+        player_dob: $form.find('input[name="dob"]').val(),
+        player_gender: $form.find('select[name="gender"]').val(),
+        player_avs_number: $form.find('input[name="avs_number"]').val() || '0000',
+        player_medical: $form.find('textarea[name="medical_conditions"]').val(),
       },
       contentType: "application/x-www-form-urlencoded; charset=UTF-8",
       beforeSend: function () {
-        console.log("Sending update player request with data:", {
-          action: "intersoccer_update_player",
+        console.log("Sending edit player request with data:", {
+          action: "intersoccer_edit_player",
           nonce: intersoccerCheckout.nonce,
           user_id: intersoccerCheckout.user_id,
           player_index: index,
-          player_data: updatedPlayer,
+          player_first_name: firstName,
+          player_last_name: lastName,
+          player_dob: $form.find('input[name="dob"]').val(),
+          player_gender: $form.find('select[name="gender"]').val(),
+          player_avs_number: $form.find('input[name="avs_number"]').val() || '0000',
+          player_medical: $form.find('textarea[name="medical_conditions"]').val(),
         });
       },
       success: function (response) {
-        console.log("Update player response:", response);
+        console.log("Edit player response:", response);
         if (response.success) {
           fetchUserPlayers();
         } else {
@@ -289,7 +295,7 @@ jQuery(document).ready(function ($) {
         }
       },
       error: function (xhr, status, error) {
-        console.error("Update player error:", status, error, xhr.responseText);
+        console.error("Edit player error:", status, error, xhr.responseText);
         alert(
           "Error updating player: " + (xhr.responseText || "Unknown error")
         );
