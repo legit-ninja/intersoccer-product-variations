@@ -314,17 +314,27 @@ function intersoccer_add_price_update_script() {
                 } else {
                     $('.intersoccer-day-selection').hide();
                     $('input[name="camp_days_temp[]"]').prop('checked', false);
+                    // Remove hidden inputs when not single-days
+                    $('input.intersoccer-camp-day-input').remove();
                 }
 
                 // Trigger price update
                 updateCampPrice();
             });
 
-            // Debounce update on camp day checkbox change
+            // Update on camp day checkbox change - immediately update hidden inputs
             var debounceCampUpdate = debounce(updateCampPrice, 200);
             $('form.cart').on('change', 'input[name="camp_days_temp[]"]', function() {
+                // Immediately update hidden inputs to ensure they're posted with cart addition
+                $('input.intersoccer-camp-day-input').remove();
+                var campDays = $('input[name="camp_days_temp[]"]:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                campDays.forEach(function(day) {
+                    $('form.cart').append('<input type="hidden" name="camp_days[]" value="' + day + '" class="intersoccer-camp-day-input">');
+                });
                 if (debugEnabled) {
-                    console.log('InterSoccer: Camp day checkbox changed');
+                    console.log('InterSoccer: Camp day checkbox changed, updated hidden inputs immediately');
                 }
                 debounceCampUpdate();
             });

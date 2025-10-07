@@ -399,6 +399,8 @@ add_action('wp_footer', function () {
             });
             attributesObserver.observe($form[0], { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
 
+            var isUpdatingPrice = false;
+
             // Update price
             function updatePrice(selectedDays, variationId) {
                 var productId = <?php echo json_encode($product_id); ?>;
@@ -408,6 +410,9 @@ add_action('wp_footer', function () {
                 }
                 
                 if (bookingType === 'single-days' && selectedDays.length > 0 && variationId) {
+                    isUpdatingPrice = true;
+                    updateButtonState();
+                    
                     $.ajax({
                         url: intersoccerCheckout.ajax_url,
                         type: 'POST',
@@ -421,18 +426,17 @@ add_action('wp_footer', function () {
                         dataType: 'json',
                         success: function(response) {
                             if (response.success && response.data.price) {
-                                var $priceContainer = $form.find('.woocommerce-variation-price .price');
-                                if ($priceContainer.length) {
-                                    $priceContainer.html(response.data.price);
-                                } else {
-                                    console.error('InterSoccer: Variation price container not found');
-                                }
+                                $('.woocommerce-variation-price .price').html(response.data.price);
                                 // Trigger event for late pickup integration
                                 $(document).trigger('intersoccer_price_updated');
                             }
+                            isUpdatingPrice = false;
+                            updateButtonState();
                         },
                         error: function(xhr, textStatus, errorThrown) {
                             console.error('InterSoccer: Price update failed:', xhr.status, textStatus, errorThrown);
+                            isUpdatingPrice = false;
+                            updateButtonState();
                         }
                     });
                 }
@@ -448,9 +452,9 @@ add_action('wp_footer', function () {
                 var isLoggedIn = intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0';
                 var $expressContainer = $('.wc-stripe-product-checkout-container');
                 
-                console.log('InterSoccer: Button state check - player:', playerSelected, 'days:', daysSelected, 'bookingType:', bookingType);
+                console.log('InterSoccer: Button state check - player:', playerSelected, 'days:', daysSelected, 'updating:', isUpdatingPrice);
                 
-                if (playerSelected && daysSelected) {
+                if (playerSelected && daysSelected && !isUpdatingPrice) {
                     $addToCartButton.prop('disabled', false);
                     $form.find('.intersoccer-attendee-notification').hide();
                     $expressContainer.show();
@@ -461,6 +465,8 @@ add_action('wp_footer', function () {
                         $form.find('.intersoccer-attendee-notification').text(isLoggedIn ? 'Please select an attendee.' : 'Please log in or register to select an attendee.').show();
                     } else if (!daysSelected) {
                         $form.find('.intersoccer-attendee-notification').hide();
+                    } else if (isUpdatingPrice) {
+                        $form.find('.intersoccer-attendee-notification').text('Updating price...').show();
                     }
                 }
             }
