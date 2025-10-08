@@ -404,12 +404,14 @@ add_action('wp_footer', function () {
             // Update price
             function updatePrice(selectedDays, variationId) {
                 var productId = <?php echo json_encode($product_id); ?>;
+                var productType = '<?php echo esc_js($product_type); ?>';
                 var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val() || '';
                 if (!variationId) {
                     variationId = $form.find('input[name="variation_id"]').val() || 0;
                 }
                 
-                if (bookingType === 'single-days' && selectedDays.length > 0 && variationId) {
+                // For camps with single-days booking, or for courses when variation is selected
+                if ((bookingType === 'single-days' && selectedDays.length > 0 && variationId) || (productType === 'course' && variationId)) {
                     isUpdatingPrice = true;
                     updateButtonState();
                     
@@ -427,6 +429,18 @@ add_action('wp_footer', function () {
                         success: function(response) {
                             if (response.success && response.data.price) {
                                 $('.woocommerce-variation-price .price').html(response.data.price);
+                                // Update discount note for courses
+                                if (productType === 'course' && response.data.discount_note) {
+                                    var $attributesDisplay = $form.find('.intersoccer-attributes');
+                                    if ($attributesDisplay.length && $attributesDisplay.is(':visible')) {
+                                        // Append or update discount in attributes
+                                        if (!$attributesDisplay.find('p:contains("Discount")').length) {
+                                            $attributesDisplay.append('<p><strong>Discount:</strong> ' + response.data.discount_note + '</p>');
+                                        } else {
+                                            $attributesDisplay.find('p:contains("Discount")').html('<strong>Discount:</strong> ' + response.data.discount_note);
+                                        }
+                                    }
+                                }
                                 // Trigger event for late pickup integration
                                 $(document).trigger('intersoccer_price_updated');
                             }

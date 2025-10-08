@@ -63,6 +63,12 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('InterSoccer: Server-validated base price: ' . $cart_item_data['base_price']);
         }
+    } elseif (intersoccer_get_product_type($product_id) === 'course') {
+        // Calculate prorated price for courses based on remaining sessions
+        $cart_item_data['base_price'] = InterSoccer_Course::calculate_price($product_id, $variation_id);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Server-validated course base price: ' . $cart_item_data['base_price']);
+        }
     } else {
         $cart_item_data['base_price'] = floatval(wc_get_product($variation_id ?: $product_id)->get_price());
         if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -216,7 +222,18 @@ function intersoccer_calculate_dynamic_price_callback() {
     $remaining_weeks = isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks']) ? (int) $_POST['remaining_weeks'] : null;
 
     $price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks);
-    wp_send_json_success(['price' => wc_price($price)]);
+    
+    $response = ['price' => wc_price($price)];
+    
+    // Add discount note for courses
+    $product_type = intersoccer_get_product_type($product_id);
+    if ($product_type === 'course' && $variation_id) {
+        $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+        $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+        $response['discount_note'] = InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
+    }
+    
+    wp_send_json_success($response);
 }
 
 /**
