@@ -161,9 +161,15 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
         
         if ($value) {
             $label = wc_attribute_label($attribute_name);
+            // If wc_attribute_label doesn't give us a proper label, format the attribute name
+            if (empty($label) || $label === $attribute_name) {
+                // Remove 'pa_' prefix if present and format the name
+                $clean_name = preg_replace('/^pa_/', '', $attribute_name);
+                $label = ucwords(str_replace(['-', '_'], ' ', $clean_name));
+            }
             $attributes[$label] = $value;
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value);
+                error_log('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value . ' (from: ' . $attribute_name . ')');
             }
         }
     }
@@ -275,6 +281,17 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     // 7. Add Activity Type for clarity
     $activity_type = ucfirst($product_type ?: 'Unknown');
     $item->add_meta_data('Activity Type', $activity_type);
+
+    // 8. Add parent product attributes (excluding variation attributes)
+    $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
+    foreach ($parent_attributes as $attribute_label => $attribute_value) {
+        // Convert attribute label to metadata key format (e.g., "City" -> "City")
+        $meta_key = $attribute_label;
+        $item->add_meta_data($meta_key, sanitize_text_field($attribute_value));
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Added parent attribute metadata: ' . $meta_key . ' = ' . $attribute_value);
+        }
+    }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
         error_log('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
