@@ -211,7 +211,7 @@ class InterSoccer_Course {
     }
 
     /**
-     * Calculate course price (prorated based on remaining sessions).
+     * Calculate course price (based on session rate multiplied by remaining sessions).
      *
      * @param int $product_id Product ID.
      * @param int $variation_id Variation ID.
@@ -227,7 +227,7 @@ class InterSoccer_Course {
 
         $base_price = floatval($product->get_price());
         $total_weeks = (int) get_post_meta($variation_id ?: $product_id, '_course_total_weeks', true);
-        $total_sessions = self::calculate_total_sessions($variation_id, $total_weeks);
+        $session_rate = floatval(get_post_meta($variation_id ?: $product_id, '_course_weekly_discount', true));
         
         if (is_null($remaining_sessions)) {
             $remaining_sessions = self::calculate_remaining_sessions($variation_id, $total_weeks);
@@ -235,17 +235,26 @@ class InterSoccer_Course {
 
         $price = $base_price; // Default to full price
 
-        if ($total_sessions > 0 && $remaining_sessions > 0 && $remaining_sessions <= $total_sessions) {
-            if ($remaining_sessions < $total_sessions) {
-                // Prorate the price based on remaining sessions
-                $price = $base_price * ($remaining_sessions / $total_sessions);
-                $price = round($price, 2); // Round to 2 decimal places
-                error_log('InterSoccer: Course prorated price for variation ' . $variation_id . ': ' . $price . ' (base: ' . $base_price . ', remaining: ' . $remaining_sessions . ', total: ' . $total_sessions . ')');
-            } else {
-                error_log('InterSoccer: Course full price for variation ' . $variation_id . ': ' . $price . ' (all sessions remaining: ' . $remaining_sessions . ')');
-            }
+        // Use session rate calculation if available
+        if ($session_rate > 0 && $remaining_sessions > 0) {
+            $price = $session_rate * $remaining_sessions;
+            $price = round($price, 2); // Round to 2 decimal places
+            error_log('InterSoccer: Course price calculated using session rate for variation ' . $variation_id . ': ' . $price . ' (rate: ' . $session_rate . ', remaining sessions: ' . $remaining_sessions . ')');
         } else {
-            error_log('InterSoccer: Invalid sessions for price calculation - remaining: ' . $remaining_sessions . ', total: ' . $total_sessions . ', base_price: ' . $base_price);
+            // Fallback to old prorated calculation for backwards compatibility
+            $total_sessions = self::calculate_total_sessions($variation_id, $total_weeks);
+            if ($total_sessions > 0 && $remaining_sessions > 0 && $remaining_sessions <= $total_sessions) {
+                if ($remaining_sessions < $total_sessions) {
+                    // Prorate the price based on remaining sessions
+                    $price = $base_price * ($remaining_sessions / $total_sessions);
+                    $price = round($price, 2); // Round to 2 decimal places
+                    error_log('InterSoccer: Course prorated price (fallback) for variation ' . $variation_id . ': ' . $price . ' (base: ' . $base_price . ', remaining: ' . $remaining_sessions . ', total: ' . $total_sessions . ')');
+                } else {
+                    error_log('InterSoccer: Course full price (fallback) for variation ' . $variation_id . ': ' . $price . ' (all sessions remaining: ' . $remaining_sessions . ')');
+                }
+            } else {
+                error_log('InterSoccer: Invalid sessions for price calculation - remaining: ' . $remaining_sessions . ', total: ' . $total_sessions . ', base_price: ' . $base_price . ', session_rate: ' . $session_rate);
+            }
         }
 
         return max(0, $price);
