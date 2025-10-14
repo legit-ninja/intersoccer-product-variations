@@ -260,13 +260,12 @@ function intersoccer_add_camp_variation_fields($loop, $variation_data, $variatio
 
     echo '<p>Late Pick Up Debug: Checkbox should appear below</p>';
     
-    woocommerce_wp_checkbox([
-        'id' => '_intersoccer_enable_late_pickup[' . $loop . ']',
-        'label' => __('Enable Late Pick Up', 'intersoccer-product-variations'),
-        'description' => __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations'),
-        'desc_tip' => true,
-        'value' => get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true),
-    ]);
+    $checked = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true) === 'yes' ? 'checked' : '';
+    echo '<p class="form-field _intersoccer_enable_late_pickup_field">
+        <label for="_intersoccer_enable_late_pickup_' . $loop . '">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>
+        <input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />
+        <span class="description">' . __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations') . '</span>
+    </p>';
     
     echo '<p>Late Pick Up Debug: Checkbox should appear above</p>';
 }
