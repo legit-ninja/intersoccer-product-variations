@@ -231,7 +231,7 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 /**
  * Add Late Pick Up option to camp variation options
  */
-add_action('woocommerce_variation_options_pricing', 'intersoccer_add_camp_variation_fields', 10, 3);
+add_action('woocommerce_variation_options_pricing', 'intersoccer_add_camp_variation_fields', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
     $variation_id = $variation->ID;
     error_log('InterSoccer: Camp variation fields function called for variation ID ' . $variation_id . ', loop: ' . $loop);
@@ -258,6 +258,8 @@ function intersoccer_add_camp_variation_fields($loop, $variation_data, $variatio
 
     error_log('InterSoccer: Adding Late Pick Up checkbox for camp variation ID ' . $variation_id);
 
+    echo '<p>Late Pick Up Debug: Checkbox should appear below</p>';
+    
     woocommerce_wp_checkbox([
         'id' => '_intersoccer_enable_late_pickup[' . $loop . ']',
         'label' => __('Enable Late Pick Up', 'intersoccer-product-variations'),
@@ -265,6 +267,8 @@ function intersoccer_add_camp_variation_fields($loop, $variation_data, $variatio
         'desc_tip' => true,
         'value' => get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true),
     ]);
+    
+    echo '<p>Late Pick Up Debug: Checkbox should appear above</p>';
 }
 
 /**
