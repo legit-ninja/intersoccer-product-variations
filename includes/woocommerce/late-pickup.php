@@ -21,9 +21,21 @@ function intersoccer_add_late_pickup_fields() {
         return;
     }
 
-    // Check if late pickup is enabled for this specific product
-    $enable_late_pickup = get_post_meta($product->get_id(), '_intersoccer_enable_late_pickup', true);
-    if ($enable_late_pickup !== 'yes') {
+    // Check if any variation has late pickup enabled
+    $variations = $product->get_available_variations();
+    $has_late_pickup_enabled = false;
+    $variation_settings = [];
+
+    foreach ($variations as $variation) {
+        $variation_id = $variation['variation_id'];
+        $enabled = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+        $variation_settings[$variation_id] = $enabled === 'yes';
+        if ($enabled === 'yes') {
+            $has_late_pickup_enabled = true;
+        }
+    }
+
+    if (!$has_late_pickup_enabled) {
         return;
     }
 
@@ -98,7 +110,34 @@ function intersoccer_add_late_pickup_fields() {
             var debugEnabled = <?php echo defined('WP_DEBUG') && WP_DEBUG ? 'true' : 'false'; ?>;
             var perDayCost = <?php echo json_encode($per_day_cost); ?>;
             var fullWeekCost = <?php echo json_encode($full_week_cost); ?>;
+            var variationSettings = <?php echo json_encode($variation_settings); ?>;
             var previousBookingType = '';
+
+            // Function to check if current variation has late pickup enabled
+            function isLatePickupEnabledForVariation(variationId) {
+                return variationSettings[variationId] === true;
+            }
+
+            // Function to show/hide late pickup fields based on selected variation
+            function updateLatePickupVisibility() {
+                var selectedVariation = $('input[name="variation_id"]').val();
+                if (selectedVariation && isLatePickupEnabledForVariation(selectedVariation)) {
+                    $('.intersoccer-late-pickup').show();
+                    if (debugEnabled) {
+                        console.log('InterSoccer: Showing late pickup for variation ' + selectedVariation);
+                    }
+                } else {
+                    $('.intersoccer-late-pickup').hide();
+                    // Reset late pickup selections when hidden
+                    $('input[name="late_pickup_type"]').prop('checked', false);
+                    $('input.late-pickup-day-checkbox').prop('checked', false);
+                    $('#intersoccer_late_pickup_cost').val('0.00');
+                    updateTotalCost();
+                    if (debugEnabled) {
+                        console.log('InterSoccer: Hiding late pickup for variation ' + selectedVariation);
+                    }
+                }
+            }
 
             // Move Add to Cart button to bottom of form
             if ($('.woocommerce-variation-add-to-cart').length) {
@@ -186,6 +225,12 @@ function intersoccer_add_late_pickup_fields() {
             // Update total cost when variation changes (e.g., price updates for single-days)
             $(document).on('found_variation', function(event, variation) {
                 updateTotalCost();
+                updateLatePickupVisibility();
+            });
+
+            // Hide late pickup when no variation is selected
+            $(document).on('reset_data', function() {
+                updateLatePickupVisibility();
             });
 
             // Update total cost when price is dynamically updated via AJAX (for single-days selection)
@@ -203,6 +248,7 @@ function intersoccer_add_late_pickup_fields() {
 
             // Initial cost update
             updateLatePickupCost();
+            updateLatePickupVisibility(); // Initial visibility check
         });
     </script>
     <?php
@@ -213,8 +259,8 @@ function intersoccer_add_late_pickup_fields() {
  */
 add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_late_pickup_data', 10, 3);
 function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variation_id) {
-    // Check if late pickup is enabled for this product
-    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    // Check if late pickup is enabled for this variation
+    $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
     if ($enable_late_pickup !== 'yes') {
         return $cart_item_data;
     }
@@ -239,9 +285,9 @@ function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variati
  */
 add_filter('woocommerce_add_cart_item', 'intersoccer_add_late_pickup_to_price', 10, 2);
 function intersoccer_add_late_pickup_to_price($cart_item, $cart_item_key) {
-    // Check if late pickup is enabled for this product
-    $product_id = $cart_item['product_id'];
-    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    // Check if late pickup is enabled for this variation
+    $variation_id = $cart_item['variation_id'];
+    $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
     if ($enable_late_pickup !== 'yes') {
         return $cart_item;
     }
@@ -261,8 +307,8 @@ function intersoccer_add_late_pickup_to_price($cart_item, $cart_item_key) {
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_late_pickup', 10, 5);
 function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $variation_id = '', $variations = []) {
-    // Check if late pickup is enabled for this product
-    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    // Check if late pickup is enabled for this variation
+    $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
     if ($enable_late_pickup !== 'yes') {
         return $passed;
     }
@@ -271,7 +317,7 @@ function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $vari
         $late_pickup_days = isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days']) ? array_map('sanitize_text_field', $_POST['late_pickup_days']) : [];
         if (empty($late_pickup_days)) {
             wc_add_notice(__('Please select at least one day for late pick up when choosing Single Day(s).', 'intersoccer-product-variations'), 'error');
-            error_log('InterSoccer: Validation failed - No late pickup days selected for product ' . $product_id);
+            error_log('InterSoccer: Validation failed - No late pickup days selected for variation ' . $variation_id);
             return false;
         }
     }

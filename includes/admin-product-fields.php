@@ -229,33 +229,37 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 }
 
 /**
- * Add Late Pick Up option to WooCommerce product general data
+ * Add Late Pick Up option to camp variation options
  */
-add_action('woocommerce_product_options_general_product_data', 'intersoccer_add_late_pickup_option');
-function intersoccer_add_late_pickup_option() {
-    global $product_object;
-    if (!$product_object || !intersoccer_is_camp($product_object->get_id())) {
+add_action('woocommerce_variation_options_pricing', 'intersoccer_add_camp_variation_fields', 10, 3);
+function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
+    $variation_id = $variation->ID;
+    $product = wc_get_product($variation_id);
+    if (!$product) {
+        error_log('InterSoccer: No product found for variation ID ' . $variation_id);
+        return;
+    }
+
+    // Check if this is a camp variation
+    $parent_product = wc_get_product($product->get_parent_id());
+    if (!$parent_product || !intersoccer_is_camp($parent_product->get_id())) {
         return;
     }
 
     woocommerce_wp_checkbox([
-        'id' => '_intersoccer_enable_late_pickup',
+        'id' => '_intersoccer_enable_late_pickup[' . $loop . ']',
         'label' => __('Enable Late Pick Up', 'intersoccer-product-variations'),
-        'description' => __('Allow customers to add late pick up options for this camp product.', 'intersoccer-product-variations'),
+        'description' => __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations'),
         'desc_tip' => true,
+        'value' => get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true),
     ]);
 }
 
 /**
- * Save Late Pick Up option
+ * Save Late Pick Up option for variations
  */
-add_action('woocommerce_process_product_meta', 'intersoccer_save_late_pickup_option');
-function intersoccer_save_late_pickup_option($post_id) {
-    if (!intersoccer_is_camp($post_id)) {
-        return;
-    }
-
-    $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup']) ? 'yes' : 'no';
-    update_post_meta($post_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
+function intersoccer_save_camp_variation_fields($variation_id, $loop) {
+    $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup'][$loop]) ? 'yes' : 'no';
+    update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
 }
-?>
