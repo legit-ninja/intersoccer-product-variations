@@ -242,38 +242,15 @@ function intersoccer_add_camp_variation_fields($loop, $variation_data, $variatio
         return;
     }
 
-    // Check if this is a camp variation by checking variation attributes
-    $attributes = $product->get_attributes();
-    error_log('InterSoccer: Camp variation attributes for ID ' . $variation_id . ': ' . print_r($attributes, true));
-    
-    $is_camp = false;
-    if (isset($attributes['pa_activity-type'])) {
-        $term = get_term_by('slug', $attributes['pa_activity-type'], 'pa_activity-type');
-        if ($term && $term->slug === 'camp') {
-            $is_camp = true;
-        }
+    // Check if this is a camp variation
+    $parent_product = wc_get_product($product->get_parent_id());
+    if (!$parent_product) {
+        error_log('InterSoccer: No parent product found for variation ID ' . $variation_id);
+        return;
     }
     
-    // Fallback: Check parent product attributes
-    if (!$is_camp) {
-        $parent_product = wc_get_product($product->get_parent_id());
-        if ($parent_product) {
-            $parent_attributes = $parent_product->get_attributes();
-            error_log('InterSoccer: Camp parent product attributes for ID ' . $product->get_parent_id() . ': ' . print_r($parent_attributes, true));
-            if (isset($parent_attributes['pa_activity-type'])) {
-                $term = get_term_by('id', $parent_attributes['pa_activity-type']['options'][0], 'pa_activity-type');
-                if ($term && $term->slug === 'camp') {
-                    $is_camp = true;
-                } else {
-                    error_log('InterSoccer: Camp parent pa_activity-type term ID ' . $parent_attributes['pa_activity-type']['options'][0] . ' is not camp (slug: ' . ($term ? $term->slug : 'not found') . ')');
-                }
-            } else {
-                error_log('InterSoccer: Camp no pa_activity-type found in parent attributes for ID ' . $product->get_parent_id());
-            }
-        }
-    }
-    
-    error_log('InterSoccer: Variation ID ' . $variation_id . ' is camp: ' . ($is_camp ? 'yes' : 'no'));
+    $is_camp = intersoccer_is_camp($parent_product->get_id());
+    error_log('InterSoccer: Parent product ID ' . $parent_product->get_id() . ' is camp: ' . ($is_camp ? 'yes' : 'no'));
     
     if (!$is_camp) {
         return;
