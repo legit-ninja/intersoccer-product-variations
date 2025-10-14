@@ -233,11 +233,23 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 /**
  * Add Late Pick Up option to camp variation options
  */
-add_action('woocommerce_variation_options_pricing', 'intersoccer_add_camp_variation_fields', 20, 3);
+add_action('woocommerce_variation_options', 'intersoccer_add_camp_variation_fields', 20, 3);
+add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
     $variation_id = $variation->ID;
-    error_log('InterSoccer: CAMP VARIATION HOOK FIRED - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
+    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_variation_options) - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
     
+    intersoccer_add_camp_late_pickup_field($variation_id, $loop);
+}
+
+function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
+    $variation_id = $variation->ID;
+    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_product_after_variable_attributes) - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
+    
+    intersoccer_add_camp_late_pickup_field($variation_id, $loop);
+}
+
+function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     $product = wc_get_product($variation_id);
     if (!$product) {
         error_log('InterSoccer: No product found for variation ID ' . $variation_id);
