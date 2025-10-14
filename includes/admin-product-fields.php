@@ -7,6 +7,8 @@
 
 defined('ABSPATH') or die('No script kiddies please!');
 
+error_log('InterSoccer: admin-product-fields.php loaded successfully');
+
 function calculate_course_end_date($variation_id, $start_date, $total_weeks, $holidays, $course_days) {
     if (empty($start_date) || $total_weeks < 1 || empty($course_days)) return ''; // Invalid, log error
 
@@ -237,19 +239,21 @@ add_action('woocommerce_variation_options', 'intersoccer_add_camp_variation_fiel
 add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
     $variation_id = $variation->ID;
-    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_variation_options) - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
+    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_variation_options) - Variation ID: ' . $variation_id . ', Loop: ' . $loop . ', Hook: woocommerce_variation_options');
     
     intersoccer_add_camp_late_pickup_field($variation_id, $loop);
 }
 
 function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
     $variation_id = $variation->ID;
-    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_product_after_variable_attributes) - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
+    error_log('InterSoccer: CAMP VARIATION HOOK FIRED (woocommerce_product_after_variable_attributes) - Variation ID: ' . $variation_id . ', Loop: ' . $loop . ', Hook: woocommerce_product_after_variable_attributes');
     
     intersoccer_add_camp_late_pickup_field($variation_id, $loop);
 }
 
 function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
+    error_log('InterSoccer: intersoccer_add_camp_late_pickup_field called for variation ID: ' . $variation_id . ', loop: ' . $loop);
+    
     $product = wc_get_product($variation_id);
     if (!$product) {
         error_log('InterSoccer: No product found for variation ID ' . $variation_id);
@@ -263,10 +267,14 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
         return;
     }
     
-    $is_camp = intersoccer_is_camp($parent_product->get_id());
-    error_log('InterSoccer: Parent product ID ' . $parent_product->get_id() . ' is camp: ' . ($is_camp ? 'yes' : 'no'));
+    $parent_id = $parent_product->get_id();
+    error_log('InterSoccer: Checking parent product ID ' . $parent_id . ' for camp detection');
+    
+    $is_camp = intersoccer_is_camp($parent_id);
+    error_log('InterSoccer: Parent product ID ' . $parent_id . ' is camp: ' . ($is_camp ? 'yes' : 'no'));
     
     if (!$is_camp) {
+        error_log('InterSoccer: Skipping Late Pick Up field - parent is not a camp');
         return;
     }
 
@@ -289,6 +297,10 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
  */
 add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
 function intersoccer_save_camp_variation_fields($variation_id, $loop) {
+    error_log('InterSoccer: intersoccer_save_camp_variation_fields called for variation ID: ' . $variation_id . ', loop: ' . $loop);
+    
     $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup'][$loop]) ? 'yes' : 'no';
+    error_log('InterSoccer: Saving _intersoccer_enable_late_pickup for variation ' . $variation_id . ': ' . $enable_late_pickup);
+    
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
 }
