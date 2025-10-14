@@ -31,6 +31,8 @@ add_action('woocommerce_variation_options_pricing', 'intersoccer_add_course_vari
 function intersoccer_add_course_variation_fields($loop, $variation_data, $variation)
 {
     $variation_id = $variation->ID;
+    error_log('InterSoccer: COURSE VARIATION HOOK FIRED - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
+    
     $product = wc_get_product($variation_id);
     if (!$product) {
         error_log('InterSoccer: No product found for variation ID ' . $variation_id);
@@ -234,7 +236,7 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 add_action('woocommerce_variation_options_pricing', 'intersoccer_add_camp_variation_fields', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
     $variation_id = $variation->ID;
-    error_log('InterSoccer: Camp variation fields function called for variation ID ' . $variation_id . ', loop: ' . $loop);
+    error_log('InterSoccer: CAMP VARIATION HOOK FIRED - Variation ID: ' . $variation_id . ', Loop: ' . $loop);
     
     $product = wc_get_product($variation_id);
     if (!$product) {
