@@ -1,0 +1,45 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run PHPUnit tests
+    cmds:
+      - vendor/bin/phpunit --configuration phpunit.xml --verbose
+    preconditions:
+      - test -f vendor/bin/phpunit || { echo "PHPUnit not installed. Run composer install."; exit 1; }
+
+  headers:
+    desc: Add/update PHP file headers (e.g., license)
+    cmds:
+      - php bin/update-headers.php
+    summary: |
+      Runs a custom script to ensure all PHP files have consistent headers.
+      Create bin/update-headers.php if not present (see setup notes).
+
+  lint:
+    desc: Lint PHP files for syntax errors
+    cmds:
+      - find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;
+
+  build:
+    desc: Build plugin/theme zip for deployment
+    cmds:
+      - rm -f ../{{.REPO_NAME}}.zip
+      - zip -r ../{{.REPO_NAME}}.zip . -x "*.git*" "*Taskfile.yml" "*composer.*" "*vendor*" "*tests*" "*cypress*"
+    vars:
+      REPO_NAME: '{{.TASK}}'  # Replace with repo name, e.g., intersoccer-product-variations
+
+  hooks:
+    desc: Install Git pre-commit hook to run tests automatically
+    cmds:
+      - |
+        cat <<EOF > .git/hooks/pre-commit
+        #!/bin/sh
+        echo "Running pre-commit tasks..."
+        task test || { echo "Tests failed! Commit aborted."; exit 1; }
+        EOF
+      - chmod +x .git/hooks/pre-commit
+
+  all:
+    desc: Run all checks (lint, headers, test)
+    deps: [lint, headers, test]

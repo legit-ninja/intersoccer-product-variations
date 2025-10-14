@@ -21,6 +21,12 @@ function intersoccer_add_late_pickup_fields() {
         return;
     }
 
+    // Check if late pickup is enabled for this specific product
+    $enable_late_pickup = get_post_meta($product->get_id(), '_intersoccer_enable_late_pickup', true);
+    if ($enable_late_pickup !== 'yes') {
+        return;
+    }
+
     // Register strings for WPML
     if (function_exists('icl_register_string')) {
         icl_register_string('intersoccer-product-variations', 'Late Pick Up Options', 'Late Pick Up Options');
@@ -207,6 +213,12 @@ function intersoccer_add_late_pickup_fields() {
  */
 add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_late_pickup_data', 10, 3);
 function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variation_id) {
+    // Check if late pickup is enabled for this product
+    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    if ($enable_late_pickup !== 'yes') {
+        return $cart_item_data;
+    }
+
     if (isset($_POST['late_pickup_cost'])) {
         $cart_item_data['late_pickup_cost'] = floatval($_POST['late_pickup_cost']);
     }
@@ -227,6 +239,13 @@ function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variati
  */
 add_filter('woocommerce_add_cart_item', 'intersoccer_add_late_pickup_to_price', 10, 2);
 function intersoccer_add_late_pickup_to_price($cart_item, $cart_item_key) {
+    // Check if late pickup is enabled for this product
+    $product_id = $cart_item['product_id'];
+    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    if ($enable_late_pickup !== 'yes') {
+        return $cart_item;
+    }
+
     if (isset($cart_item['late_pickup_cost']) && $cart_item['late_pickup_cost'] > 0) {
         $original_price = $cart_item['data']->get_price();
         $cart_item['data']->set_price($original_price + $cart_item['late_pickup_cost']);
@@ -242,6 +261,12 @@ function intersoccer_add_late_pickup_to_price($cart_item, $cart_item_key) {
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_late_pickup', 10, 5);
 function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $variation_id = '', $variations = []) {
+    // Check if late pickup is enabled for this product
+    $enable_late_pickup = get_post_meta($product_id, '_intersoccer_enable_late_pickup', true);
+    if ($enable_late_pickup !== 'yes') {
+        return $passed;
+    }
+
     if (intersoccer_is_camp($product_id) && isset($_POST['late_pickup_type']) && $_POST['late_pickup_type'] === 'single-days') {
         $late_pickup_days = isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days']) ? array_map('sanitize_text_field', $_POST['late_pickup_days']) : [];
         if (empty($late_pickup_days)) {

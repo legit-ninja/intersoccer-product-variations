@@ -95,7 +95,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_weekly_discount[' . $loop . ']',
-        'label' => __('Session Rate (CHF per day/session)', 'intersoccer-player-management'),
+        'label' => __('Session Rate (CHF per day/session)', 'intersoccer-product-variations'),
         'value' => get_post_meta($variation_id, '_course_weekly_discount', true),
         'wrapper_class' => 'form-row form-row-last',
         'type' => 'number',
@@ -226,5 +226,36 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
     $end_date = calculate_course_end_date($variation_id, $start_date, $total_weeks, $holiday_dates, $course_days);
     update_post_meta($variation_id, '_end_date', $end_date);
     error_log('Saved end_date for variation ' . $variation_id . ': ' . $end_date);
+}
+
+/**
+ * Add Late Pick Up option to WooCommerce product general data
+ */
+add_action('woocommerce_product_options_general_product_data', 'intersoccer_add_late_pickup_option');
+function intersoccer_add_late_pickup_option() {
+    global $product_object;
+    if (!$product_object || !intersoccer_is_camp($product_object->get_id())) {
+        return;
+    }
+
+    woocommerce_wp_checkbox([
+        'id' => '_intersoccer_enable_late_pickup',
+        'label' => __('Enable Late Pick Up', 'intersoccer-product-variations'),
+        'description' => __('Allow customers to add late pick up options for this camp product.', 'intersoccer-product-variations'),
+        'desc_tip' => true,
+    ]);
+}
+
+/**
+ * Save Late Pick Up option
+ */
+add_action('woocommerce_process_product_meta', 'intersoccer_save_late_pickup_option');
+function intersoccer_save_late_pickup_option($post_id) {
+    if (!intersoccer_is_camp($post_id)) {
+        return;
+    }
+
+    $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup']) ? 'yes' : 'no';
+    update_post_meta($post_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
 }
 ?>
