@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.10.9
+ * Version: 1.10.16
  * Author: Jeremy Lee
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
