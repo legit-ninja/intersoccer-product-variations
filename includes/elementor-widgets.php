@@ -415,16 +415,24 @@ add_action('wp_footer', function () {
                     isUpdatingPrice = true;
                     updateButtonState();
                     
+                    var ajaxAction = (bookingType === 'single-days') ? 'intersoccer_calculate_camp_price' : 'intersoccer_calculate_dynamic_price';
+                    var ajaxData = {
+                        action: ajaxAction,
+                        nonce: intersoccerCheckout.nonce,
+                        product_id: productId,
+                        variation_id: variationId
+                    };
+                    
+                    if (bookingType === 'single-days') {
+                        ajaxData.camp_days = selectedDays;
+                    } else if (productType === 'course') {
+                        // Add any course-specific data if needed
+                    }
+                    
                     $.ajax({
                         url: intersoccerCheckout.ajax_url,
                         type: 'POST',
-                        data: {
-                            action: 'intersoccer_calculate_dynamic_price',
-                            nonce: intersoccerCheckout.nonce,
-                            product_id: productId,
-                            variation_id: variationId,
-                            camp_days: selectedDays
-                        },
+                        data: ajaxData,
                         dataType: 'json',
                         success: function(response) {
                             if (response.success && response.data.price) {
