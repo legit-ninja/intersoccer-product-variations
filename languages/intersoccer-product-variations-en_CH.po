@@ -1,0 +1,1241 @@
+# English translations for PACKAGE package.
+# Copyright (C) 2025 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Jeremy Lee <jlee@underdogunlimited.com>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-10-17 08:25-0400\n"
+"PO-Revision-Date: 2025-10-17 08:25-0400\n"
+"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
+"Language-Team: English\n"
+"Language: en_CH\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/intersoccer-product-variations.php:117
+msgid "Coach"
+msgstr "Coach"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/intersoccer-product-variations.php:118
+msgid "Organizer"
+msgstr "Organizer"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/intersoccer-product-variations.php:133
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/intersoccer-product-variations.php:138
+msgid "Manage Players"
+msgstr "Manage Players"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/admin-product-fields.php:81
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:72
+msgid "Course Start Date (MM-DD-YYYY)"
+msgstr "Course Start Date (MM-DD-YYYY)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/admin-product-fields.php:89
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:80
+msgid "Total Weeks Duration"
+msgstr "Total Weeks Duration"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/admin-product-fields.php:98
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:89
+msgid "Session Rate (CHF per day/session)"
+msgstr "Session Rate (CHF per day/session)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:49
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:90
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:152
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:213
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:264
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:327
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:49
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:90
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:152
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:213
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:264
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:327
+msgid "Invalid nonce."
+msgstr "Invalid nonce."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:59
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:336
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:59
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:336
+msgid "Invalid product ID."
+msgstr "Invalid product ID."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:98
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:161
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:98
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:161
+msgid "Invalid variation ID."
+msgstr "Invalid variation ID."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:167
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:167
+msgid "Variation not found."
+msgstr "Variation not found."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:239
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:239
+msgid "Session updated."
+msgstr "Session updated."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:274
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:274
+msgid "You must be logged in."
+msgstr "You must be logged in."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/ajax-handlers.php:399
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/ajax-handlers.php:399
+msgid "Missing parameters."
+msgstr "Missing parameters."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:515
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:510
+#, php-format
+msgid "%d%% Family Discount (%s Child)"
+msgstr "%d%% Family Discount (%s Child)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:558
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:553
+#, php-format
+msgid "%d%% Combo Discount (%s Child)"
+msgstr "%d%% Combo Discount (%s Child)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:581
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:576
+msgid "50% Same-Season Course Discount"
+msgstr "50% Same-Season Course Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:918
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1048
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/checkout-calculations.php:338
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/cart-calculations.php:87
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:918
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1048
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/checkout-calculations.php:315
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:172
+msgid "Assigned Attendee"
+msgstr "Assigned Attendee"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:941
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1059
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:941
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1059
+msgid "Days Selected"
+msgstr "Days Selected"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:955
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1094
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1142
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:955
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1094
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1142
+#, php-format
+msgid "%d of %d"
+msgstr "%d of %d"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:957
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1095
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:957
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1095
+msgid "Sessions Remaining"
+msgstr "Sessions Remaining"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:968
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1075
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:968
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1075
+msgid "Start Date"
+msgstr "Start Date"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:975
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1079
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:975
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1079
+msgid "End Date"
+msgstr "End Date"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:988
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1086
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:988
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1086
+msgid "Holidays"
+msgstr "Holidays"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1100
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1100
+msgid "Discount Applied"
+msgstr "Discount Applied"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1143
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1143
+msgid "Sessions Remaining: "
+msgstr "Sessions Remaining: "
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1278
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1278
+msgid "camp"
+msgstr "camp"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1291
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1292
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1291
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1292
+msgid "Update Order Details"
+msgstr "Update Order Details"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1304
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:185
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:960
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1898
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2671
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1304
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:185
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:960
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1898
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2671
+msgid "You do not have permission to access this page."
+msgstr "You do not have permission to access this page."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1317
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1317
+msgid "Update Processing Orders with Parent Attributes"
+msgstr "Update Processing Orders with Parent Attributes"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1318
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1318
+msgid ""
+"Select orders to update with new visible, non-variation parent product "
+"attributes for reporting and analytics. Use \"Remove Assigned Player\" to "
+"delete the unwanted assigned_player field from orders. Use \"Fix Incorrect "
+"Attributes\" to correct orders with unwanted attributes (e.g., all days of "
+"the week)."
+msgstr ""
+"Select orders to update with new visible, non-variation parent product "
+"attributes for reporting and analytics. Use \"Remove Assigned Player\" to "
+"delete the unwanted assigned_player field from orders. Use \"Fix Incorrect "
+"Attributes\" to correct orders with unwanted attributes (e.g., all days of "
+"the week)."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1325
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1325
+msgid "Order ID"
+msgstr "Order ID"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1326
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:719
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1326
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:719
+msgid "Customer"
+msgstr "Customer"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1327
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1327
+msgid "Date"
+msgstr "Date"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1328
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1328
+msgid "Total"
+msgstr "Total"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1346
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1346
+msgid "Remove Assigned Player Field"
+msgstr "Remove Assigned Player Field"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1352
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1352
+msgid "Fix Incorrect Attributes (e.g., remove Days-of-week)"
+msgstr "Fix Incorrect Attributes (e.g., remove Days-of-week)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1356
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:735
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1087
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1337
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1342
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1356
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:735
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1087
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1337
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1342
+msgid "Update Selected Orders"
+msgstr "Update Selected Orders"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1362
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1362
+msgid "No Processing orders found."
+msgstr "No Processing orders found."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1380
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1380
+msgid "Please select at least one order."
+msgstr "Please select at least one order."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1384
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1384
+msgid "Updating orders..."
+msgstr "Updating orders..."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1398
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1398
+msgid "Orders updated successfully!"
+msgstr "Orders updated successfully!"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1400
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:266
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:306
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1971
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1400
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:266
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:306
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1971
+msgid "Error: "
+msgstr "Error: "
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1404
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1404
+msgid "An error occurred while updating orders."
+msgstr "An error occurred while updating orders."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1425
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:335
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:374
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:677
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1644
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1993
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2066
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1425
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:335
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:374
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:677
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1644
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1993
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2066
+msgid "You do not have permission to perform this action."
+msgstr "You do not have permission to perform this action."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1434
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1653
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1434
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1653
+msgid "No orders selected."
+msgstr "No orders selected."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1490
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1693
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1490
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1693
+msgid "Orders updated successfully."
+msgstr "Orders updated successfully."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1508
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1508
+msgid "Event Documents"
+msgstr "Event Documents"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1528
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1539
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1528
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1539
+msgid "Document Name"
+msgstr "Document Name"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1530
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1541
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1530
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1541
+msgid "Choose File"
+msgstr "Choose File"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1532
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1543
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1532
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1543
+msgid "Download Limit"
+msgstr "Download Limit"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1533
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1544
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1533
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1544
+msgid "Days Until Expiry"
+msgstr "Days Until Expiry"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1534
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1545
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1534
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1545
+msgid "Remove"
+msgstr "Remove"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1548
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1548
+msgid "Add Document"
+msgstr "Add Document"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1570
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1570
+msgid "Select PDF Document"
+msgstr "Select PDF Document"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1571
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1571
+msgid "Use this file"
+msgstr "Use this file"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce-modifications.php:1713
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/product-camp.php:67
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce-modifications.php:1713
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:102
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/product-camp.php:74
+msgid "Please select at least one day for this single-day camp."
+msgstr "Please select at least one day for this single-day camp."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:267
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:267
+#, php-format
+msgid "%d%% Camp Combo Discount (Child %d)"
+msgstr "%d%% Camp Combo Discount (Child %d)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:356
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:356
+#, php-format
+msgid "%d%% Course Multi-Child Discount (Child %d)"
+msgstr "%d%% Course Multi-Child Discount (Child %d)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:433
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:433
+#, php-format
+msgid "50%% Same Season Course Discount (Child %d, %s)"
+msgstr "50%% Same Season Course Discount (Child %d, %s)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:494
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:494
+msgid "Discount Information"
+msgstr "Discount Information"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:565
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:565
+msgid "Discounts Applied"
+msgstr "Discounts Applied"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:572
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:572
+msgid "saved"
+msgstr "saved"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:608
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:608
+msgid "20% Sibling Discount Applied"
+msgstr "20% Sibling Discount Applied"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:609
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:609
+msgid "Second child camp discount"
+msgstr "Second child camp discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:610
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:610
+#, php-format
+msgid ""
+"You saved 20% on this camp because you have multiple children enrolled in "
+"camps."
+msgstr ""
+"You saved 20% on this camp because you have multiple children enrolled in "
+"camps."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:613
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:613
+msgid "25% Multi-Child Discount Applied"
+msgstr "25% Multi-Child Discount Applied"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:614
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:614
+msgid "Third or additional child camp discount"
+msgstr "Third or additional child camp discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:615
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:615
+#, php-format
+msgid ""
+"You saved 25% on this camp for your third (or additional) child enrolled in "
+"camps."
+msgstr ""
+"You saved 25% on this camp for your third (or additional) child enrolled in "
+"camps."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:618
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:618
+msgid "20% Course Sibling Discount"
+msgstr "20% Course Sibling Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:619
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:619
+msgid "Second child course discount"
+msgstr "Second child course discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:620
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:620
+#, php-format
+msgid ""
+"You saved 20% on this course because you have multiple children enrolled in "
+"courses."
+msgstr ""
+"You saved 20% on this course because you have multiple children enrolled in "
+"courses."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:623
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:623
+msgid "30% Multi-Child Course Discount"
+msgstr "30% Multi-Child Course Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:624
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:624
+msgid "Third or additional child course discount"
+msgstr "Third or additional child course discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:625
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:625
+#, php-format
+msgid ""
+"You saved 30% on this course for your third (or additional) child enrolled "
+"in courses."
+msgstr ""
+"You saved 30% on this course for your third (or additional) child enrolled "
+"in courses."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:628
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:628
+msgid "50% Same Season Course Discount"
+msgstr "50% Same Season Course Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:629
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:629
+msgid "Same child, multiple courses in same season"
+msgstr "Same child, multiple courses in same season"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discount-messages.php:630
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discount-messages.php:630
+#, php-format
+msgid ""
+"You saved 50% on this course because your child is enrolled in multiple "
+"courses this season."
+msgstr ""
+"You saved 50% on this course because your child is enrolled in multiple "
+"courses this season."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discounts.php:340
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discounts.php:340
+#, php-format
+msgid "%d%% Sibling Camp Discount"
+msgstr "%d%% Sibling Camp Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discounts.php:342
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discounts.php:342
+#, php-format
+msgid "%d%% Multi-Child Camp Discount"
+msgstr "%d%% Multi-Child Camp Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discounts.php:391
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discounts.php:391
+#, php-format
+msgid "%d%% Sibling Course Discount"
+msgstr "%d%% Sibling Course Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discounts.php:393
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discounts.php:393
+#, php-format
+msgid "%d%% Multi-Child Course Discount"
+msgstr "%d%% Multi-Child Course Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/discounts.php:434
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/discounts.php:434
+#, php-format
+msgid "50%% Same Season Course Discount (%s)"
+msgstr "50%% Same Season Course Discount (%s)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:22
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:192
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:22
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:192
+msgid "Manage Discounts"
+msgstr "Manage Discounts"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:23
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:23
+msgid "InterSoccer Discounts"
+msgstr "InterSoccer Discounts"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:32
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:32
+msgid "Scan Orders missing data"
+msgstr "Scan Orders missing data"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:33
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:33
+msgid "Find Order Issues"
+msgstr "Find Order Issues"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:43
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1926
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:43
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1926
+msgid "Variation Health Checker"
+msgstr "Variation Health Checker"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:44
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:44
+msgid "Variation Health"
+msgstr "Variation Health"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:53
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:53
+msgid "Bulk Repair Order Details"
+msgstr "Bulk Repair Order Details"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:54
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:54
+msgid "Bulk Repair Order"
+msgstr "Bulk Repair Order"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:125
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:198
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:557
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:125
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:198
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:557
+msgid "Name"
+msgstr "Name"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:126
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:202
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:558
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1714
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:126
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:202
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:558
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1714
+msgid "Type"
+msgstr "Type"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:127
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:212
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:559
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:127
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:212
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:559
+msgid "Condition"
+msgstr "Condition"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:128
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:223
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:128
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:223
+msgid "Discount Rate (%)"
+msgstr "Discount Rate (%)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:129
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:227
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:561
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:129
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:227
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:561
+msgid "Active"
+msgstr "Active"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:140
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:215
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:586
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1743
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:140
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:215
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:586
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1743
+msgid "None"
+msgstr "None"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:144
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:144
+msgid "Yes"
+msgstr "Yes"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:144
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:144
+msgid "No"
+msgstr "No"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:156
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:156
+msgid "Activate"
+msgstr "Activate"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:157
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:157
+msgid "Deactivate"
+msgstr "Deactivate"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:158
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:158
+msgid "Delete"
+msgstr "Delete"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:193
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:193
+msgid ""
+"Add, edit, or delete discount rules for Camps, Courses, or other products. "
+"Rules apply automatically based on cart conditions (e.g., sibling bookings). "
+"For manual coupons, use <a href=\""
+msgstr ""
+"Add, edit, or delete discount rules for Camps, Courses, or other products. "
+"Rules apply automatically based on cart conditions (e.g., sibling bookings). "
+"For manual coupons, use <a href=\""
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:195
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:195
+msgid "Add New Discount"
+msgstr "Add New Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:205
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:578
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:205
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:578
+msgid "General"
+msgstr "General"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:206
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:576
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:206
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:576
+msgid "Camp"
+msgstr "Camp"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:207
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:577
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:207
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:577
+msgid "Course"
+msgstr "Course"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:216
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:583
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:216
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:583
+msgid "2nd Child"
+msgstr "2nd Child"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:217
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:217
+msgid "3rd or Additional Child"
+msgstr "3rd or Additional Child"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:218
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:218
+msgid "Same Season Course (Same Child)"
+msgstr "Same Season Course (Same Child)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:231
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:231
+msgid "Add Discount"
+msgstr "Add Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:245
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:245
+msgid "Saving..."
+msgstr "Saving..."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:263
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:263
+msgid "Discount saved successfully!"
+msgstr "Discount saved successfully!"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:271
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:271
+msgid "An error occurred while saving the discount: "
+msgstr "An error occurred while saving the discount: "
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:285
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:285
+msgid "Please select an action and at least one discount."
+msgstr "Please select an action and at least one discount."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:289
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1263
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:289
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1263
+msgid "Processing..."
+msgstr "Processing..."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:303
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:303
+msgid "Action completed successfully!"
+msgstr "Action completed successfully!"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:311
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:311
+msgid "An error occurred while processing the action: "
+msgstr "An error occurred while processing the action: "
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:343
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:343
+msgid "Name and discount rate are required."
+msgstr "Name and discount rate are required."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:361
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:361
+msgid "Discount saved."
+msgstr "Discount saved."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:382
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:382
+msgid "Invalid action or no discounts selected."
+msgstr "Invalid action or no discounts selected."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:404
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:404
+msgid "Action completed."
+msgstr "Action completed."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:549
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:549
+msgid "Manage Discounts & Messages"
+msgstr "Manage Discounts & Messages"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:560
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:560
+msgid "Rate (%)"
+msgstr "Rate (%)"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:562
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:562
+msgid "Messages"
+msgstr "Messages"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:584
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:584
+msgid "3rd+ Child"
+msgstr "3rd+ Child"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:585
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:585
+msgid "Same Season Course"
+msgstr "Same Season Course"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:602
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:602
+msgid "Cart Message:"
+msgstr "Cart Message:"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:606
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:606
+msgid "Admin Description:"
+msgstr "Admin Description:"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:609
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:609
+msgid "Customer Note:"
+msgstr "Customer Note:"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:621
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:621
+msgid "Save All"
+msgstr "Save All"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:701
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:701
+msgid "Discounts and messages saved successfully."
+msgstr "Discounts and messages saved successfully."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:718
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:718
+msgid "Order"
+msgstr "Order"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:720
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:720
+msgid "Items & Types"
+msgstr "Items & Types"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:721
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:721
+msgid "Missing Fields Summary"
+msgstr "Missing Fields Summary"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:722
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:722
+msgid "Risk Level"
+msgstr "Risk Level"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:984
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:984
+#, php-format
+msgid "Updated metadata for %d orders."
+msgstr "Updated metadata for %d orders."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:986
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:986
+#, php-format
+msgid "Failed to update: %s"
+msgstr "Failed to update: %s"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:992
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:992
+msgid "Order Metadata Update Tool"
+msgstr "Order Metadata Update Tool"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:993
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:993
+msgid ""
+"Find and update orders that are missing metadata fields needed for accurate "
+"rosters and reports."
+msgstr ""
+"Find and update orders that are missing metadata fields needed for accurate "
+"rosters and reports."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1003
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1003
+msgid "Order Statuses to Check"
+msgstr "Order Statuses to Check"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1005
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2686
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1005
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2686
+msgid "Processing"
+msgstr "Processing"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1006
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2687
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1006
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2687
+msgid "Completed"
+msgstr "Completed"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1007
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2688
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1007
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2688
+msgid "On Hold"
+msgstr "On Hold"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1011
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1011
+msgid "Number of Orders to Scan"
+msgstr "Number of Orders to Scan"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1022
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1022
+msgid ""
+"Higher numbers may take longer to process but will find more orders with "
+"missing data."
+msgstr ""
+"Higher numbers may take longer to process but will find more orders with "
+"missing data."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1029
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1029
+msgid "Find Orders Missing Metadata"
+msgstr "Find Orders Missing Metadata"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1032
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1032
+msgid "Note:"
+msgstr "Note:"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1033
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1033
+msgid ""
+"This will scan your selected orders and show which ones are missing metadata "
+"fields like player details, seasons, activity types, etc."
+msgstr ""
+"This will scan your selected orders and show which ones are missing metadata "
+"fields like player details, seasons, activity types, etc."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1039
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1039
+msgid "Orders Missing Metadata"
+msgstr "Orders Missing Metadata"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1043
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1043
+msgid "Update Progress"
+msgstr "Update Progress"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1055
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1055
+msgid "Great! No orders found that need metadata updates."
+msgstr "Great! No orders found that need metadata updates."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1069
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1069
+msgid "Scan Results"
+msgstr "Scan Results"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1084
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1084
+msgid "Select All Low Risk"
+msgstr "Select All Low Risk"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1085
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1085
+msgid "Deselect All"
+msgstr "Deselect All"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1090
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1090
+msgid "Export Analysis to CSV"
+msgstr "Export Analysis to CSV"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1196
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1250
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1196
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1250
+msgid "Please select at least one order to update."
+msgstr "Please select at least one order to update."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1202
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1256
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1202
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1256
+msgid ""
+"You have selected high-risk orders. These may have unexpected results. "
+"Continue?"
+msgstr ""
+"You have selected high-risk orders. These may have unexpected results. "
+"Continue?"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1712
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1712
+msgid "Product ID"
+msgstr "Product ID"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1713
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1713
+msgid "Variation ID"
+msgstr "Variation ID"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1715
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1715
+msgid "Attributes"
+msgstr "Attributes"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1716
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1716
+msgid "Health Status"
+msgstr "Health Status"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1726
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1726
+msgid "Refresh Attributes"
+msgstr "Refresh Attributes"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1749
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1749
+msgid "No attributes"
+msgstr "No attributes"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1904
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1904
+msgid "Course end dates recalculated successfully."
+msgstr "Course end dates recalculated successfully."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1919
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1919
+msgid "InterSoccer Variation Health Dashboard"
+msgstr "InterSoccer Variation Health Dashboard"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1920
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1920
+msgid ""
+"Use this dashboard to check and fix variation issues, such as recalculating "
+"course end dates."
+msgstr ""
+"Use this dashboard to check and fix variation issues, such as recalculating "
+"course end dates."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1924
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1924
+msgid "Recalculate Course End Dates"
+msgstr "Recalculate Course End Dates"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1927
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1927
+msgid ""
+"Scan and check health of product variations. Use the filter to show only "
+"unhealthy ones."
+msgstr ""
+"Scan and check health of product variations. Use the filter to show only "
+"unhealthy ones."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1934
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1934
+msgid "Show unhealthy variations only"
+msgstr "Show unhealthy variations only"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1936
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1936
+msgid "Filter"
+msgstr "Filter"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1953
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1953
+msgid "Please select an action and at least one variation."
+msgstr "Please select an action and at least one variation."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1968
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1968
+msgid "Attributes refreshed successfully!"
+msgstr "Attributes refreshed successfully!"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:1975
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:1975
+msgid "An error occurred while refreshing attributes: "
+msgstr "An error occurred while refreshing attributes: "
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2001
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2001
+msgid "Invalid action or no variations selected."
+msgstr "Invalid action or no variations selected."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2054
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2054
+msgid "Attributes refreshed."
+msgstr "Attributes refreshed."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2675
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2675
+msgid "Automated Order Metadata Update"
+msgstr "Automated Order Metadata Update"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2676
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2676
+msgid ""
+"Automatically find and update orders missing metadata. This tool can process "
+"hundreds or thousands of orders efficiently."
+msgstr ""
+"Automatically find and update orders missing metadata. This tool can process "
+"hundreds or thousands of orders efficiently."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2680
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2680
+msgid "1. Configure Scan"
+msgstr "1. Configure Scan"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2684
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2684
+msgid "Order Statuses to Process"
+msgstr "Order Statuses to Process"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2692
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2692
+msgid "Orders to Scan"
+msgstr "Orders to Scan"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2702
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2702
+msgid "Higher numbers find more orders but take longer to scan initially."
+msgstr "Higher numbers find more orders but take longer to scan initially."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2706
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2706
+msgid "Processing Speed"
+msgstr "Processing Speed"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2714
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2714
+msgid ""
+"Conservative is safer for slower servers. Fast processes more orders per "
+"batch but may timeout."
+msgstr ""
+"Conservative is safer for slower servers. Fast processes more orders per "
+"batch but may timeout."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2721
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2721
+msgid "🚀 Start Automated Update"
+msgstr "🚀 Start Automated Update"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2724
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2724
+msgid "⏹️ Stop Processing"
+msgstr "⏹️ Stop Processing"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2731
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2731
+msgid "2. Processing Progress"
+msgstr "2. Processing Progress"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2754
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2754
+msgid "3. Results"
+msgstr "3. Results"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2758
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2758
+msgid "📥 Download Results Log"
+msgstr "📥 Download Results Log"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/admin-ui.php:2761
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/admin-ui.php:2761
+msgid "🔄 Process More Orders"
+msgstr "🔄 Process More Orders"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/checkout-calculations.php:343
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/includes/woocommerce/cart-calculations.php:96
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/checkout-calculations.php:320
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:181
+msgid "Discount"
+msgstr "Discount"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:244
+msgid "Late Pick Up Options"
+msgstr "Late Pick Up Options"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:250
+msgid "Enable Late Pick Up"
+msgstr "Enable Late Pick Up"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/admin-product-fields.php:252
+msgid "Allow customers to add late pick up options for this camp variation."
+msgstr "Allow customers to add late pick up options for this camp variation."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/late-pickup.php:319
+msgid ""
+"Please select at least one day for late pick up when choosing Single Day(s)."
+msgstr ""
+"Please select at least one day for late pick up when choosing Single Day(s)."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:109
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/product-camp.php:78
+msgid "The number of selected days must match the quantity."
+msgstr "The number of selected days must match the quantity."
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:190
+msgid "Late Pickup"
+msgstr "Late Pickup"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:191
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:192
+msgid "Full Week"
+msgstr "Full Week"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/cart-calculations.php:195
+msgid "Late Pickup Cost"
+msgstr "Late Pickup Cost"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/late-pickup-settings.php:21
+msgid "Late Pick Up Settings"
+msgstr "Late Pick Up Settings"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/late-pickup-settings.php:22
+msgid "Late Pick Up"
+msgstr "Late Pick Up"
+
+#: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-product-variations/includes/woocommerce/late-pickup-settings.php:37
+msgid "Settings saved."
+msgstr "Settings saved."
