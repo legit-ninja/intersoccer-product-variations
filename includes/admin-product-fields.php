@@ -69,7 +69,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_start_date[' . $loop . ']',
-        'label' => __('Course Start Date (MM-DD-YYYY)', 'intersoccer-player-management'),
+        'label' => __('Course Start Date (MM-DD-YYYY)', 'intersoccer-product-variations'),
         'value' => get_post_meta($variation_id, '_course_start_date', true),
         'wrapper_class' => 'form-row form-row-full',
         'type' => 'date',
@@ -77,7 +77,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_total_weeks[' . $loop . ']',
-        'label' => __('Total Weeks Duration', 'intersoccer-player-management'),
+        'label' => __('Total Weeks Duration', 'intersoccer-product-variations'),
         'value' => get_post_meta($variation_id, '_course_total_weeks', true),
         'wrapper_class' => 'form-row form-row-first',
         'type' => 'number',
@@ -97,16 +97,16 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
     $holiday_dates = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
     ?>
     <div class="form-row form-row-full">
-        <label><?php esc_html_e('Holiday/Skip Dates', 'intersoccer-player-management'); ?></label>
+        <label><?php esc_html_e('Holiday/Skip Dates', 'intersoccer-product-variations'); ?></label>
         <div id="intersoccer-holiday-dates-container-<?php echo esc_attr($loop); ?>">
             <?php foreach ($holiday_dates as $index => $date) : ?>
                 <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
                     <input type="date" name="intersoccer_holiday_dates[<?php echo esc_attr($loop); ?>][<?php echo esc_attr($index); ?>]" value="<?php echo esc_attr($date); ?>" style="margin-right: 10px;">
-                    <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                    <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Remove', 'intersoccer-product-variations'); ?></button>
                 </div>
             <?php endforeach; ?>
         </div>
-        <button type="button" class="button intersoccer-add-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Add Holiday Date', 'intersoccer-player-management'); ?></button>
+        <button type="button" class="button intersoccer-add-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Add Holiday Date', 'intersoccer-product-variations'); ?></button>
     </div>
     <script>
         jQuery(document).ready(function($) {
@@ -121,7 +121,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
                 $('#intersoccer-holiday-dates-container-' + loop).append(`
                     <div class="intersoccer-holiday-row" style="margin-bottom: 10px;">
                         <input type="date" name="intersoccer_holiday_dates[${loop}][${index}]" style="margin-right: 10px;">
-                        <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="${loop}"><?php esc_html_e('Remove', 'intersoccer-player-management'); ?></button>
+                        <button type="button" class="button intersoccer-remove-holiday" data-variation-loop="${loop}"><?php esc_html_e('Remove', 'intersoccer-product-variations'); ?></button>
                     </div>
                 `);
                 holidayIndices[loop] = index + 1;
@@ -223,22 +223,31 @@ function intersoccer_add_camp_variation_fields_after_attributes($loop, $variatio
 }
 
 function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
+    error_log('InterSoccer Admin: Checking camp late pickup field for variation ' . $variation_id . ', loop ' . $loop);
+    
     $product = wc_get_product($variation_id);
     if (!$product) {
+        error_log('InterSoccer Admin: Invalid product for variation ' . $variation_id);
         return;
     }
 
     // Check if this is a camp variation
     $parent_product = wc_get_product($product->get_parent_id());
     if (!$parent_product) {
+        error_log('InterSoccer Admin: No parent product found for variation ' . $variation_id);
         return;
     }
     
+    error_log('InterSoccer Admin: Parent product ID: ' . $parent_product->get_id());
     $is_camp = intersoccer_is_camp($parent_product->get_id());
+    error_log('InterSoccer Admin: Is parent product a camp? ' . ($is_camp ? 'true' : 'false'));
     
     if (!$is_camp) {
+        error_log('InterSoccer Admin: Parent product is not a camp, skipping late pickup field');
         return;
     }
+
+    error_log('InterSoccer Admin: Adding late pickup field for camp variation ' . $variation_id);
 
     echo '<div style="margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd;">';
     echo '<p style="margin: 0 0 5px 0; font-weight: bold;">' . __('Late Pick Up Options', 'intersoccer-product-variations') . '</p>';
