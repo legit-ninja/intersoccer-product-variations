@@ -3,57 +3,56 @@
 # https://wpml.org
 msgid ""
 msgstr ""
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Project-Id-Version:WPML_EXPORT_intersoccer-product-variations\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2025-10-17 10:09-0400\n"
-"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
-"Language-Team: German <translation-team-de@lists.sourceforge.net>\n"
-"Language:de_CH\n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language:\n"
 "MIME-Version: 1.0\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 # wpml-name: c4716ed2f447aa22072d91c1acbe83e7
 msgid "Late Pick Up Cost: "
-msgstr "Kosten für späte Abholung: "
+msgstr ""
 
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: bc817b1e58c7ef645954e21a3fc1872c
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: Full Week Cost (CHF)
 msgid "Full Week Cost (CHF)"
-msgstr "Kosten für volle Woche (CHF)"
+msgstr ""
 
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: 3bc21967da79e02c83618302e838f61c
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: Per Day Cost (CHF)
 msgid "Per Day Cost (CHF)"
-msgstr "Kosten pro Tag (CHF)"
+msgstr ""
 
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: f5d6040ed78ca86ddc73296a49b18510
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: Save Changes
 msgid "Save Changes"
-msgstr "Änderungen speichern"
+msgstr ""
 
 # wpml-name: c96e5ac477f66073f9c5861a09294805
 msgid "Select Days"
-msgstr "Tage auswählen"
+msgstr ""
 
 # wpml-name: 0f81226fcb5d2f984946704cde7977b0
 msgid "Select an Attendee"
-msgstr "Teilnehmer auswählen"
+msgstr ""
 
 # wpml-name: 1226e88daa97ef3dea92bf96656b344a
 msgid "Add Holiday Date"
-msgstr "Ferientermin hinzufügen"
+msgstr ""
 
 # wpml-name: 41025273227bc0402a5030b566082024
 msgid "Holiday/Skip Dates"
-msgstr "Ferien/Überspringen-Daten"
+msgstr ""
 
 # wpml-name: 4933661483878b07bce6ad659c6474d7
 msgid ""
