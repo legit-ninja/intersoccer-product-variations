@@ -24,6 +24,14 @@ add_action('plugins_loaded', function () {
         false,
         dirname(plugin_basename(__FILE__)) . '/languages'
     );
+    
+    // Register day names for WPML translation
+    if (function_exists('icl_register_string')) {
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        foreach ($days as $day) {
+            icl_register_string('intersoccer-product-variations', $day, $day);
+        }
+    }
 });
 
 // Include plugin files
@@ -114,8 +122,8 @@ function intersoccer_refresh_nonce() {
 
 // Add custom roles
 add_action('init', function () {
-    add_role('coach', __('Coach', 'intersoccer-player-management'), ['read' => true, 'edit_posts' => true]);
-    add_role('organizer', __('Organizer', 'intersoccer-player-management'), ['read' => true, 'edit_posts' => true]);
+    add_role('coach', __('Coach', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
+    add_role('organizer', __('Organizer', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
 });
 
 // Register endpoint
@@ -130,12 +138,12 @@ add_filter('woocommerce_account_menu_items', function ($items) {
     foreach ($items as $key => $label) {
         $new_items[$key] = $label;
         if ($key === 'dashboard' && !$inserted) {
-            $new_items['manage-players'] = __('Manage Players', 'intersoccer-player-management');
+            $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
             $inserted = true;
         }
     }
     if (!$inserted) {
-        $new_items['manage-players'] = __('Manage Players', 'intersoccer-player-management');
+        $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
     }
     return $new_items;
 }, 10);
