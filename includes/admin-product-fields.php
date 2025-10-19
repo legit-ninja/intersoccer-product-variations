@@ -215,10 +215,12 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 add_action('woocommerce_variation_options', 'intersoccer_add_camp_variation_fields', 20, 3);
 add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
+    error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields called for loop ' . $loop . ', variation ID ' . $variation->ID);
     intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
 }
 
 function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
+    error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
     intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
 }
 
@@ -269,6 +271,12 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
  */
 add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
 function intersoccer_save_camp_variation_fields($variation_id, $loop) {
+    error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
+    error_log('InterSoccer Save: POST data: ' . json_encode($_POST));
+    
     $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup'][$loop]) ? 'yes' : 'no';
+    error_log('InterSoccer Save: enable_late_pickup = ' . $enable_late_pickup);
+    
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+    error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to ' . $enable_late_pickup);
 }
