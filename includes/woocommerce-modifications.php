@@ -507,7 +507,7 @@ function intersoccer_apply_discounts($cart) {
                             } else {
                                 $discount = $base_price * $discount_rate;
                             }
-                            $discount_note = sprintf(__('%d%% Family Discount (%s Child)', 'intersoccer-player-management'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
+                            $discount_note = sprintf(__('%d%% Family Discount (%s Child)', 'intersoccer-product-variations'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
                         }
 
                         if ($discount > 0) {
@@ -550,7 +550,7 @@ function intersoccer_apply_discounts($cart) {
                         if ($player_index > 0) { // Skip first child
                             $discount_rate = ($player_index == 1) ? 0.20 : 0.30; // 20% for 2nd child, 30% for 3rd+
                             $discount = $calculated_price * $discount_rate;
-                            $discount_note = sprintf(__('%d%% Combo Discount (%s Child)', 'intersoccer-player-management'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
+                            $discount_note = sprintf(__('%d%% Combo Discount (%s Child)', 'intersoccer-product-variations'), $discount_rate * 100, ($player_index == 1) ? '2nd' : ($player_index == 2 ? '3rd' : 'Additional'));
                             $final_price = $calculated_price - $discount;
                             $cart_item['data']->set_price($final_price);
                             $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_note;
@@ -573,7 +573,7 @@ function intersoccer_apply_discounts($cart) {
                         $variation_id = $cart_item['variation_id'] ?: $product_id;
                         $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], $cart_item['remaining_weeks'] ?? null);
                         $discount = $calculated_price * 0.50; // 50% for 2nd+ course
-                        $discount_note = __('50% Same-Season Course Discount', 'intersoccer-player-management');
+                        $discount_note = __('50% Same-Season Course Discount', 'intersoccer-product-variations');
                         $final_price = $calculated_price - $discount;
                         $cart_item['data']->set_price($final_price);
                         $cart->cart_contents[$cart_item_key]['combo_discount_note'] = $discount_note;
@@ -915,7 +915,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             if (!empty($player['first_name']) && !empty($player['last_name'])) {
                 $player_name = esc_html($player['first_name'] . ' ' . $player['last_name']);
                 $item_data[] = [
-                    'key' => __('Assigned Attendee', 'intersoccer-player-management'),
+                    'key' => __('Assigned Attendee', 'intersoccer-product-variations'),
                     'value' => $player_name,
                     'display' => '<span class="intersoccer-meta-item">' . $player_name . '</span>'
                 ];
@@ -938,7 +938,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         $days = array_map('esc_html', $cart_item['camp_days']);
         $days_display = implode(', ', $days);
         $item_data[] = [
-            'key' => __('Days Selected', 'intersoccer-player-management'),
+            'key' => __('Days Selected', 'intersoccer-product-variations'),
             'value' => $days_display,
             'display' => '<span class="intersoccer-meta-item">' . $days_display . '</span>'
         ];
@@ -952,9 +952,9 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
 
         if (isset($cart_item['remaining_weeks']) && intval($cart_item['remaining_weeks']) >= 0) {
             $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
-            $sessions_display = esc_html(sprintf(__('%d of %d', 'intersoccer-player-management'), $cart_item['remaining_weeks'], $total_sessions));
+            $sessions_display = esc_html(sprintf(__('%d of %d', 'intersoccer-product-variations'), $cart_item['remaining_weeks'], $total_sessions));
             $item_data[] = [
-                'key' => __('Sessions Remaining', 'intersoccer-player-management'),
+                'key' => __('Sessions Remaining', 'intersoccer-product-variations'),
                 'value' => $sessions_display,
                 'display' => '<span class="intersoccer-meta-item">' . $sessions_display . '</span>'
             ];
@@ -965,14 +965,14 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
         $end_date = get_post_meta($variation_id, '_end_date', true) ?: '';
         if ($start_date) {
             $item_data[] = [
-                'key' => __('Start Date', 'intersoccer-player-management'),
+                'key' => __('Start Date', 'intersoccer-product-variations'),
                 'value' => date_i18n('F j, Y', strtotime($start_date)),
                 'display' => '<span class="intersoccer-meta-item">' . date_i18n('F j, Y', strtotime($start_date)) . '</span>'
             ];
         }
         if ($end_date) {
             $item_data[] = [
-                'key' => __('End Date', 'intersoccer-player-management'),
+                'key' => __('End Date', 'intersoccer-product-variations'),
                 'value' => date_i18n('F j, Y', strtotime($end_date)),
                 'display' => '<span class="intersoccer-meta-item">' . date_i18n('F j, Y', strtotime($end_date)) . '</span>'
             ];
@@ -985,7 +985,7 @@ function intersoccer_display_cart_item_data($item_data, $cart_item) {
             }, $holiday_dates);
             $holidays_display = esc_html('(no session) ' . implode(', ', $formatted_dates));
             $item_data[] = [
-                'key' => __('Holidays', 'intersoccer-player-management'),
+                'key' => __('Holidays', 'intersoccer-product-variations'),
                 'value' => $holidays_display,
                 'display' => '<span class="intersoccer-meta-item">' . $holidays_display . '</span>'
             ];
@@ -1045,7 +1045,7 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         if (isset($players[$player_index])) {
             $player = $players[$player_index];
             $player_name = esc_html($player['first_name'] . ' ' . $player['last_name']);
-            $item->add_meta_data(__('Assigned Attendee', 'intersoccer-player-management'), $player_name);
+            $item->add_meta_data(__('Assigned Attendee', 'intersoccer-product-variations'), $player_name);
             error_log('InterSoccer: Saved player to order item ' . $cart_item_key . ': ' . $player_name);
         } else {
             error_log('InterSoccer: Invalid player index ' . $player_index . ' for order item ' . $cart_item_key);
@@ -1056,7 +1056,7 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
     if ($product_type === 'camp' && isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
         $days = array_map('sanitize_text_field', $values['camp_days']);
         $days_display = implode(', ', $days);
-        $item->add_meta_data(__('Days Selected', 'intersoccer-player-management'), $days_display);
+        $item->add_meta_data(__('Days Selected', 'intersoccer-product-variations'), $days_display);
         error_log('InterSoccer: Saved selected days to order item ' . $cart_item_key . ': ' . $days_display);
     }
 
@@ -1072,18 +1072,18 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
 
         // Save course metadata
         if ($start_date) {
-            $item->add_meta_data(__('Start Date', 'intersoccer-player-management'), date_i18n('F j, Y', strtotime($start_date)));
+            $item->add_meta_data(__('Start Date', 'intersoccer-product-variations'), date_i18n('F j, Y', strtotime($start_date)));
             error_log('InterSoccer: Saved start_date to order item ' . $cart_item_key . ': ' . $start_date);
         }
         if ($end_date) {
-            $item->add_meta_data(__('End Date', 'intersoccer-player-management'), date_i18n('F j, Y', strtotime($end_date)));
+            $item->add_meta_data(__('End Date', 'intersoccer-product-variations'), date_i18n('F j, Y', strtotime($end_date)));
             error_log('InterSoccer: Saved end_date to order item ' . $cart_item_key . ': ' . $end_date);
         }
         if (!empty($holidays)) {
             $holidays_display = implode(', ', array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));
             }, $holidays));
-            $item->add_meta_data(__('Holidays', 'intersoccer-player-management'), $holidays_display);
+            $item->add_meta_data(__('Holidays', 'intersoccer-product-variations'), $holidays_display);
             error_log('InterSoccer: Saved holidays to order item ' . $cart_item_key . ': ' . $holidays_display);
         }
 
@@ -1091,13 +1091,13 @@ function intersoccer_save_order_item_data($item, $cart_item_key, $values, $order
         error_log('InterSoccer: Calculating remaining_sessions for order item ' . $cart_item_key . ' - total_weeks: ' . $total_weeks);
         $remaining_sessions = calculate_remaining_sessions($variation_id, $total_weeks);
         $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
-        $sessions_display = sprintf(__('%d of %d', 'intersoccer-player-management'), $remaining_sessions, $total_sessions);
-        $item->add_meta_data(__('Sessions Remaining', 'intersoccer-player-management'), $sessions_display);
+        $sessions_display = sprintf(__('%d of %d', 'intersoccer-product-variations'), $remaining_sessions, $total_sessions);
+        $item->add_meta_data(__('Sessions Remaining', 'intersoccer-product-variations'), $sessions_display);
         error_log('InterSoccer: Saved sessions remaining to order item ' . $cart_item_key . ': ' . $sessions_display);
 
         $discount_note = calculate_discount_note($variation_id, $remaining_sessions);
         if ($discount_note) {
-            $item->add_meta_data(__('Discount Applied', 'intersoccer-player-management'), $discount_note);
+            $item->add_meta_data(__('Discount Applied', 'intersoccer-product-variations'), $discount_note);
             error_log('InterSoccer: Saved discount note to order item ' . $cart_item_key . ': ' . $discount_note);
         }
     }
@@ -1139,8 +1139,8 @@ function intersoccer_cart_item_subtotal($subtotal_html, $cart_item, $cart_item_k
         $variation_id = $cart_item['variation_id'] ?: $cart_item['product_id'];
         $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
         $total_sessions = calculate_total_sessions($variation_id, $total_weeks);
-        $discount_message = esc_html(sprintf(__('%d of %d', 'intersoccer-player-management'), $cart_item['remaining_weeks'], $total_sessions));
-        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . __('Sessions Remaining: ', 'intersoccer-player-management') . $discount_message . '</div>';
+        $discount_message = esc_html(sprintf(__('%d of %d', 'intersoccer-product-variations'), $cart_item['remaining_weeks'], $total_sessions));
+        $subtotal_html .= '<div class="intersoccer-discount" style="color: green; font-size: 0.9em; margin-top: 5px;">' . __('Sessions Remaining: ', 'intersoccer-product-variations') . $discount_message . '</div>';
         error_log('InterSoccer: Added green sessions remaining message to subtotal for cart item ' . $cart_item_key . ': ' . $discount_message);
     }
 
@@ -1288,8 +1288,8 @@ add_action('admin_menu', 'intersoccer_add_update_orders_submenu');
 function intersoccer_add_update_orders_submenu() {
     add_submenu_page(
         'woocommerce',
-        __('Update Order Details', 'intersoccer-player-management'),
-        __('Update Order Details', 'intersoccer-player-management'),
+        __('Update Order Details', 'intersoccer-product-variations'),
+        __('Update Order Details', 'intersoccer-product-variations'),
         'manage_woocommerce',
         'intersoccer-update-orders',
         'intersoccer_render_update_orders_page'
@@ -1301,7 +1301,7 @@ function intersoccer_add_update_orders_submenu() {
  */
 function intersoccer_render_update_orders_page() {
     if (!current_user_can('manage_woocommerce')) {
-        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
     // Get Processing orders
@@ -1314,18 +1314,18 @@ function intersoccer_render_update_orders_page() {
 
     ?>
     <div class="wrap">
-        <h1><?php _e('Update Processing Orders with Parent Attributes', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Select orders to update with new visible, non-variation parent product attributes for reporting and analytics. Use "Remove Assigned Player" to delete the unwanted assigned_player field from orders. Use "Fix Incorrect Attributes" to correct orders with unwanted attributes (e.g., all days of the week).', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('Update Processing Orders with Parent Attributes', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Select orders to update with new visible, non-variation parent product attributes for reporting and analytics. Use "Remove Assigned Player" to delete the unwanted assigned_player field from orders. Use "Fix Incorrect Attributes" to correct orders with unwanted attributes (e.g., all days of the week).', 'intersoccer-product-variations'); ?></p>
         <?php if (!empty($orders)) : ?>
             <form id="intersoccer-update-orders-form">
                 <table class="wp-list-table widefat fixed striped">
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="select-all-orders"></th>
-                            <th><?php _e('Order ID', 'intersoccer-player-management'); ?></th>
-                            <th><?php _e('Customer', 'intersoccer-player-management'); ?></th>
-                            <th><?php _e('Date', 'intersoccer-player-management'); ?></th>
-                            <th><?php _e('Total', 'intersoccer-player-management'); ?></th>
+                            <th><?php _e('Order ID', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Customer', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Date', 'intersoccer-product-variations'); ?></th>
+                            <th><?php _e('Total', 'intersoccer-product-variations'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1343,23 +1343,23 @@ function intersoccer_render_update_orders_page() {
                 <p>
                     <label>
                         <input type="checkbox" id="remove-assigned-player" name="remove_assigned_player">
-                        <?php _e('Remove Assigned Player Field', 'intersoccer-player-management'); ?>
+                        <?php _e('Remove Assigned Player Field', 'intersoccer-product-variations'); ?>
                     </label>
                 </p>
                 <p>
                     <label>
                         <input type="checkbox" id="fix-incorrect-attributes" name="fix_incorrect_attributes">
-                        <?php _e('Fix Incorrect Attributes (e.g., remove Days-of-week)', 'intersoccer-player-management'); ?>
+                        <?php _e('Fix Incorrect Attributes (e.g., remove Days-of-week)', 'intersoccer-product-variations'); ?>
                     </label>
                 </p>
                 <p>
-                    <button type="button" id="intersoccer-update-orders-button" class="button button-primary"><?php _e('Update Selected Orders', 'intersoccer-player-management'); ?></button>
+                    <button type="button" id="intersoccer-update-orders-button" class="button button-primary"><?php _e('Update Selected Orders', 'intersoccer-product-variations'); ?></button>
                     <span id="intersoccer-update-status"></span>
                 </p>
                 <?php wp_nonce_field('intersoccer_update_orders_nonce', 'intersoccer_update_orders_nonce'); ?>
             </form>
         <?php else : ?>
-            <p><?php _e('No Processing orders found.', 'intersoccer-player-management'); ?></p>
+            <p><?php _e('No Processing orders found.', 'intersoccer-product-variations'); ?></p>
         <?php endif; ?>
     </div>
     <script>
@@ -1377,11 +1377,11 @@ function intersoccer_render_update_orders_page() {
                 var fixIncorrect = $('#fix-incorrect-attributes').is(':checked');
 
                 if (orderIds.length === 0) {
-                    alert('<?php _e('Please select at least one order.', 'intersoccer-player-management'); ?>');
+                    alert('<?php _e('Please select at least one order.', 'intersoccer-product-variations'); ?>');
                     return;
                 }
 
-                $('#intersoccer-update-status').text('<?php _e('Updating orders...', 'intersoccer-player-management'); ?>').removeClass('error');
+                $('#intersoccer-update-status').text('<?php _e('Updating orders...', 'intersoccer-product-variations'); ?>').removeClass('error');
 
                 $.ajax({
                     url: ajaxurl,
@@ -1395,13 +1395,13 @@ function intersoccer_render_update_orders_page() {
                     },
                     success: function(response) {
                         if (response.success) {
-                            $('#intersoccer-update-status').text('<?php _e('Orders updated successfully!', 'intersoccer-player-management'); ?>');
+                            $('#intersoccer-update-status').text('<?php _e('Orders updated successfully!', 'intersoccer-product-variations'); ?>');
                         } else {
-                            $('#intersoccer-update-status').text('<?php _e('Error: ', 'intersoccer-player-management'); ?>' + response.data.message).addClass('error');
+                            $('#intersoccer-update-status').text('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + response.data.message).addClass('error');
                         }
                     },
                     error: function() {
-                        $('#intersoccer-update-status').text('<?php _e('An error occurred while updating orders.', 'intersoccer-player-management'); ?>').addClass('error');
+                        $('#intersoccer-update-status').text('<?php _e('An error occurred while updating orders.', 'intersoccer-product-variations'); ?>').addClass('error');
                     }
                 });
             });
@@ -1422,7 +1422,7 @@ function intersoccer_update_processing_orders_callback() {
     check_ajax_referer('intersoccer_update_orders_nonce', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -1431,7 +1431,7 @@ function intersoccer_update_processing_orders_callback() {
     $fix_incorrect = isset($_POST['fix_incorrect_attributes']) && $_POST['fix_incorrect_attributes'] === 'true';
 
     if (empty($order_ids)) {
-        wp_send_json_error(['message' => __('No orders selected.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('No orders selected.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -1487,7 +1487,7 @@ function intersoccer_update_processing_orders_callback() {
         error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
     }
 
-    wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-player-management')]);
+    wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-product-variations')]);
     wp_die();
 }
 
@@ -1505,7 +1505,7 @@ function intersoccer_add_downloadable_documents_metabox() {
     if (in_array($product_type, ['camp', 'course', 'birthday'])) {
         add_meta_box(
             'intersoccer_downloadable_documents',
-            __('Event Documents', 'intersoccer-player-management'),
+            __('Event Documents', 'intersoccer-product-variations'),
             'intersoccer_render_downloadable_documents_metabox',
             'product',
             'normal',
@@ -1525,27 +1525,27 @@ function intersoccer_render_downloadable_documents_metabox($post) {
     <div id="intersoccer-downloads-container">
         <?php foreach ($downloads as $index => $download) : ?>
             <div class="intersoccer-download-row" style="margin-bottom: 10px;">
-                <input type="text" name="intersoccer_downloads[<?php echo $index; ?>][name]" value="<?php echo esc_attr($download['name']); ?>" placeholder="<?php _e('Document Name', 'intersoccer-player-management'); ?>" style="width: 200px; margin-right: 10px;">
+                <input type="text" name="intersoccer_downloads[<?php echo $index; ?>][name]" value="<?php echo esc_attr($download['name']); ?>" placeholder="<?php _e('Document Name', 'intersoccer-product-variations'); ?>" style="width: 200px; margin-right: 10px;">
                 <input type="hidden" name="intersoccer_downloads[<?php echo $index; ?>][file]" value="<?php echo esc_attr($download['file']); ?>" class="intersoccer-download-file">
-                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-player-management'); ?></button>
+                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-product-variations'); ?></button>
                 <span class="intersoccer-file-name"><?php echo basename($download['file']); ?></span>
-                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][limit]" value="<?php echo esc_attr($download['limit']); ?>" placeholder="<?php _e('Download Limit', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
-                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][expiry]" value="<?php echo esc_attr($download['expiry']); ?>" placeholder="<?php _e('Days Until Expiry', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
-                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-player-management'); ?></button>
+                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][limit]" value="<?php echo esc_attr($download['limit']); ?>" placeholder="<?php _e('Download Limit', 'intersoccer-product-variations'); ?>" style="width: 100px; margin-left: 10px;">
+                <input type="number" name="intersoccer_downloads[<?php echo $index; ?>][expiry]" value="<?php echo esc_attr($download['expiry']); ?>" placeholder="<?php _e('Days Until Expiry', 'intersoccer-product-variations'); ?>" style="width: 100px; margin-left: 10px;">
+                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-product-variations'); ?></button>
             </div>
         <?php endforeach; ?>
         <div id="intersoccer-downloads-template" style="display: none;">
             <div class="intersoccer-download-row" style="margin-bottom: 10px;">
-                <input type="text" name="intersoccer_downloads[{index}][name]" placeholder="<?php _e('Document Name', 'intersoccer-player-management'); ?>" style="width: 200px; margin-right: 10px;">
+                <input type="text" name="intersoccer_downloads[{index}][name]" placeholder="<?php _e('Document Name', 'intersoccer-product-variations'); ?>" style="width: 200px; margin-right: 10px;">
                 <input type="hidden" name="intersoccer_downloads[{index}][file]" class="intersoccer-download-file">
-                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-player-management'); ?></button>
+                <button type="button" class="button intersoccer-upload-button"><?php _e('Choose File', 'intersoccer-product-variations'); ?></button>
                 <span class="intersoccer-file-name"></span>
-                <input type="number" name="intersoccer_downloads[{index}][limit]" placeholder="<?php _e('Download Limit', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
-                <input type="number" name="intersoccer_downloads[{index}][expiry]" placeholder="<?php _e('Days Until Expiry', 'intersoccer-player-management'); ?>" style="width: 100px; margin-left: 10px;">
-                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-player-management'); ?></button>
+                <input type="number" name="intersoccer_downloads[{index}][limit]" placeholder="<?php _e('Download Limit', 'intersoccer-product-variations'); ?>" style="width: 100px; margin-left: 10px;">
+                <input type="number" name="intersoccer_downloads[{index}][expiry]" placeholder="<?php _e('Days Until Expiry', 'intersoccer-product-variations'); ?>" style="width: 100px; margin-left: 10px;">
+                <button type="button" class="button intersoccer-remove-download" style="margin-left: 10px;"><?php _e('Remove', 'intersoccer-product-variations'); ?></button>
             </div>
         </div>
-        <p><button type="button" id="intersoccer-add-download" class="button"><?php _e('Add Document', 'intersoccer-player-management'); ?></button></p>
+        <p><button type="button" id="intersoccer-add-download" class="button"><?php _e('Add Document', 'intersoccer-product-variations'); ?></button></p>
     </div>
     <script>
         jQuery(document).ready(function($) {
@@ -1567,8 +1567,8 @@ function intersoccer_render_downloadable_documents_metabox($post) {
                 e.preventDefault();
                 var button = $(this);
                 var fileFrame = wp.media({
-                    title: '<?php _e('Select PDF Document', 'intersoccer-player-management'); ?>',
-                    button: { text: '<?php _e('Use this file', 'intersoccer-player-management'); ?>' },
+                    title: '<?php _e('Select PDF Document', 'intersoccer-product-variations'); ?>',
+                    button: { text: '<?php _e('Use this file', 'intersoccer-product-variations'); ?>' },
                     multiple: false,
                     library: { type: 'application/pdf' }
                 });
