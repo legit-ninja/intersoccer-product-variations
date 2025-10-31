@@ -77,7 +77,9 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
 
     woocommerce_wp_text_input([
         'id' => '_course_total_weeks[' . $loop . ']',
-        'label' => __('Total Weeks Duration', 'intersoccer-product-variations'),
+        'label' => __('Total Sessions', 'intersoccer-player-management'),
+        'description' => __('Number of sessions the customer will participate in (holidays will extend the end date)', 'intersoccer-player-management'),
+        'desc_tip' => true,
         'value' => get_post_meta($variation_id, '_course_total_weeks', true),
         'wrapper_class' => 'form-row form-row-first',
         'type' => 'number',
