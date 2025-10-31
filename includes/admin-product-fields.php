@@ -202,11 +202,41 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 
     // Get course days (from pa_days-of-week or pa_course-day)
     $parent_id = wp_get_post_parent_id($variation_id);
-    $course_days = wc_get_product_terms($parent_id, 'pa_days-of-week', ['fields' => 'names']) ?: 
-                wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names']) ?: ['Monday']; // Fallback
+    $course_days = [];
+    // Prefer canonical slugs for deterministic ordering so behavior is language-agnostic.
+    $day_slugs = wc_get_product_terms($parent_id, 'pa_days-of-week', ['fields' => 'slugs']);
+    if (!empty($day_slugs)) {
+        $canonical = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        $ordered_slugs = array_values(array_intersect($canonical, $day_slugs));
+        foreach ($ordered_slugs as $slug) {
+            $term = get_term_by('slug', $slug, 'pa_days-of-week');
+            if ($term && !is_wp_error($term)) {
+                $course_days[] = $term->name;
+            }
+        }
+    } else {
+        $names = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names']);
+        if (!empty($names)) {
+            $course_days = $names;
+        } else {
+            $course_days = ['Monday']; // Fallback
+        }
+    }
 
     $end_date = calculate_course_end_date($variation_id, $start_date, $total_weeks, $holiday_dates, $course_days);
     update_post_meta($variation_id, '_end_date', $end_date);
+
+    // Update variation price to full course price if session rate is set
+    if ($weekly_discount > 0) {
+        $full_price = $weekly_discount * $total_weeks;
+        update_post_meta($variation_id, '_price', $full_price);
+        update_post_meta($variation_id, '_regular_price', $full_price);
+        wc_delete_product_transients($variation_id); // Clear transients
+        error_log('InterSoccer: Updated variation ' . $variation_id . ' price to full course price: ' . $full_price);
+    }
+
+    // Sync course metadata to WPML translations
+    intersoccer_sync_course_metadata_to_translations($variation_id, $start_date, $total_weeks, $holiday_dates, $weekly_discount, $end_date);
 }
 
 /**
@@ -279,4 +309,73 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
     error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to ' . $enable_late_pickup);
+}
+
+/**
+ * Sync course metadata to all WPML translations of the variation
+ *
+ * @param int $variation_id Original variation ID
+ * @param string $start_date Course start date
+ * @param int $total_weeks Total weeks
+ * @param array $holiday_dates Holiday dates
+ * @param float $weekly_discount Session rate
+ * @param string $end_date Calculated end date
+ */
+function intersoccer_sync_course_metadata_to_translations($variation_id, $start_date, $total_weeks, $holiday_dates, $weekly_discount, $end_date) {
+    // Check if WPML is active
+    if (!function_exists('icl_object_id')) {
+        return;
+    }
+
+    // Get all active languages
+    $languages = apply_filters('wpml_active_languages', null);
+    if (!$languages || !is_array($languages)) {
+        return;
+    }
+
+    $current_lang = apply_filters('wpml_current_language', null);
+    if (!$current_lang) {
+        return;
+    }
+
+    // Get the original post language
+    $original_lang = apply_filters('wpml_element_language_code', null, [
+        'element_id' => $variation_id,
+        'element_type' => 'post_product_variation'
+    ]);
+
+    if (!$original_lang) {
+        $original_lang = $current_lang;
+    }
+
+    // Sync to all other languages
+    foreach ($languages as $lang_code => $lang_info) {
+        if ($lang_code === $original_lang) {
+            continue; // Skip original language
+        }
+
+        // Get translated variation ID
+        $translated_variation_id = apply_filters('wpml_object_id', $variation_id, 'product_variation', false, $lang_code);
+
+        if (!$translated_variation_id || $translated_variation_id === $variation_id) {
+            continue; // No translation or same ID
+        }
+
+        // Sync course metadata
+        update_post_meta($translated_variation_id, '_course_start_date', $start_date);
+        update_post_meta($translated_variation_id, '_course_total_weeks', $total_weeks);
+        update_post_meta($translated_variation_id, '_course_holiday_dates', $holiday_dates);
+        update_post_meta($translated_variation_id, '_course_weekly_discount', $weekly_discount);
+        update_post_meta($translated_variation_id, '_end_date', $end_date);
+
+        // Sync price metadata if session rate is set
+        if ($weekly_discount > 0) {
+            $full_price = $weekly_discount * $total_weeks;
+            update_post_meta($translated_variation_id, '_price', $full_price);
+            update_post_meta($translated_variation_id, '_regular_price', $full_price);
+            wc_delete_product_transients($translated_variation_id);
+        }
+
+        error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
+    }
 }
