@@ -198,7 +198,7 @@
 
         // Handle booking type change
         handleBookingTypeChange: function(bookingType) {
-            if (bookingType === 'single-days') {
+            if (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) {
                 this.showDaySelection();
                 this.renderDayCheckboxes();
             } else {
@@ -342,7 +342,7 @@
             
             const playerSelected = !!$form.find('.intersoccer-player-select').val();
             const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
-            const daysSelected = bookingType === 'single-days' ? this.state.selectedDays.length > 0 : true;
+            const daysSelected = (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) ? this.state.selectedDays.length > 0 : true;
             const isLoggedIn = this.config.userId > 0;
 
             const canAddToCart = playerSelected && daysSelected && isLoggedIn;

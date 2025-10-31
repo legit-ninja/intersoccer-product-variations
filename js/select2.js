@@ -112,7 +112,7 @@ add_action('wp_footer', function () {
                         setTimeout(() => $form.find('.intersoccer-player-selection .error-message').hide(), 5000);
                     }
                     var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
-                    if (bookingType === 'single-days') {
+                    if (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) {
                         var selectedDays = $form.find('.day-select').val();
                         if (!selectedDays || !selectedDays.length) {
                             e.preventDefault();

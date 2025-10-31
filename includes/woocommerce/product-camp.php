@@ -35,7 +35,14 @@ class InterSoccer_Camp {
         $price = floatval($product->get_price());
         $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
 
-        if ($booking_type === 'single-days') {
+        // Check if this is a single-day booking
+        $is_single_day = stripos($booking_type, 'single') !== false ||
+                        stripos($booking_type, 'jour') !== false ||
+                        stripos($booking_type, 'day') !== false ||
+                        stripos($booking_type, 'einzel') !== false ||
+                        stripos($booking_type, 'tag') !== false;
+
+        if ($is_single_day) {
             $price_per_day = $price; // CHF 55/day as base price
             $num_days = count($camp_days);
             if ($num_days > 0) {
@@ -45,11 +52,11 @@ class InterSoccer_Camp {
                 $price = $price_per_day * $quantity;
             }
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (' . $num_days . ' days selected, per_day: ' . $price_per_day . ')');
+                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (' . $num_days . ' days selected, per_day: ' . $price_per_day . ', booking_type: ' . $booking_type . ')');
             }
         } else {
             // Full-week price (e.g., CHF 500/week)
-            error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (full-week)');
+            error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (full-week, booking_type: ' . $booking_type . ')');
         }
 
         return max(0, floatval($price));
@@ -95,7 +102,7 @@ class InterSoccer_Camp {
     public static function calculate_discount_note($variation_id, $camp_days = []) {
         $discount_note = '';
         if (!empty($camp_days)) {
-            $discount_note = count($camp_days) . ' Day(s) Selected';
+            $discount_note = sprintf(__('%d Day(s) Selected', 'intersoccer-product-variations'), count($camp_days));
         }
         error_log('InterSoccer: Calculated discount_note for camp variation ' . $variation_id . ': ' . $discount_note);
         return $discount_note;

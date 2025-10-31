@@ -43,8 +43,11 @@ class InterSoccer_Product_Types {
         $transient_key = 'intersoccer_type_' . $product_id;
         $cached_type = get_transient($transient_key);
         if (false !== $cached_type) {
+            error_log('InterSoccer: Found cached type for product ' . $product_id . ': ' . ($cached_type ?: 'null'));
             return $cached_type ?: null;
         }
+
+        error_log('InterSoccer: No cache found for product ' . $product_id . ', detecting type...');
 
         $product = wc_get_product($product_id);
         if (!$product) {
@@ -53,28 +56,35 @@ class InterSoccer_Product_Types {
             return null;
         }
 
+        error_log('InterSoccer: Product object found for ID: ' . $product_id . ', type: ' . $product->get_type());
+
         // Check existing meta first
         $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
         if ($product_type && in_array($product_type, ['camp', 'course', 'birthday'])) {
+            error_log('InterSoccer: Found saved meta type for product ' . $product_id . ': ' . $product_type);
             set_transient($transient_key, $product_type, HOUR_IN_SECONDS);
             return $product_type;
         }
+
+        error_log('InterSoccer: No saved meta found for product ' . $product_id . ', checking attributes...');
 
         // Detect from pa_activity-type attribute
         $product_type = self::detect_type_from_attribute($product);
         if ($product_type) {
+            error_log('InterSoccer: Detected type from attribute for product ' . $product_id . ': ' . $product_type);
             update_post_meta($product_id, '_intersoccer_product_type', $product_type);
             set_transient($transient_key, $product_type, HOUR_IN_SECONDS);
-            error_log('InterSoccer: Detected product type from attribute for product ' . $product_id . ': ' . $product_type);
             return $product_type;
         }
+
+        error_log('InterSoccer: No attribute detection for product ' . $product_id . ', checking categories...');
 
         // Fallback to categories
         $product_type = self::detect_type_from_category($product_id);
         if ($product_type) {
+            error_log('InterSoccer: Detected type from category for product ' . $product_id . ': ' . $product_type);
             update_post_meta($product_id, '_intersoccer_product_type', $product_type);
             set_transient($transient_key, $product_type, HOUR_IN_SECONDS);
-            error_log('InterSoccer: Detected product type from category for product ' . $product_id . ': ' . $product_type);
             return $product_type;
         }
 
@@ -90,35 +100,58 @@ class InterSoccer_Product_Types {
      * @return string|null Product type or null.
      */
     private static function detect_type_from_attribute($product) {
+        error_log('InterSoccer: Checking pa_activity-type attribute for product ' . $product->get_id());
+        
         // Try WooCommerce taxonomy approach first
         $product_id = $product->get_id();
         $activity_types = wc_get_product_terms($product_id, 'pa_activity-type', ['fields' => 'names']);
         
+        error_log('InterSoccer: wc_get_product_terms result for pa_activity-type: ' . json_encode($activity_types));
+        
         if (!empty($activity_types)) {
             $type = strtolower(trim($activity_types[0]));
+            error_log('InterSoccer: First activity type: "' . $type . '"');
             if (in_array($type, ['camp', 'course', 'birthday'])) {
                 error_log('InterSoccer: Found type from pa_activity-type taxonomy: ' . $type);
                 return $type;
+            } else {
+                error_log('InterSoccer: Activity type "' . $type . '" not in allowed types [camp, course, birthday]');
             }
+        } else {
+            error_log('InterSoccer: No activity types found via wc_get_product_terms');
         }
 
         // Fallback to attribute object approach
         $attributes = $product->get_attributes();
+        error_log('InterSoccer: Product attributes: ' . json_encode(array_keys($attributes)));
+        
         if (isset($attributes['pa_activity-type']) && $attributes['pa_activity-type'] instanceof WC_Product_Attribute) {
             $attribute = $attributes['pa_activity-type'];
+            error_log('InterSoccer: pa_activity-type attribute found, is_taxonomy: ' . ($attribute->is_taxonomy() ? 'true' : 'false'));
+            
             if ($attribute->is_taxonomy()) {
                 $terms = $attribute->get_terms();
+                error_log('InterSoccer: Attribute terms: ' . json_encode($terms));
+                
                 if (is_array($terms)) {
                     foreach ($terms as $term) {
+                        error_log('InterSoccer: Checking term: ' . $term->slug);
                         if (in_array($term->slug, ['camp', 'course', 'birthday'], true)) {
                             error_log('InterSoccer: Found type from pa_activity-type attribute: ' . $term->slug);
                             return $term->slug;
                         }
                     }
+                } else {
+                    error_log('InterSoccer: Terms is not an array');
                 }
+            } else {
+                error_log('InterSoccer: pa_activity-type attribute is not taxonomy-based');
             }
+        } else {
+            error_log('InterSoccer: pa_activity-type attribute not found or not valid WC_Product_Attribute');
         }
         
+        error_log('InterSoccer: No type detected from attributes');
         return null;
     }
 
@@ -178,7 +211,9 @@ class InterSoccer_Product_Types {
  * @return bool
  */
 function intersoccer_is_camp($product_id) {
-    return intersoccer_get_product_type($product_id) === 'camp';
+    $result = intersoccer_get_product_type($product_id) === 'camp';
+    error_log('InterSoccer: intersoccer_is_camp(' . $product_id . ') = ' . ($result ? 'true' : 'false'));
+    return $result;
 }
 
 /**

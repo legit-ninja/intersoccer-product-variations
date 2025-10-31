@@ -19,8 +19,8 @@ function intersoccer_add_admin_submenus() {
     // Discounts submenu
     add_submenu_page(
         'woocommerce-marketing',
-        __('Manage Discounts', 'intersoccer-player-management'),
-        __('InterSoccer Discounts', 'intersoccer-player-management'),
+        __('Manage Discounts', 'intersoccer-product-variations'),
+        __('InterSoccer Discounts', 'intersoccer-product-variations'),
         'manage_woocommerce',
         'intersoccer-discounts',
         'intersoccer_render_discounts_page'
@@ -29,8 +29,8 @@ function intersoccer_add_admin_submenus() {
     // Update Orders submenu
     add_submenu_page(
         'woocommerce',
-        __('Scan Orders missing data', 'intersoccer-player-management'),
-        __('Find Order Issues', 'intersoccer-player-management'),
+        __('Scan Orders missing data', 'intersoccer-product-variations'),
+        __('Find Order Issues', 'intersoccer-product-variations'),
         'manage_woocommerce',
         'intersoccer-update-orders',
         'intersoccer_render_update_orders_page',
@@ -40,8 +40,8 @@ function intersoccer_add_admin_submenus() {
     // Variation Health Checker submenu
     add_submenu_page(
         'edit.php?post_type=product',
-        __('Variation Health Checker', 'intersoccer-player-management'),
-        __('Variation Health', 'intersoccer-player-management'),
+        __('Variation Health Checker', 'intersoccer-product-variations'),
+        __('Variation Health', 'intersoccer-product-variations'),
         'manage_woocommerce',
         'intersoccer-variation-health',
         'intersoccer_render_variation_health_page',
@@ -50,8 +50,8 @@ function intersoccer_add_admin_submenus() {
 
     add_submenu_page(
         'woocommerce',
-        __('Bulk Repair Order Details', 'intersoccer-player-management'),
-        __('Bulk Repair Order', 'intersoccer-player-management'),
+        __('Bulk Repair Order Details', 'intersoccer-product-variations'),
+        __('Bulk Repair Order', 'intersoccer-product-variations'),
         'manage_woocommerce',
         'intersoccer-automated-updates',
         'intersoccer_render_automated_update_orders_page',
@@ -122,11 +122,11 @@ class InterSoccer_Discounts_Table extends WP_List_Table {
     public function get_columns() {
         return [
             'cb' => '<input type="checkbox" />',
-            'name' => __('Name', 'intersoccer-player-management'),
-            'type' => __('Type', 'intersoccer-player-management'),
-            'condition' => __('Condition', 'intersoccer-player-management'),
-            'rate' => __('Discount Rate (%)', 'intersoccer-player-management'),
-            'active' => __('Active', 'intersoccer-player-management')
+            'name' => __('Name', 'intersoccer-product-variations'),
+            'type' => __('Type', 'intersoccer-product-variations'),
+            'condition' => __('Condition', 'intersoccer-product-variations'),
+            'rate' => __('Discount Rate (%)', 'intersoccer-product-variations'),
+            'active' => __('Active', 'intersoccer-product-variations')
         ];
     }
 
@@ -137,11 +137,11 @@ class InterSoccer_Discounts_Table extends WP_List_Table {
             case 'type':
                 return esc_html(ucfirst($item['type']));
             case 'condition':
-                return esc_html($item['condition'] === 'none' ? __('None', 'intersoccer-player-management') : ucwords(str_replace('_', ' ', $item['condition'])));
+                return esc_html($item['condition'] === 'none' ? __('None', 'intersoccer-product-variations') : ucwords(str_replace('_', ' ', $item['condition'])));
             case 'rate':
                 return esc_html($item['rate']);
             case 'active':
-                return $item['active'] ? __('Yes', 'intersoccer-player-management') : __('No', 'intersoccer-player-management');
+                return $item['active'] ? __('Yes', 'intersoccer-product-variations') : __('No', 'intersoccer-product-variations');
             default:
                 return '';
         }
@@ -153,9 +153,9 @@ class InterSoccer_Discounts_Table extends WP_List_Table {
 
     public function get_bulk_actions() {
         return [
-            'activate' => __('Activate', 'intersoccer-player-management'),
-            'deactivate' => __('Deactivate', 'intersoccer-player-management'),
-            'delete' => __('Delete', 'intersoccer-player-management')
+            'activate' => __('Activate', 'intersoccer-product-variations'),
+            'deactivate' => __('Deactivate', 'intersoccer-product-variations'),
+            'delete' => __('Delete', 'intersoccer-product-variations')
         ];
     }
 
@@ -182,53 +182,53 @@ class InterSoccer_Discounts_Table extends WP_List_Table {
  */
 function intersoccer_render_discounts_page() {
     if (!current_user_can('manage_woocommerce')) {
-        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
     $table = new InterSoccer_Discounts_Table();
     $table->prepare_items();
     ?>
     <div class="wrap">
-        <h1><?php _e('Manage Discounts', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Add, edit, or delete discount rules for Camps, Courses, or other products. Rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href="' . admin_url('edit.php?post_type=shop_coupon') . '">WooCommerce > Coupons</a>.', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('Manage Discounts', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Add, edit, or delete discount rules for Camps, Courses, or other products. Rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href="' . admin_url('edit.php?post_type=shop_coupon') . '">WooCommerce > Coupons</a>.', 'intersoccer-product-variations'); ?></p>
         <form id="intersoccer-discounts-form" method="post">
-            <h2><?php _e('Add New Discount', 'intersoccer-player-management'); ?></h2>
+            <h2><?php _e('Add New Discount', 'intersoccer-product-variations'); ?></h2>
             <table class="form-table">
                 <tr>
-                    <th><label for="discount_name"><?php _e('Name', 'intersoccer-player-management'); ?></label></th>
+                    <th><label for="discount_name"><?php _e('Name', 'intersoccer-product-variations'); ?></label></th>
                     <td><input type="text" id="discount_name" name="discount[name]" class="regular-text" required></td>
                 </tr>
                 <tr>
-                    <th><label for="discount_type"><?php _e('Type', 'intersoccer-player-management'); ?></label></th>
+                    <th><label for="discount_type"><?php _e('Type', 'intersoccer-product-variations'); ?></label></th>
                     <td>
                         <select id="discount_type" name="discount[type]">
-                            <option value="general"><?php _e('General', 'intersoccer-player-management'); ?></option>
-                            <option value="camp"><?php _e('Camp', 'intersoccer-player-management'); ?></option>
-                            <option value="course"><?php _e('Course', 'intersoccer-player-management'); ?></option>
+                            <option value="general"><?php _e('General', 'intersoccer-product-variations'); ?></option>
+                            <option value="camp"><?php _e('Camp', 'intersoccer-product-variations'); ?></option>
+                            <option value="course"><?php _e('Course', 'intersoccer-product-variations'); ?></option>
                         </select>
                     </td>
                 </tr>
                 <tr>
-                    <th><label for="discount_condition"><?php _e('Condition', 'intersoccer-player-management'); ?></label></th>
+                    <th><label for="discount_condition"><?php _e('Condition', 'intersoccer-product-variations'); ?></label></th>
                     <td>
                         <select id="discount_condition" name="discount[condition]">
-                            <option value="none"><?php _e('None', 'intersoccer-player-management'); ?></option>
-                            <option value="2nd_child"><?php _e('2nd Child', 'intersoccer-player-management'); ?></option>
-                            <option value="3rd_plus_child"><?php _e('3rd or Additional Child', 'intersoccer-player-management'); ?></option>
-                            <option value="same_season_course"><?php _e('Same Season Course (Same Child)', 'intersoccer-player-management'); ?></option>
+                            <option value="none"><?php _e('None', 'intersoccer-product-variations'); ?></option>
+                            <option value="2nd_child"><?php _e('2nd Child', 'intersoccer-product-variations'); ?></option>
+                            <option value="3rd_plus_child"><?php _e('3rd or Additional Child', 'intersoccer-product-variations'); ?></option>
+                            <option value="same_season_course"><?php _e('Same Season Course (Same Child)', 'intersoccer-product-variations'); ?></option>
                         </select>
                     </td>
                 </tr>
                 <tr>
-                    <th><label for="discount_rate"><?php _e('Discount Rate (%)', 'intersoccer-player-management'); ?></label></th>
+                    <th><label for="discount_rate"><?php _e('Discount Rate (%)', 'intersoccer-product-variations'); ?></label></th>
                     <td><input type="number" id="discount_rate" name="discount[rate]" min="0" max="100" step="0.1" required></td>
                 </tr>
                 <tr>
-                    <th><label for="discount_active"><?php _e('Active', 'intersoccer-player-management'); ?></label></th>
+                    <th><label for="discount_active"><?php _e('Active', 'intersoccer-product-variations'); ?></label></th>
                     <td><input type="checkbox" id="discount_active" name="discount[active]" checked></td>
                 </tr>
             </table>
-            <p><button type="button" id="intersoccer-add-discount" class="button button-primary"><?php _e('Add Discount', 'intersoccer-player-management'); ?></button></p>
+            <p><button type="button" id="intersoccer-add-discount" class="button button-primary"><?php _e('Add Discount', 'intersoccer-product-variations'); ?></button></p>
             <?php wp_nonce_field('intersoccer_save_discount', 'intersoccer_discount_nonce'); ?>
         </form>
         <form id="intersoccer-discounts-table-form" method="post">
@@ -242,7 +242,7 @@ function intersoccer_render_discounts_page() {
             console.log('InterSoccer: Discounts page script loaded');
             $('#intersoccer-add-discount').on('click', function() {
                 console.log('InterSoccer: Add Discount button clicked');
-                $('#intersoccer-discount-status').text('<?php _e('Saving...', 'intersoccer-player-management'); ?>').removeClass('error');
+                $('#intersoccer-discount-status').text('<?php _e('Saving...', 'intersoccer-product-variations'); ?>').removeClass('error');
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
@@ -260,15 +260,15 @@ function intersoccer_render_discounts_page() {
                     success: function(response) {
                         console.log('InterSoccer: AJAX success', response);
                         if (response.success) {
-                            $('#intersoccer-discount-status').text('<?php _e('Discount saved successfully!', 'intersoccer-player-management'); ?>');
+                            $('#intersoccer-discount-status').text('<?php _e('Discount saved successfully!', 'intersoccer-product-variations'); ?>');
                             window.location.reload();
                         } else {
-                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-player-management'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
+                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
                         }
                     },
                     error: function(xhr, status, error) {
                         console.error('InterSoccer: AJAX error', xhr.responseText, status, error);
-                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while saving the discount: ', 'intersoccer-player-management'); ?>' + error).addClass('error');
+                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while saving the discount: ', 'intersoccer-product-variations'); ?>' + error).addClass('error');
                     }
                 });
             });
@@ -282,11 +282,11 @@ function intersoccer_render_discounts_page() {
                 }).get();
 
                 if (!action || discountIds.length === 0) {
-                    alert('<?php _e('Please select an action and at least one discount.', 'intersoccer-player-management'); ?>');
+                    alert('<?php _e('Please select an action and at least one discount.', 'intersoccer-product-variations'); ?>');
                     return;
                 }
 
-                $('#intersoccer-discount-status').text('<?php _e('Processing...', 'intersoccer-player-management'); ?>').removeClass('error');
+                $('#intersoccer-discount-status').text('<?php _e('Processing...', 'intersoccer-product-variations'); ?>').removeClass('error');
 
                 $.ajax({
                     url: ajaxurl,
@@ -300,15 +300,15 @@ function intersoccer_render_discounts_page() {
                     success: function(response) {
                         console.log('InterSoccer: Bulk AJAX success', response);
                         if (response.success) {
-                            $('#intersoccer-discount-status').text('<?php _e('Action completed successfully!', 'intersoccer-player-management'); ?>');
+                            $('#intersoccer-discount-status').text('<?php _e('Action completed successfully!', 'intersoccer-product-variations'); ?>');
                             window.location.reload();
                         } else {
-                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-player-management'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
+                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
                         }
                     },
                     error: function(xhr, status, error) {
                         console.error('InterSoccer: Bulk AJAX error', xhr.responseText, status, error);
-                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while processing the action: ', 'intersoccer-player-management'); ?>' + error).addClass('error');
+                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while processing the action: ', 'intersoccer-product-variations'); ?>' + error).addClass('error');
                     }
                 });
             });
@@ -332,7 +332,7 @@ function intersoccer_save_discount_callback() {
 
     if (!current_user_can('manage_woocommerce')) {
         error_log('InterSoccer: Permission denied for user ' . get_current_user_id());
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
     error_log('InterSoccer: Permission check passed');
@@ -340,7 +340,7 @@ function intersoccer_save_discount_callback() {
     $discount = isset($_POST['discount']) && is_array($_POST['discount']) ? $_POST['discount'] : [];
     if (empty($discount['name']) || empty($discount['rate'])) {
         error_log('InterSoccer: Missing name or rate in discount data: ' . print_r($discount, true));
-        wp_send_json_error(['message' => __('Name and discount rate are required.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('Name and discount rate are required.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -358,7 +358,7 @@ function intersoccer_save_discount_callback() {
     update_option('intersoccer_discount_rules', $rules);
     error_log('InterSoccer: Saved new discount rule: ' . print_r($new_rule, true));
 
-    wp_send_json_success(['message' => __('Discount saved.', 'intersoccer-player-management')]);
+    wp_send_json_success(['message' => __('Discount saved.', 'intersoccer-product-variations')]);
     wp_die();
 }
 
@@ -371,7 +371,7 @@ function intersoccer_bulk_discounts_callback() {
     check_ajax_referer('intersoccer_bulk_discounts', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -379,7 +379,7 @@ function intersoccer_bulk_discounts_callback() {
     $discount_ids = isset($_POST['discount_ids']) && is_array($_POST['discount_ids']) ? array_map('sanitize_key', $_POST['discount_ids']) : [];
 
     if (empty($action) || empty($discount_ids)) {
-        wp_send_json_error(['message' => __('Invalid action or no discounts selected.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('Invalid action or no discounts selected.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -401,7 +401,7 @@ function intersoccer_bulk_discounts_callback() {
     }
 
     update_option('intersoccer_discount_rules', $rules);
-    wp_send_json_success(['message' => __('Action completed.', 'intersoccer-player-management')]);
+    wp_send_json_success(['message' => __('Action completed.', 'intersoccer-product-variations')]);
     wp_die();
 }
 
@@ -715,11 +715,11 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
     public function get_columns() {
         return [
             'cb' => '<input type="checkbox" />',
-            'order_id' => __('Order', 'intersoccer-player-management'),
-            'customer' => __('Customer', 'intersoccer-player-management'),
-            'items_summary' => __('Items & Types', 'intersoccer-player-management'),
-            'missing_summary' => __('Missing Fields Summary', 'intersoccer-player-management'),
-            'risk_level' => __('Risk Level', 'intersoccer-player-management')
+            'order_id' => __('Order', 'intersoccer-product-variations'),
+            'customer' => __('Customer', 'intersoccer-product-variations'),
+            'items_summary' => __('Items & Types', 'intersoccer-product-variations'),
+            'missing_summary' => __('Missing Fields Summary', 'intersoccer-product-variations'),
+            'risk_level' => __('Risk Level', 'intersoccer-product-variations')
         ];
     }
 
@@ -732,7 +732,7 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
 
     public function get_bulk_actions() {
         return [
-            'update_selected' => __('Update Selected Orders', 'intersoccer-player-management')
+            'update_selected' => __('Update Selected Orders', 'intersoccer-product-variations')
         ];
     }
 
@@ -957,7 +957,7 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
  */
 function intersoccer_render_update_orders_page() {
     if (!current_user_can('manage_woocommerce')) {
-        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
     $message = '';
@@ -981,16 +981,16 @@ function intersoccer_render_update_orders_page() {
             }
         }
         
-        $message = sprintf(__('Updated metadata for %d orders.', 'intersoccer-player-management'), $updated_count);
+        $message = sprintf(__('Updated metadata for %d orders.', 'intersoccer-product-variations'), $updated_count);
         if (!empty($errors)) {
-            $message .= ' ' . sprintf(__('Failed to update: %s', 'intersoccer-player-management'), implode(', ', $errors));
+            $message .= ' ' . sprintf(__('Failed to update: %s', 'intersoccer-product-variations'), implode(', ', $errors));
         }
     }
 
     ?>
     <div class="wrap">
-        <h1><?php _e('Order Metadata Update Tool', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Find and update orders that are missing metadata fields needed for accurate rosters and reports.', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('Order Metadata Update Tool', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Find and update orders that are missing metadata fields needed for accurate rosters and reports.', 'intersoccer-product-variations'); ?></p>
         
         <?php if ($message) : ?>
             <div class="updated notice"><p><?php echo esc_html($message); ?></p></div>
@@ -1000,15 +1000,15 @@ function intersoccer_render_update_orders_page() {
         <form method="post" id="preview-orders-form">
             <table class="form-table">
                 <tr>
-                    <th scope="row"><?php _e('Order Statuses to Check', 'intersoccer-player-management'); ?></th>
+                    <th scope="row"><?php _e('Order Statuses to Check', 'intersoccer-product-variations'); ?></th>
                     <td>
-                        <label><input type="checkbox" name="order_statuses[]" value="processing" checked> <?php _e('Processing', 'intersoccer-player-management'); ?></label><br>
-                        <label><input type="checkbox" name="order_statuses[]" value="completed" checked> <?php _e('Completed', 'intersoccer-player-management'); ?></label><br>
-                        <label><input type="checkbox" name="order_statuses[]" value="on-hold"> <?php _e('On Hold', 'intersoccer-player-management'); ?></label>
+                        <label><input type="checkbox" name="order_statuses[]" value="processing" checked> <?php _e('Processing', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" name="order_statuses[]" value="completed" checked> <?php _e('Completed', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" name="order_statuses[]" value="on-hold"> <?php _e('On Hold', 'intersoccer-product-variations'); ?></label>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php _e('Number of Orders to Scan', 'intersoccer-player-management'); ?></th>
+                    <th scope="row"><?php _e('Number of Orders to Scan', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <select name="preview_limit">
                             <option value="25" <?php selected($_POST['preview_limit'] ?? '', '25'); ?>>25 recent orders</option>
@@ -1019,28 +1019,28 @@ function intersoccer_render_update_orders_page() {
                             <option value="2000" <?php selected($_POST['preview_limit'] ?? '', '2000'); ?>>2000 recent orders</option>
                             <option value="-1" <?php selected($_POST['preview_limit'] ?? '', '-1'); ?>>All orders (may be slow)</option>
                         </select>
-                        <p class="description"><?php _e('Higher numbers may take longer to process but will find more orders with missing data.', 'intersoccer-player-management'); ?></p>
+                        <p class="description"><?php _e('Higher numbers may take longer to process but will find more orders with missing data.', 'intersoccer-product-variations'); ?></p>
                     </td>
                 </tr>
             </table>
             
             <?php wp_nonce_field('intersoccer_update_orders', 'intersoccer_update_orders_nonce'); ?>
             <p>
-                <input type="submit" name="preview_updates" class="button button-primary" value="<?php _e('Find Orders Missing Metadata', 'intersoccer-player-management'); ?>">
+                <input type="submit" name="preview_updates" class="button button-primary" value="<?php _e('Find Orders Missing Metadata', 'intersoccer-product-variations'); ?>">
             </p>
             <p class="description">
-                <strong><?php _e('Note:', 'intersoccer-player-management'); ?></strong> 
-                <?php _e('This will scan your selected orders and show which ones are missing metadata fields like player details, seasons, activity types, etc.', 'intersoccer-player-management'); ?>
+                <strong><?php _e('Note:', 'intersoccer-product-variations'); ?></strong> 
+                <?php _e('This will scan your selected orders and show which ones are missing metadata fields like player details, seasons, activity types, etc.', 'intersoccer-product-variations'); ?>
             </p>
         </form>
 
         <?php if ($show_preview) : ?>
             <hr>
-            <h2><?php _e('Orders Missing Metadata', 'intersoccer-player-management'); ?></h2>
+            <h2><?php _e('Orders Missing Metadata', 'intersoccer-product-variations'); ?></h2>
             
             <!-- Progress Bar Container -->
             <div id="update-progress" style="display: none;">
-                <h3><?php _e('Update Progress', 'intersoccer-player-management'); ?></h3>
+                <h3><?php _e('Update Progress', 'intersoccer-product-variations'); ?></h3>
                 <div style="background: #f1f1f1; border-radius: 10px; padding: 3px;">
                     <div id="progress-bar" style="background: #4CAF50; height: 20px; border-radius: 8px; width: 0%; transition: width 0.3s;"></div>
                 </div>
@@ -1052,7 +1052,7 @@ function intersoccer_render_update_orders_page() {
             $table->prepare_items();
             
             if (empty($table->items)) {
-                echo '<div class="notice notice-success"><p>' . __('Great! No orders found that need metadata updates.', 'intersoccer-player-management') . '</p></div>';
+                echo '<div class="notice notice-success"><p>' . __('Great! No orders found that need metadata updates.', 'intersoccer-product-variations') . '</p></div>';
             } else {
                 // Get actual statistics
                 $total_orders_scanned = count($table->all_items);  // We'll need to track this
@@ -1066,7 +1066,7 @@ function intersoccer_render_update_orders_page() {
                 ?>
                 <!-- Fixed Summary Statistics -->
                 <div class="intersoccer-summary-stats" style="background: #fff; border: 1px solid #ccd0d4; padding: 15px; margin: 15px 0;">
-                    <h3><?php _e('Scan Results', 'intersoccer-player-management'); ?></h3>
+                    <h3><?php _e('Scan Results', 'intersoccer-product-variations'); ?></h3>
                     <div style="display: flex; gap: 30px; flex-wrap: wrap;">
                         <div><strong><?php echo $orders_with_missing; ?></strong> orders need updates</div>
                         <div><strong><?php echo $total_missing_items; ?></strong> total missing metadata fields</div>
@@ -1081,13 +1081,13 @@ function intersoccer_render_update_orders_page() {
                 <form method="post" id="bulk-update-form">
                     <div class="tablenav top">
                         <div class="alignleft actions">
-                            <button type="button" id="select-all-low-risk" class="button"><?php _e('Select All Low Risk', 'intersoccer-player-management'); ?></button>
-                            <button type="button" id="select-none" class="button"><?php _e('Deselect All', 'intersoccer-player-management'); ?></button>
+                            <button type="button" id="select-all-low-risk" class="button"><?php _e('Select All Low Risk', 'intersoccer-product-variations'); ?></button>
+                            <button type="button" id="select-none" class="button"><?php _e('Deselect All', 'intersoccer-product-variations'); ?></button>
                             <button type="submit" name="update_selected_orders" class="button button-primary" id="update-selected-btn" disabled>
-                                <?php _e('Update Selected Orders', 'intersoccer-player-management'); ?>
+                                <?php _e('Update Selected Orders', 'intersoccer-product-variations'); ?>
                             </button>
                             <button type="button" id="export-analysis" class="button button-secondary">
-                                <?php _e('Export Analysis to CSV', 'intersoccer-player-management'); ?>
+                                <?php _e('Export Analysis to CSV', 'intersoccer-product-variations'); ?>
                             </button>
                         </div>
                     </div>
@@ -1193,13 +1193,13 @@ function intersoccer_render_update_orders_page() {
                 e.preventDefault();
                 
                 if (selectedOrders.length === 0) {
-                    alert('<?php _e('Please select at least one order to update.', 'intersoccer-player-management'); ?>');
+                    alert('<?php _e('Please select at least one order to update.', 'intersoccer-product-variations'); ?>');
                     return false;
                 }
                 
                 let highRiskSelected = $('input[name="order_ids[]"][data-risk="high"]:checked').length;
                 if (highRiskSelected > 0) {
-                    if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-player-management'); ?>')) {
+                    if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-product-variations'); ?>')) {
                         return false;
                     }
                 }
@@ -1247,20 +1247,20 @@ function intersoccer_update_orders_scripts() {
                 }).get();
                 
                 if (selectedOrders.length === 0) {
-                    alert('<?php _e('Please select at least one order to update.', 'intersoccer-player-management'); ?>');
+                    alert('<?php _e('Please select at least one order to update.', 'intersoccer-product-variations'); ?>');
                     return false;
                 }
                 
                 let highRiskSelected = $('input[name="order_ids[]"][data-risk="high"]:checked').length;
                 if (highRiskSelected > 0) {
-                    if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-player-management'); ?>')) {
+                    if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-product-variations'); ?>')) {
                         return false;
                     }
                 }
 
                 // Initialize progress tracking
                 $('#update-progress').show();
-                $('#update-selected-btn').prop('disabled', true).text('<?php _e('Processing...', 'intersoccer-player-management'); ?>');
+                $('#update-selected-btn').prop('disabled', true).text('<?php _e('Processing...', 'intersoccer-product-variations'); ?>');
                 
                 let totalOrders = selectedOrders.length;
                 let processedOrders = 0;
@@ -1334,12 +1334,12 @@ function intersoccer_update_orders_scripts() {
                                 }
                             } else {
                                 $('#progress-text').html('<span style="color: red;">Error: ' + (response.data?.message || 'Unknown error occurred') + '</span>');
-                                $('#update-selected-btn').prop('disabled', false).text('<?php _e('Update Selected Orders', 'intersoccer-player-management'); ?>');
+                                $('#update-selected-btn').prop('disabled', false).text('<?php _e('Update Selected Orders', 'intersoccer-product-variations'); ?>');
                             }
                         })
                         .fail(function(xhr, status, error) {
                             $('#progress-text').html('<span style="color: red;">Network error: ' + error + '</span>');
-                            $('#update-selected-btn').prop('disabled', false).text('<?php _e('Update Selected Orders', 'intersoccer-player-management'); ?>');
+                            $('#update-selected-btn').prop('disabled', false).text('<?php _e('Update Selected Orders', 'intersoccer-product-variations'); ?>');
                         });
                 }
 
@@ -1641,7 +1641,7 @@ function intersoccer_update_processing_orders_callback() {
     check_ajax_referer('intersoccer_update_orders_nonce', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -1650,7 +1650,7 @@ function intersoccer_update_processing_orders_callback() {
     $fix_incorrect = isset($_POST['fix_incorrect_attributes']) && $_POST['fix_incorrect_attributes'] === 'true';
 
     if (empty($order_ids)) {
-        wp_send_json_error(['message' => __('No orders selected.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('No orders selected.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -1690,7 +1690,7 @@ function intersoccer_update_processing_orders_callback() {
         error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
     }
 
-    wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-player-management')]);
+    wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-product-variations')]);
     wp_die();
 }
 
@@ -1709,11 +1709,11 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
     public function get_columns() {
         return [
             'cb' => '<input type="checkbox" />',
-            'product_id' => __('Product ID', 'intersoccer-player-management'),
-            'variation_id' => __('Variation ID', 'intersoccer-player-management'),
-            'type' => __('Type', 'intersoccer-player-management'),
-            'attributes' => __('Attributes', 'intersoccer-player-management'),
-            'status' => __('Health Status', 'intersoccer-player-management')
+            'product_id' => __('Product ID', 'intersoccer-product-variations'),
+            'variation_id' => __('Variation ID', 'intersoccer-product-variations'),
+            'type' => __('Type', 'intersoccer-product-variations'),
+            'attributes' => __('Attributes', 'intersoccer-product-variations'),
+            'status' => __('Health Status', 'intersoccer-product-variations')
         ];
     }
 
@@ -1723,7 +1723,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
 
     public function get_bulk_actions() {
         return [
-            'refresh' => __('Refresh Attributes', 'intersoccer-player-management'),
+            'refresh' => __('Refresh Attributes', 'intersoccer-product-variations'),
         ];
     }
 
@@ -1740,13 +1740,13 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                 foreach ($item['attributes'] as $key => $value) {
                     if ($value instanceof WC_Product_Attribute) {
                         $terms = $value->get_terms();
-                        $value = $terms ? implode(', ', wp_list_pluck($terms, 'name')) : __('None', 'intersoccer-player-management');
+                        $value = $terms ? implode(', ', wp_list_pluck($terms, 'name')) : __('None', 'intersoccer-product-variations');
                     } elseif (is_array($value)) {
                         $value = implode(', ', $value);
                     }
                     $attr_list[] = esc_html($key . ': ' . $value);
                 }
-                return implode(', ', $attr_list) ?: __('No attributes', 'intersoccer-player-management');
+                return implode(', ', $attr_list) ?: __('No attributes', 'intersoccer-product-variations');
             case 'status':
                 $status = $item['is_healthy'] ? 'Healthy' : 'Unhealthy';
                 $color = $item['is_healthy'] ? 'green' : 'red';
@@ -1895,13 +1895,13 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
  */
 function intersoccer_render_variation_health_page() {
     if (!current_user_can('manage_woocommerce')) {
-        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
     // Handle recalc form submission
     if (isset($_POST['intersoccer_recalc_end_dates']) && check_admin_referer('intersoccer_recalc_nonce')) {
         intersoccer_run_course_end_date_update_callback();
-        echo '<div class="notice notice-success is-dismissible"><p>' . __('Course end dates recalculated successfully.', 'intersoccer-player-management') . '</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>' . __('Course end dates recalculated successfully.', 'intersoccer-product-variations') . '</p></div>';
     }
 
     $show_unhealthy = isset($_GET['show_unhealthy']) && $_GET['show_unhealthy'] == 1;
@@ -1916,24 +1916,24 @@ function intersoccer_render_variation_health_page() {
     $table->prepare_items();
     ?>
     <div class="wrap">
-        <h1><?php _e('InterSoccer Variation Health Dashboard', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Use this dashboard to check and fix variation issues, such as recalculating course end dates.', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('InterSoccer Variation Health Dashboard', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Use this dashboard to check and fix variation issues, such as recalculating course end dates.', 'intersoccer-product-variations'); ?></p>
 
         <form method="post" action="">
             <?php wp_nonce_field('intersoccer_recalc_nonce'); ?>
-            <input type="submit" name="intersoccer_recalc_end_dates" class="button button-primary" value="<?php _e('Recalculate Course End Dates', 'intersoccer-player-management'); ?>">
+            <input type="submit" name="intersoccer_recalc_end_dates" class="button button-primary" value="<?php _e('Recalculate Course End Dates', 'intersoccer-product-variations'); ?>">
         </form>
-        <h1><?php _e('Variation Health Checker', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('Variation Health Checker', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-product-variations'); ?></p>
 
         <form method="get" action="<?php echo menu_page_url('intersoccer-variation-health', false); ?>">
             <input type="hidden" name="post_type" value="product" />
             <input type="hidden" name="page" value="intersoccer-variation-health" />
             <label>
                 <input type="checkbox" name="show_unhealthy" value="1" <?php checked(isset($_GET['show_unhealthy']), 1); ?> />
-                <?php _e('Show unhealthy variations only', 'intersoccer-player-management'); ?>
+                <?php _e('Show unhealthy variations only', 'intersoccer-product-variations'); ?>
             </label>
-            <button type="submit" class="button"><?php _e('Filter', 'intersoccer-player-management'); ?></button>
+            <button type="submit" class="button"><?php _e('Filter', 'intersoccer-product-variations'); ?></button>
         </form>
         <form id="intersoccer-variation-health-form" method="post">
             <?php $table->display(); ?>
@@ -1950,7 +1950,7 @@ function intersoccer_render_variation_health_page() {
                 }).get();
 
                 if (!action || variationIds.length === 0) {
-                    alert('<?php _e('Please select an action and at least one variation.', 'intersoccer-player-management'); ?>');
+                    alert('<?php _e('Please select an action and at least one variation.', 'intersoccer-product-variations'); ?>');
                     return;
                 }
 
@@ -1965,14 +1965,14 @@ function intersoccer_render_variation_health_page() {
                     },
                     success: function(response) {
                         if (response.success) {
-                            alert('<?php _e('Attributes refreshed successfully!', 'intersoccer-player-management'); ?>');
+                            alert('<?php _e('Attributes refreshed successfully!', 'intersoccer-product-variations'); ?>');
                             window.location.reload();
                         } else {
-                            alert('<?php _e('Error: ', 'intersoccer-player-management'); ?>' + (response.data.message || 'Unknown error'));
+                            alert('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + (response.data.message || 'Unknown error'));
                         }
                     },
                     error: function(xhr, status, error) {
-                        alert('<?php _e('An error occurred while refreshing attributes: ', 'intersoccer-player-management'); ?>' + error);
+                        alert('<?php _e('An error occurred while refreshing attributes: ', 'intersoccer-product-variations'); ?>' + error);
                     }
                 });
             });
@@ -1990,7 +1990,7 @@ function intersoccer_refresh_variation_attributes_callback() {
     check_ajax_referer('intersoccer_variation_health_nonce', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -1998,7 +1998,7 @@ function intersoccer_refresh_variation_attributes_callback() {
     $action = isset($_POST['bulk_action']) ? sanitize_text_field($_POST['bulk_action']) : '';
 
     if ($action !== 'refresh' || empty($variation_ids)) {
-        wp_send_json_error(['message' => __('Invalid action or no variations selected.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('Invalid action or no variations selected.', 'intersoccer-product-variations')]);
         wp_die();
     }
 
@@ -2051,7 +2051,7 @@ function intersoccer_refresh_variation_attributes_callback() {
         }
     }
 
-    wp_send_json_success(['message' => __('Attributes refreshed.', 'intersoccer-player-management')]);
+    wp_send_json_success(['message' => __('Attributes refreshed.', 'intersoccer-product-variations')]);
     wp_die();
 }
 
@@ -2063,7 +2063,7 @@ function intersoccer_export_order_analysis_callback() {
     check_ajax_referer('intersoccer_update_orders_nonce', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
-        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-player-management')]);
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         return;
     }
 
@@ -2668,28 +2668,28 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
 // Enhanced UI with automated processing controls
 function intersoccer_render_automated_update_orders_page() {
     if (!current_user_can('manage_woocommerce')) {
-        wp_die(__('You do not have permission to access this page.', 'intersoccer-player-management'));
+        wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
     ?>
     <div class="wrap">
-        <h1><?php _e('Automated Order Metadata Update', 'intersoccer-player-management'); ?></h1>
-        <p><?php _e('Automatically find and update orders missing metadata. This tool can process hundreds or thousands of orders efficiently.', 'intersoccer-player-management'); ?></p>
+        <h1><?php _e('Automated Order Metadata Update', 'intersoccer-product-variations'); ?></h1>
+        <p><?php _e('Automatically find and update orders missing metadata. This tool can process hundreds or thousands of orders efficiently.', 'intersoccer-product-variations'); ?></p>
         
         <!-- Scan Configuration -->
         <div class="intersoccer-config-section" style="background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin: 20px 0;">
-            <h2><?php _e('1. Configure Scan', 'intersoccer-player-management'); ?></h2>
+            <h2><?php _e('1. Configure Scan', 'intersoccer-product-variations'); ?></h2>
             
             <table class="form-table">
                 <tr>
-                    <th scope="row"><?php _e('Order Statuses to Process', 'intersoccer-player-management'); ?></th>
+                    <th scope="row"><?php _e('Order Statuses to Process', 'intersoccer-product-variations'); ?></th>
                     <td>
-                        <label><input type="checkbox" id="status-processing" checked> <?php _e('Processing', 'intersoccer-player-management'); ?></label><br>
-                        <label><input type="checkbox" id="status-completed" checked> <?php _e('Completed', 'intersoccer-player-management'); ?></label><br>
-                        <label><input type="checkbox" id="status-onhold"> <?php _e('On Hold', 'intersoccer-player-management'); ?></label>
+                        <label><input type="checkbox" id="status-processing" checked> <?php _e('Processing', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" id="status-completed" checked> <?php _e('Completed', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" id="status-onhold"> <?php _e('On Hold', 'intersoccer-product-variations'); ?></label>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php _e('Orders to Scan', 'intersoccer-player-management'); ?></th>
+                    <th scope="row"><?php _e('Orders to Scan', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <select id="scan-limit">
                             <option value="100">100 recent orders</option>
@@ -2699,11 +2699,11 @@ function intersoccer_render_automated_update_orders_page() {
                             <option value="5000">5000 recent orders</option>
                             <option value="-1">All orders (may take very long)</option>
                         </select>
-                        <p class="description"><?php _e('Higher numbers find more orders but take longer to scan initially.', 'intersoccer-player-management'); ?></p>
+                        <p class="description"><?php _e('Higher numbers find more orders but take longer to scan initially.', 'intersoccer-product-variations'); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><?php _e('Processing Speed', 'intersoccer-player-management'); ?></th>
+                    <th scope="row"><?php _e('Processing Speed', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <select id="batch-size">
                             <option value="10">Conservative (10 orders per batch)</option>
@@ -2711,24 +2711,24 @@ function intersoccer_render_automated_update_orders_page() {
                             <option value="20">Fast (20 orders per batch)</option>
                             <option value="25">Aggressive (25 orders per batch - may timeout)</option>
                         </select>
-                        <p class="description"><?php _e('Conservative is safer for slower servers. Fast processes more orders per batch but may timeout.', 'intersoccer-player-management'); ?></p>
+                        <p class="description"><?php _e('Conservative is safer for slower servers. Fast processes more orders per batch but may timeout.', 'intersoccer-product-variations'); ?></p>
                     </td>
                 </tr>
             </table>
             
             <p>
                 <button type="button" id="start-automated-update" class="button button-primary button-large">
-                    <?php _e('🚀 Start Automated Update', 'intersoccer-player-management'); ?>
+                    <?php _e('🚀 Start Automated Update', 'intersoccer-product-variations'); ?>
                 </button>
                 <button type="button" id="stop-automated-update" class="button button-secondary" style="display: none;">
-                    <?php _e('⏹️ Stop Processing', 'intersoccer-player-management'); ?>
+                    <?php _e('⏹️ Stop Processing', 'intersoccer-product-variations'); ?>
                 </button>
             </p>
         </div>
         
         <!-- Progress Section -->
         <div id="progress-section" style="display: none; background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin: 20px 0;">
-            <h2><?php _e('2. Processing Progress', 'intersoccer-player-management'); ?></h2>
+            <h2><?php _e('2. Processing Progress', 'intersoccer-product-variations'); ?></h2>
             
             <div id="progress-overview" style="margin-bottom: 20px;">
                 <div style="display: flex; gap: 30px; margin-bottom: 15px;">
@@ -2751,14 +2751,14 @@ function intersoccer_render_automated_update_orders_page() {
         
         <!-- Results Section -->
         <div id="results-section" style="display: none; background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin: 20px 0;">
-            <h2><?php _e('3. Results', 'intersoccer-player-management'); ?></h2>
+            <h2><?php _e('3. Results', 'intersoccer-product-variations'); ?></h2>
             <div id="final-results"></div>
             <p>
                 <button type="button" id="download-results" class="button button-secondary">
-                    <?php _e('📥 Download Results Log', 'intersoccer-player-management'); ?>
+                    <?php _e('📥 Download Results Log', 'intersoccer-product-variations'); ?>
                 </button>
                 <button type="button" id="start-new-batch" class="button button-primary">
-                    <?php _e('🔄 Process More Orders', 'intersoccer-player-management'); ?>
+                    <?php _e('🔄 Process More Orders', 'intersoccer-product-variations'); ?>
                 </button>
             </p>
         </div>
