@@ -25,22 +25,33 @@ function intersoccer_get_course_meta($variation_id, $meta_key, $default = null) 
 
     // If value exists and is not empty, return it
     if ($value !== '' && $value !== null) {
+        error_log('InterSoccer: Found ' . $meta_key . ' directly on variation ' . $variation_id . ': ' . (is_array($value) ? json_encode($value) : $value));
         return $value;
     }
 
     // If WPML is active, try to get from original language variation
-    if (function_exists('wpml_object_id')) {
-        $original_variation_id = apply_filters('wpml_object_id', $variation_id, 'product_variation', true, apply_filters('wpml_default_language', null));
+    if (defined('ICL_SITEPRESS_VERSION') || function_exists('icl_get_current_language')) {
+        // Get the default language
+        $default_lang = apply_filters('wpml_default_language', null) ?: 'en';
+
+        $original_variation_id = apply_filters('wpml_object_id', $variation_id, 'product_variation', true, $default_lang);
 
         if ($original_variation_id && $original_variation_id !== $variation_id) {
             $original_value = get_post_meta($original_variation_id, $meta_key, true);
             if ($original_value !== '' && $original_value !== null) {
-                error_log('InterSoccer: Using metadata from original variation ' . $original_variation_id . ' for ' . $meta_key . ' on translated variation ' . $variation_id);
+                error_log('InterSoccer: Using metadata from original variation ' . $original_variation_id . ' for ' . $meta_key . ' on translated variation ' . $variation_id . ': ' . (is_array($original_value) ? json_encode($original_value) : $original_value));
                 return $original_value;
+            } else {
+                error_log('InterSoccer: Original variation ' . $original_variation_id . ' also has empty ' . $meta_key);
             }
+        } else {
+            error_log('InterSoccer: Could not find original variation for ' . $variation_id . ' (original_id: ' . ($original_variation_id ?: 'null') . ')');
         }
+    } else {
+        error_log('InterSoccer: WPML not detected for metadata fallback');
     }
 
+    error_log('InterSoccer: Returning default for ' . $meta_key . ' on variation ' . $variation_id . ': ' . (is_array($default) ? json_encode($default) : $default));
     return $default;
 }
 
@@ -286,6 +297,8 @@ class InterSoccer_Course {
         $base_price = floatval($product->get_price());
         $total_weeks = (int) intersoccer_get_course_meta($variation_id ?: $product_id, '_course_total_weeks', 0);
         $session_rate = floatval(intersoccer_get_course_meta($variation_id ?: $product_id, '_course_weekly_discount', 0));
+
+        error_log('InterSoccer: Course price calculation for variation ' . ($variation_id ?: $product_id) . ' - base_price: ' . $base_price . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate);
         
         if (is_null($remaining_sessions)) {
             $remaining_sessions = self::calculate_remaining_sessions($variation_id, $total_weeks);

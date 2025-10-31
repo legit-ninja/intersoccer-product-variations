@@ -323,7 +323,7 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
  */
 function intersoccer_sync_course_metadata_to_translations($variation_id, $start_date, $total_weeks, $holiday_dates, $weekly_discount, $end_date) {
     // Check if WPML is active
-    if (!function_exists('icl_object_id')) {
+    if (!defined('ICL_SITEPRESS_VERSION') && !function_exists('icl_get_current_language')) {
         return;
     }
 
