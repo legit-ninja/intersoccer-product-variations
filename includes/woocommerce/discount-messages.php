@@ -181,29 +181,46 @@ function intersoccer_get_available_languages_safe() {
 
 /**
  * Register discount messages with WPML String Translation
- * FIXED: Now uses safe language functions
+ * FIXED: Now uses safe language functions and registers template strings
  */
 function intersoccer_register_wpml_strings() {
     if (!function_exists('icl_register_string')) {
         return;
     }
-    
+
     try {
+        $context = 'intersoccer-product-variations';
+
+        // Register fallback template strings for dynamic messages
+        $template_strings = [
+            'camp_combo_discount_template' => '%d%% Camp Combo Discount (Child %d)',
+            'course_multi_child_discount_template' => '%d%% Course Multi-Child Discount (Child %d)',
+            'same_season_course_discount_template' => '50%% Same Season Course Discount (Child %d, %s)',
+            'discount_information_label' => 'Discount Information',
+            'discounts_applied_label' => 'Discounts Applied',
+            'saved_label' => 'saved'
+        ];
+
+        foreach ($template_strings as $string_name => $string_value) {
+            icl_register_string($context, $string_name, $string_value);
+            error_log("InterSoccer: Registered WPML template string: {$string_name}");
+        }
+
+        // Register discount rule messages from database
         $discount_rules = get_option('intersoccer_discount_rules', []);
         $discount_messages = get_option('intersoccer_discount_messages', []);
-        
+
         foreach ($discount_rules as $rule) {
             $message_key = $rule['message_key'] ?? $rule['id'];
             $rule_messages = $discount_messages[$message_key] ?? [];
-            
+
             foreach ($rule_messages as $lang_code => $messages) {
                 if ($lang_code === 'en') { // Register English as source
                     foreach ($messages as $type => $message) {
                         if (!empty($message)) {
                             $string_name = "intersoccer_discount_{$rule['id']}_{$type}";
-                            $context = 'intersoccer-product-variations';
                             icl_register_string($context, $string_name, $message);
-                            error_log("InterSoccer: Registered WPML string: {$string_name}");
+                            error_log("InterSoccer: Registered WPML discount string: {$string_name}");
                         }
                     }
                 }
@@ -262,13 +279,18 @@ function intersoccer_apply_camp_combo_discounts_with_messages($camps_by_child) {
             // Get custom message for the appropriate rule
             $rule_id = ($i === 1) ? 'camp_2nd_child' : 'camp_3rd_plus_child';
             
-            // Safe fallback message creation
+            // Safe fallback message creation using WPML-compatible translation
+            $default_message_template = intersoccer_translate_string(
+                '%d%% Camp Combo Discount (Child %d)',
+                'intersoccer-product-variations',
+                'camp_combo_discount_template'
+            );
             $default_message = sprintf(
-                __('%d%% Camp Combo Discount (Child %d)', 'intersoccer-product-variations'), 
-                ($discount_rate * 100), 
+                $default_message_template,
+                ($discount_rate * 100),
                 $camp['child_id'] + 1
             );
-            
+
             $discount_label = intersoccer_get_discount_message($rule_id, 'cart_message', $default_message);
             
             WC()->cart->add_fee($discount_label, -$discount_amount);
@@ -350,14 +372,19 @@ function intersoccer_apply_course_combo_discounts_with_messages($courses_by_chil
                 
                 // Get custom message for the appropriate rule
                 $rule_id = ($i === 1) ? 'course_2nd_child' : 'course_3rd_plus_child';
-                
-                // Safe fallback message
+
+                // Safe fallback message using WPML-compatible translation
+                $default_message_template = intersoccer_translate_string(
+                    '%d%% Course Multi-Child Discount (Child %d)',
+                    'intersoccer-product-variations',
+                    'course_multi_child_discount_template'
+                );
                 $default_message = sprintf(
-                    __('%d%% Course Multi-Child Discount (Child %d)', 'intersoccer-product-variations'),
+                    $default_message_template,
                     ($discount_rate * 100),
                     $child_id + 1
                 );
-                
+
                 $discount_label = intersoccer_get_discount_message($rule_id, 'cart_message', $default_message);
                 
                 WC()->cart->add_fee($discount_label, -$discount_amount);
@@ -427,14 +454,19 @@ function intersoccer_apply_same_season_course_discounts_with_messages($courses_b
                 for ($i = 1; $i < count($courses); $i++) {
                     $course = $courses[$i];
                     $discount_amount = $course['price'] * $combo_rate;
-                    
-                    // Safe fallback message
+
+                    // Safe fallback message using WPML-compatible translation
+                    $default_message_template = intersoccer_translate_string(
+                        '50%% Same Season Course Discount (Child %d, %s)',
+                        'intersoccer-product-variations',
+                        'same_season_course_discount_template'
+                    );
                     $default_message = sprintf(
-                        __('50%% Same Season Course Discount (Child %d, %s)', 'intersoccer-product-variations'),
+                        $default_message_template,
                         $child_id + 1,
                         $season
                     );
-                    
+
                     $discount_label = intersoccer_get_discount_message('course_same_season', 'cart_message', $default_message);
                     
                     WC()->cart->add_fee($discount_label, -$discount_amount);
@@ -490,8 +522,13 @@ function intersoccer_add_discount_messages_to_cart($item_data, $cart_item) {
                     $customer_note = intersoccer_get_discount_message($rule_id, 'customer_note');
                     
                     if (!empty($customer_note)) {
+                        $discount_info_label = intersoccer_translate_string(
+                            'Discount Information',
+                            'intersoccer-product-variations',
+                            'discount_information_label'
+                        );
                         $item_data[] = [
-                            'key' => __('Discount Information', 'intersoccer-product-variations'),
+                            'key' => $discount_info_label,
                             'value' => esc_html($customer_note),
                             'display' => '<small style="color: #666; font-style: italic;">' . esc_html($customer_note) . '</small>'
                         ];
@@ -561,15 +598,26 @@ function intersoccer_add_discount_email_content($order, $sent_to_admin = false) 
         if (empty($discount_fees)) {
             return;
         }
-        
-        echo '<h3>' . __('Discounts Applied', 'intersoccer-product-variations') . '</h3>';
+
+        $discounts_applied_text = intersoccer_translate_string(
+            'Discounts Applied',
+            'intersoccer-product-variations',
+            'discounts_applied_label'
+        );
+        $saved_text = intersoccer_translate_string(
+            'saved',
+            'intersoccer-product-variations',
+            'saved_label'
+        );
+
+        echo '<h3>' . esc_html($discounts_applied_text) . '</h3>';
         echo '<ul>';
-        
+
         foreach ($discount_fees as $fee) {
             $fee_name = $fee->get_name();
             $fee_amount = wc_price(abs($fee->get_amount()));
-            
-            echo '<li><strong>' . esc_html($fee_name) . ':</strong> ' . $fee_amount . ' ' . __('saved', 'intersoccer-product-variations') . '</li>';
+
+            echo '<li><strong>' . esc_html($fee_name) . ':</strong> ' . $fee_amount . ' ' . esc_html($saved_text) . '</li>';
             
             // Try to find and display customer note for this discount
             $discount_rules = get_option('intersoccer_discount_rules', []);
@@ -603,31 +651,33 @@ function intersoccer_initialize_default_messages() {
         $discount_messages = get_option('intersoccer_discount_messages', []);
         $available_languages = intersoccer_get_available_languages_safe();
         
+        // Default messages in English - these will be stored in the database
+        // and translated via WPML String Translation
         $default_messages = [
             'camp_2nd_child' => [
-                'cart_message' => __('20% Sibling Discount Applied', 'intersoccer-product-variations'),
-                'admin_description' => __('Second child camp discount', 'intersoccer-product-variations'),
-                'customer_note' => __('You saved 20% on this camp because you have multiple children enrolled in camps.', 'intersoccer-product-variations')
+                'cart_message' => '20% Sibling Discount Applied',
+                'admin_description' => 'Second child camp discount',
+                'customer_note' => 'You saved 20% on this camp because you have multiple children enrolled in camps.'
             ],
             'camp_3rd_plus_child' => [
-                'cart_message' => __('25% Multi-Child Discount Applied', 'intersoccer-product-variations'),
-                'admin_description' => __('Third or additional child camp discount', 'intersoccer-product-variations'),
-                'customer_note' => __('You saved 25% on this camp for your third (or additional) child enrolled in camps.', 'intersoccer-product-variations')
+                'cart_message' => '25% Multi-Child Discount Applied',
+                'admin_description' => 'Third or additional child camp discount',
+                'customer_note' => 'You saved 25% on this camp for your third (or additional) child enrolled in camps.'
             ],
             'course_2nd_child' => [
-                'cart_message' => __('20% Course Sibling Discount', 'intersoccer-product-variations'),
-                'admin_description' => __('Second child course discount', 'intersoccer-product-variations'),
-                'customer_note' => __('You saved 20% on this course because you have multiple children enrolled in courses.', 'intersoccer-product-variations')
+                'cart_message' => '20% Course Sibling Discount',
+                'admin_description' => 'Second child course discount',
+                'customer_note' => 'You saved 20% on this course because you have multiple children enrolled in courses.'
             ],
             'course_3rd_plus_child' => [
-                'cart_message' => __('30% Multi-Child Course Discount', 'intersoccer-product-variations'),
-                'admin_description' => __('Third or additional child course discount', 'intersoccer-product-variations'),
-                'customer_note' => __('You saved 30% on this course for your third (or additional) child enrolled in courses.', 'intersoccer-product-variations')
+                'cart_message' => '30% Multi-Child Course Discount',
+                'admin_description' => 'Third or additional child course discount',
+                'customer_note' => 'You saved 30% on this course for your third (or additional) child enrolled in courses.'
             ],
             'course_same_season' => [
-                'cart_message' => __('50% Same Season Course Discount', 'intersoccer-product-variations'),
-                'admin_description' => __('Same child, multiple courses in same season', 'intersoccer-product-variations'),
-                'customer_note' => __('You saved 50% on this course because your child is enrolled in multiple courses this season.', 'intersoccer-product-variations')
+                'cart_message' => '50% Same Season Course Discount',
+                'admin_description' => 'Same child, multiple courses in same season',
+                'customer_note' => 'You saved 50% on this course because your child is enrolled in multiple courses this season.'
             ]
         ];
         
