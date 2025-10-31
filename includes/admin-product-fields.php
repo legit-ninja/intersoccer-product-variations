@@ -379,3 +379,50 @@ function intersoccer_sync_course_metadata_to_translations($variation_id, $start_
         error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
     }
 }
+
+/**
+ * Sync course metadata when WPML translation is completed
+ */
+add_action('wpml_pro_translation_completed', 'intersoccer_sync_course_metadata_on_translation_complete', 10, 3);
+function intersoccer_sync_course_metadata_on_translation_complete($post_id, $data, $job) {
+    // Check if this is a product variation
+    if (get_post_type($post_id) !== 'product_variation') {
+        return;
+    }
+
+    // Check if this is a course variation
+    $product_id = wp_get_post_parent_id($post_id);
+    if (!intersoccer_is_course($product_id)) {
+        return;
+    }
+
+    // Get the original variation data
+    $original_lang = apply_filters('wpml_default_language', null) ?: 'en';
+    $original_variation_id = apply_filters('wpml_object_id', $post_id, 'product_variation', true, $original_lang);
+
+    if (!$original_variation_id || $original_variation_id === $post_id) {
+        return;
+    }
+
+    // Sync metadata from original to translated variation
+    $metadata_keys = [
+        '_course_start_date',
+        '_course_total_weeks',
+        '_course_holiday_dates',
+        '_course_weekly_discount',
+        '_end_date',
+        '_price',
+        '_regular_price'
+    ];
+
+    foreach ($metadata_keys as $key) {
+        $original_value = get_post_meta($original_variation_id, $key, true);
+        if ($original_value !== '' && $original_value !== null) {
+            update_post_meta($post_id, $key, $original_value);
+            error_log('InterSoccer: Synced ' . $key . ' from original variation ' . $original_variation_id . ' to translated variation ' . $post_id);
+        }
+    }
+
+    // Clear transients
+    wc_delete_product_transients($post_id);
+}
