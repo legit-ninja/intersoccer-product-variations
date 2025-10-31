@@ -138,13 +138,47 @@ function intersoccer_fix_course_holidays() {
     }
 }
 
-// Only run if this script is accessed directly
-if (isset($_GET['run_course_fix']) && $_GET['run_course_fix'] === 'confirm') {
-    intersoccer_fix_course_holidays();
-} else {
-    echo "<h2>Course Holiday Fix Tool</h2>";
-    echo "<p>This tool will fix existing courses that were created with inflated session counts to work around the old holiday calculation bug.</p>";
-    echo "<p><strong>⚠️ Important:</strong> This should only be run once after deploying the fixed course logic.</p>";
-    echo "<p><a href='?run_course_fix=confirm' style='background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;'>Run Course Holiday Fix</a></p>";
-    echo "<p><em>This will modify course data. Make sure you have a backup!</em></p>";
+/**
+ * Check if the course holiday fix has already been run
+ */
+function intersoccer_course_holiday_fix_has_run() {
+    return get_option('intersoccer_course_holiday_fix_completed', false);
 }
+
+/**
+ * Mark the course holiday fix as completed
+ */
+function intersoccer_course_holiday_fix_mark_completed() {
+    update_option('intersoccer_course_holiday_fix_completed', true);
+}
+
+/**
+ * AJAX handler for running the course holiday fix
+ */
+function intersoccer_run_course_holiday_fix_ajax() {
+    check_ajax_referer('intersoccer_course_holiday_fix_nonce', 'nonce');
+
+    if (!current_user_can('manage_woocommerce')) {
+        wp_send_json_error(['message' => 'Insufficient permissions']);
+        return;
+    }
+
+    if (intersoccer_course_holiday_fix_has_run()) {
+        wp_send_json_error(['message' => 'Course holiday fix has already been completed']);
+        return;
+    }
+
+    // Run the fix
+    ob_start();
+    intersoccer_fix_course_holidays();
+    $output = ob_get_clean();
+
+    // Mark as completed
+    intersoccer_course_holiday_fix_mark_completed();
+
+    wp_send_json_success([
+        'message' => 'Course holiday fix completed successfully',
+        'output' => $output
+    ]);
+}
+add_action('wp_ajax_intersoccer_run_course_holiday_fix', 'intersoccer_run_course_holiday_fix_ajax');
