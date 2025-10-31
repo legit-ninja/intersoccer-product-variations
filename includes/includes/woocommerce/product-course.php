@@ -44,8 +44,13 @@ class InterSoccer_Course {
     /**
      * Calculate the end date for a course, accounting for holidays.
      *
+     * IMPORTANT: The "needed sessions" are the actual number of events the customer
+     * will participate in. Holidays are ADDED TO (not subtracted from) the sessions needed
+     * in order to determine the end date. This ensures the customer receives the full
+     * number of paid sessions even when holidays occur.
+     *
      * @param int $variation_id Variation ID.
-     * @param int $total_weeks Total sessions.
+     * @param int $total_weeks Total sessions the customer should receive.
      * @return string End date in 'Y-m-d' or empty.
      */
     public static function calculate_end_date($variation_id, $total_weeks) {
@@ -62,6 +67,8 @@ class InterSoccer_Course {
 
         $holidays = get_post_meta($variation_id, '_course_holiday_dates', true) ?: [];
         $holiday_set = array_flip($holidays);
+
+        // Count holidays on the course day to determine how much to extend the duration
         $holiday_count_on_course_day = 0;
         foreach ($holidays as $holiday) {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
@@ -77,35 +84,54 @@ class InterSoccer_Course {
 
         try {
             $start = new DateTime($start_date);
+
+            // Needed sessions = actual events customer participates in
             $sessions_needed = $total_weeks;
+
+            // Total occurrences needed = sessions_needed + holidays
+            // This is the key fix: holidays are ADDED to extend the duration
+            $total_occurrences_needed = $sessions_needed + $holiday_count_on_course_day;
+
+            error_log('InterSoccer: Calculating end date for variation ' . $variation_id . ': sessions_needed=' . $sessions_needed . ', holidays_on_course_day=' . $holiday_count_on_course_day . ', total_occurrences_needed=' . $total_occurrences_needed);
+
             $current_date = clone $start;
+            $occurrences_counted = 0;
             $sessions_counted = 0;
             $days_checked = 0;
-            $max_days = ($total_weeks + $holiday_count_on_course_day) * 7 + 7; // Buffer for skips
+            $max_days = $total_occurrences_needed * 10; // Safe buffer
             $end_date = '';
 
-            while ($sessions_counted < $sessions_needed && $days_checked < $max_days) {
+            while ($occurrences_counted < $total_occurrences_needed && $days_checked < $max_days) {
                 $day = $current_date->format('Y-m-d');
-                error_log('InterSoccer: Checking date ' . $day . ' for course day ' . $course_day . ', holiday: ' . (isset($holiday_set[$day]) ? 'yes' : 'no') . ', sessions_counted: ' . $sessions_counted);
-                if ($current_date->format('l') === $course_day && !isset($holiday_set[$day])) {
-                    $sessions_counted++;
-                    error_log('InterSoccer: Counted session ' . $sessions_counted . ' on ' . $day . ' for variation ' . $variation_id);
-                    if ($sessions_counted === $sessions_needed) {
+
+                if ($current_date->format('l') === $course_day) {
+                    $occurrences_counted++;
+                    $is_holiday = isset($holiday_set[$day]);
+
+                    if (!$is_holiday) {
+                        $sessions_counted++;
+                        error_log('InterSoccer: Session #' . $sessions_counted . ' on ' . $day . ' (occurrence ' . $occurrences_counted . '/' . $total_occurrences_needed . ')');
+                    } else {
+                        error_log('InterSoccer: Holiday on ' . $day . ' (occurrence ' . $occurrences_counted . '/' . $total_occurrences_needed . ') - extends duration');
+                    }
+
+                    // End date is set when we've counted all needed occurrences (sessions + holidays)
+                    if ($occurrences_counted === $total_occurrences_needed) {
                         $end_date = $day;
-                        error_log('InterSoccer: Set end_date to ' . $end_date . ' for variation ' . $variation_id);
+                        error_log('InterSoccer: Final end_date for variation ' . $variation_id . ': ' . $end_date . ' (sessions: ' . $sessions_counted . ', holidays: ' . $holiday_count_on_course_day . ', total occurrences: ' . $total_occurrences_needed . ')');
                         break;
                     }
                 }
+
                 $current_date->add(new DateInterval('P1D'));
                 $days_checked++;
             }
 
-            if ($sessions_counted == $sessions_needed && $end_date) {
-                error_log('InterSoccer: Final end_date for variation ' . $variation_id . ': ' . $end_date . ', sessions: ' . $sessions_counted . ', holidays on course day: ' . $holiday_count_on_course_day);
+            if ($end_date && $sessions_counted == $sessions_needed) {
                 update_post_meta($variation_id, '_end_date', $end_date);
                 return $end_date;
             } else {
-                error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ' - insufficient sessions found: ' . $sessions_counted . ', needed: ' . $sessions_needed);
+                error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ' - sessions_counted: ' . $sessions_counted . ', sessions_needed: ' . $sessions_needed . ', days_checked: ' . $days_checked);
                 return '';
             }
         } catch (Exception $e) {
