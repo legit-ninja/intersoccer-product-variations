@@ -13,7 +13,9 @@ if (!defined('ABSPATH')) exit;
 add_action('woocommerce_before_single_product', function () {
     global $product;
     if (!is_a($product, 'WC_Product')) {
-        error_log('InterSoccer: No valid product found');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: No valid product found');
+        }
         return;
     }
 
@@ -21,19 +23,25 @@ add_action('woocommerce_before_single_product', function () {
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = intersoccer_get_product_type($product_id);
-    error_log("InterSoccer: Initializing wp_footer for product ID: $product_id, type: $product_type");
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log("InterSoccer: Initializing wp_footer for product ID: $product_id, type: $product_type");
+    }
 
     // Preload days for Camps
     $preloaded_days = [];
     if ($product_type === 'camp') {
         $attributes = $product->get_attributes();
-        error_log('InterSoccer: Checking pa_days-of-week attribute for product ' . $product_id);
-        error_log('InterSoccer: Product attributes: ' . json_encode(array_keys($attributes)));
-        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Checking pa_days-of-week attribute for product ' . $product_id);
+            error_log('InterSoccer: Product attributes: ' . json_encode(array_keys($attributes)));
+        }
+
         if (isset($attributes['pa_days-of-week']) && $attributes['pa_days-of-week'] instanceof WC_Product_Attribute) {
             // Get terms with both names and slugs for multilingual support
             $terms = wc_get_product_terms($product_id, 'pa_days-of-week', ['fields' => 'all']);
-            error_log('InterSoccer: Retrieved terms for pa_days-of-week: ' . json_encode($terms));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Retrieved terms for pa_days-of-week: ' . json_encode($terms));
+            }
             
             if (!empty($terms)) {
                 // Map of day slugs to English names (assuming slugs are in English)
@@ -48,15 +56,21 @@ add_action('woocommerce_before_single_product', function () {
                 $english_days = [];
                 foreach ($terms as $term) {
                     $slug = strtolower($term->slug);
-                    error_log('InterSoccer: Processing term: ' . $term->name . ' (slug: ' . $term->slug . ')');
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('InterSoccer: Processing term: ' . $term->name . ' (slug: ' . $term->slug . ')');
+                    }
                     if (isset($day_map[$slug])) {
                         $english_days[] = $day_map[$slug];
-                        error_log('InterSoccer: Mapped to English: ' . $day_map[$slug]);
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            error_log('InterSoccer: Mapped to English: ' . $day_map[$slug]);
+                        }
                     } else {
-                        error_log('InterSoccer: No mapping found for slug: ' . $slug);
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            error_log('InterSoccer: No mapping found for slug: ' . $slug);
+                        }
                     }
                 }
-                
+
                 if (!empty($english_days)) {
                     $day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
                     usort($english_days, function ($a, $b) use ($day_order) {
@@ -65,26 +79,38 @@ add_action('woocommerce_before_single_product', function () {
                         return $pos_a - $pos_b;
                     });
                     $preloaded_days = $english_days;
-                    error_log('InterSoccer: Final preloaded days: ' . json_encode($preloaded_days));
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('InterSoccer: Final preloaded days: ' . json_encode($preloaded_days));
+                    }
                 } else {
                     // Fallback to default English days
                     $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                    error_log('InterSoccer: Using fallback days: ' . json_encode($preloaded_days));
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        error_log('InterSoccer: Using fallback days: ' . json_encode($preloaded_days));
+                    }
                 }
             } else {
                 // Fallback to default English days
                 $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                error_log('InterSoccer: No terms found, using fallback days: ' . json_encode($preloaded_days));
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('InterSoccer: No terms found, using fallback days: ' . json_encode($preloaded_days));
+                }
             }
         } else {
-            error_log('InterSoccer: pa_days-of-week attribute not found or not valid');
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: pa_days-of-week attribute not found or not valid');
+            }
         }
     } else {
-        error_log('InterSoccer: Product is not a camp, skipping day preloading');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Product is not a camp, skipping day preloading');
+        }
     }
-    error_log('InterSoccer: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
-    error_log('InterSoccer: Product attributes for ' . $product_id . ': ' . json_encode(array_keys($product->get_attributes())));
-    error_log('InterSoccer: Product type: ' . $product_type);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
+        error_log('InterSoccer: Product attributes for ' . $product_id . ': ' . json_encode(array_keys($product->get_attributes())));
+        error_log('InterSoccer: Product type: ' . $product_type);
+    }
 
     // Player selection HTML
     ob_start();
@@ -636,15 +662,21 @@ add_action('woocommerce_before_single_product', function () {
             $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
             foreach ($days as $day) {
                 $translated = icl_t('intersoccer-product-variations', $day, $day);
-                error_log('InterSoccer: WPML translation for ' . $day . ': ' . $translated);
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('InterSoccer: WPML translation for ' . $day . ': ' . $translated);
+                }
                 if ($translated !== $day) { // Only include if actually translated
                     $translations[$day] = $translated;
                 }
             }
         } else {
-            error_log('InterSoccer: icl_t function not available');
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: icl_t function not available');
+            }
         }
-        error_log('InterSoccer: Final translations array: ' . json_encode($translations));
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Final translations array: ' . json_encode($translations));
+        }
         echo json_encode($translations);
         ?>;
 

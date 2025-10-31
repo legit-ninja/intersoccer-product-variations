@@ -232,7 +232,9 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
         update_post_meta($variation_id, '_price', $full_price);
         update_post_meta($variation_id, '_regular_price', $full_price);
         wc_delete_product_transients($variation_id); // Clear transients
-        error_log('InterSoccer: Updated variation ' . $variation_id . ' price to full course price: ' . $full_price);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Updated variation ' . $variation_id . ' price to full course price: ' . $full_price);
+        }
     }
 
     // Sync course metadata to WPML translations
@@ -245,41 +247,59 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 add_action('woocommerce_variation_options', 'intersoccer_add_camp_variation_fields', 20, 3);
 add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
 function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
-    error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields called for loop ' . $loop . ', variation ID ' . $variation->ID);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields called for loop ' . $loop . ', variation ID ' . $variation->ID);
+    }
     intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
 }
 
 function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
-    error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
+    }
     intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
 }
 
 function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
-    error_log('InterSoccer Admin: Checking camp late pickup field for variation ' . $variation_id . ', loop ' . $loop);
-    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: Checking camp late pickup field for variation ' . $variation_id . ', loop ' . $loop);
+    }
+
     $product = wc_get_product($variation_id);
     if (!$product) {
-        error_log('InterSoccer Admin: Invalid product for variation ' . $variation_id);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer Admin: Invalid product for variation ' . $variation_id);
+        }
         return;
     }
 
     // Check if this is a camp variation
     $parent_product = wc_get_product($product->get_parent_id());
     if (!$parent_product) {
-        error_log('InterSoccer Admin: No parent product found for variation ' . $variation_id);
-        return;
-    }
-    
-    error_log('InterSoccer Admin: Parent product ID: ' . $parent_product->get_id());
-    $is_camp = intersoccer_is_camp($parent_product->get_id());
-    error_log('InterSoccer Admin: Is parent product a camp? ' . ($is_camp ? 'true' : 'false'));
-    
-    if (!$is_camp) {
-        error_log('InterSoccer Admin: Parent product is not a camp, skipping late pickup field');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer Admin: No parent product found for variation ' . $variation_id);
+        }
         return;
     }
 
-    error_log('InterSoccer Admin: Adding late pickup field for camp variation ' . $variation_id);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: Parent product ID: ' . $parent_product->get_id());
+    }
+    $is_camp = intersoccer_is_camp($parent_product->get_id());
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: Is parent product a camp? ' . ($is_camp ? 'true' : 'false'));
+    }
+
+    if (!$is_camp) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer Admin: Parent product is not a camp, skipping late pickup field');
+        }
+        return;
+    }
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: Adding late pickup field for camp variation ' . $variation_id);
+    }
 
     echo '<div style="margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd;">';
     echo '<p style="margin: 0 0 5px 0; font-weight: bold;">' . __('Late Pick Up Options', 'intersoccer-product-variations') . '</p>';
@@ -301,14 +321,20 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
  */
 add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
 function intersoccer_save_camp_variation_fields($variation_id, $loop) {
-    error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
-    error_log('InterSoccer Save: POST data: ' . json_encode($_POST));
-    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
+        error_log('InterSoccer Save: POST data: ' . json_encode($_POST));
+    }
+
     $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup'][$loop]) ? 'yes' : 'no';
-    error_log('InterSoccer Save: enable_late_pickup = ' . $enable_late_pickup);
-    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Save: enable_late_pickup = ' . $enable_late_pickup);
+    }
+
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
-    error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to ' . $enable_late_pickup);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to ' . $enable_late_pickup);
+    }
 }
 
 /**
@@ -376,7 +402,9 @@ function intersoccer_sync_course_metadata_to_translations($variation_id, $start_
             wc_delete_product_transients($translated_variation_id);
         }
 
-        error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
+        }
     }
 }
 
@@ -419,7 +447,9 @@ function intersoccer_sync_course_metadata_on_translation_complete($post_id, $dat
         $original_value = get_post_meta($original_variation_id, $key, true);
         if ($original_value !== '' && $original_value !== null) {
             update_post_meta($post_id, $key, $original_value);
-            error_log('InterSoccer: Synced ' . $key . ' from original variation ' . $original_variation_id . ' to translated variation ' . $post_id);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Synced ' . $key . ' from original variation ' . $original_variation_id . ' to translated variation ' . $post_id);
+            }
         }
     }
 

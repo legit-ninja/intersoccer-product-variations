@@ -24,7 +24,9 @@ add_action('plugins_loaded', function () {
         false,
         dirname(plugin_basename(__FILE__)) . '/lang'
     );
-    error_log('Text domain loaded: ' . (is_textdomain_loaded('intersoccer-product-variations') ? 'yes' : 'no'));
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('Text domain loaded: ' . (is_textdomain_loaded('intersoccer-product-variations') ? 'yes' : 'no'));
+    }
 });
 
 // Register strings for WPML translation on init to ensure WPML is loaded
@@ -319,16 +321,22 @@ $includes = [
 foreach ($includes as $file) {
     if (file_exists(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file)) {
         require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file;
-        error_log('InterSoccer: Included ' . $file);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Included ' . $file);
+        }
     } else {
-        error_log('InterSoccer: Failed to include ' . $file . ' - File not found');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Failed to include ' . $file . ' - File not found');
+        }
     }
 }
 
 // Enqueue scripts and styles
 add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
-    error_log('InterSoccer: Generated nonce for intersoccer_nonce: ' . $nonce);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Generated nonce for intersoccer_nonce: ' . $nonce);
+    }
 
     if (is_product()) {
         wp_enqueue_script(
@@ -362,7 +370,9 @@ add_action('wp_enqueue_scripts', function () {
 
 // Register activation hook
 register_activation_hook(__FILE__, function () {
-    error_log('InterSoccer: Plugin activated');
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Plugin activated');
+    }
     // if (!wp_next_scheduled('intersoccer_expire_products')) {
     //     wp_schedule_event(time(), 'daily', 'intersoccer_expire_products');
     // }
@@ -371,7 +381,9 @@ register_activation_hook(__FILE__, function () {
 // Register deactivation hook
 register_deactivation_hook(__FILE__, function () {
     // wp_clear_scheduled_hook('intersoccer_expire_products');
-    error_log('InterSoccer: Plugin deactivated');
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Plugin deactivated');
+    }
 });
 
 // AJAX handler for nonce refresh
@@ -463,10 +475,14 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                     $days_checked++;
                 }
                 $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
-                error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
+                }
             } else {
                 $end_date = '';
-                error_log('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
+                }
             }
         }
         $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
@@ -476,7 +492,9 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
         }, $holidays);
         $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
         $data['discount_note'] = calculate_discount_note($variation_id, $data['remaining_sessions']);
-        error_log('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
+        }
     }
     return $data;
 }, 10, 3);
@@ -496,7 +514,9 @@ function calculate_discount_note($variation_id, $remaining_sessions) {
     if ($course_index !== false && $course_index == 1) {
         $discount_note = intersoccer_get_discount_message('course_same_season', 'cart_message', intersoccer_translate_string('50% Same Season Course Discount', 'intersoccer-product-variations', '50% Same Season Course Discount'));
     }
-    error_log('InterSoccer: Calculated discount_note for variation ' . $variation_id . ': ' . $discount_note);
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Calculated discount_note for variation ' . $variation_id . ': ' . $discount_note);
+    }
     return $discount_note;
 }
 ?>
