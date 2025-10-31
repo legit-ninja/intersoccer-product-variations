@@ -310,7 +310,7 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
         }
     } elseif ($product_type === 'course') {
         // Course-specific metadata
-        $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
+        $start_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_start_date', '');
         if ($start_date) {
             $formatted_start = date_i18n('F j, Y', strtotime($start_date));
             $item->add_meta_data('Start Date', $formatted_start);
@@ -318,14 +318,14 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
                 error_log('InterSoccer: Added Start Date: ' . $formatted_start);
             }
         }
-        
-        $end_date = get_post_meta($variation_id ?: $product_id, '_end_date', true);
+
+        $end_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_end_date', '');
         if ($end_date) {
             $formatted_end = date_i18n('F j, Y', strtotime($end_date));
             $item->add_meta_data('End Date', $formatted_end);
         }
-        
-        $holidays = get_post_meta($variation_id ?: $product_id, '_course_holiday_dates', true) ?: [];
+
+        $holidays = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_holiday_dates', []);
         if (!empty($holidays) && is_array($holidays)) {
             $formatted_holidays = array_map(function($date) {
                 return date_i18n('F j, Y', strtotime($date));

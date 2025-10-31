@@ -145,7 +145,7 @@ function intersoccer_add_derived_cart_item_data($cart_item) {
     if ($product_type === 'camp') {
         $cart_item['discount_note'] = InterSoccer_Camp::calculate_discount_note($variation_id, $cart_item['camp_days'] ?? []);
     } elseif ($product_type === 'course') {
-        $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
         $cart_item['discount_note'] = InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
         $cart_item['remaining_sessions'] = $remaining_sessions;
