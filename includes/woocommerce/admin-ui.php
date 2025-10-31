@@ -56,6 +56,17 @@ function intersoccer_add_admin_submenus() {
         'intersoccer-automated-updates',
         'intersoccer_render_automated_update_orders_page',
     );
+
+    // Course Holiday Fix submenu
+    add_submenu_page(
+        'woocommerce',
+        __('Fix Course Holiday Logic', 'intersoccer-product-variations'),
+        __('Course Holiday Fix', 'intersoccer-product-variations'),
+        'manage_woocommerce',
+        'intersoccer-course-holiday-fix',
+        'intersoccer_render_course_holiday_fix_page'
+    );
+
     error_log('InterSoccer: Registered admin submenus including Variation Health Checker');
 }
 
@@ -3048,5 +3059,22 @@ function intersoccer_emergency_stop_callback() {
     delete_transient('intersoccer_batch_orders_' . get_current_user_id());
     
     wp_send_json_success(['message' => 'Batch processing stopped and cleared.']);
+}
+
+/**
+ * Render the Course Holiday Fix admin page.
+ */
+function intersoccer_render_course_holiday_fix_page() {
+    if (!current_user_can('manage_woocommerce')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
+    echo '<div class="wrap">';
+    echo '<h1>' . __('Course Holiday Fix Tool', 'intersoccer-product-variations') . '</h1>';
+
+    // Include the fix script
+    require_once plugin_dir_path(dirname(dirname(dirname(__FILE__)))) . 'fix-course-holidays.php';
+
+    echo '</div>';
 }
 ?>
