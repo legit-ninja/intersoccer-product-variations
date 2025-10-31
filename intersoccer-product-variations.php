@@ -279,6 +279,9 @@ add_action('init', function () {
             'You saved 20% on this camp because you have multiple children enrolled in camps.',
             'Second child camp discount',
             '20% Sibling Discount Applied',
+            '50% Same Season Course Discount',
+            '%s Camp Sibling Discount',
+            '%s Course Sibling Discount',
             'Coach',
             'Organizer',
             'Manage Players',
@@ -491,7 +494,7 @@ function calculate_discount_note($variation_id, $remaining_sessions) {
     }
     $course_index = array_search($variation_id, array_column($grouped_items, 'variation_id') ?: array_column($grouped_items, 'product_id'));
     if ($course_index !== false && $course_index == 1) {
-        $discount_note = intersoccer_get_discount_message('course_same_season', 'cart_message', '50% Same Season Course Discount');
+        $discount_note = intersoccer_get_discount_message('course_same_season', 'cart_message', intersoccer_translate_string('50% Same Season Course Discount', 'intersoccer-product-variations', '50% Same Season Course Discount'));
     }
     error_log('InterSoccer: Calculated discount_note for variation ' . $variation_id . ': ' . $discount_note);
     return $discount_note;

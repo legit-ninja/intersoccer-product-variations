@@ -232,7 +232,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             elseif ($index >= 2) $percent = 0.25;  // 25% for 3rd+
             
             if ($percent > 0) {
-                $message = intersoccer_get_discount_message('camp_multi_child_' . ($index + 1), 'cart_message', ($percent * 100) . '% Camp Sibling Discount');
+                $template = intersoccer_translate_string('%s Camp Sibling Discount', 'intersoccer-product-variations', '%s Camp Sibling Discount');
+                $fallback = sprintf($template, $percent * 100);
+                $message = intersoccer_get_discount_message('camp_multi_child_' . ($index + 1), 'cart_message', $fallback);
                 foreach ($camp_children[$child] as $item) {
                     $cart_key = $item['cart_key'];
                     $base_price = $cart->cart_contents[$cart_key]['base_price'];
@@ -266,7 +268,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             elseif ($index >= 2) $percent = 0.25;  // 25% for 3rd+
             
             if ($percent > 0) {
-                $message = intersoccer_get_discount_message('course_multi_child_' . ($index + 1), 'cart_message', ($percent * 100) . '% Course Sibling Discount');
+                $template = intersoccer_translate_string('%s Course Sibling Discount', 'intersoccer-product-variations', '%s Course Sibling Discount');
+                $fallback = sprintf($template, $percent * 100);
+                $message = intersoccer_get_discount_message('course_multi_child_' . ($index + 1), 'cart_message', $fallback);
                 foreach ($course_children[$child] as $item) {
                     $cart_key = $item['cart_key'];
                     $base_price = $cart->cart_contents[$cart_key]['base_price'];
@@ -294,7 +298,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 $discounted_price = $base_price * (1 - $percent);
                 $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
                 $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
-                $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', '50% Same Season Course Discount');
+                $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', intersoccer_translate_string('50% Same Season Course Discount', 'intersoccer-product-variations', '50% Same Season Course Discount'));
                 error_log('InterSoccer: Applied 50% same-season discount to item ' . $item['product_id']);
             }
         }
