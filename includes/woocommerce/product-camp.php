@@ -35,13 +35,12 @@ class InterSoccer_Camp {
         $price = floatval($product->get_price());
         $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
 
-        // Check if this is a single-day booking (including French variants)
-        $is_single_day = $booking_type === 'single-days' || 
-                        $booking_type === 'à la journée' || 
-                        $booking_type === 'a-la-journee' ||
-                        stripos($booking_type, 'single') !== false || 
-                        stripos($booking_type, 'journée') !== false ||
-                        stripos($booking_type, 'journee') !== false;
+        // Check if this is a single-day booking
+        $is_single_day = stripos($booking_type, 'single') !== false ||
+                        stripos($booking_type, 'jour') !== false ||
+                        stripos($booking_type, 'day') !== false ||
+                        stripos($booking_type, 'einzel') !== false ||
+                        stripos($booking_type, 'tag') !== false;
 
         if ($is_single_day) {
             $price_per_day = $price; // CHF 55/day as base price
@@ -103,7 +102,7 @@ class InterSoccer_Camp {
     public static function calculate_discount_note($variation_id, $camp_days = []) {
         $discount_note = '';
         if (!empty($camp_days)) {
-            $discount_note = count($camp_days) . ' Day(s) Selected';
+            $discount_note = sprintf(__('%d Day(s) Selected', 'intersoccer-product-variations'), count($camp_days));
         }
         error_log('InterSoccer: Calculated discount_note for camp variation ' . $variation_id . ': ' . $discount_note);
         return $discount_note;
