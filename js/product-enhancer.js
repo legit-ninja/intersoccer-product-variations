@@ -270,24 +270,33 @@
         displayCourseInfo: function(courseData) {
             const $form = $(this.state.formSelector);
             let $display = $form.find('.intersoccer-course-info');
-            
+
             if (!$display.length) {
                 $form.find('.single_add_to_cart_button').before('<div class="intersoccer-course-info"></div>');
                 $display = $form.find('.intersoccer-course-info');
             }
 
-            let html = '';
+            let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
                 const startDate = new Date(courseData.start_date).toLocaleDateString();
                 html += `<p><strong>Start Date:</strong> ${startDate}</p>`;
             }
-            if (courseData.remaining_sessions) {
-                html += `<p><strong>Remaining Sessions:</strong> ${courseData.remaining_sessions}</p>`;
+            if (courseData.end_date) {
+                const endDate = new Date(courseData.end_date).toLocaleDateString();
+                html += `<p><strong>End Date:</strong> ${endDate}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
                 const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString()).join(', ');
                 html += `<p><strong>Holidays (No Session):</strong> ${holidays}</p>`;
             }
+            if (courseData.remaining_sessions) {
+                html += `<p><strong>Remaining Sessions:</strong> ${courseData.remaining_sessions}`;
+                if (courseData.total_sessions) {
+                    html += ` of ${courseData.total_sessions}`;
+                }
+                html += `</p>`;
+            }
+            html += '</div>';
 
             $display.html(html);
         },
@@ -389,5 +398,12 @@
             $(this.state.formSelector).find('.intersoccer-course-info').empty();
         }
     };
+
+    // Initialize when DOM is ready
+    jQuery(document).ready(function() {
+        if (typeof window.InterSoccerProductEnhancer !== 'undefined') {
+            window.InterSoccerProductEnhancer.init();
+        }
+    });
 
 })(jQuery);
