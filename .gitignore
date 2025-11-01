@@ -1,1 +1,14 @@
 *.log
+
+# Composer dependencies
+vendor/
+
+# PHPUnit cache
+.phpunit.result.cache
+
+# Debug scripts (keep locally for development)
+debug-course-prices.php
+
+# Local test files
+run-tests.php
+test_class.php
