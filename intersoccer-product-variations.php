@@ -341,10 +341,18 @@ add_action('wp_enqueue_scripts', function () {
 
     if (is_product()) {
         wp_enqueue_script(
+            'intersoccer-product-enhancer',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/product-enhancer.js',
+            ['jquery'],
+            '1.4.55',
+            true
+        );
+
+        wp_enqueue_script(
             'intersoccer-variation-details',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
-            ['jquery'],
-            '1.4.54',
+            ['jquery', 'intersoccer-product-enhancer'],
+            '1.4.55',
             true
         );
 
@@ -365,7 +373,7 @@ add_action('wp_enqueue_scripts', function () {
         'intersoccer-styles',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
-        '1.4.54'
+        '1.4.55'
     );
 });
 
@@ -451,7 +459,8 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
     if ($product_type === 'course') {
         $variation_id = $variation->get_id();
         $course_start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        $data['course_start_date'] = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
+        $formatted_start_date = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
+        $data['course_start_date'] = $formatted_start_date;
         $end_date = get_post_meta($variation_id, '_end_date', true);
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
@@ -462,7 +471,7 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
 
         // Calculate end date if not set or recalculate using new logic
         if (!$end_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) || !strtotime($end_date)) {
-            if ($data['course_start_date'] && $total_weeks > 0 && class_exists('InterSoccer_Course')) {
+            if ($formatted_start_date && $total_weeks > 0 && class_exists('InterSoccer_Course')) {
                 // Use the new course calculation logic
                 $end_date = InterSoccer_Course::calculate_end_date($variation_id, $total_weeks);
                 if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -475,15 +484,28 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                 }
             }
         }
-        $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
-        
-        $data['course_holiday_dates'] = array_map(function($date) {
+        $formatted_end_date = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
+        $data['end_date'] = $formatted_end_date;
+
+        $formatted_holidays = array_map(function($date) {
             return date_i18n('F j, Y', strtotime($date));
         }, $holidays);
-        $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
-        $data['discount_note'] = calculate_discount_note($variation_id, $data['remaining_sessions']);
+        $data['course_holiday_dates'] = $formatted_holidays;
+        $remaining_sessions = calculate_remaining_sessions($variation_id, $total_weeks);
+        $data['remaining_sessions'] = $remaining_sessions;
+        $data['discount_note'] = calculate_discount_note($variation_id, $remaining_sessions);
+
+        // Add course data in the format expected by product-enhancer.js
+        $data['intersoccer_course_data'] = [
+            'start_date' => $course_start_date, // Use raw date format for JavaScript
+            'end_date' => $end_date,
+            'holidays' => $holidays, // Use raw date array for JavaScript
+            'remaining_sessions' => $remaining_sessions,
+            'total_sessions' => $total_weeks
+        ];
+
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
+            error_log('Variation ' . $variation_id . ' data: start=' . $formatted_start_date . ', end=' . $formatted_end_date . ', holidays=' . json_encode($formatted_holidays) . ', sessions=' . $remaining_sessions . ', discount=' . $data['discount_note']);
         }
     }
     return $data;
