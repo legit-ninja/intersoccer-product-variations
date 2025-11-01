@@ -1714,6 +1714,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
             'variation_id' => __('Variation ID', 'intersoccer-product-variations'),
             'type' => __('Type', 'intersoccer-product-variations'),
             'attributes' => __('Attributes', 'intersoccer-product-variations'),
+            'course_info' => __('Course Info', 'intersoccer-product-variations'),
             'status' => __('Health Status', 'intersoccer-product-variations')
         ];
     }
@@ -1748,10 +1749,39 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                     $attr_list[] = esc_html($key . ': ' . $value);
                 }
                 return implode(', ', $attr_list) ?: __('No attributes', 'intersoccer-product-variations');
+            case 'course_info':
+                if ($item['type'] === 'course') {
+                    $start_date = $item['attributes']['_course_start_date'] ?? '';
+                    $total_weeks = $item['attributes']['_course_total_weeks'] ?? 0;
+                    $session_rate = $item['attributes']['_course_weekly_discount'] ?? 0;
+                    $base_price = '';
+
+                    // Get base price from product
+                    if ($item['variation_id']) {
+                        $product = wc_get_product($item['variation_id']);
+                        if ($product) {
+                            $base_price_num = floatval($product->get_price());
+                            $base_price = wc_price($base_price_num);
+                        }
+                    }
+
+                    $info = [];
+                    if ($start_date) $info[] = 'Start: ' . $start_date;
+                    if ($total_weeks) $info[] = 'Weeks: ' . $total_weeks;
+                    if ($session_rate) {
+                        $info[] = 'Rate: ' . wc_price($session_rate);
+                        $full_price = $session_rate * $total_weeks;
+                        $info[] = 'Full: ' . wc_price($full_price);
+                    }
+                    if ($base_price) $info[] = 'Base: ' . $base_price;
+
+                    return implode(', ', $info);
+                }
+                return '-';
             case 'status':
                 $status = $item['is_healthy'] ? 'Healthy' : 'Unhealthy';
                 $color = $item['is_healthy'] ? 'green' : 'red';
-                $missing = empty($item['missing']) ? '' : ' (Missing: ' . implode(', ', $item['missing']) . ')';
+                $missing = empty($item['missing']) ? '' : ' (Issues: ' . implode('; ', $item['missing']) . ')';
                 return '<span style="color: ' . $color . ';">' . esc_html($status . $missing) . '</span>';
             default:
                 return '';
@@ -1792,6 +1822,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         foreach ($products as $product) {
             $product_id = $product->get_id();
             $type = InterSoccer_Product_Types::get_product_type($product_id);
+            error_log('InterSoccer: Processing product ' . $product_id . ' with type: ' . ($type ?: 'null'));
             $attributes = [];
 
             if ($product instanceof WC_Product_Variation) {
@@ -1821,6 +1852,14 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                     } else {
                         error_log('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $variation_id);
                     }
+                }
+
+                // Course-specific health checks
+                if ($type === 'course') {
+                    error_log('InterSoccer: Processing course variation ' . $variation_id . ' with type: ' . $type);
+                    $issues = $this->check_course_health($variation_id, $product);
+                    $missing = array_merge($missing, $issues);
+                    error_log('InterSoccer: Course health issues for ' . $variation_id . ': ' . json_encode($issues));
                 }
 
                 $is_healthy = empty($missing);
@@ -1869,6 +1908,14 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                         }
                     }
 
+                    // Course-specific health checks
+                    if ($type === 'course') {
+                        error_log('InterSoccer: Processing course variation ' . $var_id . ' with type: ' . $type);
+                        $issues = $this->check_course_health($var_id, $var_product);
+                        $missing = array_merge($missing, $issues);
+                        error_log('InterSoccer: Course health issues for ' . $var_id . ': ' . json_encode($issues));
+                    }
+
                     $is_healthy = empty($missing);
                     if ($unhealthy_only && $is_healthy) {
                         continue;
@@ -1888,6 +1935,78 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
 
         error_log('InterSoccer: Prepared ' . count($data) . ' variations for health check, unhealthy_only=' . ($unhealthy_only ? 'true' : 'false'));
         return $data;
+    }
+
+    /**
+     * Check course-specific health issues.
+     *
+     * @param int $variation_id The variation ID.
+     * @param WC_Product $product The product object.
+     * @return array Array of health issues.
+     */
+    public function check_course_health($variation_id, $product) {
+        $issues = [];
+
+        error_log('InterSoccer: Checking course health for variation ' . $variation_id);
+
+        // Get course metadata
+        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
+        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+        $session_rate = floatval(intersoccer_get_course_meta($variation_id, '_course_weekly_discount', 0));
+        $base_price = floatval($product->get_price());
+
+        error_log('InterSoccer: Course data - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate . ', base_price: ' . $base_price);
+
+        // Check if start date is in the future
+        $current_date = current_time('Y-m-d');
+        $is_future_course = !empty($start_date) && strtotime($start_date) > strtotime($current_date);
+
+        if ($session_rate <= 0 || $total_weeks <= 0) {
+            $issues[] = 'Course missing session rate or total weeks for pricing validation';
+            return $issues;
+        }
+
+        $full_session_price = $session_rate * $total_weeks;
+
+        // Check if base price exceeds full session price (always an issue)
+        if ($base_price > $full_session_price) {
+            $issues[] = sprintf(
+                'Course base price %.2f CHF exceeds full session price %.2f CHF (%.0f sessions × %.2f CHF)',
+                $base_price,
+                $full_session_price,
+                $total_weeks,
+                $session_rate
+            );
+        }
+
+        if ($is_future_course) {
+            // For future courses, base price should be advance purchase price with small discount
+            $expected_advance_price = $full_session_price * 0.95; // 5% discount for advance purchase
+
+            // Allow 20% tolerance for pricing variations
+            $price_diff = abs($base_price - $expected_advance_price);
+            $tolerance = $expected_advance_price * 0.20;
+
+            if ($price_diff > $tolerance) {
+                $issues[] = sprintf(
+                    'Future course pricing issue: Base price %.2f CHF, expected advance price ~%.2f CHF (5%% discount from %.2f CHF full price)',
+                    $base_price,
+                    $expected_advance_price,
+                    $full_session_price
+                );
+            }
+        } else {
+            // For started/past courses, base price should be prorated, not exceed full price significantly
+            if ($base_price > $full_session_price * 1.1) {
+                $issues[] = sprintf(
+                    'Started course base price %.2f CHF exceeds reasonable range (full price: %.2f CHF)',
+                    $base_price,
+                    $full_session_price
+                );
+            }
+        }
+
+        return $issues;
     }
 }
 
@@ -1927,7 +2046,7 @@ function intersoccer_render_variation_health_page() {
 
         <?php
         // Include course holiday fix functionality
-        require_once plugin_dir_path(dirname(dirname(dirname(__FILE__)))) . 'fix-course-holidays.php';
+        // require_once plugin_dir_path(dirname(dirname(dirname(__FILE__)))) . 'fix-course-holidays.php';
         $fix_completed = intersoccer_course_holiday_fix_has_run();
         ?>
         <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
