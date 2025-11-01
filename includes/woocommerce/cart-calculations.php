@@ -220,11 +220,17 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
  */
 function intersoccer_calculate_price($product_id, $variation_id, $camp_days = [], $remaining_weeks = null) {
     $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+    error_log('InterSoccer: calculate_price called for product ' . $product_id . ' (type: ' . $product_type . '), variation ' . $variation_id);
 
     if ($product_type === 'camp') {
-        return InterSoccer_Camp::calculate_price($product_id, $variation_id, $camp_days);
+        $price = InterSoccer_Camp::calculate_price($product_id, $variation_id, $camp_days);
+        error_log('InterSoccer: Camp price calculated: ' . $price);
+        return $price;
     } elseif ($product_type === 'course') {
-        return InterSoccer_Course::calculate_price($product_id, $variation_id, $remaining_weeks);
+        error_log('InterSoccer: Delegating to InterSoccer_Course::calculate_price for product ' . $product_id . ', variation ' . $variation_id);
+        $price = InterSoccer_Course::calculate_price($product_id, $variation_id, $remaining_weeks);
+        error_log('InterSoccer: Course price calculated: ' . $price . ' (remaining_weeks param: ' . ($remaining_weeks ?: 'null') . ')');
+        return $price;
     } else {
         $product = wc_get_product($variation_id ?: $product_id);
         $price = $product ? floatval($product->get_price()) : 0;
@@ -234,20 +240,68 @@ function intersoccer_calculate_price($product_id, $variation_id, $camp_days = []
 }
 
 /**
+ * Clear variation price cache when course data is updated
+ */
+add_action('updated_post_meta', 'intersoccer_clear_variation_cache_on_course_update', 10, 4);
+function intersoccer_clear_variation_cache_on_course_update($meta_id, $post_id, $meta_key, $meta_value) {
+    if (in_array($meta_key, ['_course_start_date', '_course_total_weeks', '_course_holiday_dates', '_course_weekly_discount'])) {
+        $product = wc_get_product($post_id);
+        if ($product && $product->is_type('variation')) {
+            $parent_id = $product->get_parent_id();
+            if ($parent_id) {
+                // Clear the variation price cache for the parent product
+                wp_cache_delete('wc_var_prices_' . $parent_id, 'wc_var_prices');
+                error_log('InterSoccer: Cleared variation price cache for product ' . $parent_id . ' due to course data update');
+            }
+        }
+    }
+}
+
+/**
  * Modify variation prices for frontend display (avoids session during rendering).
  */
-add_filter('woocommerce_variation_prices', 'intersoccer_modify_variation_prices', 10, 3);
+add_filter('woocommerce_variation_prices', 'intersoccer_modify_variation_prices', 999, 3);
 function intersoccer_modify_variation_prices($prices, $product, $for_display) {
     $product_id = $product->get_id();
-    error_log('InterSoccer: Modifying variation prices for product ' . $product_id . ' during rendering, using defaults');
+    $product_type = InterSoccer_Product_Types::get_product_type($product_id);
 
-    foreach ($prices['price'] as $variation_id => $price) {
-        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], null);
-        $prices['price'][$variation_id] = $calculated_price;
-        $prices['regular_price'][$variation_id] = $calculated_price;
-        $prices['sale_price'][$variation_id] = $calculated_price;
+    error_log('InterSoccer: woocommerce_variation_prices filter triggered for product ' . $product_id . ', type: ' . ($product_type ?: 'null') . ', for_display: ' . ($for_display ? 'true' : 'false'));
+
+    // Only modify prices for courses
+    if ($product_type !== 'course') {
+        error_log('InterSoccer: Skipping price modification - not a course product');
+        return $prices;
     }
 
+    error_log('InterSoccer: Modifying variation prices for course product ' . $product_id . ' during rendering');
+    error_log('InterSoccer: Original prices: ' . json_encode($prices['price']));
+
+    foreach ($prices['price'] as $variation_id => $price) {
+        // Check if this variation has course data
+        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
+        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+
+        error_log('InterSoccer: Variation ' . $variation_id . ' - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks);
+
+        if (empty($start_date) || $total_weeks <= 0) {
+            error_log('InterSoccer: Skipping variation ' . $variation_id . ' - missing course data');
+            continue;
+        }
+
+        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], null);
+        error_log('InterSoccer: Course variation ' . $variation_id . ' - original: ' . $price . ', calculated: ' . $calculated_price);
+
+        if ($calculated_price != $price) {
+            $prices['price'][$variation_id] = $calculated_price;
+            $prices['regular_price'][$variation_id] = $calculated_price;
+            $prices['sale_price'][$variation_id] = $calculated_price;
+            error_log('InterSoccer: Updated price for variation ' . $variation_id . ' to ' . $calculated_price);
+        } else {
+            error_log('InterSoccer: Price unchanged for variation ' . $variation_id);
+        }
+    }
+
+    error_log('InterSoccer: Modified prices: ' . json_encode($prices['price']));
     return $prices;
 }
 

@@ -44,7 +44,7 @@ function calculate_end_date($variation_id, $total_weeks) {
     $holiday_count_on_course_day = 0;
     foreach ($holidays as $holiday) {
         $holiday_date = new DateTime($holiday);
-        if ($holiday_date->format('l') === $course_day) {
+        if ($holiday_date->format('N') == $course_day) {
             $holiday_count_on_course_day++;
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('InterSoccer: Identified holiday on course day ' . $course_day . ': ' . $holiday);
@@ -65,7 +65,7 @@ function calculate_end_date($variation_id, $total_weeks) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('InterSoccer: Checking date ' . $day . ' for course day ' . $course_day . ', holiday: ' . (isset($holiday_set[$day]) ? 'yes' : 'no'));
             }
-            if ($current_date->format('l') === $course_day) {
+            if ($current_date->format('N') == $course_day) {
                 if (!isset($holiday_set[$day])) {
                     $sessions_counted++;
                     if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -140,7 +140,7 @@ function calculate_total_sessions($variation_id, $total_weeks) {
     $total = 0;
     $date = clone $start;
     while ($date <= $end) {
-        if ($date->format('l') === $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
+        if ($date->format('N') == $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
             $total++;
         }
         $date->add(new DateInterval('P1D'));
@@ -353,7 +353,7 @@ function calculate_remaining_sessions($variation_id, $total_weeks) {
     $skipped_holidays = 0;
     while ($date <= $end) {
         $day = $date->format('Y-m-d');
-        if ($date->format('l') === $course_day) {
+        if ($date->format('N') == $course_day) {
             if (isset($holiday_set[$day])) {
                 $skipped_holidays++;
                 if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -839,7 +839,7 @@ function intersoccer_add_cart_item_data($cart_item_data, $product_id, $variation
             $remaining_sessions = 0;
             $date = max($current, $start);
             while ($date <= $end) {
-                if ($date->format('l') === $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
+                if ($date->format('N') == $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
                     $remaining_sessions++;
                 }
                 $date->add(new DateInterval('P1D'));

@@ -375,7 +375,8 @@
                 const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || $form.find('input[name="attribute_pa_booking-type"]').val();
                 console.log("InterSoccer: Player selected:", playerId);
 
-                const remainingWeeks = $form.find('input[name="remaining_weeks"]').val();
+                // For courses, remaining weeks should be calculated server-side, not from form
+                const remainingWeeks = (productType === "course") ? null : ($form.find('input[name="remaining_weeks"]').val() || null);
                 updateFormData(playerId, remainingWeeks, currentVariation?.variation_id);
 
                 clearTimeout(playerChangeTimeout);
