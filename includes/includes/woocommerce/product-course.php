@@ -88,7 +88,7 @@ class InterSoccer_Course {
                 continue;
             }
             $holiday_date = new DateTime($holiday);
-            if ($holiday_date->format('l') === $course_day) {
+            if ($holiday_date->format('N') == $course_day) {
                 $holiday_count_on_course_day++;
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log('InterSoccer: Holiday on course day ' . $course_day . ' for variation ' . $variation_id . ': ' . $holiday);
@@ -120,7 +120,7 @@ class InterSoccer_Course {
             while ($occurrences_counted < $total_occurrences_needed && $days_checked < $max_days) {
                 $day = $current_date->format('Y-m-d');
 
-                if ($current_date->format('l') === $course_day) {
+                if ($current_date->format('N') == $course_day) {
                     $occurrences_counted++;
                     $is_holiday = isset($holiday_set[$day]);
 
@@ -200,7 +200,7 @@ class InterSoccer_Course {
         $total = 0;
         $date = clone $start;
         while ($date <= $end) {
-            if ($date->format('l') === $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
+            if ($date->format('N') == $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
                 $total++;
             }
             $date->add(new DateInterval('P1D'));
@@ -254,7 +254,7 @@ class InterSoccer_Course {
 
         while ($date <= $end) {
             $day = $date->format('Y-m-d');
-            if ($date->format('l') === $course_day) {
+            if ($date->format('N') == $course_day) {
                 if (isset($holiday_set[$day])) {
                     $skipped_holidays++;
                     if (defined('WP_DEBUG') && WP_DEBUG) {

@@ -112,6 +112,14 @@ add_action('woocommerce_before_single_product', function () {
         error_log('InterSoccer: Product type: ' . $product_type);
     }
 
+    // Course info container for Elementor
+    if ($product_type === 'course') {
+        echo '<div id="intersoccer-course-info" class="intersoccer-course-info" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+        echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
+        echo '<div id="intersoccer-course-details"></div>';
+        echo '</div>';
+    }
+
     // Player selection HTML
     ob_start();
 ?>
@@ -538,36 +546,46 @@ add_action('woocommerce_before_single_product', function () {
             $form.on('found_variation', function(event, variation) {
                 console.log('InterSoccer: WooCommerce found variation:', variation);
                 console.log('InterSoccer: Variation attributes:', variation.attributes);
-                
+
                 lastVariation = variation;
                 lastVariationId = variation.variation_id;
-                
+
                 // Extract booking type from variation attributes
                 var variationBookingType = '';
                 if (variation.attributes) {
                     // Check for different possible attribute names
-                    variationBookingType = variation.attributes['attribute_pa_booking-type'] || 
+                    variationBookingType = variation.attributes['attribute_pa_booking-type'] ||
                                          variation.attributes['attribute_booking-type'] ||
                                          variation.attributes.attribute_pa_booking_type ||
                                          variation.attributes.attribute_booking_type || '';
                 }
-                
+
                 console.log('InterSoccer: Booking type from variation:', variationBookingType);
-                
+
                 // Render day checkboxes based on the variation's booking type
                 renderDayCheckboxes(variationBookingType, $daySelection, $dayCheckboxes, $form);
-                
+
                 // Update price for single-day bookings
-                var isSingleDayBooking = variationBookingType === 'single-days' || 
-                                       variationBookingType === 'à la journée' || 
+                var isSingleDayBooking = variationBookingType === 'single-days' ||
+                                       variationBookingType === 'à la journée' ||
                                        variationBookingType === 'a-la-journee' ||
-                                       variationBookingType.toLowerCase().includes('single') || 
+                                       variationBookingType.toLowerCase().includes('single') ||
                                        variationBookingType.toLowerCase().includes('journée') ||
                                        variationBookingType.toLowerCase().includes('journee');
                 if (isSingleDayBooking) {
                     updateCampPrice($form, selectedDays);
                 }
-                
+
+                // Handle course information display and price updates
+                if (productType === 'course') {
+                    console.log('InterSoccer: Course variation selected, fetching course info and updating price');
+                    updateCourseInfo($form, variation.variation_id);
+                    updateCoursePrice($form, variation);
+                } else {
+                    // Hide course info for non-course products
+                    $('#intersoccer-course-info').hide();
+                }
+
                 $form.trigger('intersoccer_update_button_state');
             });
 
@@ -622,12 +640,17 @@ add_action('woocommerce_before_single_product', function () {
                 console.log('InterSoccer: WooCommerce reset variation data');
                 lastVariation = null;
                 lastVariationId = 0;
-                
+
                 // Hide day selection when variation is reset
                 $daySelection.hide();
                 $form.find('input[name="camp_days[]"]').remove();
                 selectedDays = [];
-                
+
+                // Hide course information when variation is reset
+                if (productType === 'course') {
+                    $('#intersoccer-course-info').hide();
+                }
+
                 $form.trigger('intersoccer_update_button_state');
             });
 
@@ -679,6 +702,92 @@ add_action('woocommerce_before_single_product', function () {
         }
         echo json_encode($translations);
         ?>;
+
+        // Function to update course price display
+        function updateCoursePrice($form, variation) {
+            console.log('InterSoccer: updateCoursePrice called for variation:', variation.variation_id);
+
+            // Make AJAX call to get course price
+            jQuery.ajax({
+                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                type: 'POST',
+                data: {
+                    action: 'intersoccer_get_course_price',
+                    nonce: '<?php echo wp_create_nonce('intersoccer_nonce'); ?>',
+                    product_id: '<?php echo esc_js($product_id); ?>',
+                    variation_id: variation.variation_id
+                },
+                success: function(response) {
+                    console.log('InterSoccer: Course price AJAX success:', response);
+                    if (response.success && response.data.price !== undefined) {
+                        var price = parseFloat(response.data.price);
+                        console.log('InterSoccer: Updating course price display to:', price);
+
+                        // Update the variation object
+                        variation.display_price = price;
+                        variation.price = price;
+                        variation.display_regular_price = price;
+
+                        // Trigger WooCommerce price update events
+                        $form.trigger('woocommerce_variation_has_changed');
+                        jQuery(document.body).trigger('wc_variation_form');
+                        jQuery(document.body).trigger('woocommerce_variation_has_changed');
+
+                        // Force update price display elements
+                        setTimeout(function() {
+                            jQuery('.woocommerce-variation-price .woocommerce-Price-amount, .price .woocommerce-Price-amount').each(function() {
+                                var formattedPrice = wc_price(price);
+                                jQuery(this).html(formattedPrice);
+                                console.log('InterSoccer: Updated price element:', jQuery(this).prop('tagName'), jQuery(this).attr('class'), 'to:', formattedPrice);
+                            });
+                        }, 100);
+                    } else {
+                        console.error('InterSoccer: Course price response failed:', response.data);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('InterSoccer: Course price AJAX error:', status, error, xhr.responseText);
+                }
+            });
+        }
+
+        // Function to update course information display
+        function updateCourseInfo($form, variationId) {
+            console.log('InterSoccer: updateCourseInfo called for variation:', variationId);
+
+            if (!variationId || variationId === '0') {
+                console.log('InterSoccer: No valid variation ID for course info');
+                $('#intersoccer-course-info').hide();
+                return;
+            }
+
+            // Make AJAX call to get course information
+            jQuery.ajax({
+                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                type: 'POST',
+                data: {
+                    action: 'intersoccer_get_course_info_display',
+                    nonce: '<?php echo wp_create_nonce('intersoccer_nonce'); ?>',
+                    product_id: '<?php echo esc_js($product_id); ?>',
+                    variation_id: variationId
+                },
+                success: function(response) {
+                    console.log('InterSoccer: Course info AJAX success:', response);
+                    if (response.success && response.data.html) {
+                        $('#intersoccer-course-details').html(response.data.html);
+                        $('#intersoccer-course-info').show();
+                        console.log('InterSoccer: Course information displayed');
+                    } else {
+                        console.error('InterSoccer: Course info response failed:', response.data);
+                        $('#intersoccer-course-info').hide();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('InterSoccer: Course info AJAX error:', status, error, xhr.responseText);
+                    $('#intersoccer-course-info').hide();
+                }
+            });
+        }
 
         // Function to update camp price when days are selected
         function updateCampPrice($form, selectedDays) {
