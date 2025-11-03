@@ -808,6 +808,7 @@ add_action('woocommerce_before_single_product', function () {
             
             function updateLatePickupFormData(settings) {
                 // Remove any existing late pickup hidden inputs
+                $form.find('input[name="late_pickup_type"]').remove();
                 $form.find('input[name="late_pickup_cost"]').remove();
                 $form.find('input[name="late_pickup_days[]"]').remove();
                 
@@ -846,6 +847,9 @@ add_action('woocommerce_before_single_product', function () {
                     return;
                 }
                 
+                // Add hidden input for late pickup type (CRITICAL - server needs this to process late pickup)
+                $form.append('<input type="hidden" name="late_pickup_type" value="' + selectedLatePickupOption + '">');
+                
                 // Add hidden input for cost
                 $form.append('<input type="hidden" name="late_pickup_cost" value="' + cost + '">');
                 
@@ -854,7 +858,7 @@ add_action('woocommerce_before_single_product', function () {
                     $form.append('<input type="hidden" name="late_pickup_days[]" value="' + day + '">');
                 });
                 
-                console.log('InterSoccer Late Pickup: Added form data - option:', selectedLatePickupOption, 'cost:', cost, 'days:', daysToSend);
+                console.log('InterSoccer Late Pickup: Added form data - type:', selectedLatePickupOption, 'cost:', cost, 'days:', daysToSend);
             }
 
             // Button state update handler - ensures player selection is required for ALL products

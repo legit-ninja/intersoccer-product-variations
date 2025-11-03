@@ -373,22 +373,38 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
 
     // 8. Add parent product attributes (excluding variation attributes)
     $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Retrieved ' . count($parent_attributes) . ' parent attributes for product ' . $product_id);
+        error_log('InterSoccer: Parent attributes to add: ' . print_r($parent_attributes, true));
+    }
+    
     foreach ($parent_attributes as $attribute_label => $attribute_value) {
         // Skip attributes that are already added separately to avoid duplication
         if (in_array($attribute_label, ['Activity Type', 'Season'])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
+            }
             continue;
         }
         // Convert attribute label to metadata key format (e.g., "City" -> "City")
         $meta_key = $attribute_label;
         $item->add_meta_data($meta_key, sanitize_text_field($attribute_value));
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Added parent attribute metadata: ' . $meta_key . ' = ' . $attribute_value);
+            error_log('InterSoccer: ✅ Added parent attribute to order: ' . $meta_key . ' = ' . $attribute_value);
         }
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
         error_log('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
-        error_log('InterSoccer: Checkout metadata - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none') . ', Discount: ' . ($values['discount_note'] ?? 'none') . ', Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
+        error_log('InterSoccer: Order metadata summary:');
+        error_log('  - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none'));
+        error_log('  - Camp Days: ' . (isset($values['camp_days']) && is_array($values['camp_days']) ? implode(', ', $values['camp_days']) : 'none'));
+        error_log('  - Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
+        error_log('  - Late Pickup Days: ' . (isset($values['late_pickup_days']) && is_array($values['late_pickup_days']) ? implode(', ', $values['late_pickup_days']) : 'none'));
+        error_log('  - Late Pickup Cost: ' . ($values['late_pickup_cost'] ?? 'none'));
+        error_log('  - Discount: ' . ($values['discount_note'] ?? 'none'));
+        error_log('  - Parent Attributes: ' . count($parent_attributes));
     }
 }
 
