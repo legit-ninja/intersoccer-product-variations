@@ -19,8 +19,8 @@ if (!defined('ABSPATH')) {
  * @return string|null 'camp', 'course', 'birthday', or null
  */
 if (!function_exists('intersoccer_get_product_type')) {
-    function intersoccer_get_product_type($product_id) {
-        return InterSoccer_Product_Types::get_product_type($product_id);
+function intersoccer_get_product_type($product_id) {
+    return InterSoccer_Product_Types::get_product_type($product_id);
     }
 }
 
@@ -140,7 +140,7 @@ class InterSoccer_Product_Types {
         } elseif (in_array('birthdays', $categories, true)) {
             return 'birthday';
         }
-
+        
         return null;
     }
 
@@ -176,7 +176,7 @@ class InterSoccer_Product_Types {
  * @return bool
  */
 if (!function_exists('intersoccer_is_camp')) {
-    function intersoccer_is_camp($product_id) {
+function intersoccer_is_camp($product_id) {
         return intersoccer_get_product_type($product_id) === 'camp';
     }
 }
@@ -187,8 +187,8 @@ if (!function_exists('intersoccer_is_camp')) {
  * @return bool
  */
 if (!function_exists('intersoccer_is_course')) {
-    function intersoccer_is_course($product_id) {
-        return intersoccer_get_product_type($product_id) === 'course';
+function intersoccer_is_course($product_id) {
+    return intersoccer_get_product_type($product_id) === 'course';
     }
 }
 
