@@ -119,7 +119,7 @@ function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $vari
             if (!in_array($day, $valid_days, true)) {
                 wc_add_notice(__('Invalid day selected for late pick up.', 'intersoccer-product-variations'), 'error');
                 error_log('InterSoccer Late Pickup: ❌ VALIDATION FAILED - Invalid day: ' . $day);
-                return false;
+            return false;
             }
         }
         
