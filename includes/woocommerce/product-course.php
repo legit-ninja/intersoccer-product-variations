@@ -801,4 +801,30 @@ function intersoccer_get_course_price() {
     wp_send_json_success(['price' => $price]);
 }
 
+/**
+ * Filter variation prices for courses to show prorated price automatically
+ * This ensures the correct price displays immediately without needing AJAX
+ */
+add_filter('woocommerce_product_variation_get_price', 'intersoccer_filter_course_variation_price', 10, 2);
+add_filter('woocommerce_product_variation_get_regular_price', 'intersoccer_filter_course_variation_price', 10, 2);
+add_filter('woocommerce_product_variation_get_sale_price', 'intersoccer_filter_course_variation_price', 10, 2);
+
+function intersoccer_filter_course_variation_price($price, $variation) {
+    // Only apply to course products
+    $parent_id = $variation->get_parent_id();
+    if (intersoccer_get_product_type($parent_id) !== 'course') {
+        return $price;
+    }
+    
+    // Calculate prorated price
+    $variation_id = $variation->get_id();
+    $prorated_price = InterSoccer_Course::calculate_price($parent_id, $variation_id);
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Filtering course variation price for ' . $variation_id . ' from ' . $price . ' to ' . $prorated_price);
+    }
+    
+    return $prorated_price;
+}
+
 ?>

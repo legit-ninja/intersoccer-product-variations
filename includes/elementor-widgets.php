@@ -225,10 +225,11 @@ add_action('woocommerce_before_single_product', function () {
             console.log('InterSoccer Debug: Form classes:', $form.attr('class'));
             console.log('InterSoccer Debug: Form ID:', $form.attr('id'));
             
-            // CRITICAL FIX: Intercept WooCommerce AJAX add-to-cart for camp products
+            // CRITICAL FIX: Intercept WooCommerce AJAX add-to-cart for camp and course products
             // We need to prevent AJAX but keep the variation form working
-            <?php if ($product_type === 'camp' && $is_variable): ?>
-            console.log('InterSoccer: Setting up standard POST submission for camp product');
+            // This is necessary because AJAX add-to-cart doesn't properly handle custom fields
+            <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
+            console.log('InterSoccer: Setting up standard POST submission for <?php echo $product_type; ?> product');
             
             // Unbind WooCommerce's AJAX add-to-cart handler
             $(document).off('click', '.single_add_to_cart_button');
@@ -948,12 +949,12 @@ add_action('woocommerce_before_single_product', function () {
             $form.on('submit', function(e) {
                 console.log('InterSoccer: Form submit event triggered');
                 
-                <?php if ($product_type === 'camp' && $is_variable): ?>
-                // For camp products, force standard POST submission
+                <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
+                // For camp and course products, force standard POST submission
                 // Stop all other handlers from executing
                 e.stopImmediatePropagation();
                 
-                console.log('InterSoccer: Forcing standard POST submission for camp product');
+                console.log('InterSoccer: Forcing standard POST submission for <?php echo $product_type; ?> product');
                 
                 // Get the actual form element
                 var formElement = $form[0];
