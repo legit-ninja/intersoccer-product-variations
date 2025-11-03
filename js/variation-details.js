@@ -103,6 +103,14 @@
         // Update product price
         function updateProductPrice(productId, variationId, remainingWeeks = null) {
             return new Promise((resolve, reject) => {
+                const now = Date.now();
+                if (now - lastPriceUpdateTime < 1000) {
+                    console.log("InterSoccer: Price update throttled - too soon since last update");
+                    resolve();
+                    return;
+                }
+                lastPriceUpdateTime = now;
+
                 console.log("InterSoccer: Updating price for product:", productId, "variation:", variationId, "weeks:", remainingWeeks);
                 $.ajax({
                     url: intersoccerCheckout.ajax_url,
@@ -117,13 +125,40 @@
                     success: function (response) {
                         if (response.success && response.data.price) {
                             console.log("InterSoccer: Price updated:", response.data.price);
-                            const $priceElement = $("form.cart .woocommerce-variation-price .price");
-                            if ($priceElement.length) {
-                                $priceElement.html(response.data.price);
-                            } else {
-                                console.warn("InterSoccer: Price element not found");
+
+                            // Try multiple selectors for the price element
+                            const $priceSelectors = [
+                                ".woocommerce-variation-price .price",
+                                "form.cart .woocommerce-variation-price .price",
+                                ".single_variation_wrap .woocommerce-variation-price .price",
+                                ".single_variation .price",
+                                ".woocommerce-variation-price",
+                                ".price",
+                                "[data-product_id] .price",
+                                ".product .price"
+                            ];
+
+                            let priceUpdated = false;
+                            for (const selector of $priceSelectors) {
+                                const $priceElement = $(selector).first();
+                                if ($priceElement.length) {
+                                    console.log("InterSoccer: Found price element with selector:", selector, "HTML:", $priceElement.html().substring(0, 100));
+                                    $priceElement.html(response.data.price);
+                                    console.log("InterSoccer: Updated price element with selector:", selector, "to:", response.data.price);
+                                    priceUpdated = true;
+                                    break;
+                                }
                             }
-                            const $subtotalElement = $("form.cart .single_variation_wrap .price-subtotal");
+
+                            if (!priceUpdated) {
+                                console.warn("InterSoccer: No price element found to update. Available price elements:");
+                                $('[class*="price"]').each(function() {
+                                    console.warn("Found price element:", $(this).attr('class'), "HTML:", $(this).html().substring(0, 50));
+                                });
+                            }
+
+                            // Also try to update any subtotal elements
+                            const $subtotalElement = $(".price-subtotal, .woocommerce-variation-price .price-subtotal");
                             if ($subtotalElement.length) {
                                 $subtotalElement.html(response.data.price);
                             }
@@ -145,6 +180,44 @@
                         }
                     }
                 });
+            });
+        }
+
+        // Function to update course information display
+        function updateCourseInfo(productId, variationId) {
+            console.log('InterSoccer: updateCourseInfo called for variation:', variationId);
+
+            if (!variationId || variationId === '0') {
+                console.log('InterSoccer: No valid variation ID for course info');
+                $('#intersoccer-course-info').hide();
+                return;
+            }
+
+            // Make AJAX call to get course information
+            $.ajax({
+                url: intersoccerCheckout.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'intersoccer_get_course_info_display',
+                    nonce: intersoccerCheckout.nonce,
+                    product_id: productId,
+                    variation_id: variationId
+                },
+                success: function(response) {
+                    console.log('InterSoccer: Course info AJAX success:', response);
+                    if (response.success && response.data.html) {
+                        $('#intersoccer-course-details').html(response.data.html);
+                        $('#intersoccer-course-info').show();
+                        console.log('InterSoccer: Course information displayed');
+                    } else {
+                        console.error('InterSoccer: Course info response failed:', response.data);
+                        $('#intersoccer-course-info').hide();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('InterSoccer: Course info AJAX error:', status, error, xhr.responseText);
+                    $('#intersoccer-course-info').hide();
+                }
             });
         }
 
@@ -205,6 +278,7 @@
             let currentVariation = null;
             let lastVariationId = null;
             let lastBookingType = null;
+            let lastPriceUpdateTime = 0;
             let lastValidPlayerId = "";
             let isProcessing = false;
 
@@ -221,6 +295,9 @@
                         if (response.success && response.data.product_type) {
                             productType = response.data.product_type;
                             console.log("InterSoccer: Product type fetched:", productType);
+
+                            // Check for already-selected variation after product type is known
+                            checkForPreSelectedVariation();
                         }
                     },
                     error: function (xhr) {
@@ -231,6 +308,53 @@
                     }
                 });
             }
+
+            function checkForPreSelectedVariation() {
+                // Check URL parameters for pre-selected attributes
+                const urlParams = new URLSearchParams(window.location.search);
+                let hasPreSelectedAttributes = false;
+                let preSelectedAttributes = {};
+
+                // Get all variation attributes from the form
+                const $variationSelects = $form.find('select[name^="attribute_"]');
+                $variationSelects.each(function() {
+                    const $select = $(this);
+                    const attrName = $select.attr('name');
+                    const paramName = attrName.replace('attribute_', '');
+                    const paramValue = urlParams.get(attrName);
+
+                    if (paramValue) {
+                        hasPreSelectedAttributes = true;
+                        preSelectedAttributes[paramName] = paramValue;
+                        // Set the select value
+                        $select.val(paramValue);
+                    }
+                });
+
+                if (hasPreSelectedAttributes) {
+                    console.log("InterSoccer: Found pre-selected attributes from URL:", preSelectedAttributes);
+
+                    // Trigger WooCommerce's variation checking
+                    $form.trigger('check_variations');
+
+                    // For course products, try to display course info and update price immediately
+                    if (productType === 'course') {
+                        // Wait a bit for WooCommerce to process, then check for variation ID
+                        setTimeout(() => {
+                            const variationId = $form.find('input[name="variation_id"]').val();
+                            if (variationId && variationId !== '0') {
+                                console.log("InterSoccer: Found variation ID from pre-selected attributes, displaying course info:", variationId);
+                                updateCourseInfo(productId, parseInt(variationId));
+
+                                // Note: Price for pre-selected variations is handled by PHP filter
+                            } else {
+                                console.log("InterSoccer: No variation ID found for pre-selected attributes");
+                            }
+                        }, 500);
+                    }
+                }
+            }
+
             fetchProductType();
 
             function updateFormData(playerId, remainingWeeks = null, variationId = null) {
@@ -263,6 +387,7 @@
             }
 
             function handleVariation(variation, retryCount = 0, maxRetries = 12) {
+                console.log("InterSoccer: handleVariation called with productType:", productType, "variation:", variation);
                 if (isProcessing) {
                     console.log("InterSoccer: Skipping handleVariation, processing in progress");
                     return;
@@ -301,13 +426,11 @@
                             updateFormData(playerId, remainingWeeks, variationId);
                             updateAddToCartButtonState(playerId, bookingType);
 
-                            updateProductPrice(productId, variationId, remainingWeeks)
-                                .then(() => {
-                                    console.log("InterSoccer: Price updated for Course");
-                                })
-                                .catch((error) => {
-                                    console.error("InterSoccer: Failed to update price for Course:", error);
-                                });
+                            // Display course information
+                            updateCourseInfo(productId, variationId);
+
+                            // Note: Price is now handled by PHP filter woocommerce_variation_price_html
+                            console.log("InterSoccer: Course price handled by PHP filter");
                         }).catch((error) => {
                             console.error("InterSoccer: Failed to fetch course metadata:", error);
                             const playerId = $form.find(".player-select").val() || "";
@@ -328,6 +451,9 @@
                                 console.error("InterSoccer: Failed to update price for Full Week Camp:", error);
                             });
                     } else {
+                        // Hide course info for non-course products
+                        $('#intersoccer-course-info').hide();
+
                         // Camps with single-days handled by elementor-widgets.php
                         const playerId = $form.find(".player-select").val() || "";
                         updateFormData(playerId, null, variationId);
@@ -346,7 +472,7 @@
                 isVariationEventProcessed = true;
                 clearTimeout(debounceTimeout);
                 debounceTimeout = setTimeout(() => {
-                    console.log("InterSoccer: Found variation event triggered");
+                    console.log("InterSoccer: Found variation event triggered for product type:", productType);
                     handleVariation(variation);
                     isVariationEventProcessed = false;
                 }, 200);
@@ -359,6 +485,8 @@
                 currentVariation = null;
                 lastVariationId = null;
                 lastBookingType = null;
+                // Hide course info when variation is reset
+                $('#intersoccer-course-info').hide();
                 setTimeout(() => {
                     isVariationEventProcessed = false;
                 }, 600);

@@ -478,46 +478,169 @@ function calculate_remaining_sessions($variation_id, $total_weeks) {
 }
 
 /**
- * Display course information on single product page
+ * Get pre-selected variation ID from URL parameters or session
+ *
+ * @param WC_Product $product Variable product
+ * @return int Variation ID or 0 if none found
  */
-add_action('woocommerce_single_product_summary', 'intersoccer_display_course_info', 25);
-function intersoccer_display_course_info() {
-    global $product;
+function intersoccer_get_preselected_variation_id($product) {
+    if (!$product || !$product->is_type('variable')) {
+        return 0;
+    }
 
+    // Check URL parameters for variation attributes
+    $attributes = $product->get_variation_attributes();
+    $selected_attributes = [];
+
+    foreach ($attributes as $attribute_name => $options) {
+        $param_name = 'attribute_' . sanitize_title($attribute_name);
+        if (isset($_GET[$param_name]) && !empty($_GET[$param_name])) {
+            $selected_attributes[$attribute_name] = sanitize_text_field($_GET[$param_name]);
+        }
+    }
+
+    // If we have selected attributes, find the matching variation
+    if (!empty($selected_attributes)) {
+        $variation_id = intersoccer_find_matching_variation($product, $selected_attributes);
+        if ($variation_id) {
+            return $variation_id;
+        }
+    }
+
+    // Check session for pre-selected variation (could be set from cart links)
+    $session_variation = WC()->session->get('intersoccer_preselected_variation');
+    if ($session_variation && isset($session_variation[$product->get_id()])) {
+        return absint($session_variation[$product->get_id()]);
+    }
+
+    return 0;
+}
+
+/**
+ * Find variation that matches selected attributes
+ *
+ * @param WC_Product $product Variable product
+ * @param array $selected_attributes Selected attribute values
+ * @return int Variation ID or 0 if not found
+ */
+function intersoccer_find_matching_variation($product, $selected_attributes) {
+    $variations = $product->get_available_variations();
+
+    foreach ($variations as $variation) {
+        $variation_attributes = $variation['attributes'];
+        $matches = true;
+
+        foreach ($selected_attributes as $attribute_name => $selected_value) {
+            $variation_attr_key = 'attribute_' . sanitize_title($attribute_name);
+            $variation_value = isset($variation_attributes[$variation_attr_key]) ? $variation_attributes[$variation_attr_key] : '';
+
+            if ($variation_value !== $selected_value) {
+                $matches = false;
+                break;
+            }
+        }
+
+        if ($matches) {
+            return $variation['variation_id'];
+        }
+    }
+
+    return 0;
+}
+
+
+
+/**
+ * Automatically display course information on course product pages (fallback for non-variable products)
+ */
+add_filter('the_content', 'intersoccer_add_course_info_to_content', 20);
+function intersoccer_add_course_info_to_content($content) {
+    // Only modify single product pages
+    if (!is_singular('product')) {
+        return $content;
+    }
+
+    global $product;
     if (!$product || !is_a($product, 'WC_Product')) {
-        return;
+        return $content;
     }
 
     $product_id = $product->get_id();
     $product_type = intersoccer_get_product_type($product_id);
 
     if ($product_type !== 'course') {
-        return;
+        return $content;
+    }
+
+    // For variable products, course info is handled by woocommerce_after_variations_table hook
+    if ($product->is_type('variable')) {
+        return $content;
+    }
+
+    // Get variation ID if this is a variation product
+    $variation_id = 0;
+    if ($product->is_type('variation')) {
+        $variation_id = $product_id;
+        $product_id = $product->get_parent_id();
+    }
+
+    // For variation and simple products, show the info directly
+    ob_start();
+    intersoccer_render_course_info($product_id, $variation_id, false, true); // plain = true
+    $course_info_html = ob_get_clean();
+
+    // Append to content
+    return $content . $course_info_html;
+}
+
+/**
+ * Shortcode to display course information (for manual use if needed)
+ */
+add_shortcode('intersoccer_course_info', 'intersoccer_course_info_shortcode');
+function intersoccer_course_info_shortcode($atts) {
+    global $product;
+
+    if (!$product || !is_a($product, 'WC_Product')) {
+        return '';
+    }
+
+    $product_id = $product->get_id();
+    $product_type = intersoccer_get_product_type($product_id);
+
+    if ($product_type !== 'course') {
+        return '';
     }
 
     // Get variation ID if this is a variable product
     $variation_id = 0;
     if ($product->is_type('variable')) {
-        // For variable products, we need to wait for variation selection
-        // This will be updated via AJAX when variation changes
+        // Always show the course info container - JavaScript will populate it
+        ob_start();
         echo '<div id="intersoccer-course-info" class="intersoccer-course-info" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
         echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
         echo '<div id="intersoccer-course-details"></div>';
         echo '</div>';
-        return;
+        return ob_get_clean();
     } elseif ($product->is_type('variation')) {
         $variation_id = $product_id;
         $product_id = $product->get_parent_id();
     }
 
     // Display course info for simple products or when variation is selected
+    ob_start();
     intersoccer_render_course_info($product_id, $variation_id);
+    return ob_get_clean();
 }
 
 /**
  * Render course information HTML
+ *
+ * @param int $product_id Product ID
+ * @param int $variation_id Variation ID
+ * @param bool $inner_only Return inner HTML only (for AJAX/pre-selected variations)
+ * @param bool $plain Remove styling for plain text display
  */
-function intersoccer_render_course_info($product_id, $variation_id) {
+function intersoccer_render_course_info($product_id, $variation_id, $inner_only = false, $plain = false) {
     if (!$variation_id) {
         return;
     }
@@ -542,9 +665,16 @@ function intersoccer_render_course_info($product_id, $variation_id) {
         $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
     }
 
-    echo '<div class="intersoccer-course-info" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
-    echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
-    echo '<div class="intersoccer-course-details">';
+    if (!$inner_only) {
+        if ($plain) {
+            echo '<div class="intersoccer-course-info">';
+            echo '<strong>' . __('Course Information:', 'intersoccer-product-variations') . '</strong><br>';
+        } else {
+            echo '<div class="intersoccer-course-info" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+            echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
+        }
+        echo '<div class="intersoccer-course-details">';
+    }
 
     // Start Date
     if ($start_date) {
@@ -579,8 +709,12 @@ function intersoccer_render_course_info($product_id, $variation_id) {
         echo '</ul>';
     }
 
-    echo '</div>';
-    echo '</div>';
+    if (!$inner_only) {
+        echo '</div>';
+        if (!$plain) {
+            echo '</div>';
+        }
+    }
 }
 
 /**
@@ -600,7 +734,7 @@ function intersoccer_get_course_info_display() {
     }
 
     ob_start();
-    intersoccer_render_course_info($product_id, $variation_id);
+    intersoccer_render_course_info($product_id, $variation_id, true, true); // inner_only = true, plain = true for AJAX
     $html = ob_get_clean();
 
     wp_send_json_success(['html' => $html]);
