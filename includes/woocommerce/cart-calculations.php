@@ -16,29 +16,32 @@ if (!defined('ABSPATH')) {
  */
 add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_data', 10, 3);
 function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Adding custom data to cart for product ' . $product_id . ' / variation ' . $variation_id . '. POST data: ' . json_encode($_POST));
-    }
+    error_log('===== InterSoccer Add Cart Item Data START =====');
+    error_log('InterSoccer Cart Data: Product ID: ' . $product_id . ', Variation ID: ' . $variation_id);
+    error_log('InterSoccer Cart Data: Full POST: ' . print_r($_POST, true));
 
     // Assigned player
+    error_log('InterSoccer Cart Data: Checking player_assignment...');
     if (isset($_POST['player_assignment'])) {
         $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
         $user_id = get_current_user_id();
         $player_details = intersoccer_get_player_details($user_id, $cart_item_data['assigned_player']);
         $cart_item_data['assigned_attendee'] = $player_details['name'];
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Added assigned_player to cart: ' . $cart_item_data['assigned_player'] . ', Attendee: ' . $cart_item_data['assigned_attendee']);
-        }
+        error_log('InterSoccer Cart Data: ✅ Added assigned_player: ' . $cart_item_data['assigned_player'] . ', Attendee: ' . $cart_item_data['assigned_attendee']);
+    } else {
+        error_log('InterSoccer Cart Data: ⚠️  No player_assignment in POST');
     }
 
     // Camp days
+    error_log('InterSoccer Cart Data: Checking camp_days...');
+    error_log('InterSoccer Cart Data: isset($_POST[camp_days]): ' . (isset($_POST['camp_days']) ? 'YES' : 'NO'));
+    error_log('InterSoccer Cart Data: is_array($_POST[camp_days]): ' . (isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? 'YES' : 'NO'));
+    
     if (isset($_POST['camp_days']) && is_array($_POST['camp_days'])) {
         $cart_item_data['camp_days'] = array_map('sanitize_text_field', $_POST['camp_days']);
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Added camp_days to cart: ' . json_encode($cart_item_data['camp_days']));
-        }
+        error_log('InterSoccer Cart Data: ✅ Added camp_days to cart: ' . print_r($cart_item_data['camp_days'], true));
     } else {
-        error_log('InterSoccer: No camp_days in POST data');
+        error_log('InterSoccer Cart Data: ⚠️  No camp_days in POST data or not an array');
     }
 
     // Late pickup data
@@ -78,6 +81,8 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         }
     }
 
+    error_log('InterSoccer Cart Data: Final cart_item_data: ' . print_r($cart_item_data, true));
+    error_log('===== InterSoccer Add Cart Item Data END =====');
     return $cart_item_data;
 }
 
@@ -86,13 +91,22 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_cart_item', 10, 6);
 function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variation_id = null, $variations = null, $cart_item_data = null) {
+    error_log('===== InterSoccer Cart Validation START =====');
+    error_log('InterSoccer Cart: Product ID: ' . $product_id);
+    error_log('InterSoccer Cart: Variation ID: ' . $variation_id);
+    error_log('InterSoccer Cart: Full POST data: ' . print_r($_POST, true));
+    
     // Check if this is a camp product
     if (!intersoccer_is_camp($product_id)) {
+        error_log('InterSoccer Cart: Not a camp product, skipping validation');
         return $passed;
     }
 
+    error_log('InterSoccer Cart: IS a camp product');
+
     // Get the booking type from the variation
     $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
+    error_log('InterSoccer Cart: Booking type from meta: ' . $booking_type);
 
     // Check if this is a single-day booking (including French variants)
     $is_single_day = $booking_type === 'single-days' || 
@@ -101,25 +115,32 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
                     stripos($booking_type, 'single') !== false || 
                     stripos($booking_type, 'journée') !== false ||
                     stripos($booking_type, 'journee') !== false;
+    
+    error_log('InterSoccer Cart: Is single day booking? ' . ($is_single_day ? 'YES' : 'NO'));
 
     // For single-day camps, require at least one day to be selected
     if ($is_single_day) {
+        error_log('InterSoccer Cart: Checking for camp_days in POST...');
+        error_log('InterSoccer Cart: isset($_POST[camp_days]): ' . (isset($_POST['camp_days']) ? 'YES' : 'NO'));
+        
         $camp_days = isset($_POST['camp_days']) ? (array) $_POST['camp_days'] : [];
+        error_log('InterSoccer Cart: Camp days after casting to array: ' . print_r($camp_days, true));
+        error_log('InterSoccer Cart: Camp days count: ' . count($camp_days));
+        error_log('InterSoccer Cart: Camp days empty? ' . (empty($camp_days) ? 'YES' : 'NO'));
 
         if (empty($camp_days)) {
             wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
             $passed = false;
 
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Validation failed - no camp days selected for single-day camp product ' . $product_id . ', variation ' . $variation_id);
-            }
+            error_log('InterSoccer Cart: ❌ VALIDATION FAILED - no camp days selected');
         } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Validation passed - ' . count($camp_days) . ' days selected for single-day camp product ' . $product_id);
-            }
+            error_log('InterSoccer Cart: ✅ VALIDATION PASSED - ' . count($camp_days) . ' days selected');
+            error_log('InterSoccer Cart: Days: ' . implode(', ', $camp_days));
         }
     }
 
+    error_log('InterSoccer Cart: Final validation result: ' . ($passed ? 'PASSED' : 'FAILED'));
+    error_log('===== InterSoccer Cart Validation END =====');
     return $passed;
 }
 
@@ -276,32 +297,55 @@ function intersoccer_modify_variation_prices($prices, $product, $for_display) {
     error_log('InterSoccer: Modifying variation prices for course product ' . $product_id . ' during rendering');
     error_log('InterSoccer: Original prices: ' . json_encode($prices['price']));
 
+    // Check if we have session data for prorated pricing
+    $session_data = WC()->session ? WC()->session->get('intersoccer_product_' . $product_id) : null;
+    error_log('InterSoccer: Session data in variation_prices: ' . ($session_data ? print_r($session_data, true) : 'NOT FOUND'));
+
     foreach ($prices['price'] as $variation_id => $price) {
-        // Check if this variation has course data
-        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+        error_log('InterSoccer: Processing variation ' . $variation_id . ' with original price: ' . $price);
 
-        error_log('InterSoccer: Variation ' . $variation_id . ' - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks);
+        if ($session_data) {
+            // Use session data for prorated pricing
+            $total_sessions = isset($session_data['total_sessions']) ? intval($session_data['total_sessions']) : 0;
+            $remaining_sessions = isset($session_data['remaining_sessions']) ? intval($session_data['remaining_sessions']) : 0;
 
-        if (empty($start_date) || $total_weeks <= 0) {
-            error_log('InterSoccer: Skipping variation ' . $variation_id . ' - missing course data');
-            continue;
-        }
+            error_log('InterSoccer: Using session data for variation ' . $variation_id . ' - total: ' . $total_sessions . ', remaining: ' . $remaining_sessions);
 
-        $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], null);
-        error_log('InterSoccer: Course variation ' . $variation_id . ' - original: ' . $price . ', calculated: ' . $calculated_price);
+            if ($total_sessions > 0 && $remaining_sessions > 0) {
+                $prorated_price = ($price / $total_sessions) * $remaining_sessions;
+                error_log('InterSoccer: Calculated prorated price for variation ' . $variation_id . ': ' . $prorated_price);
 
-        if ($calculated_price != $price) {
-            $prices['price'][$variation_id] = $calculated_price;
-            $prices['regular_price'][$variation_id] = $calculated_price;
-            $prices['sale_price'][$variation_id] = $calculated_price;
-            error_log('InterSoccer: Updated price for variation ' . $variation_id . ' to ' . $calculated_price);
+                $prices['price'][$variation_id] = $prorated_price;
+                $prices['regular_price'][$variation_id] = $prorated_price;
+                $prices['sale_price'][$variation_id] = $prorated_price;
+                error_log('InterSoccer: Updated variation ' . $variation_id . ' price to prorated: ' . $prorated_price);
+            }
         } else {
-            error_log('InterSoccer: Price unchanged for variation ' . $variation_id);
+            // Fallback to course calculation without session data
+            $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
+            $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+
+            error_log('InterSoccer: No session data, checking course meta for variation ' . $variation_id . ' - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks);
+
+            if (!empty($start_date) && $total_weeks > 0) {
+                $calculated_price = intersoccer_calculate_price($product_id, $variation_id, [], null);
+                error_log('InterSoccer: Course variation ' . $variation_id . ' - original: ' . $price . ', calculated: ' . $calculated_price);
+
+                if ($calculated_price != $price) {
+                    $prices['price'][$variation_id] = $calculated_price;
+                    $prices['regular_price'][$variation_id] = $calculated_price;
+                    $prices['sale_price'][$variation_id] = $calculated_price;
+                    error_log('InterSoccer: Updated price for variation ' . $variation_id . ' to ' . $calculated_price);
+                } else {
+                    error_log('InterSoccer: Price unchanged for variation ' . $variation_id);
+                }
+            } else {
+                error_log('InterSoccer: Skipping variation ' . $variation_id . ' - missing course data');
+            }
         }
     }
 
-    error_log('InterSoccer: Modified prices: ' . json_encode($prices['price']));
+    error_log('InterSoccer: Final modified prices: ' . json_encode($prices['price']));
     return $prices;
 }
 
@@ -315,24 +359,73 @@ function intersoccer_modify_price_html($price_html, $product) {
         return $price_html;
     }
 
-    // Check if WooCommerce session is available (not available in admin)
-    if (!WC()->session) {
-        return $price_html;
-    }
-
-    // Check if we have selected days stored in session or transient
-    $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
-    if (!empty($selected_days)) {
-        // Get current variation
-        $variation_id = WC()->session->get('intersoccer_current_variation_' . $product->get_id());
-        if ($variation_id) {
-            $calculated_price = intersoccer_calculate_price($product->get_id(), $variation_id, $selected_days);
-            $price_html = wc_price($calculated_price);
-            error_log('InterSoccer: Modified price HTML for product ' . $product->get_id() . ' with ' . count($selected_days) . ' days: ' . $price_html);
+    // For camps, check selected days
+    if ($product_type === 'camp') {
+        // Check if WooCommerce session is available (not available in admin)
+        if (!WC()->session) {
+            return $price_html;
         }
+
+        // Check if we have selected days stored in session
+        $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
+        if (!empty($selected_days)) {
+            $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id(), $selected_days);
+            $price_html = wc_price($calculated_price);
+            error_log('InterSoccer: Modified camp variation price HTML for variation ' . $variation->get_id() . ' with ' . count($selected_days) . ' days: ' . $price_html);
+        }
+    }
+    // For courses, calculate price based on remaining sessions
+    elseif ($product_type === 'course') {
+        $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id());
+        $price_html = wc_price($calculated_price);
+        error_log('InterSoccer: Modified course variation price HTML for variation ' . $variation->get_id() . ': ' . $price_html . ' (base: ' . $variation->get_price() . ')');
     }
 
     return $price_html;
+}
+
+/**
+ * Modify variation price at source level for courses
+ */
+add_filter('woocommerce_get_variation_price', 'intersoccer_modify_variation_price', 10, 4);
+function intersoccer_modify_variation_price($price, $variation, $product, $min_or_max) {
+    $product_type = InterSoccer_Product_Types::get_product_type($product->get_id());
+
+    error_log('InterSoccer: woocommerce_get_variation_price filter called for product ' . $product->get_id() . ' (type: ' . $product_type . '), variation ' . $variation->get_id() . ', min_or_max: ' . $min_or_max . ', original price: ' . $price);
+
+    // Only modify for course products
+    if ($product_type !== 'course') {
+        error_log('InterSoccer: Skipping variation price modification - not a course product');
+        return $price;
+    }
+
+    // Check if WooCommerce session is available (not available in admin)
+    if (!WC()->session) {
+        error_log('InterSoccer: No WooCommerce session available for variation price modification');
+        return $price;
+    }
+
+    $session_data = WC()->session->get('intersoccer_product_' . $product->get_id());
+    error_log('InterSoccer: Session data for product ' . $product->get_id() . ': ' . ($session_data ? print_r($session_data, true) : 'NOT FOUND'));
+
+    if ($session_data) {
+        $total_sessions = isset($session_data['total_sessions']) ? intval($session_data['total_sessions']) : 0;
+        $remaining_sessions = isset($session_data['remaining_sessions']) ? intval($session_data['remaining_sessions']) : 0;
+
+        error_log('InterSoccer: Course session data - total_sessions: ' . $total_sessions . ', remaining_sessions: ' . $remaining_sessions);
+
+        if ($total_sessions > 0 && $remaining_sessions > 0) {
+            $prorated_price = ($price / $total_sessions) * $remaining_sessions;
+            error_log('InterSoccer: Modified variation price for course - original: ' . $price . ', prorated: ' . $prorated_price . ' (total: ' . $total_sessions . ', remaining: ' . $remaining_sessions . ')');
+            return $prorated_price;
+        } else {
+            error_log('InterSoccer: Invalid session data for course pricing - total: ' . $total_sessions . ', remaining: ' . $remaining_sessions);
+        }
+    } else {
+        error_log('InterSoccer: No session data found for course product ' . $product->get_id());
+    }
+
+    return $price;
 }
 
 /**
@@ -340,22 +433,80 @@ function intersoccer_modify_price_html($price_html, $product) {
  */
 add_filter('woocommerce_variation_price_html', 'intersoccer_modify_variation_price_html', 10, 4);
 function intersoccer_modify_variation_price_html($price_html, $variation, $product) {
-    // Only modify for camp products
-    if (!intersoccer_is_camp($product->get_id())) {
+    $product_type = InterSoccer_Product_Types::get_product_type($product->get_id());
+
+    error_log('InterSoccer: woocommerce_variation_price_html filter called for product ' . $product->get_id() . ' (type: ' . $product_type . '), variation ' . $variation->get_id() . ', original price_html: ' . $price_html);
+
+    // Only modify for camp or course products
+    if ($product_type !== 'camp' && $product_type !== 'course') {
+        error_log('InterSoccer: Skipping variation price HTML modification - not a camp or course product');
         return $price_html;
     }
 
     // Check if WooCommerce session is available (not available in admin)
     if (!WC()->session) {
+        error_log('InterSoccer: No WooCommerce session available');
         return $price_html;
     }
 
-    // Check if we have selected days stored in session
-    $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
-    if (!empty($selected_days)) {
-        $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id(), $selected_days);
-        $price_html = wc_price($calculated_price);
-        error_log('InterSoccer: Modified variation price HTML for variation ' . $variation->get_id() . ' with ' . count($selected_days) . ' days: ' . $price_html);
+    // Handle camps with selected days
+    if ($product_type === 'camp') {
+        $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
+        if (!empty($selected_days)) {
+            $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id(), $selected_days);
+            $price_html = wc_price($calculated_price);
+            error_log('InterSoccer: Modified camp variation price HTML for variation ' . $variation->get_id() . ' with ' . count($selected_days) . ' days: ' . $price_html);
+        }
+        return $price_html;
+    }
+
+    // Handle courses with prorated pricing
+    if ($product_type === 'course') {
+        $session_data = WC()->session->get('intersoccer_product_' . $product->get_id());
+        error_log('InterSoccer: Course session data in price_html filter: ' . ($session_data ? print_r($session_data, true) : 'NOT FOUND'));
+
+        if ($session_data) {
+            $total_sessions = isset($session_data['total_sessions']) ? intval($session_data['total_sessions']) : 0;
+            $remaining_sessions = isset($session_data['remaining_sessions']) ? intval($session_data['remaining_sessions']) : 0;
+
+            error_log('InterSoccer: Course calculation - total_sessions: ' . $total_sessions . ', remaining_sessions: ' . $remaining_sessions);
+
+            if ($total_sessions > 0 && $remaining_sessions > 0) {
+                $base_price = $variation->get_price();
+                $prorated_price = ($base_price / $total_sessions) * $remaining_sessions;
+
+                error_log('InterSoccer: Course price calculation - base: ' . $base_price . ', total_sessions: ' . $total_sessions . ', remaining: ' . $remaining_sessions . ', prorated: ' . $prorated_price);
+
+                // Format the price
+                $price_html = wc_price($prorated_price);
+                error_log('InterSoccer: Updated course price HTML: ' . $price_html);
+                return $price_html;
+            } else {
+                error_log('InterSoccer: Invalid session data for course pricing');
+            }
+        } else {
+            error_log('InterSoccer: No session data found for course product ' . $product->get_id() . ' - checking URL parameters');
+
+            // Check if we have course data in URL parameters (for pre-selected variations)
+            if (isset($_GET['course_id']) && isset($_GET['total_sessions']) && isset($_GET['remaining_sessions'])) {
+                $total_sessions = intval($_GET['total_sessions']);
+                $remaining_sessions = intval($_GET['remaining_sessions']);
+
+                error_log('InterSoccer: Found course data in URL - total: ' . $total_sessions . ', remaining: ' . $remaining_sessions);
+
+                if ($total_sessions > 0 && $remaining_sessions > 0) {
+                    $base_price = $variation->get_price();
+                    $prorated_price = ($base_price / $total_sessions) * $remaining_sessions;
+
+                    error_log('InterSoccer: Course price calculation from URL - base: ' . $base_price . ', prorated: ' . $prorated_price);
+
+                    $price_html = wc_price($prorated_price);
+                    error_log('InterSoccer: Updated course price HTML from URL: ' . $price_html);
+                    return $price_html;
+                }
+            }
+        }
+        return $price_html;
     }
 
     return $price_html;
@@ -639,6 +790,9 @@ function intersoccer_add_price_update_script() {
                     // Clear session data for non-single-day bookings
                     clearSessionData();
                     hidePriceLoading();
+
+                    // Check if this is a course product and update price if needed
+                    checkAndUpdateCoursePrice(variation);
                 }
             }, 300);
 
@@ -678,6 +832,68 @@ function intersoccer_add_price_update_script() {
                         func.apply(context, args);
                     }, wait);
                 };
+            }
+
+            function checkAndUpdateCoursePrice(variation) {
+                console.log('InterSoccer: Checking if course price needs updating for variation:', variation);
+
+                // Check if course info is displayed (indicates this is a course with session data)
+                if ($('.intersoccer-course-info').length > 0) {
+                    console.log('InterSoccer: Course info found, checking price display');
+
+                    // Get course data from the displayed info
+                    var courseInfoText = $('.intersoccer-course-info').text();
+                    var remainingMatch = courseInfoText.match(/Remaining Sessions: (\d+) of (\d+)/);
+
+                    if (remainingMatch) {
+                        var remainingSessions = parseInt(remainingMatch[1]);
+                        var totalSessions = parseInt(remainingMatch[2]);
+
+                        console.log('InterSoccer: Course data from display - remaining:', remainingSessions, 'total:', totalSessions);
+
+                        // Calculate prorated price
+                        var basePrice = parseFloat(variation.display_price || variation.price || 0);
+                        if (basePrice > 0 && totalSessions > 0 && remainingSessions > 0) {
+                            var proratedPrice = (basePrice / totalSessions) * remainingSessions;
+                            var formattedPrice = 'CHF ' + proratedPrice.toFixed(2);
+
+                            console.log('InterSoccer: Calculated prorated price - base:', basePrice, 'prorated:', proratedPrice, 'formatted:', formattedPrice);
+
+                            // Update price display
+                            var priceSelectors = [
+                                '.woocommerce-Price-amount.amount',
+                                '.price .woocommerce-Price-amount',
+                                '.woocommerce-variation-price .woocommerce-Price-amount',
+                                '.single-product .price .woocommerce-Price-amount',
+                                '.woocommerce-variation-price .price .woocommerce-Price-amount',
+                                '.price .amount',
+                                '.woocommerce-Price-amount'
+                            ];
+
+                            var updated = false;
+                            priceSelectors.forEach(function(selector) {
+                                if ($(selector).length > 0) {
+                                    var currentText = $(selector).text();
+                                    if (currentText !== formattedPrice) {
+                                        $(selector).html('<span class="woocommerce-Price-currencySymbol">CHF</span>' + proratedPrice.toFixed(2));
+                                        console.log('InterSoccer: Updated course price using selector:', selector, 'from:', currentText, 'to:', formattedPrice);
+                                        updated = true;
+                                    }
+                                }
+                            });
+
+                            if (!updated) {
+                                console.log('InterSoccer: No price elements found to update for course');
+                            }
+                        } else {
+                            console.log('InterSoccer: Invalid data for course price calculation - base:', basePrice, 'total:', totalSessions, 'remaining:', remainingSessions);
+                        }
+                    } else {
+                        console.log('InterSoccer: Could not parse course info from display');
+                    }
+                } else {
+                    console.log('InterSoccer: No course info displayed, not a course product');
+                }
             }
 
             function clearSessionData() {
