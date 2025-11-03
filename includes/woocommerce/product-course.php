@@ -810,19 +810,48 @@ add_filter('woocommerce_product_variation_get_regular_price', 'intersoccer_filte
 add_filter('woocommerce_product_variation_get_sale_price', 'intersoccer_filter_course_variation_price', 10, 2);
 
 function intersoccer_filter_course_variation_price($price, $variation) {
+    // Prevent infinite recursion - check if we're already filtering
+    static $filtering = [];
+    $variation_id = $variation->get_id();
+    
+    if (isset($filtering[$variation_id])) {
+        return $price; // Already filtering this variation, return original price
+    }
+    
     // Only apply to course products
     $parent_id = $variation->get_parent_id();
     if (intersoccer_get_product_type($parent_id) !== 'course') {
         return $price;
     }
     
-    // Calculate prorated price
-    $variation_id = $variation->get_id();
-    $prorated_price = InterSoccer_Course::calculate_price($parent_id, $variation_id);
+    // Mark as filtering to prevent recursion
+    $filtering[$variation_id] = true;
+    
+    // Get the raw base price from post meta to avoid triggering the filter again
+    $base_price = floatval(get_post_meta($variation_id, '_price', true));
+    if (empty($base_price)) {
+        $base_price = floatval(get_post_meta($parent_id, '_price', true));
+    }
+    
+    // Calculate prorated price manually without calling get_price()
+    $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+    $session_rate = floatval(intersoccer_get_course_meta($variation_id, '_course_weekly_discount', 0));
+    $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+    
+    $prorated_price = $base_price; // Default to full price
+    
+    // Use session rate calculation if available
+    if ($session_rate > 0 && $remaining_sessions > 0) {
+        $prorated_price = $session_rate * $remaining_sessions;
+        $prorated_price = round($prorated_price, 2);
+    }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Filtering course variation price for ' . $variation_id . ' from ' . $price . ' to ' . $prorated_price);
+        error_log('InterSoccer: Filtered course variation price for ' . $variation_id . ' from ' . $price . ' to ' . $prorated_price);
     }
+    
+    // Remove filtering flag
+    unset($filtering[$variation_id]);
     
     return $prorated_price;
 }
