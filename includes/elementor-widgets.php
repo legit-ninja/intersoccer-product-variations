@@ -153,6 +153,65 @@ add_action('woocommerce_before_single_product', function () {
     </tr>
 <?php
     $day_selection_html = ob_get_clean();
+    
+    // Late Pickup HTML - Generate for ALL camp products (show/hide based on variation)
+    $late_pickup_html = '';
+    
+    error_log('=== InterSoccer Late Pickup: Starting HTML generation ===');
+    error_log('Product type: ' . $product_type);
+    error_log('Is variable: ' . ($is_variable ? 'yes' : 'no'));
+    
+    if ($product_type === 'camp' && $is_variable) {
+        error_log('InterSoccer Late Pickup: Product IS camp and IS variable, proceeding...');
+        
+        // Get late pickup pricing from settings
+        $per_day_cost = floatval(get_option('intersoccer_late_pickup_per_day', 25));
+        $full_week_cost = floatval(get_option('intersoccer_late_pickup_full_week', 90));
+        
+        error_log('InterSoccer Late Pickup: Loaded pricing - Per Day: ' . $per_day_cost . ' CHF, Full Week: ' . $full_week_cost . ' CHF');
+        
+        // Get variation settings for late pickup
+        $variations = $product->get_available_variations();
+        $variation_settings = [];
+        foreach ($variations as $variation) {
+            $variation_id = $variation['variation_id'];
+            $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+            if ($enable_late_pickup === 'yes') {
+                $variation_settings[$variation_id] = [
+                    'enabled' => true,
+                    'per_day_cost' => $per_day_cost,
+                    'full_week_cost' => $full_week_cost,
+                ];
+            }
+        }
+        
+        error_log('InterSoccer Late Pickup (Elementor): Total variations: ' . count($variations));
+        error_log('InterSoccer Late Pickup (Elementor): Variations with late pickup enabled: ' . count($variation_settings));
+        error_log('InterSoccer Late Pickup (Elementor): Variation settings: ' . json_encode($variation_settings));
+        
+        // ALWAYS generate the HTML for camp products, even if no variations have it enabled yet
+        // The JavaScript will show/hide it based on the selected variation
+        error_log('InterSoccer Late Pickup: Generating HTML now...');
+        ob_start();
+?>
+    <tr class="intersoccer-late-pickup-row intersoccer-injected" style="display: none;" data-variation-settings="<?php echo esc_attr(json_encode($variation_settings, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS)); ?>">
+        <th class="label"><label><?php esc_html_e('Late Pick Up Options', 'intersoccer-product-variations'); ?></label></th>
+        <td class="value">
+            <div class="intersoccer-late-pickup-content">
+                <div class="intersoccer-late-pickup-days"></div>
+                <div class="intersoccer-late-pickup-cost" style="margin-top: 10px; font-weight: bold;"></div>
+            </div>
+        </td>
+    </tr>
+<?php
+        $late_pickup_html = ob_get_clean();
+        error_log('InterSoccer Late Pickup: HTML generated, length: ' . strlen($late_pickup_html));
+        error_log('InterSoccer Late Pickup: HTML content preview: ' . substr($late_pickup_html, 0, 200));
+    } else {
+        error_log('InterSoccer Late Pickup: NOT generating HTML (product_type=' . $product_type . ', is_variable=' . ($is_variable ? 'yes' : 'no') . ')');
+    }
+    
+    error_log('InterSoccer Late Pickup: Final $late_pickup_html empty? ' . (empty($late_pickup_html) ? 'YES' : 'NO'));
 ?>
     <script>
         jQuery(document).ready(function($) {
@@ -165,6 +224,21 @@ add_action('woocommerce_before_single_product', function () {
             console.log('InterSoccer Debug: Found form:', $form);
             console.log('InterSoccer Debug: Form classes:', $form.attr('class'));
             console.log('InterSoccer Debug: Form ID:', $form.attr('id'));
+            
+            // CRITICAL FIX: Intercept WooCommerce AJAX add-to-cart for camp products
+            // We need to prevent AJAX but keep the variation form working
+            <?php if ($product_type === 'camp' && $is_variable): ?>
+            console.log('InterSoccer: Setting up standard POST submission for camp product');
+            
+            // Unbind WooCommerce's AJAX add-to-cart handler
+            $(document).off('click', '.single_add_to_cart_button');
+            
+            // Prevent WooCommerce from intercepting the form submission
+            $form.off('submit.wc-variation-form');
+            
+            console.log('InterSoccer: AJAX handlers removed, form will use standard POST');
+            <?php endif; ?>
+            
             console.log('InterSoccer Debug: All forms on page:', $('form').length);
             $('form').each(function(i) {
                 console.log('InterSoccer Debug: Form', i, 'classes:', $(this).attr('class'), 'ID:', $(this).attr('id'));
@@ -200,6 +274,7 @@ add_action('woocommerce_before_single_product', function () {
             var lastVariation = null;
             var lastVariationId = 0;
             var productType = '<?php echo esc_js($product_type); ?>';
+            var isSubmitting = false;
             
             // ENHANCEMENT: Player persistence state management
             var playerPersistence = {
@@ -240,22 +315,46 @@ add_action('woocommerce_before_single_product', function () {
             // Inject fields
             function injectFields(retryCount = 0, maxRetries = 10) {
                 if ($form.find('.intersoccer-player-selection').length > 0) {
+                    console.log('InterSoccer: Fields already injected, skipping');
                     return;
                 }
 
+                console.log('InterSoccer: Injecting fields into form');
                 var $variationsTable = $form.find('.variations, .woocommerce-variation');
+                console.log('InterSoccer: Variations table found:', $variationsTable.length);
+                
                 if ($variationsTable.length) {
                     var $tbody = $variationsTable.find('tbody, .variations_table');
+                    console.log('InterSoccer: tbody found:', $tbody.length);
+                    
                     if ($tbody.length) {
+                        console.log('InterSoccer: Appending to tbody');
                         $tbody.append(<?php echo json_encode($player_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                         $tbody.append(<?php echo json_encode($day_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                        <?php if (!empty($late_pickup_html)): ?>
+                        console.log('InterSoccer Late Pickup: Injecting late pickup HTML into tbody');
+                        $tbody.append(<?php echo json_encode($late_pickup_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                        console.log('InterSoccer Late Pickup: Late pickup row injected, checking presence:', $tbody.find('.intersoccer-late-pickup-row').length);
+                        <?php else: ?>
+                        console.log('InterSoccer Late Pickup: No late pickup HTML to inject (empty)');
+                        <?php endif; ?>
                     } else {
+                        console.log('InterSoccer: Appending to variations table directly');
                         $variationsTable.append(<?php echo json_encode($player_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                         $variationsTable.append(<?php echo json_encode($day_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                        <?php if (!empty($late_pickup_html)): ?>
+                        console.log('InterSoccer Late Pickup: Injecting late pickup HTML into variations table');
+                        $variationsTable.append(<?php echo json_encode($late_pickup_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                        <?php endif; ?>
                     }
                 } else {
+                    console.log('InterSoccer: No variations table, prepending to form');
                     $form.prepend(<?php echo json_encode($player_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
                     $form.prepend(<?php echo json_encode($day_selection_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                    <?php if (!empty($late_pickup_html)): ?>
+                    console.log('InterSoccer Late Pickup: Prepending late pickup HTML to form (no variations table)');
+                    $form.prepend(<?php echo json_encode($late_pickup_html, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS); ?>);
+                    <?php endif; ?>
                 }
 
                 $form.find('.intersoccer-player-selection').css('display', 'table-row');
@@ -407,11 +506,22 @@ add_action('woocommerce_before_single_product', function () {
                     // For single-day bookings, use all available days if no preloaded days
                     var daysToShow = preloadedDays.length > 0 ? preloadedDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+                    // Check multiple sources for which days should be checked
                     var currentChecked = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() { return $(this).val(); }).get();
+                    var hiddenDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                    
+                    console.log('  Days state - currentChecked:', currentChecked, 'hiddenDays:', hiddenDays, 'selectedDays:', selectedDays);
+                    
+                    // Sync selectedDays with hidden inputs (source of truth)
+                    if (hiddenDays.length > 0) {
+                        selectedDays = hiddenDays;
+                        console.log('  Synced selectedDays from hidden inputs:', selectedDays);
+                    }
+                    
                     $dayCheckboxes.empty();
                     daysToShow.forEach((day) => {
                         var translatedDay = dayTranslations[day] || day; // Fallback to English if translation not found
-                        var isChecked = currentChecked.includes(day) || selectedDays.includes(day) ? 'checked' : '';
+                        var isChecked = currentChecked.includes(day) || selectedDays.includes(day) || hiddenDays.includes(day) ? 'checked' : '';
                         $dayCheckboxes.append(`
                             <label style="margin-right: 10px; display: inline-block;">
                                 <input type="checkbox" name="camp_days_temp[]" value="${day}" class="intersoccer-day-checkbox" ${isChecked}> ${translatedDay}
@@ -419,15 +529,51 @@ add_action('woocommerce_before_single_product', function () {
                         `);
                     });
                     $dayCheckboxes.find('input.intersoccer-day-checkbox').prop('disabled', false);
+                    
+                    // Update notification state after rendering checkboxes based on ACTUAL checkbox state
+                    var $dayNotification = $daySelection.find('.intersoccer-day-notification');
+                    var actuallyCheckedCount = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').length;
+                    console.log('  After render - actuallyCheckedCount:', actuallyCheckedCount, 'isSubmitting:', isSubmitting);
+                    console.log('  Current call stack:', new Error().stack);
+                    
+                    // Don't show notification if form is being submitted or has been submitted
+                    if (isSubmitting) {
+                        console.log('  Form is submitting, FORCING notification to hide');
+                        $dayNotification.hide().css('display', 'none');
+                    } else if (actuallyCheckedCount === 0) {
+                        console.log('  Showing day notification - no days selected');
+                        $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                    } else {
+                        console.log('  Hiding day notification - days are selected');
+                        $dayNotification.hide();
+                    }
 
                     $dayCheckboxes.find('input.intersoccer-day-checkbox').off('change').on('change', function() {
                         var $checkbox = $(this);
 
                         selectedDays = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() { return $(this).val(); }).get();
+                        console.log('InterSoccer Day Checkbox CHANGED: Selected days:', selectedDays);
+                        
                         $form.find('input[name="camp_days[]"]').remove();
                         selectedDays.forEach((day) => {
                             $form.append(`<input type="hidden" name="camp_days[]" value="${day}" class="intersoccer-camp-day-input">`);
                         });
+                        
+                        // Verify hidden inputs were added
+                        var hiddenInputCount = $form.find('input[name="camp_days[]"]').length;
+                        console.log('InterSoccer Day Checkbox: Hidden inputs in form:', hiddenInputCount, 'values:', $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get());
+                        
+                        // Update day selection notification
+                        var $dayNotification = $daySelection.find('.intersoccer-day-notification');
+                        if (!isSubmitting) {
+                            if (selectedDays.length === 0) {
+                                $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                            } else {
+                                $dayNotification.hide();
+                            }
+                        } else {
+                            console.log('  Checkbox change - form is submitting, keeping notification hidden');
+                        }
                         
                         // Update price for single-day camps
                         updateCampPrice($form, selectedDays);
@@ -441,21 +587,290 @@ add_action('woocommerce_before_single_product', function () {
                     $daySelection.hide();
                     $form.find('input[name="camp_days[]"]').remove();
                     selectedDays = [];
+                    // Hide the notification when day selection is hidden
+                    $daySelection.find('.intersoccer-day-notification').hide();
                 }
+            }
+            
+            // Late Pickup Handling
+            var latePickupVariationSettings = {};
+            var selectedLatePickupOption = 'none'; // 'none', 'full-week', or 'single-days'
+            var selectedLatePickupDays = []; // For 'single-days' option, stores selected days
+            
+            function getLatePickupRow() {
+                return $form.find('.intersoccer-late-pickup-row');
+            }
+            
+            function loadLatePickupSettings() {
+                var $row = getLatePickupRow();
+                if ($row.length) {
+                    try {
+                        latePickupVariationSettings = JSON.parse($row.attr('data-variation-settings') || '{}');
+                        console.log('InterSoccer Late Pickup: Variation settings loaded:', latePickupVariationSettings);
+                    } catch (e) {
+                        console.error('InterSoccer Late Pickup: Failed to parse variation settings:', e);
+                    }
+                }
+            }
+            
+            function handleLatePickupDisplay(variationId) {
+                console.log('InterSoccer Late Pickup: handleLatePickupDisplay called for variation', variationId);
+                
+                var $latePickupRow = getLatePickupRow();
+                
+                if (!$latePickupRow.length) {
+                    console.log('InterSoccer Late Pickup: Row element not found');
+                    return;
+                }
+                
+                console.log('InterSoccer Late Pickup: Row element found!');
+                
+                // Load settings if not already loaded
+                if (Object.keys(latePickupVariationSettings).length === 0) {
+                    loadLatePickupSettings();
+                }
+                
+                var settings = latePickupVariationSettings[variationId];
+                
+                if (settings && settings.enabled) {
+                    console.log('InterSoccer Late Pickup: Showing late pickup for variation', variationId);
+                    $latePickupRow.show();
+                    renderLatePickupRadioButtons(settings);
+                } else {
+                    console.log('InterSoccer Late Pickup: Hiding late pickup (not enabled for this variation)');
+                    $latePickupRow.hide();
+                    selectedLatePickupOption = 'none';
+                    selectedLatePickupDays = [];
+                }
+            }
+            
+            function renderLatePickupRadioButtons(settings) {
+                var $latePickupRow = getLatePickupRow();
+                var $daysContainer = $latePickupRow.find('.intersoccer-late-pickup-days');
+                var $costContainer = $latePickupRow.find('.intersoccer-late-pickup-cost');
+                
+                // Reset to default if not already set
+                if (!selectedLatePickupOption || selectedLatePickupOption === '') {
+                    selectedLatePickupOption = 'none';
+                    selectedLatePickupDays = [];
+                }
+                
+                var days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                
+                var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : {
+                    'Monday': 'Monday',
+                    'Tuesday': 'Tuesday',
+                    'Wednesday': 'Wednesday',
+                    'Thursday': 'Thursday',
+                    'Friday': 'Friday'
+                };
+                
+                $daysContainer.empty();
+                
+                // Add optional note
+                $daysContainer.append(`
+                    <div style="margin-bottom: 10px; font-style: italic; color: #666;">
+                        Select late pick up option (optional)
+                    </div>
+                `);
+                
+                // Create options container
+                var $optionsContainer = $('<div class="intersoccer-late-pickup-options"></div>');
+                
+                // Add "No Late Pickup" option (default)
+                var noneChecked = selectedLatePickupOption === 'none' ? 'checked' : '';
+                $optionsContainer.append(`
+                    <label style="display: block; margin-bottom: 8px;">
+                        <input type="radio" name="late_pickup_option" value="none" class="intersoccer-late-pickup-radio" ${noneChecked}> 
+                        <strong>No Late Pickup</strong>
+                    </label>
+                `);
+                
+                // Add "Full Week" option
+                var fullWeekChecked = selectedLatePickupOption === 'full-week' ? 'checked' : '';
+                $optionsContainer.append(`
+                    <label style="display: block; margin-bottom: 8px;">
+                        <input type="radio" name="late_pickup_option" value="full-week" class="intersoccer-late-pickup-radio" ${fullWeekChecked}> 
+                        <strong>Full Week</strong>
+                    </label>
+                `);
+                
+                // Add "Single Days" option
+                var singleDaysChecked = selectedLatePickupOption === 'single-days' ? 'checked' : '';
+                $optionsContainer.append(`
+                    <label style="display: block; margin-bottom: 8px;">
+                        <input type="radio" name="late_pickup_option" value="single-days" class="intersoccer-late-pickup-radio" ${singleDaysChecked}> 
+                        <strong>Single Days</strong>
+                    </label>
+                `);
+                
+                $daysContainer.append($optionsContainer);
+                
+                // Add day checkboxes container (hidden by default)
+                var $dayCheckboxesContainer = $('<div class="intersoccer-late-pickup-day-checkboxes" style="margin-left: 25px; margin-top: 10px; display: none;"></div>');
+                
+                days.forEach(function(day) {
+                    var translatedDay = dayTranslations[day] || day;
+                    var isChecked = selectedLatePickupDays.includes(day) ? 'checked' : '';
+                    $dayCheckboxesContainer.append(`
+                        <label style="display: block; margin-bottom: 5px;">
+                            <input type="checkbox" name="late_pickup_single_days[]" value="${day}" class="intersoccer-late-pickup-day-checkbox" ${isChecked}> ${translatedDay}
+                        </label>
+                    `);
+                });
+                
+                $daysContainer.append($dayCheckboxesContainer);
+                
+                // Handle radio button changes
+                $optionsContainer.find('.intersoccer-late-pickup-radio').on('change', function() {
+                    selectedLatePickupOption = $(this).val();
+                    console.log('InterSoccer Late Pickup: Option changed to:', selectedLatePickupOption);
+                    
+                    // Show/hide day checkboxes based on selection
+                    if (selectedLatePickupOption === 'single-days') {
+                        $dayCheckboxesContainer.show();
+                    } else {
+                        $dayCheckboxesContainer.hide();
+                        selectedLatePickupDays = []; // Clear selected days when not in single-days mode
+                    }
+                    
+                    updateLatePickupCost(settings);
+                    updateLatePickupFormData(settings);
+                });
+                
+                // Handle day checkbox changes
+                $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox').on('change', function() {
+                    selectedLatePickupDays = $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox:checked').map(function() {
+                        return $(this).val();
+                    }).get();
+                    
+                    console.log('InterSoccer Late Pickup: Selected days:', selectedLatePickupDays);
+                    
+                    updateLatePickupCost(settings);
+                    updateLatePickupFormData(settings);
+                });
+                
+                // Show day checkboxes if single-days is already selected
+                if (selectedLatePickupOption === 'single-days') {
+                    $dayCheckboxesContainer.show();
+                }
+                
+                updateLatePickupCost(settings);
+                updateLatePickupFormData(settings);
+            }
+            
+            function updateLatePickupCost(settings) {
+                var $latePickupRow = getLatePickupRow();
+                var $costContainer = $latePickupRow.find('.intersoccer-late-pickup-cost');
+                
+                // Handle radio button selection
+                if (selectedLatePickupOption === 'none') {
+                    $costContainer.html('<span style="color: #666;">No late pick up selected</span>');
+                    console.log('InterSoccer Late Pickup: No option selected');
+                    return;
+                }
+                
+                var cost;
+                var costText;
+                
+                if (selectedLatePickupOption === 'full-week') {
+                    cost = settings.full_week_cost;
+                    costText = 'Full Week (5 days): ';
+                } else if (selectedLatePickupOption === 'single-days') {
+                    // Calculate based on number of days selected
+                    var dayCount = selectedLatePickupDays.length;
+                    
+                    if (dayCount === 0) {
+                        $costContainer.html('<span style="color: #666;">Select at least one day</span>');
+                        console.log('InterSoccer Late Pickup: Single days selected but no days checked');
+                        return;
+                    }
+                    
+                    // Use full week price if 5 days selected
+                    if (dayCount === 5) {
+                        cost = settings.full_week_cost;
+                        costText = 'Full Week (5 days): ';
+                    } else {
+                        cost = dayCount * settings.per_day_cost;
+                        costText = dayCount + ' day' + (dayCount > 1 ? 's' : '') + ': ';
+                    }
+                } else {
+                    // Fallback (shouldn't happen)
+                    $costContainer.html('<span style="color: #666;">Invalid selection</span>');
+                    return;
+                }
+                
+                var formattedCost = typeof wc_price !== 'undefined' ? wc_price(cost) : 'CHF ' + cost.toFixed(2);
+                $costContainer.html(costText + formattedCost);
+                
+                console.log('InterSoccer Late Pickup: Cost updated - option:', selectedLatePickupOption, 'days:', selectedLatePickupDays.length, 'cost:', cost);
+            }
+            
+            function updateLatePickupFormData(settings) {
+                // Remove any existing late pickup hidden inputs
+                $form.find('input[name="late_pickup_cost"]').remove();
+                $form.find('input[name="late_pickup_days[]"]').remove();
+                
+                // If "none" is selected, don't add any form data
+                if (selectedLatePickupOption === 'none') {
+                    console.log('InterSoccer Late Pickup: No option selected, not adding form data');
+                    return;
+                }
+                
+                // Calculate cost based on selection
+                var cost;
+                var daysToSend = [];
+                
+                if (selectedLatePickupOption === 'full-week') {
+                    cost = settings.full_week_cost;
+                    daysToSend = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                } else if (selectedLatePickupOption === 'single-days') {
+                    // Use selected days from checkboxes
+                    var dayCount = selectedLatePickupDays.length;
+                    
+                    if (dayCount === 0) {
+                        console.log('InterSoccer Late Pickup: Single days selected but no days checked, not adding form data');
+                        return;
+                    }
+                    
+                    // Use full week price if 5 days selected
+                    if (dayCount === 5) {
+                        cost = settings.full_week_cost;
+                    } else {
+                        cost = dayCount * settings.per_day_cost;
+                    }
+                    
+                    daysToSend = selectedLatePickupDays;
+                } else {
+                    console.log('InterSoccer Late Pickup: Invalid option, not adding form data');
+                    return;
+                }
+                
+                // Add hidden input for cost
+                $form.append('<input type="hidden" name="late_pickup_cost" value="' + cost + '">');
+                
+                // Add hidden inputs for each day
+                daysToSend.forEach(function(day) {
+                    $form.append('<input type="hidden" name="late_pickup_days[]" value="' + day + '">');
+                });
+                
+                console.log('InterSoccer Late Pickup: Added form data - option:', selectedLatePickupOption, 'cost:', cost, 'days:', daysToSend);
             }
 
             // Button state update handler - ensures player selection is required for ALL products
             $form.on('intersoccer_update_button_state', function() {
                 var $button = $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
-                var playerId = $form.find('.player-select').val();
+                var playerId = $form.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select').val();
                 var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || 
                                 $form.find('select[name="attribute_booking-type"]').val() || 
                                 $form.find('select[id*="booking-type"]').val() || 
                                 $form.find('input[name="attribute_pa_booking-type"]').val() || 
                                 $form.find('input[name="attribute_booking-type"]').val() || '';
-                var hasPlayer = playerId && playerId !== '';
+                // Fix: Check for null/undefined/empty string, but allow 0 (first player index)
+                var hasPlayer = playerId !== null && playerId !== undefined && playerId !== '';
                 
                 console.log('InterSoccer: Updating button state');
+                console.log('  Player ID value:', playerId, 'type:', typeof playerId);
                 console.log('  Player selected:', hasPlayer);
                 console.log('  Booking type:', bookingType);
                 
@@ -485,15 +900,175 @@ add_action('woocommerce_before_single_product', function () {
                 
                 console.log('  Should enable button:', shouldEnable);
                 
+                // Manage notifications based on what's missing
+                var $attendeeNotification = $form.find('.intersoccer-attendee-notification');
+                var $dayNotification = $form.find('.intersoccer-day-notification');
+                var isSingleDayBooking = bookingType === 'single-days' || 
+                                       bookingType === 'à la journée' || 
+                                       bookingType === 'a-la-journee' ||
+                                       bookingType.toLowerCase().includes('single') || 
+                                       bookingType.toLowerCase().includes('journée') ||
+                                       bookingType.toLowerCase().includes('journee');
+                
                 if (shouldEnable) {
                     $button.prop('disabled', false).removeClass('disabled');
-                    $form.find('.intersoccer-attendee-notification').hide();
+                    $attendeeNotification.hide();
+                    if (!isSubmitting) {
+                        $dayNotification.hide();
+                    }
                 } else {
                     $button.prop('disabled', true).addClass('disabled');
-                    if (!hasPlayer) {
-                        $form.find('.intersoccer-attendee-notification').show();
+                    
+                    // Don't show notifications if form is being submitted
+                    if (isSubmitting) {
+                        $attendeeNotification.hide();
+                        $dayNotification.hide();
+                    } else {
+                        // Show appropriate notification based on what's missing
+                        if (!hasPlayer) {
+                            $attendeeNotification.show();
+                            $dayNotification.hide();
+                        } else if (isSingleDayBooking && !daysSelected) {
+                            $attendeeNotification.hide();
+                            $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                        } else {
+                            // Variation not selected or other issue
+                            $attendeeNotification.hide();
+                            $dayNotification.hide();
+                        }
                     }
                 }
+            });
+
+            // Handle form submission
+            $form.on('submit', function(e) {
+                console.log('InterSoccer: Form submit event triggered');
+                
+                <?php if ($product_type === 'camp' && $is_variable): ?>
+                // For camp products, force standard POST submission
+                // Stop all other handlers from executing
+                e.stopImmediatePropagation();
+                
+                console.log('InterSoccer: Forcing standard POST submission for camp product');
+                
+                // Get the actual form element
+                var formElement = $form[0];
+                
+                // Submit the form natively (bypassing all jQuery handlers)
+                setTimeout(function() {
+                    console.log('InterSoccer: Native form submit executed');
+                    formElement.submit();
+                }, 10);
+                
+                return;  // Don't execute any code below this
+                <?php endif; ?>
+                
+                isSubmitting = true;
+                
+                // Debug: Check what data is in the form
+                var campDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                var latePickupDays = $form.find('input[name="late_pickup_days[]"]').map(function() { return $(this).val(); }).get();
+                var latePickupCost = $form.find('input[name="late_pickup_cost"]').val();
+                var variationId = $form.find('input[name="variation_id"]').val();
+                var assignedAttendee = $form.find('input[name="assigned_attendee"]').val();
+                
+                console.log('InterSoccer: Form data at submission:');
+                console.log('  - Camp days:', campDays);
+                console.log('  - Late pickup days:', latePickupDays);
+                console.log('  - Late pickup cost:', latePickupCost);
+                console.log('  - Variation ID:', variationId);
+                console.log('  - Assigned attendee:', assignedAttendee);
+                console.log('  - Selected days variable:', selectedDays);
+                
+                // Hide all notifications during submission
+                $form.addClass('intersoccer-form-submitting');
+                $form.find('.intersoccer-attendee-notification').hide().css('display', 'none');
+                $form.find('.intersoccer-day-notification').hide().css('display', 'none');
+                
+                console.log('InterSoccer: Form submitting, isSubmitting =', isSubmitting);
+                
+                // Don't automatically reset - only reset if there's an error
+                // The adding_to_cart event will handle successful submissions
+            });
+            
+            // Also handle button click directly
+            $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').on('click', function(e) {
+                console.log('=== InterSoccer: Buy Now button clicked ===');
+                var $button = $(this);
+                
+                // Debug: Log form data BEFORE any checks
+                var campDaysBeforeSubmit = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
+                var variationId = $form.find('input[name="variation_id"]').val();
+                var $playerSelect = $form.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
+                var playerId = $playerSelect.val();
+                
+                console.log('InterSoccer Button Click: Player select found?', $playerSelect.length, 'selector:', $playerSelect.attr('name'));
+                console.log('InterSoccer Button Click: Player select element:', $playerSelect[0]);
+                
+                console.log('InterSoccer Button Click: Booking type:', bookingType);
+                console.log('InterSoccer Button Click: Variation ID:', variationId);
+                console.log('InterSoccer Button Click: Player ID:', playerId);
+                console.log('InterSoccer Button Click: Camp days in form:', campDaysBeforeSubmit);
+                console.log('InterSoccer Button Click: Selected days variable:', selectedDays);
+                console.log('InterSoccer Button Click: Button disabled?', $button.prop('disabled'));
+                
+                // Check if button is disabled
+                if ($button.prop('disabled')) {
+                    console.log('InterSoccer: ❌ Button is DISABLED, preventing submission');
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // If no camp days in form but we have selectedDays, add them
+                if (campDaysBeforeSubmit.length === 0 && selectedDays.length > 0) {
+                    console.log('InterSoccer: ⚠️  WARNING - No camp_days[] inputs found, but selectedDays has:', selectedDays);
+                    console.log('InterSoccer: Adding camp days to form now...');
+                    selectedDays.forEach(function(day) {
+                        $form.append('<input type="hidden" name="camp_days[]" value="' + day + '" class="intersoccer-camp-day-input">');
+                    });
+                    var afterAdd = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                    console.log('InterSoccer: ✅ Added camp days to form, now have:', afterAdd);
+                }
+                
+                isSubmitting = true;
+                
+                // Hide all notifications and add a class to track submission
+                $form.addClass('intersoccer-form-submitting');
+                $form.find('.intersoccer-attendee-notification').hide().css('display', 'none');
+                $form.find('.intersoccer-day-notification').hide().css('display', 'none');
+                
+                console.log('InterSoccer: ✅ Proceeding with form submission, isSubmitting =', isSubmitting);
+            });
+            
+            // Handle successful add to cart
+            $(document.body).on('added_to_cart', function() {
+                console.log('InterSoccer: Product successfully added to cart');
+                // Keep isSubmitting = true so notifications don't reappear
+                // Page might redirect or cart drawer might open
+            });
+            
+            // Handle add to cart errors
+            $(document.body).on('wc_fragments_refreshed wc_cart_fragments_refreshed', function() {
+                // Check if there are error notices
+                if ($('.woocommerce-error, .woocommerce-message--error').length > 0) {
+                    console.log('InterSoccer: Add to cart failed, resetting isSubmitting');
+                    isSubmitting = false;
+                    $form.removeClass('intersoccer-form-submitting');
+                    $form.trigger('intersoccer_update_button_state');
+                }
+            });
+            
+            // Reset isSubmitting after a longer timeout as a safety net (5 seconds)
+            // This ensures that if something goes wrong, the form becomes usable again
+            $form.on('submit', function() {
+                setTimeout(function() {
+                    if (isSubmitting) {
+                        console.log('InterSoccer: Safety timeout - resetting isSubmitting after 5 seconds');
+                        isSubmitting = false;
+                        $form.removeClass('intersoccer-form-submitting');
+                    }
+                }, 5000);
             });
 
             // Inject fields and initialize
@@ -564,6 +1139,9 @@ add_action('woocommerce_before_single_product', function () {
 
                 // Render day checkboxes based on the variation's booking type
                 renderDayCheckboxes(variationBookingType, $daySelection, $dayCheckboxes, $form);
+                
+                // Handle late pickup display
+                handleLatePickupDisplay(variation.variation_id);
 
                 // Update price for single-day bookings
                 var isSingleDayBooking = variationBookingType === 'single-days' ||

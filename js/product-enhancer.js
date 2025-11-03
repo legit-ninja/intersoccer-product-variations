@@ -52,12 +52,14 @@
             const self = this;
             const $form = $(this.state.formSelector);
 
-            // Form submission validation
+            // Form submission validation is now handled by elementor-widgets.php
+            // Only keeping quantity enforcement here
             $form.on('submit', function(e) {
-                if (!self.validateForm()) {
-                    e.preventDefault();
-                    return false;
+                // Force quantity to 1 for InterSoccer products
+                if (['camp', 'course'].includes(self.config.productType)) {
+                    $form.find('input[name="quantity"], .quantity input[type="number"]').val(1);
                 }
+                console.log('InterSoccer Product Enhancer: Form submitting, quantity set to 1');
             });
 
             // Variation change handler
@@ -72,7 +74,13 @@
 
             // Player selection change
             $form.on('change', '.intersoccer-player-select', function() {
-                self.updateButtonState();
+                // For camps, delegate button state to elementor-widgets.php via custom event
+                if (self.config.productType === 'camp') {
+                    console.log('InterSoccer Product Enhancer: Player changed, triggering intersoccer_update_button_state event');
+                    $form.trigger('intersoccer_update_button_state');
+                } else {
+                    self.updateButtonState();
+                }
             });
 
             // Booking type change
@@ -101,7 +109,12 @@
             }
 
             this.populatePlayerSelect($form);
-            this.updateButtonState();
+            // For camps, delegate to elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                $form.trigger('intersoccer_update_button_state');
+            } else {
+                this.updateButtonState();
+            }
         },
 
         // Inject player selection field
@@ -178,7 +191,12 @@
                 this.handleCourseVariation(variation.intersoccer_course_data);
             }
 
-            this.updateButtonState();
+            // For camps, delegate to elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                $(this.state.formSelector).trigger('intersoccer_update_button_state');
+            } else {
+                this.updateButtonState();
+            }
         },
 
         // Handle camp-specific variation
@@ -198,13 +216,19 @@
 
         // Handle booking type change
         handleBookingTypeChange: function(bookingType) {
+            if (!bookingType) return;
             if (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) {
                 this.showDaySelection();
                 this.renderDayCheckboxes();
             } else {
                 this.hideDaySelection();
             }
-            this.updateButtonState();
+            // For camps, delegate to elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                $(this.state.formSelector).trigger('intersoccer_update_button_state');
+            } else {
+                this.updateButtonState();
+            }
         },
 
         // Show day selection
@@ -263,7 +287,12 @@
                 $form.append(`<input type="hidden" name="camp_days[]" value="${day}">`);
             });
 
-            this.updateButtonState();
+            // For camps, delegate to elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                $form.trigger('intersoccer_update_button_state');
+            } else {
+                this.updateButtonState();
+            }
         },
 
         // Display course information
@@ -272,21 +301,28 @@
             let $display = $form.find('.intersoccer-course-info');
 
             if (!$display.length) {
-                $form.find('.single_add_to_cart_button').before('<div class="intersoccer-course-info"></div>');
+                // Position after the variations table
+                const $variationsTable = $form.find('.variations');
+                if ($variationsTable.length) {
+                    $variationsTable.after('<div class="intersoccer-course-info"></div>');
+                } else {
+                    // Fallback: before add to cart button
+                    $form.find('.single_add_to_cart_button').before('<div class="intersoccer-course-info"></div>');
+                }
                 $display = $form.find('.intersoccer-course-info');
             }
 
             let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
-                const startDate = new Date(courseData.start_date).toLocaleDateString();
+                const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
                 html += `<p><strong>Start Date:</strong> ${startDate}</p>`;
             }
             if (courseData.end_date) {
-                const endDate = new Date(courseData.end_date).toLocaleDateString();
+                const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
                 html += `<p><strong>End Date:</strong> ${endDate}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
-                const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString()).join(', ');
+                const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
                 html += `<p><strong>Holidays (No Session):</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
@@ -312,12 +348,16 @@
                 return false;
             }
 
+            // Day validation is now handled by elementor-widgets.php
+            // Commenting out to prevent conflicts with the new system
+            /*
             // Check day selection for single-day camps
             const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
             if (bookingType === 'single-days' && this.state.selectedDays.length === 0) {
                 this.showError('days', 'Please select at least one day.');
                 return false;
             }
+            */
 
             // Force quantity to 1 for InterSoccer products
             if (['camp', 'course'].includes(this.config.productType)) {
@@ -346,13 +386,26 @@
 
         // Update add to cart button state
         updateButtonState: function() {
+            // For camps, button state is handled by elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                console.log('InterSoccer Product Enhancer: Skipping updateButtonState for camp (handled by elementor-widgets.php)');
+                return;
+            }
+            
             const $form = $(this.state.formSelector);
             const $button = $form.find('button.single_add_to_cart_button');
             
-            const playerSelected = !!$form.find('.intersoccer-player-select').val();
+            // Fix: Check for null/undefined/empty string, but allow 0 (first player index)
+            const playerValue = $form.find('.intersoccer-player-select').val();
+            const playerSelected = playerValue !== null && playerValue !== undefined && playerValue !== '';
             const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
-            const daysSelected = (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) ? this.state.selectedDays.length > 0 : true;
+            
+            // Check actual hidden inputs instead of this.state.selectedDays (which is managed by elementor-widgets.php)
+            const actualSelectedDays = $form.find('input[name="camp_days[]"]').length;
+            const daysSelected = (!bookingType) ? true : (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) ? actualSelectedDays > 0 : true;
             const isLoggedIn = this.config.userId > 0;
+
+            console.log('InterSoccer Product Enhancer: Button state check - playerValue:', playerValue, 'player:', playerSelected, 'days:', daysSelected, 'actualDays:', actualSelectedDays, 'logged in:', isLoggedIn);
 
             const canAddToCart = playerSelected && daysSelected && isLoggedIn;
 
@@ -372,6 +425,12 @@
 
         // Update notification messages
         updateNotifications: function(playerSelected, daysSelected, isLoggedIn) {
+            // For camps, notifications are handled by elementor-widgets.php
+            if (this.config.productType === 'camp') {
+                console.log('InterSoccer Product Enhancer: Skipping notifications for camp (handled by elementor-widgets.php)');
+                return;
+            }
+            
             const $form = $(this.state.formSelector);
             const $notification = $form.find('.intersoccer-attendee-notification');
 
