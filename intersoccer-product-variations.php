@@ -496,6 +496,18 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
         $data['remaining_sessions'] = $remaining_sessions;
         $data['discount_note'] = calculate_discount_note($variation_id, $remaining_sessions);
 
+        // v2.0 - Calculate and add prorated price directly to variation data
+        // This ensures JavaScript receives the correct price immediately
+        if (class_exists('InterSoccer_Course')) {
+            $prorated_price = InterSoccer_Course::calculate_price($variation->get_parent_id(), $variation_id);
+            $data['display_price'] = $prorated_price;
+            $data['display_regular_price'] = $prorated_price;
+            $data['price'] = $prorated_price;
+            // Wrap price in <span class="price"> to match WooCommerce standard structure
+            $data['price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
+            $data['display_price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
+        }
+
         // Add course data in the format expected by product-enhancer.js
         $data['intersoccer_course_data'] = [
             'start_date' => $course_start_date, // Use raw date format for JavaScript

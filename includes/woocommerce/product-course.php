@@ -800,7 +800,12 @@ function intersoccer_get_course_price() {
 
     $price = InterSoccer_Course::calculate_price($product_id, $variation_id);
 
-    wp_send_json_success(['price' => $price]);
+    // v2.0 - Return both price and formatted HTML
+    // Wrap in <span class="price"> to match WooCommerce standard structure
+    wp_send_json_success([
+        'price' => $price,
+        'price_html' => '<span class="price">' . wc_price($price) . '</span>'
+    ]);
 }
 
 /**
