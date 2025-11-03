@@ -1160,9 +1160,27 @@ add_action('woocommerce_before_single_product', function () {
                 }
 
                 // Handle course price updates (info display removed from top of page)
+                // v2.0 - Use price_html from variation data if available
                 if (productType === 'course') {
-                    console.log('InterSoccer: Course variation selected, updating price');
-                    updateCoursePrice($form, variation);
+                    console.log('InterSoccer: Course variation selected');
+                    
+                    // Check if variation already has price_html from server
+                    if (variation.price_html || variation.display_price_html) {
+                        var priceHtml = variation.price_html || variation.display_price_html;
+                        console.log('InterSoccer: Using price_html from variation data:', priceHtml);
+                        
+                        // Update price display - priceHtml now includes <span class="price"> wrapper
+                        var $priceContainer = jQuery('.woocommerce-variation-price');
+                        if ($priceContainer.length) {
+                            // Replace entire content since priceHtml includes the .price wrapper
+                            $priceContainer.html(priceHtml);
+                            console.log('InterSoccer: Updated price display from variation data');
+                        }
+                    } else {
+                        // Fallback to AJAX if price_html not in variation data
+                        console.log('InterSoccer: No price_html in variation, calling AJAX');
+                        updateCoursePrice($form, variation);
+                    }
                 }
 
                 $form.trigger('intersoccer_update_button_state');
@@ -1295,30 +1313,33 @@ add_action('woocommerce_before_single_product', function () {
                 },
                 success: function(response) {
                     console.log('InterSoccer: Course price AJAX success:', response);
-                    if (response.success && response.data.price !== undefined) {
+                    if (response.success && response.data.price !== undefined && response.data.price_html) {
                         var price = parseFloat(response.data.price);
-                        console.log('InterSoccer: Updating course price display to:', price);
+                        var priceHtml = response.data.price_html;
+                        console.log('InterSoccer: Updating course price display to:', price, 'HTML:', priceHtml);
 
                         // Update the variation object
                         variation.display_price = price;
                         variation.price = price;
                         variation.display_regular_price = price;
+                        variation.price_html = priceHtml;
+                        variation.display_price_html = priceHtml;
 
-                        // Trigger WooCommerce price update events
-                        $form.trigger('woocommerce_variation_has_changed');
-                        jQuery(document.body).trigger('wc_variation_form');
-                        jQuery(document.body).trigger('woocommerce_variation_has_changed');
+                        // Update price display elements directly with formatted HTML from server
+                        // priceHtml now includes <span class="price"> wrapper to match WooCommerce structure
+                        var $priceContainer = jQuery('.woocommerce-variation-price');
+                        if ($priceContainer.length) {
+                            // Replace entire content since priceHtml includes the .price wrapper
+                            $priceContainer.html(priceHtml);
+                            console.log('InterSoccer: Updated course price display to:', priceHtml);
+                        } else {
+                            console.warn('InterSoccer: Price container .woocommerce-variation-price not found, cannot update display');
+                        }
 
-                        // Force update price display elements
-                        setTimeout(function() {
-                            jQuery('.woocommerce-variation-price .woocommerce-Price-amount, .price .woocommerce-Price-amount').each(function() {
-                                var formattedPrice = wc_price(price);
-                                jQuery(this).html(formattedPrice);
-                                console.log('InterSoccer: Updated price element:', jQuery(this).prop('tagName'), jQuery(this).attr('class'), 'to:', formattedPrice);
-                            });
-                        }, 100);
+                        // Update variation object so cart uses correct price
+                        // Don't trigger woocommerce_variation_has_changed - it tries to call wc_price() which doesn't exist
                     } else {
-                        console.error('InterSoccer: Course price response failed:', response.data);
+                        console.error('InterSoccer: Course price response failed or missing price_html:', response.data);
                     }
                 },
                 error: function(xhr, status, error) {
@@ -1451,13 +1472,8 @@ add_action('woocommerce_before_single_product', function () {
                         $form.trigger('woocommerce_variation_has_changed');
                         jQuery(document.body).trigger('wc_variation_form');
                         
-                        // Force immediate DOM update
-                        setTimeout(function() {
-                            jQuery('.woocommerce-variation-price .woocommerce-Price-amount, .price .woocommerce-Price-amount').each(function() {
-                                jQuery(this).html(wc_price(newPrice));
-                                console.log('InterSoccer: Force updated price element:', jQuery(this).prop('tagName'), jQuery(this).attr('class'));
-                            });
-                        }, 100);
+                        // WooCommerce will handle price display update via variation_has_changed event
+                        // No need to manually update DOM - price filter handles it
                     }
                 }
                 
