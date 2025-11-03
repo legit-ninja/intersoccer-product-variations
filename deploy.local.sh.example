@@ -1,0 +1,26 @@
+#!/bin/bash
+
+###############################################################################
+# Local Deployment Configuration
+###############################################################################
+#
+# Copy this file to deploy.local.sh and configure with your credentials:
+#   cp deploy.local.sh.example deploy.local.sh
+#
+# Then edit deploy.local.sh with your actual server details.
+# The deploy.local.sh file is in .gitignore and won't be committed.
+#
+###############################################################################
+
+# SSH credentials
+SERVER_USER="your-ssh-username"
+SERVER_HOST="intersoccer.legit.ninja"
+SSH_PORT="22"
+SSH_KEY="~/.ssh/id_rsa"
+
+# Plugin path on server (absolute path)
+SERVER_PATH="/var/www/html/wp-content/plugins/intersoccer-product-variations"
+
+# Optional: Custom rsync options
+# RSYNC_EXTRA_OPTS="--verbose"
+
