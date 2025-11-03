@@ -286,7 +286,6 @@ add_action('init', function () {
             '%s Course Sibling Discount',
             'Coach',
             'Organizer',
-            'Manage Players',
         ];
 
         foreach ($strings as $string) {
@@ -407,33 +406,6 @@ function intersoccer_refresh_nonce() {
     wp_send_json_success(['nonce' => $nonce]);
 }
 
-// Add custom roles
-add_action('init', function () {
-    add_role('coach', __('Coach', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
-    add_role('organizer', __('Organizer', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
-});
-
-// Register endpoint
-add_action('init', function () {
-    add_rewrite_endpoint('manage-players', EP_ROOT | EP_PAGES);
-});
-
-// Add menu item with high priority (after Dashboard)
-add_filter('woocommerce_account_menu_items', function ($items) {
-    $new_items = [];
-    $inserted = false;
-    foreach ($items as $key => $label) {
-        $new_items[$key] = $label;
-        if ($key === 'dashboard' && !$inserted) {
-            $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
-            $inserted = true;
-        }
-    }
-    if (!$inserted) {
-        $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
-    }
-    return $new_items;
-}, 10);
 
 // Flush permalinks on activation
 add_action('init', function () {
