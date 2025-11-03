@@ -12,3 +12,21 @@ debug-course-prices.php
 # Local test files
 run-tests.php
 test_class.php
+
+# Deployment configuration (contains credentials)
+deploy.local.sh
+
+# Node modules (for Cypress tests)
+node_modules/
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+.cypress/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
