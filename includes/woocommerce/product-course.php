@@ -70,6 +70,7 @@ function intersoccer_get_course_meta($variation_id, $meta_key, $default = null) 
 /**
  * Class to handle course-specific calculations.
  */
+if (!class_exists('InterSoccer_Course')) {
 class InterSoccer_Course {
 
     /**
@@ -463,6 +464,7 @@ class InterSoccer_Course {
         return $discount_note;
     }
 }
+} // End class_exists check for InterSoccer_Course
 
 // Procedural wrappers for backward compatibility
 function calculate_end_date($variation_id, $total_weeks) {
@@ -804,12 +806,14 @@ function intersoccer_get_course_price() {
 /**
  * Filter variation prices for courses to show prorated price automatically
  * This ensures the correct price displays immediately without needing AJAX
+ * 
+ * TEMPORARILY DISABLED - CAUSING INFINITE LOOP
  */
-add_filter('woocommerce_product_variation_get_price', 'intersoccer_filter_course_variation_price', 10, 2);
-add_filter('woocommerce_product_variation_get_regular_price', 'intersoccer_filter_course_variation_price', 10, 2);
-add_filter('woocommerce_product_variation_get_sale_price', 'intersoccer_filter_course_variation_price', 10, 2);
+// add_filter('woocommerce_product_variation_get_price', 'intersoccer_filter_course_variation_price', 10, 2);
+// add_filter('woocommerce_product_variation_get_regular_price', 'intersoccer_filter_course_variation_price', 10, 2);
+// add_filter('woocommerce_product_variation_get_sale_price', 'intersoccer_filter_course_variation_price', 10, 2);
 
-function intersoccer_filter_course_variation_price($price, $variation) {
+function intersoccer_filter_course_variation_price_DISABLED($price, $variation) {
     // Prevent infinite recursion - check if we're already filtering
     static $filtering = [];
     $variation_id = $variation->get_id();

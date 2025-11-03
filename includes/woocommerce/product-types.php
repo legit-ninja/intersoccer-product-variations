@@ -18,13 +18,16 @@ if (!defined('ABSPATH')) {
  * @param int $product_id
  * @return string|null 'camp', 'course', 'birthday', or null
  */
-function intersoccer_get_product_type($product_id) {
-    return InterSoccer_Product_Types::get_product_type($product_id);
+if (!function_exists('intersoccer_get_product_type')) {
+    function intersoccer_get_product_type($product_id) {
+        return InterSoccer_Product_Types::get_product_type($product_id);
+    }
 }
 
 /**
  * Class to handle product type detection and related utilities.
  */
+if (!class_exists('InterSoccer_Product_Types')) {
 class InterSoccer_Product_Types {
 
     /**
@@ -204,16 +207,19 @@ class InterSoccer_Product_Types {
         }
     }
 }
+} // End class_exists check for InterSoccer_Product_Types
 
 /**
  * Check if product is a camp
  * @param int $product_id
  * @return bool
  */
-function intersoccer_is_camp($product_id) {
-    $result = intersoccer_get_product_type($product_id) === 'camp';
-    error_log('InterSoccer: intersoccer_is_camp(' . $product_id . ') = ' . ($result ? 'true' : 'false'));
-    return $result;
+if (!function_exists('intersoccer_is_camp')) {
+    function intersoccer_is_camp($product_id) {
+        $result = intersoccer_get_product_type($product_id) === 'camp';
+        error_log('InterSoccer: intersoccer_is_camp(' . $product_id . ') = ' . ($result ? 'true' : 'false'));
+        return $result;
+    }
 }
 
 /**
@@ -221,8 +227,10 @@ function intersoccer_is_camp($product_id) {
  * @param int $product_id
  * @return bool
  */
-function intersoccer_is_course($product_id) {
-    return intersoccer_get_product_type($product_id) === 'course';
+if (!function_exists('intersoccer_is_course')) {
+    function intersoccer_is_course($product_id) {
+        return intersoccer_get_product_type($product_id) === 'course';
+    }
 }
 
 /**
