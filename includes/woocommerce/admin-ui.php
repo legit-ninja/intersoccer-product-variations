@@ -3230,4 +3230,220 @@ function intersoccer_emergency_stop_callback() {
     wp_send_json_success(['message' => 'Batch processing stopped and cleared.']);
 }
 
+/**
+ * ============================================================================
+ * PLAYER ASSIGNMENT - Admin Order Item Management
+ * ============================================================================
+ * Allows admins to assign or change the player/attendee for order items
+ * in the WooCommerce order edit screen.
+ */
+
+/**
+ * Add player assignment dropdown to order items in admin
+ */
+add_action('woocommerce_before_order_itemmeta', 'intersoccer_add_player_assignment_dropdown_admin', 10, 3);
+function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $product) {
+    // Only show in admin
+    if (!is_admin()) {
+        return;
+    }
+    
+    // Only show for InterSoccer products (camp, course, birthday)
+    $product_id = $item->get_product_id();
+    $product_type = function_exists('intersoccer_get_product_type') 
+        ? intersoccer_get_product_type($product_id) 
+        : null;
+    
+    if (!in_array($product_type, ['camp', 'course', 'birthday'])) {
+        return; // Not an InterSoccer product
+    }
+    
+    // Get the order and customer
+    $order = $item->get_order();
+    if (!$order) {
+        return;
+    }
+    
+    $customer_id = $order->get_customer_id();
+    if (!$customer_id) {
+        echo '<div class="player-assignment-notice" style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107;">';
+        echo '<strong>' . esc_html__('Player Assignment:', 'intersoccer-product-variations') . '</strong> ';
+        echo esc_html__('Guest order - no registered players available.', 'intersoccer-product-variations');
+        echo '</div>';
+        return;
+    }
+    
+    // Get customer's registered players
+    $players = get_user_meta($customer_id, 'intersoccer_players', true) ?: [];
+    
+    if (empty($players)) {
+        echo '<div class="player-assignment-notice" style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107;">';
+        echo '<strong>' . esc_html__('Player Assignment:', 'intersoccer-product-variations') . '</strong> ';
+        echo esc_html__('Customer has no registered players.', 'intersoccer-product-variations');
+        echo ' <a href="' . esc_url(admin_url('user-edit.php?user_id=' . $customer_id)) . '#intersoccer-players">';
+        echo esc_html__('Add players in customer profile', 'intersoccer-product-variations');
+        echo '</a>';
+        echo '</div>';
+        return;
+    }
+    
+    // Get current assignment
+    $current_attendee = $item->get_meta('Assigned Attendee');
+    $current_player_index = $item->get_meta('intersoccer_player_index');
+    if ($current_player_index === '') {
+        $current_player_index = $item->get_meta('Player Index'); // Fallback to old key
+    }
+    
+    ?>
+    <div class="player-assignment-dropdown" style="margin-top: 10px; padding: 10px; background: #f0f6fc; border: 1px solid #c3dafe; border-radius: 4px;">
+        <label for="player_assignment_<?php echo esc_attr($item_id); ?>" style="display: block; margin-bottom: 5px; font-weight: 600; color: #1e40af;">
+            <?php esc_html_e('Assigned Player:', 'intersoccer-product-variations'); ?>
+        </label>
+        <select 
+            id="player_assignment_<?php echo esc_attr($item_id); ?>" 
+            name="player_assignment[<?php echo esc_attr($item_id); ?>]" 
+            class="player-assignment-select"
+            style="width: 100%; max-width: 400px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;"
+            data-item-id="<?php echo esc_attr($item_id); ?>"
+            data-customer-id="<?php echo esc_attr($customer_id); ?>">
+            
+            <option value=""><?php esc_html_e('-- Select Player --', 'intersoccer-product-variations'); ?></option>
+            
+            <?php foreach ($players as $index => $player) : 
+                $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
+                $selected = '';
+                
+                // Check if this player is currently assigned (by name or index)
+                if ($current_attendee === $player_name || $current_player_index == $index) {
+                    $selected = 'selected';
+                }
+                
+                $player_dob = $player['dob'] ?? '';
+                $player_gender = $player['gender'] ?? '';
+                
+                // Use gender translation helper if available
+                if ($player_gender && function_exists('intersoccer_translate_gender')) {
+                    $player_gender = intersoccer_translate_gender($player_gender);
+                }
+                
+                $display_info = $player_name;
+                if ($player_dob) {
+                    $display_info .= ' (' . esc_html($player_dob);
+                    if ($player_gender) {
+                        $display_info .= ', ' . esc_html($player_gender);
+                    }
+                    $display_info .= ')';
+                }
+                ?>
+                <option value="<?php echo esc_attr($index); ?>" <?php echo $selected; ?>>
+                    <?php echo esc_html($display_info); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        
+        <?php if ($current_attendee) : ?>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
+                <?php esc_html_e('Current:', 'intersoccer-product-variations'); ?> 
+                <strong><?php echo esc_html($current_attendee); ?></strong>
+                <?php if ($current_player_index !== '' && $current_player_index !== null): ?>
+                    <span style="color: #999;">(Index: <?php echo esc_html($current_player_index); ?>)</span>
+                <?php endif; ?>
+            </p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Save player assignment when order is saved in admin
+ */
+add_action('woocommerce_saved_order_items', 'intersoccer_save_player_assignment_from_admin', 10, 2);
+function intersoccer_save_player_assignment_from_admin($order_id, $items) {
+    if (!is_admin() || !isset($_POST['player_assignment'])) {
+        return;
+    }
+    
+    $order = wc_get_order($order_id);
+    if (!$order) {
+        return;
+    }
+    
+    $customer_id = $order->get_customer_id();
+    if (!$customer_id) {
+        return;
+    }
+    
+    // Get customer's players
+    $players = get_user_meta($customer_id, 'intersoccer_players', true) ?: [];
+    
+    foreach ($_POST['player_assignment'] as $item_id => $selected_index) {
+        $item = $order->get_item($item_id);
+        if (!$item) {
+            continue;
+        }
+        
+        // Empty selection - clear assignment
+        if ($selected_index === '') {
+            $item->delete_meta_data('Assigned Attendee');
+            $item->delete_meta_data('intersoccer_player_index');
+            $item->delete_meta_data('Player Index');
+            $item->delete_meta_data('Attendee DOB');
+            $item->delete_meta_data('Attendee Gender');
+            $item->delete_meta_data('Medical Conditions');
+            $item->save();
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Cleared player assignment for order item ' . $item_id);
+            }
+            continue;
+        }
+        
+        // Validate player exists
+        if (!isset($players[$selected_index])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('InterSoccer: Invalid player index ' . $selected_index . ' for customer ' . $customer_id);
+            }
+            continue;
+        }
+        
+        // Get player info
+        $player = $players[$selected_index];
+        $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
+        
+        // Update item metadata
+        $item->update_meta_data('Assigned Attendee', $player_name);
+        $item->update_meta_data('intersoccer_player_index', $selected_index);
+        
+        // Also update Player Index for backwards compatibility
+        $item->update_meta_data('Player Index', $selected_index);
+        
+        // Update additional player details
+        if (!empty($player['dob'])) {
+            $item->update_meta_data('Attendee DOB', $player['dob']);
+        }
+        
+        if (!empty($player['gender'])) {
+            $item->update_meta_data('Attendee Gender', $player['gender']);
+        }
+        
+        if (!empty($player['medical_conditions'])) {
+            $item->update_meta_data('Medical Conditions', $player['medical_conditions']);
+        } else {
+            $item->update_meta_data('Medical Conditions', 'None');
+        }
+        
+        $item->save();
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf(
+                'InterSoccer: Updated player assignment for order item %d | Player: %s (index: %d) | Customer: %d',
+                $item_id,
+                $player_name,
+                $selected_index,
+                $customer_id
+            ));
+        }
+    }
+}
+
 ?>
