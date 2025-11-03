@@ -186,8 +186,7 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
     }
 
     if (isset($_POST['_course_weekly_discount'][$loop])) {
-        $weekly_discount = floatval($_POST['_course_weekly_discount'][$loop]);
-        update_post_meta($variation_id, '_course_weekly_discount', $weekly_discount);
+        $weekly_discount = floatval($_POST['_course_weekly_discount'][$loop]);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            update_post_meta($variation_id, '_course_weekly_discount', $weekly_discount);
     }
 
     // Save holiday dates
@@ -245,16 +244,9 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 
 /**
  * Add Late Pick Up option to camp variation options
+ * Using woocommerce_product_after_variable_attributes to place it after the main variation fields
  */
-add_action('woocommerce_variation_options', 'intersoccer_add_camp_variation_fields', 20, 3);
 add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
-function intersoccer_add_camp_variation_fields($loop, $variation_data, $variation) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields called for loop ' . $loop . ', variation ID ' . $variation->ID);
-    }
-    intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
-}
-
 function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
     if (defined('WP_DEBUG') && WP_DEBUG) {
         error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
@@ -306,14 +298,40 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     echo '<div style="margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd;">';
     echo '<p style="margin: 0 0 5px 0; font-weight: bold;">' . __('Late Pick Up Options', 'intersoccer-product-variations') . '</p>';
     
-    $checked = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
-    // Enable by default for new variations, respect saved setting
-    $checked = ($checked === 'yes' || $checked === '') ? 'checked' : '';
-    echo '<p class="form-field _intersoccer_enable_late_pickup_field" style="margin: 5px 0;">
-        <label for="_intersoccer_enable_late_pickup_' . $loop . '" style="display: inline-block; margin-right: 10px;">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>
-        <input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />
-        <span class="description" style="display: block; margin-top: 5px; color: #666;">' . __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations') . '</span>
-    </p>';
+    // Get the raw value directly from database to avoid any caching
+    global $wpdb;
+    $db_value = $wpdb->get_var($wpdb->prepare(
+        "SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_intersoccer_enable_late_pickup' LIMIT 1",
+        $variation_id
+    ));
+    
+    $saved_value = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+    
+    // Disabled by default for new variations (empty meta), respect saved setting
+    // Only check if explicitly set to 'yes'
+    if ($saved_value === 'yes') {
+        $checked = 'checked';
+    } else {
+        // Default to unchecked (disabled) for new variations or when set to 'no'
+        $checked = '';
+    }
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Admin: Late pickup field for variation ' . $variation_id . ': DB value="' . ($db_value ?: 'NULL') . '", get_post_meta="' . $saved_value . '", checked="' . $checked . '", loop=' . $loop);
+    }
+    
+    echo '<p class="form-field _intersoccer_enable_late_pickup_field" style="margin: 5px 0;">';
+    echo '<label for="_intersoccer_enable_late_pickup_' . $loop . '" style="display: inline-block; margin-right: 10px;">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>';
+    echo '<input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />';
+    echo '<span class="description" style="display: block; margin-top: 5px; color: #666;">' . __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations') . '</span>';
+    
+    // Debug info (visible in admin)
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        echo '<span style="display: block; margin-top: 5px; color: #999; font-size: 11px; font-family: monospace;">';
+        echo 'DEBUG: Variation ' . $variation_id . ' | Loop: ' . $loop . ' | DB: ' . esc_html($db_value ?: 'NULL') . ' | Checked: ' . ($checked ? 'YES' : 'NO');
+        echo '</span>';
+    }
+    echo '</p>';
     
     echo '</div>';
 }
@@ -323,19 +341,85 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
  */
 add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
 function intersoccer_save_camp_variation_fields($variation_id, $loop) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
-        error_log('InterSoccer Save: POST data: ' . json_encode($_POST));
+    // Check if this is a camp variation
+    $product = wc_get_product($variation_id);
+    if (!$product) {
+        return;
     }
 
-    $enable_late_pickup = isset($_POST['_intersoccer_enable_late_pickup'][$loop]) ? 'yes' : 'no';
+    $parent_product = wc_get_product($product->get_parent_id());
+    if (!$parent_product) {
+        return;
+    }
+
+    $is_camp = intersoccer_is_camp($parent_product->get_id());
+    if (!$is_camp) {
+        return;
+    }
+
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Save: enable_late_pickup = ' . $enable_late_pickup);
+        error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
+        error_log('InterSoccer Save: POST data keys: ' . implode(', ', array_keys($_POST)));
+        if (isset($_POST['_intersoccer_enable_late_pickup'])) {
+            error_log('InterSoccer Save: _intersoccer_enable_late_pickup structure: ' . json_encode($_POST['_intersoccer_enable_late_pickup']));
+        }
+    }
+
+    // Handle both array format (bulk save) and direct format (individual save)
+    // Default to 'no' - checkbox unchecked means field won't be in POST
+    $enable_late_pickup = 'no';
+    
+    // Check if POST data exists for this variation
+    if (isset($_POST['_intersoccer_enable_late_pickup'])) {
+        if (is_array($_POST['_intersoccer_enable_late_pickup'])) {
+            // Bulk save format: _intersoccer_enable_late_pickup[$loop]
+            if ($loop >= 0 && isset($_POST['_intersoccer_enable_late_pickup'][$loop]) && $_POST['_intersoccer_enable_late_pickup'][$loop] === 'yes') {
+                $enable_late_pickup = 'yes';
+            }
+        } else {
+            // Direct format: _intersoccer_enable_late_pickup (for single variation save)
+            if ($_POST['_intersoccer_enable_late_pickup'] === 'yes') {
+                $enable_late_pickup = 'yes';
+            }
+        }
+    }
+    
+    // Also check for variation-specific format (when saved via AJAX or individual save)
+    // Some WooCommerce versions use variation_id as key or when loop is -1
+    if (isset($_POST['_intersoccer_enable_late_pickup_' . $variation_id]) && $_POST['_intersoccer_enable_late_pickup_' . $variation_id] === 'yes') {
+        $enable_late_pickup = 'yes';
+    }
+    
+    // When loop is -1 (individual save), search all POST keys for our checkbox
+    if ($loop < 0) {
+        // Look for any POST key that contains our field name
+        foreach ($_POST as $key => $value) {
+            if (strpos($key, '_intersoccer_enable_late_pickup') !== false) {
+                if ($value === 'yes' || (is_array($value) && in_array('yes', $value))) {
+                    $enable_late_pickup = 'yes';
+                    break;
+                }
+            }
+        }
+    }
+
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer Save: Final enable_late_pickup = ' . $enable_late_pickup . ' for variation ' . $variation_id);
     }
 
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+    
+    // Clear any product caches
+    wc_delete_product_transients($variation_id);
+    $parent_id = wp_get_post_parent_id($variation_id);
+    if ($parent_id) {
+        wc_delete_product_transients($parent_id);
+    }
+    
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to ' . $enable_late_pickup);
+        $saved_value = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+        error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to "' . $enable_late_pickup . '" (verified: "' . $saved_value . '")');
+        error_log('InterSoccer Save: Cleared product transients for variation ' . $variation_id . ' and parent ' . $parent_id);
     }
 }
 
