@@ -317,6 +317,7 @@ $includes = [
     'includes/woocommerce/late-pickup-settings.php',
     'includes/woocommerce/late-pickup.php',
     'fix-course-holidays.php',
+    'debug-late-pickup.php',
 ];
 
 foreach ($includes as $file) {

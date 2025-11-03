@@ -1917,24 +1917,40 @@ function intersoccer_grant_download_permissions($order_id) {
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_single_day_camp', 10, 3);
 function intersoccer_validate_single_day_camp($passed, $product_id, $quantity) {
+    error_log('InterSoccer: validate_single_day_camp called for product ' . $product_id);
+    error_log('InterSoccer: POST data: ' . print_r($_POST, true));
+    
     if (isset($_POST['variation_id'])) {
         $variation_id = intval($_POST['variation_id']);
         $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
-        if ($booking_type === 'single-days') {
+        
+        error_log('InterSoccer: Variation ID: ' . $variation_id);
+        error_log('InterSoccer: Booking type from meta: ' . $booking_type);
+        
+        if ($booking_type === 'single-days' || $booking_type === 'à la journée' || $booking_type === 'a-la-journee') {
+            error_log('InterSoccer: This IS a single-days booking, checking for camp_days...');
             $camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
+            
+            error_log('InterSoccer: camp_days found: ' . (isset($_POST['camp_days']) ? 'YES' : 'NO'));
+            error_log('InterSoccer: camp_days is array: ' . (isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? 'YES' : 'NO'));
+            error_log('InterSoccer: camp_days count: ' . count($camp_days));
+            error_log('InterSoccer: camp_days content: ' . print_r($camp_days, true));
+            
             if (empty($camp_days)) {
                 $passed = false;
                 wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ': ' . print_r($_POST, true));
-                }
+                error_log('InterSoccer: Validation FAILED - no valid camp_days data for product ' . $product_id);
             } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days for product ' . $product_id . ': ' . print_r($camp_days, true));
-                }
+                error_log('InterSoccer: Validation PASSED - single-day camp with ' . count($camp_days) . ' days for product ' . $product_id);
             }
+        } else {
+            error_log('InterSoccer: This is NOT a single-days booking (booking_type: ' . $booking_type . '), skipping validation');
         }
+    } else {
+        error_log('InterSoccer: No variation_id in POST data, skipping validation');
     }
+    
+    error_log('InterSoccer: Validation result: ' . ($passed ? 'PASSED' : 'FAILED'));
     return $passed;
 }
 
