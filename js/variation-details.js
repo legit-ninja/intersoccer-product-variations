@@ -189,7 +189,7 @@
             console.log('InterSoccer: updateCourseInfo disabled - course info displays in variation table only');
             // Function disabled - course info container removed from page
             // Course information is now displayed in the variation details table
-            return;
+                return;
         }
 
         // Form observer setup
