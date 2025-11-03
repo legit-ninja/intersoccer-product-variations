@@ -183,42 +183,13 @@
             });
         }
 
-        // Function to update course information display
+        // Function to update course information display - DISABLED
+        // Course info now only displays in the variation table, not at the top of the page
         function updateCourseInfo(productId, variationId) {
-            console.log('InterSoccer: updateCourseInfo called for variation:', variationId);
-
-            if (!variationId || variationId === '0') {
-                console.log('InterSoccer: No valid variation ID for course info');
-                $('#intersoccer-course-info').hide();
-                return;
-            }
-
-            // Make AJAX call to get course information
-            $.ajax({
-                url: intersoccerCheckout.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'intersoccer_get_course_info_display',
-                    nonce: intersoccerCheckout.nonce,
-                    product_id: productId,
-                    variation_id: variationId
-                },
-                success: function(response) {
-                    console.log('InterSoccer: Course info AJAX success:', response);
-                    if (response.success && response.data.html) {
-                        $('#intersoccer-course-details').html(response.data.html);
-                        $('#intersoccer-course-info').show();
-                        console.log('InterSoccer: Course information displayed');
-                    } else {
-                        console.error('InterSoccer: Course info response failed:', response.data);
-                        $('#intersoccer-course-info').hide();
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('InterSoccer: Course info AJAX error:', status, error, xhr.responseText);
-                    $('#intersoccer-course-info').hide();
-                }
-            });
+            console.log('InterSoccer: updateCourseInfo disabled - course info displays in variation table only');
+            // Function disabled - course info container removed from page
+            // Course information is now displayed in the variation details table
+            return;
         }
 
         // Form observer setup
