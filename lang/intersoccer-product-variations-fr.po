@@ -886,10 +886,6 @@ msgstr "ID de produit invalide."
 #~ msgid "Invalid action or no variations selected."
 #~ msgstr "Action invalide ou aucune variation sélectionnée."
 
-# wpml-name: 094b0e7af98942f95931108299711149
-#~ msgid "Manage Players"
-#~ msgstr "Gérer les joueurs"
-
 # wpml-name: dcd46de9a3b3accf80e479e41811bc9d
 #~ msgid "Organizer"
 #~ msgstr "Organisateur"
