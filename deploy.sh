@@ -181,6 +181,17 @@ deploy_to_server() {
     echo -e "Target: ${GREEN}${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}${NC}"
     echo ""
     
+    # Compile translation files before deployment
+    if [ -f "scripts/compile-translations.sh" ]; then
+        echo -e "${BLUE}Compiling translation files...${NC}"
+        bash scripts/compile-translations.sh
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}❌ Translation compilation failed!${NC}"
+            exit 1
+        fi
+        echo ""
+    fi
+    
     # Build rsync command WITHOUT --delete flag
     # Using --delete is dangerous - could delete other plugins if path is wrong!
     RSYNC_CMD="rsync -avz"
