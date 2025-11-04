@@ -168,21 +168,22 @@ function intersoccer_ajax_calculate_dynamic_price() {
         wp_die();
     }
 
-    $base_price = $variation->get_price();
-    $calculated_price = $base_price;
-
-    // Apply course pro-rating if applicable
-    if ($remaining_weeks !== null && $remaining_weeks > 0) {
-        $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
-        if ($total_weeks > 0) {
-            $calculated_price = ($base_price / $total_weeks) * $remaining_weeks;
-        }
+    // Use the proper course calculation method (handles session rates, holidays, etc.)
+    $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+    
+    if ($product_type === 'course' && class_exists('InterSoccer_Course')) {
+        $calculated_price = InterSoccer_Course::calculate_price($product_id, $variation_id, $remaining_weeks);
+    } else {
+        // Fallback for non-courses or if class not available
+        $calculated_price = $variation->get_price();
     }
 
+    // Return properly formatted price HTML with WooCommerce structure
+    // Format: <span class="price"><span class="woocommerce-Price-amount">...</span></span>
     $response = [
-        'price' => wc_price($calculated_price),
+        'price' => '<span class="price">' . wc_price($calculated_price) . '</span>',
         'raw_price' => $calculated_price,
-        'base_price' => $base_price,
+        'base_price' => $variation->get_price(),
         'remaining_weeks' => $remaining_weeks
     ];
 

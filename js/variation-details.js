@@ -100,89 +100,6 @@
             });
         }
 
-        // Update product price
-        function updateProductPrice(productId, variationId, remainingWeeks = null) {
-            return new Promise((resolve, reject) => {
-                const now = Date.now();
-                if (now - lastPriceUpdateTime < 1000) {
-                    console.log("InterSoccer: Price update throttled - too soon since last update");
-                    resolve();
-                    return;
-                }
-                lastPriceUpdateTime = now;
-
-                console.log("InterSoccer: Updating price for product:", productId, "variation:", variationId, "weeks:", remainingWeeks);
-                $.ajax({
-                    url: intersoccerCheckout.ajax_url,
-                    type: "POST",
-                    data: {
-                        action: "intersoccer_calculate_dynamic_price",
-                        nonce: intersoccerCheckout.nonce,
-                        product_id: productId,
-                        variation_id: variationId,
-                        remaining_weeks: remainingWeeks
-                    },
-                    success: function (response) {
-                        if (response.success && response.data.price) {
-                            console.log("InterSoccer: Price updated:", response.data.price);
-
-                            // Try multiple selectors for the price element
-                            const $priceSelectors = [
-                                ".woocommerce-variation-price .price",
-                                "form.cart .woocommerce-variation-price .price",
-                                ".single_variation_wrap .woocommerce-variation-price .price",
-                                ".single_variation .price",
-                                ".woocommerce-variation-price",
-                                ".price",
-                                "[data-product_id] .price",
-                                ".product .price"
-                            ];
-
-                            let priceUpdated = false;
-                            for (const selector of $priceSelectors) {
-                                const $priceElement = $(selector).first();
-                                if ($priceElement.length) {
-                                    console.log("InterSoccer: Found price element with selector:", selector, "HTML:", $priceElement.html().substring(0, 100));
-                                    $priceElement.html(response.data.price);
-                                    console.log("InterSoccer: Updated price element with selector:", selector, "to:", response.data.price);
-                                    priceUpdated = true;
-                                    break;
-                                }
-                            }
-
-                            if (!priceUpdated) {
-                                console.warn("InterSoccer: No price element found to update. Available price elements:");
-                                $('[class*="price"]').each(function() {
-                                    console.warn("Found price element:", $(this).attr('class'), "HTML:", $(this).html().substring(0, 50));
-                                });
-                            }
-
-                            // Also try to update any subtotal elements
-                            const $subtotalElement = $(".price-subtotal, .woocommerce-variation-price .price-subtotal");
-                            if ($subtotalElement.length) {
-                                $subtotalElement.html(response.data.price);
-                            }
-                            resolve(response.data.raw_price);
-                        } else {
-                            console.error("InterSoccer: Failed to update price:", response.data ? response.data.message : "Unknown error");
-                            reject(new Error(response.data.message || "Failed to update price"));
-                        }
-                    },
-                    error: function (xhr) {
-                        console.error("InterSoccer: AJAX error updating price:", xhr.status, xhr.responseText);
-                        if (xhr.status === 403) {
-                            refreshNonce()
-                                .then(() => updateProductPrice(productId, variationId, remainingWeeks))
-                                .then(resolve)
-                                .catch(reject);
-                        } else {
-                            reject(new Error("Failed to update price: " + xhr.statusText));
-                        }
-                    }
-                });
-            });
-        }
-
         // Function to update course information display - DISABLED
         // Course info now only displays in the variation table, not at the top of the page
         function updateCourseInfo(productId, variationId) {
@@ -252,6 +169,80 @@
             let lastPriceUpdateTime = 0;
             let lastValidPlayerId = "";
             let isProcessing = false;
+
+            // Update product price (must be inside setupFormHandlers to access lastPriceUpdateTime)
+            function updateProductPrice(prodId, varId, remainingWeeks = null) {
+                return new Promise((resolve, reject) => {
+                    const now = Date.now();
+                    if (now - lastPriceUpdateTime < 1000) {
+                        console.log("InterSoccer: Price update throttled - too soon since last update");
+                        resolve();
+                        return;
+                    }
+                    lastPriceUpdateTime = now;
+
+                    console.log("InterSoccer: Updating price for product:", prodId, "variation:", varId, "weeks:", remainingWeeks);
+                    $.ajax({
+                        url: intersoccerCheckout.ajax_url,
+                        type: "POST",
+                        data: {
+                            action: "intersoccer_calculate_dynamic_price",
+                            nonce: intersoccerCheckout.nonce,
+                            product_id: prodId,
+                            variation_id: varId,
+                            remaining_weeks: remainingWeeks
+                        },
+                        success: function (response) {
+                            if (response.success && response.data.price) {
+                                console.log("InterSoccer: Price AJAX response received:", response.data);
+                                console.log("InterSoccer: Formatted price HTML:", response.data.price);
+                                console.log("InterSoccer: Raw price:", response.data.raw_price);
+
+                                // Update the variation price display - target the specific container
+                                const $variationPriceContainer = $('.woocommerce-variation-price');
+                                
+                                console.log("InterSoccer: Found", $variationPriceContainer.length, "variation price containers");
+                                
+                                if ($variationPriceContainer.length) {
+                                    console.log("InterSoccer: Current price HTML:", $variationPriceContainer.html().substring(0, 200));
+                                    $variationPriceContainer.html(response.data.price);
+                                    console.log("InterSoccer: Updated variation price container");
+                                    console.log("InterSoccer: New price HTML:", $variationPriceContainer.html().substring(0, 200));
+                                } else {
+                                    console.warn("InterSoccer: .woocommerce-variation-price container not found");
+                                    const $priceElement = $('.single_variation .price, .woocommerce-variation-price .price').first();
+                                    if ($priceElement.length) {
+                                        $priceElement.html(response.data.price);
+                                        console.log("InterSoccer: Updated price element (fallback)");
+                                    } else {
+                                        console.error("InterSoccer: No price element found to update");
+                                    }
+                                }
+
+                                const $subtotalElement = $(".price-subtotal, .woocommerce-variation-price .price-subtotal");
+                                if ($subtotalElement.length) {
+                                    $subtotalElement.html(response.data.price);
+                                }
+                                resolve(response.data.raw_price);
+                            } else {
+                                console.error("InterSoccer: Failed to update price:", response.data ? response.data.message : "Unknown error");
+                                reject(new Error(response.data.message || "Failed to update price"));
+                            }
+                        },
+                        error: function (xhr) {
+                            console.error("InterSoccer: AJAX error updating price:", xhr.status, xhr.responseText);
+                            if (xhr.status === 403) {
+                                refreshNonce()
+                                    .then(() => updateProductPrice(prodId, varId, remainingWeeks))
+                                    .then(resolve)
+                                    .catch(reject);
+                            } else {
+                                reject(new Error("Failed to update price: " + xhr.statusText));
+                            }
+                        }
+                    });
+                });
+            }
 
             function fetchProductType() {
                 $.ajax({
@@ -400,8 +391,14 @@
                             // Display course information
                             updateCourseInfo(productId, variationId);
 
-                            // Note: Price is now handled by PHP filter woocommerce_variation_price_html
-                            console.log("InterSoccer: Course price handled by PHP filter");
+                            // Update price display with prorated course price
+                            updateProductPrice(productId, variationId, remainingWeeks)
+                                .then(() => {
+                                    console.log("InterSoccer: Course price updated successfully");
+                                })
+                                .catch((error) => {
+                                    console.error("InterSoccer: Failed to update course price:", error);
+                                });
                         }).catch((error) => {
                             console.error("InterSoccer: Failed to fetch course metadata:", error);
                             const playerId = $form.find(".player-select").val() || "";
