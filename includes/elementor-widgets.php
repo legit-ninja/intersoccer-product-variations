@@ -170,19 +170,37 @@ add_action('woocommerce_before_single_product', function () {
         
         error_log('InterSoccer Late Pickup: Loaded pricing - Per Day: ' . $per_day_cost . ' CHF, Full Week: ' . $full_week_cost . ' CHF');
         
-        // Get variation settings for late pickup
+        // Get variation settings for late pickup and available days
         $variations = $product->get_available_variations();
         $variation_settings = [];
+        $default_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        
         foreach ($variations as $variation) {
             $variation_id = $variation['variation_id'];
             $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
-            if ($enable_late_pickup === 'yes') {
-                $variation_settings[$variation_id] = [
-                    'enabled' => true,
-                    'per_day_cost' => $per_day_cost,
-                    'full_week_cost' => $full_week_cost,
-                ];
+            
+            // Get available days for this variation (default to all days if not set)
+            $camp_days_available = get_post_meta($variation_id, '_intersoccer_camp_days_available', true);
+            if (!is_array($camp_days_available) || empty($camp_days_available)) {
+                $camp_days_available = array_fill_keys($default_days, true);
             }
+            
+            $late_pickup_days_available = get_post_meta($variation_id, '_intersoccer_late_pickup_days_available', true);
+            if (!is_array($late_pickup_days_available) || empty($late_pickup_days_available)) {
+                $late_pickup_days_available = array_fill_keys($default_days, true);
+            }
+            
+            // Filter to only include enabled days
+            $available_camp_days = array_keys(array_filter($camp_days_available));
+            $available_late_pickup_days = array_keys(array_filter($late_pickup_days_available));
+            
+            $variation_settings[$variation_id] = [
+                'enabled' => ($enable_late_pickup === 'yes'),
+                'per_day_cost' => $per_day_cost,
+                'full_week_cost' => $full_week_cost,
+                'available_camp_days' => $available_camp_days,
+                'available_late_pickup_days' => $available_late_pickup_days,
+            ];
         }
         
         error_log('InterSoccer Late Pickup (Elementor): Total variations: ' . count($variations));
@@ -276,6 +294,7 @@ add_action('woocommerce_before_single_product', function () {
             var lastVariationId = 0;
             var productType = '<?php echo esc_js($product_type); ?>';
             var isSubmitting = false;
+            var lastValidAvailableDays = null; // Cache last valid available days to prevent reset on player change
             
             // ENHANCEMENT: Player persistence state management
             var playerPersistence = {
@@ -426,6 +445,19 @@ add_action('woocommerce_before_single_product', function () {
                                         var selectedPlayer = $(this).val();
                                         playerPersistence.setPlayer(selectedPlayer);
                                         $form.trigger('intersoccer_update_button_state');
+                                        
+                                        // Reapply late pickup cost if late pickup is active
+                                        var variationId = $form.find('input[name="variation_id"]').val();
+                                        if (variationId && variationId !== '0') {
+                                            var latePickupSettings = getLatePickupSettings(variationId);
+                                            if (latePickupSettings && selectedLatePickupOption !== 'none') {
+                                                console.log('InterSoccer: Reapplying late pickup cost after player change');
+                                                // Small delay to let price update from camp days complete first
+                                                setTimeout(function() {
+                                                    updateLatePickupCost(latePickupSettings);
+                                                }, 100);
+                                            }
+                                        }
                                     });
                                     
                                     $form.trigger('intersoccer_update_button_state');
@@ -504,8 +536,58 @@ add_action('woocommerce_before_single_product', function () {
                     console.log('InterSoccer Debug: Showing day selection for camp/single-days');
                     $daySelection.show();
 
-                    // For single-day bookings, use all available days if no preloaded days
-                    var daysToShow = preloadedDays.length > 0 ? preloadedDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                    // Get available days from variation settings (respects admin day availability settings)
+                    var variationId = $form.find('input[name="variation_id"]').val();
+                    var availableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']; // Default
+                    
+                    // Ensure settings are loaded from DOM if not already in memory
+                    if (Object.keys(latePickupVariationSettings).length === 0) {
+                        var $latePickupRow = $form.find('.intersoccer-late-pickup-row');
+                        if ($latePickupRow.length) {
+                            try {
+                                latePickupVariationSettings = JSON.parse($latePickupRow.attr('data-variation-settings') || '{}');
+                                console.log('InterSoccer Debug: Loaded variation settings from DOM:', latePickupVariationSettings);
+                            } catch (e) {
+                                console.error('InterSoccer Debug: Failed to parse variation settings:', e);
+                            }
+                        }
+                    }
+                    
+                    // Try to get available days from variation settings (includes camp day availability)
+                    if (variationId && variationId !== '0' && latePickupVariationSettings[variationId]) {
+                        var settings = latePickupVariationSettings[variationId];
+                        if (settings.available_camp_days && settings.available_camp_days.length > 0) {
+                            availableDays = settings.available_camp_days;
+                            lastValidAvailableDays = availableDays; // Cache for future use
+                            console.log('InterSoccer Debug: Using available camp days from variation settings:', availableDays);
+                        } else {
+                            console.log('InterSoccer Debug: No available_camp_days in settings or empty array');
+                        }
+                    } else {
+                        console.log('InterSoccer Debug: Variation settings not found or invalid variation ID');
+                        // Use cached value if available (prevents reset during player selection)
+                        if (lastValidAvailableDays && lastValidAvailableDays.length > 0) {
+                            availableDays = lastValidAvailableDays;
+                            console.log('InterSoccer Debug: Using cached available days:', availableDays);
+                        }
+                    }
+                    
+                    // For single-day bookings, prioritize available days from admin settings
+                    // Filter preloadedDays to only include days that are available
+                    var daysToShow = availableDays; // Use admin-controlled available days as base
+                    if (preloadedDays.length > 0) {
+                        // Filter preloadedDays to only include days that are in availableDays
+                        var filteredPreloaded = preloadedDays.filter(function(day) {
+                            return availableDays.indexOf(day) !== -1;
+                        });
+                        // Only use preloadedDays if they're all valid (don't want to lose admin settings)
+                        if (filteredPreloaded.length === preloadedDays.length) {
+                            daysToShow = filteredPreloaded;
+                        }
+                    }
+                    console.log('InterSoccer Debug: preloadedDays:', preloadedDays);
+                    console.log('InterSoccer Debug: availableDays:', availableDays);
+                    console.log('InterSoccer Debug: Final daysToShow:', daysToShow);
 
                     // Check multiple sources for which days should be checked
                     var currentChecked = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() { return $(this).val(); }).get();
@@ -694,7 +776,12 @@ add_action('woocommerce_before_single_product', function () {
                     selectedLatePickupDays = [];
                 }
                 
-                var days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                // Get available late pickup days from settings (respects admin day availability settings)
+                var days = (settings.available_late_pickup_days && settings.available_late_pickup_days.length > 0) 
+                    ? settings.available_late_pickup_days 
+                    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']; // Default to all days
+                
+                console.log('InterSoccer Late Pickup: Available late pickup days from settings:', days);
                 
                 var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : {
                     'Monday': 'Monday',
@@ -1241,8 +1328,30 @@ add_action('woocommerce_before_single_product', function () {
                             // Calculate the new price based on selected days
                             var calculatedPrice = basePricePerDay * selectedDays.length;
                             
+                            // Add late pickup cost if active
+                            var latePickupCost = 0;
+                            if (selectedLatePickupOption && selectedLatePickupOption !== 'none') {
+                                var variationId = variation.variation_id;
+                                if (variationId && latePickupVariationSettings[variationId]) {
+                                    var settings = latePickupVariationSettings[variationId];
+                                    if (selectedLatePickupOption === 'full-week') {
+                                        latePickupCost = settings.full_week_cost || 0;
+                                    } else if (selectedLatePickupOption === 'single-days' && selectedLatePickupDays.length > 0) {
+                                        var dayCount = selectedLatePickupDays.length;
+                                        if (dayCount === 5) {
+                                            latePickupCost = settings.full_week_cost || 0;
+                                        } else {
+                                            latePickupCost = dayCount * (settings.per_day_cost || 0);
+                                        }
+                                    }
+                                    console.log('InterSoccer: Including late pickup cost in show_variation price:', latePickupCost);
+                                }
+                            }
+                            
+                            var totalPrice = calculatedPrice + latePickupCost;
+                            
                             // Build price HTML matching WooCommerce structure
-                            var priceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + calculatedPrice.toFixed(2) + '</bdi></span></span>';
+                            var priceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + totalPrice.toFixed(2) + '</bdi></span></span>';
                             
                             // Set flag to prevent interference
                             $priceContainer.data('intersoccer-updating', true);
@@ -1258,7 +1367,7 @@ add_action('woocommerce_before_single_product', function () {
                                 
                                 if (stillSelected.length > 0 && $priceContainer.data('intersoccer-updating')) {
                                     $priceContainer.html(priceHtml);
-                                    console.log('InterSoccer: Prevented WooCommerce price reset, set calculated price to CHF', calculatedPrice.toFixed(2));
+                                    console.log('InterSoccer: Prevented WooCommerce price reset, set calculated price to CHF', totalPrice.toFixed(2), '(camp:', calculatedPrice, '+ late pickup:', latePickupCost + ')');
                                 }
                                 
                                 // Flag will be cleared when AJAX completes in updateCampPrice success handler

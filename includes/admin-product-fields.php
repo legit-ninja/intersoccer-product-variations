@@ -333,6 +333,80 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     }
     echo '</p>';
     
+    // Check if this is a single-day booking type to show "Available Camp Days"
+    $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
+    $is_single_day = ($booking_type === 'single-days' || 
+                     $booking_type === 'à la journée' || 
+                     $booking_type === 'a-la-journee' ||
+                     stripos($booking_type, 'single') !== false ||
+                     stripos($booking_type, 'journée') !== false ||
+                     stripos($booking_type, 'journee') !== false);
+    
+    // Get saved day availability (default to all enabled)
+    $camp_days_available = get_post_meta($variation_id, '_intersoccer_camp_days_available', true);
+    if (!is_array($camp_days_available) || empty($camp_days_available)) {
+        // Default: all days enabled
+        $camp_days_available = [
+            'Monday' => true,
+            'Tuesday' => true,
+            'Wednesday' => true,
+            'Thursday' => true,
+            'Friday' => true
+        ];
+    }
+    
+    $late_pickup_days_available = get_post_meta($variation_id, '_intersoccer_late_pickup_days_available', true);
+    if (!is_array($late_pickup_days_available) || empty($late_pickup_days_available)) {
+        // Default: all days enabled
+        $late_pickup_days_available = [
+            'Monday' => true,
+            'Tuesday' => true,
+            'Wednesday' => true,
+            'Thursday' => true,
+            'Friday' => true
+        ];
+    }
+    
+    $weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    // Show "Available Camp Days" for single-day booking types
+    if ($is_single_day) {
+        echo '<div style="margin: 15px 0; padding: 10px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px;">';
+        echo '<p style="margin: 0 0 8px 0; font-weight: bold; color: #0056b3;">' . __('Available Camp Days', 'intersoccer-product-variations') . '</p>';
+        echo '<p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">' . __('Select which days customers can book for this camp. Unchecked days will not be displayed as options.', 'intersoccer-product-variations') . '</p>';
+        echo '<div style="display: flex; gap: 15px; flex-wrap: wrap;">';
+        
+        foreach ($weekdays as $day) {
+            $checked_day = !empty($camp_days_available[$day]) ? 'checked' : '';
+            echo '<label style="display: flex; align-items: center; cursor: pointer;">';
+            echo '<input type="checkbox" name="_intersoccer_camp_days_available[' . $loop . '][' . esc_attr($day) . ']" value="1" ' . $checked_day . ' style="margin-right: 5px;" />';
+            echo '<span>' . esc_html($day) . '</span>';
+            echo '</label>';
+        }
+        
+        echo '</div>';
+        echo '</div>';
+    }
+    
+    // Show "Available Late Pickup Days" if late pickup is enabled
+    if ($saved_value === 'yes') {
+        echo '<div style="margin: 15px 0; padding: 10px; background: #fff8e1; border: 1px solid #ffd54f; border-radius: 4px;">';
+        echo '<p style="margin: 0 0 8px 0; font-weight: bold; color: #ff8f00;">' . __('Available Late Pickup Days', 'intersoccer-product-variations') . '</p>';
+        echo '<p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">' . __('Select which days late pickup is available. Unchecked days will not be displayed as late pickup options.', 'intersoccer-product-variations') . '</p>';
+        echo '<div style="display: flex; gap: 15px; flex-wrap: wrap;">';
+        
+        foreach ($weekdays as $day) {
+            $checked_day = !empty($late_pickup_days_available[$day]) ? 'checked' : '';
+            echo '<label style="display: flex; align-items: center; cursor: pointer;">';
+            echo '<input type="checkbox" name="_intersoccer_late_pickup_days_available[' . $loop . '][' . esc_attr($day) . ']" value="1" ' . $checked_day . ' style="margin-right: 5px;" />';
+            echo '<span>' . esc_html($day) . '</span>';
+            echo '</label>';
+        }
+        
+        echo '</div>';
+        echo '</div>';
+    }
+    
     echo '</div>';
 }
 
@@ -408,6 +482,54 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     }
 
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+    
+    // Save Available Camp Days (for single-day booking types)
+    $weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    $camp_days_available = [];
+    $late_pickup_days_available = [];
+    
+    // Process camp days availability
+    if (isset($_POST['_intersoccer_camp_days_available'])) {
+        if (is_array($_POST['_intersoccer_camp_days_available'])) {
+            // Bulk save format: _intersoccer_camp_days_available[$loop][$day]
+            if ($loop >= 0 && isset($_POST['_intersoccer_camp_days_available'][$loop])) {
+                foreach ($weekdays as $day) {
+                    // If checkbox is checked, it will be in POST, otherwise it won't
+                    $camp_days_available[$day] = isset($_POST['_intersoccer_camp_days_available'][$loop][$day]) && 
+                                                  $_POST['_intersoccer_camp_days_available'][$loop][$day] === '1';
+                }
+            }
+        }
+    }
+    
+    // Process late pickup days availability
+    if (isset($_POST['_intersoccer_late_pickup_days_available'])) {
+        if (is_array($_POST['_intersoccer_late_pickup_days_available'])) {
+            // Bulk save format: _intersoccer_late_pickup_days_available[$loop][$day]
+            if ($loop >= 0 && isset($_POST['_intersoccer_late_pickup_days_available'][$loop])) {
+                foreach ($weekdays as $day) {
+                    $late_pickup_days_available[$day] = isset($_POST['_intersoccer_late_pickup_days_available'][$loop][$day]) && 
+                                                         $_POST['_intersoccer_late_pickup_days_available'][$loop][$day] === '1';
+                }
+            }
+        }
+    }
+    
+    // Save camp days availability (only if data was submitted)
+    if (!empty($camp_days_available)) {
+        update_post_meta($variation_id, '_intersoccer_camp_days_available', $camp_days_available);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer Save: Camp days available for variation ' . $variation_id . ': ' . json_encode($camp_days_available));
+        }
+    }
+    
+    // Save late pickup days availability (only if data was submitted)
+    if (!empty($late_pickup_days_available)) {
+        update_post_meta($variation_id, '_intersoccer_late_pickup_days_available', $late_pickup_days_available);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer Save: Late pickup days available for variation ' . $variation_id . ': ' . json_encode($late_pickup_days_available));
+        }
+    }
     
     // Clear any product caches
     wc_delete_product_transients($variation_id);
