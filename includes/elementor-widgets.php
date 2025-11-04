@@ -576,8 +576,8 @@ add_action('woocommerce_before_single_product', function () {
                             console.log('  Checkbox change - form is submitting, keeping notification hidden');
                         }
                         
-                        // Update price for single-day camps
-                        updateCampPrice($form, selectedDays);
+                        // Price update is handled by the main checkbox change handler in jQuery(document).ready()
+                        // to prevent duplicate AJAX calls (removed from here to avoid race conditions)
                         
                         $form.trigger('intersoccer_update_button_state');
                         // Trigger WooCommerce variation check
@@ -602,6 +602,26 @@ add_action('woocommerce_before_single_product', function () {
                 return $form.find('.intersoccer-late-pickup-row');
             }
             
+            function getLatePickupSettings(variationId) {
+                if (!variationId) {
+                    // Try to get current variation ID
+                    variationId = $form.find('input[name="variation_id"]').val();
+                }
+                
+                if (!variationId || variationId === '0') {
+                    console.log('InterSoccer Late Pickup: No valid variation ID for settings lookup');
+                    return null;
+                }
+                
+                var settings = latePickupVariationSettings[variationId];
+                if (!settings || !settings.enabled) {
+                    console.log('InterSoccer Late Pickup: No settings found or late pickup not enabled for variation', variationId);
+                    return null;
+                }
+                
+                return settings;
+            }
+            
             function loadLatePickupSettings() {
                 var $row = getLatePickupRow();
                 if ($row.length) {
@@ -623,6 +643,24 @@ add_action('woocommerce_before_single_product', function () {
                     console.log('InterSoccer Late Pickup: Row element not found');
                     return;
                 }
+                
+                // Listen for price updates from camp days changes and update base price + reapply late pickup
+                $form.off('intersoccer_price_updated.latePickup').on('intersoccer_price_updated.latePickup', function(event, data) {
+                    console.log('InterSoccer Late Pickup: Camp price updated, recalculating with late pickup');
+                    
+                    // Update stored base price with the new camp price
+                    var $priceContainer = jQuery('.woocommerce-variation-price');
+                    if (data && data.rawPrice) {
+                        $priceContainer.data('intersoccer-base-price', parseFloat(data.rawPrice));
+                        console.log('InterSoccer Late Pickup: Updated base price to:', data.rawPrice);
+                    }
+                    
+                    // Reapply late pickup cost to the new base price
+                    var latePickupSettings = getLatePickupSettings(variationId);
+                    if (latePickupSettings) {
+                        updateLatePickupCost(latePickupSettings);
+                    }
+                });
                 
                 console.log('InterSoccer Late Pickup: Row element found!');
                 
@@ -768,6 +806,9 @@ add_action('woocommerce_before_single_product', function () {
                 if (selectedLatePickupOption === 'none') {
                     $costContainer.html('<span style="color: #666;">No late pick up selected</span>');
                     console.log('InterSoccer Late Pickup: No option selected');
+                    
+                    // Update main price display to remove late pickup cost
+                    updateMainPriceWithLatePickup(0);
                     return;
                 }
                 
@@ -784,6 +825,9 @@ add_action('woocommerce_before_single_product', function () {
                     if (dayCount === 0) {
                         $costContainer.html('<span style="color: #666;">Select at least one day</span>');
                         console.log('InterSoccer Late Pickup: Single days selected but no days checked');
+                        
+                        // Update main price display to remove late pickup cost
+                        updateMainPriceWithLatePickup(0);
                         return;
                     }
                     
@@ -798,6 +842,7 @@ add_action('woocommerce_before_single_product', function () {
                 } else {
                     // Fallback (shouldn't happen)
                     $costContainer.html('<span style="color: #666;">Invalid selection</span>');
+                    updateMainPriceWithLatePickup(0);
                     return;
                 }
                 
@@ -805,6 +850,51 @@ add_action('woocommerce_before_single_product', function () {
                 $costContainer.html(costText + formattedCost);
                 
                 console.log('InterSoccer Late Pickup: Cost updated - option:', selectedLatePickupOption, 'days:', selectedLatePickupDays.length, 'cost:', cost);
+                
+                // Update main price display to include late pickup cost
+                updateMainPriceWithLatePickup(cost);
+            }
+            
+            function updateMainPriceWithLatePickup(latePickupCost) {
+                var $priceContainer = jQuery('.woocommerce-variation-price');
+                if (!$priceContainer.length) {
+                    console.log('InterSoccer Late Pickup: Price container not found, skipping main price update');
+                    return;
+                }
+                
+                // Get the current price HTML
+                var currentPriceHtml = $priceContainer.html();
+                if (!currentPriceHtml) {
+                    console.log('InterSoccer Late Pickup: No current price HTML, skipping update');
+                    return;
+                }
+                
+                // Extract the current numeric price from the HTML
+                var priceMatch = currentPriceHtml.match(/[\d,]+\.?\d*/);
+                if (!priceMatch) {
+                    console.log('InterSoccer Late Pickup: Could not extract price from HTML:', currentPriceHtml);
+                    return;
+                }
+                
+                // Get or calculate the base price (price without late pickup)
+                var basePrice = parseFloat($priceContainer.data('intersoccer-base-price'));
+                if (!basePrice || isNaN(basePrice)) {
+                    // First time or base price not stored - use current displayed price
+                    basePrice = parseFloat(priceMatch[0].replace(',', ''));
+                    $priceContainer.data('intersoccer-base-price', basePrice);
+                    console.log('InterSoccer Late Pickup: Stored base price:', basePrice);
+                }
+                
+                // Calculate new total price
+                var totalPrice = basePrice + parseFloat(latePickupCost || 0);
+                
+                // Build the new price HTML maintaining WooCommerce structure
+                var newPriceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + totalPrice.toFixed(2) + '</bdi></span></span>';
+                
+                // Update the display
+                $priceContainer.html(newPriceHtml);
+                
+                console.log('InterSoccer Late Pickup: Updated main price - base:', basePrice, 'late pickup:', latePickupCost, 'total:', totalPrice);
             }
             
             function updateLatePickupFormData(settings) {
@@ -1116,6 +1206,66 @@ add_action('woocommerce_before_single_product', function () {
             
             $form.on('show_variation', function(event, variation) {
                 console.log('InterSoccer: show_variation triggered:', variation);
+                
+                // For single-day camps, immediately update price based on selected days
+                // This prevents WooCommerce from displaying the base price
+                var variationBookingType = '';
+                if (variation.attributes) {
+                    variationBookingType = variation.attributes['attribute_pa_booking-type'] ||
+                                         variation.attributes['attribute_booking-type'] ||
+                                         variation.attributes.attribute_pa_booking_type ||
+                                         variation.attributes.attribute_booking_type || '';
+                }
+                
+                var isSingleDayBooking = variationBookingType === 'single-days' ||
+                                       variationBookingType === 'à la journée' ||
+                                       variationBookingType === 'a-la-journee' ||
+                                       (variationBookingType && (variationBookingType.toLowerCase().includes('single') || 
+                                        variationBookingType.toLowerCase().includes('journée') || 
+                                        variationBookingType.toLowerCase().includes('journee')));
+                
+                if (isSingleDayBooking) {
+                    // Check if we have selected days
+                    var selectedDays = [];
+                    $form.find('.intersoccer-day-checkbox:checked').each(function() {
+                        selectedDays.push(jQuery(this).val());
+                    });
+                    
+                    // If days are selected, immediately update price to prevent base price flicker
+                    if (selectedDays.length > 0) {
+                        var $priceContainer = $('.woocommerce-variation-price');
+                        if ($priceContainer.length) {
+                            // Get the base price per day from the variation
+                            var basePricePerDay = parseFloat(variation.display_regular_price || variation.price || variation.display_price);
+                            
+                            // Calculate the new price based on selected days
+                            var calculatedPrice = basePricePerDay * selectedDays.length;
+                            
+                            // Build price HTML matching WooCommerce structure
+                            var priceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + calculatedPrice.toFixed(2) + '</bdi></span></span>';
+                            
+                            // Set flag to prevent interference
+                            $priceContainer.data('intersoccer-updating', true);
+                            
+                            // Update price immediately after WooCommerce renders (next tick)
+                            // This prevents the flicker from base price to calculated price
+                            setTimeout(function() {
+                                // Double-check we still have selected days
+                                var stillSelected = [];
+                                $form.find('.intersoccer-day-checkbox:checked').each(function() {
+                                    stillSelected.push(jQuery(this).val());
+                                });
+                                
+                                if (stillSelected.length > 0 && $priceContainer.data('intersoccer-updating')) {
+                                    $priceContainer.html(priceHtml);
+                                    console.log('InterSoccer: Prevented WooCommerce price reset, set calculated price to CHF', calculatedPrice.toFixed(2));
+                                }
+                                
+                                // Flag will be cleared when AJAX completes in updateCampPrice success handler
+                            }, 0);
+                        }
+                    }
+                }
             });
             
             $form.on('hide_variation', function() {
@@ -1129,6 +1279,10 @@ add_action('woocommerce_before_single_product', function () {
 
                 lastVariation = variation;
                 lastVariationId = variation.variation_id;
+                
+                // Clear stored base price for new variation so late pickup calculates from correct base
+                jQuery('.woocommerce-variation-price').removeData('intersoccer-base-price');
+                console.log('InterSoccer Late Pickup: Cleared stored base price for new variation');
 
                 // Extract booking type from variation attributes
                 var variationBookingType = '';
@@ -1149,14 +1303,20 @@ add_action('woocommerce_before_single_product', function () {
                 handleLatePickupDisplay(variation.variation_id);
 
                 // Update price for single-day bookings
+                // Note: Only on initial variation load when days are already selected
+                // Checkbox changes are handled by the dedicated checkbox change handler
                 var isSingleDayBooking = variationBookingType === 'single-days' ||
                                        variationBookingType === 'à la journée' ||
                                        variationBookingType === 'a-la-journee' ||
                                        variationBookingType.toLowerCase().includes('single') ||
                                        variationBookingType.toLowerCase().includes('journée') ||
                                        variationBookingType.toLowerCase().includes('journee');
-                if (isSingleDayBooking) {
-                    updateCampPrice($form, selectedDays);
+                if (isSingleDayBooking && selectedDays.length > 0) {
+                    // Only update if days were already selected (page load with pre-selected days)
+                    // Checkbox change events handle price updates for user interactions
+                    if (!$form.data('intersoccer-checkbox-changed')) {
+                        updateCampPrice($form, selectedDays);
+                    }
                 }
 
                 // Handle course price updates (info display removed from top of page)
@@ -1198,6 +1358,12 @@ add_action('woocommerce_before_single_product', function () {
                     (bookingType && (bookingType.includes('single') || bookingType.includes('journée') || bookingType.includes('journee')))) {
                     console.log('InterSoccer: Single-day camp detected, setting up price update');
                     
+                    // Store the original per-day price (only if not already stored)
+                    if (originalPricePerDay === null) {
+                        originalPricePerDay = parseFloat(variation.display_regular_price || variation.price);
+                        console.log('InterSoccer: Stored original per-day price:', originalPricePerDay);
+                    }
+                    
                     // Get currently selected days
                     var selectedDays = [];
                     $form.find('.intersoccer-day-checkbox:checked').each(function() {
@@ -1205,24 +1371,9 @@ add_action('woocommerce_before_single_product', function () {
                     });
                     
                     if (selectedDays.length > 0) {
-                        console.log('InterSoccer: Days already selected, updating price immediately');
-                        // Update the variation price for display
-                        var basePrice = parseFloat(variation.display_price || variation.price);
-                        var newPrice = basePrice * selectedDays.length;
-                        
-                        // Modify the variation object that WooCommerce will use for display
-                        variation.display_price = newPrice;
-                        variation.price = newPrice;
-                        variation.display_regular_price = newPrice;
-                        
-                        console.log('InterSoccer: Modified variation price from', basePrice, 'to', newPrice, 'for', selectedDays.length, 'days');
-                        
-                        // Update the form data
-                        $form.data('current_variation', variation);
-                        var variationForm = $form.data('wc_variation_form');
-                        if (variationForm) {
-                            variationForm.current_variation = variation;
-                        }
+                        console.log('InterSoccer: Days already selected (' + selectedDays.length + '), will update via checkbox handler');
+                        // DO NOT modify variation object here - it causes the base price to compound
+                        // The checkbox change handler will update the price via optimistic update + AJAX
                     }
                 }
                 
@@ -1360,6 +1511,11 @@ add_action('woocommerce_before_single_product', function () {
         //     // AJAX call removed - course info container no longer exists at top of page
         // }
 
+        // Shared variables for price request tracking (must be in outer scope)
+        var pendingCampPriceRequest = null;
+        var campPriceRequestSequence = 0;
+        var originalPricePerDay = null;  // Store original per-day price to prevent compounding
+
         // Function to update camp price when days are selected
         function updateCampPrice($form, selectedDays) {
             console.log('InterSoccer: updateCampPrice called with days:', selectedDays);
@@ -1369,7 +1525,7 @@ add_action('woocommerce_before_single_product', function () {
             
             if (!variationId || variationId === '0') {
                 console.log('InterSoccer: No valid variation selected for price update');
-                return;
+                return null;
             }
 
             // Only make AJAX call if we have days selected or if this is a single-day booking
@@ -1379,15 +1535,15 @@ add_action('woocommerce_before_single_product', function () {
             
             if (isSingleDayBooking && selectedDays.length === 0) {
                 console.log('InterSoccer: Single-day booking but no days selected, skipping AJAX');
-                return;
+                return null;
             }
 
             console.log('InterSoccer: Updating camp price for variation', variationId, 'with days:', selectedDays);
             console.log('InterSoccer: AJAX URL:', '<?php echo admin_url('admin-ajax.php'); ?>');
             console.log('InterSoccer: Nonce:', '<?php echo wp_create_nonce('intersoccer_nonce'); ?>');
 
-            // Make AJAX call to get updated price
-            jQuery.ajax({
+            // Make AJAX call to get updated price (return jqXHR for abort capability)
+            return jQuery.ajax({
                 url: '<?php echo admin_url('admin-ajax.php'); ?>',
                 type: 'POST',
                 data: {
@@ -1396,36 +1552,53 @@ add_action('woocommerce_before_single_product', function () {
                     variation_id: variationId,
                     camp_days: selectedDays
                 },
-                success: function(response) {
+                success: function(response, textStatus, jqXHR) {
+                    // Check if this response is from the latest request (prevent stale responses)
+                    var responseSequence = jqXHR.requestSequence || 0;
+                    console.log('InterSoccer: Price response received for request #' + responseSequence);
+                    
+                    if (responseSequence < campPriceRequestSequence) {
+                        console.warn('InterSoccer: Ignoring stale price response #' + responseSequence + ' (current: #' + campPriceRequestSequence + ')');
+                        return;
+                    }
+                    
                     console.log('InterSoccer: Price update AJAX success:', response);
                     if (response.success) {
-                        var price = response.data.price;
+                        var priceHtml = response.data.price;  // Already formatted HTML from server
                         var rawPrice = response.data.raw_price;
-                        console.log('InterSoccer: Session updated with selected days, price filters should handle display');
+                        console.log('InterSoccer: Updating price display with:', priceHtml);
+                        console.log('InterSoccer: Raw price:', rawPrice);
                         
-                        // Trigger WooCommerce events to refresh price display
-                        $form.trigger('woocommerce_variation_has_changed');
-                        jQuery(document.body).trigger('wc_variation_form');
-                        jQuery(document.body).trigger('woocommerce_variation_has_changed');
-                        
-                        // Force refresh of variation price display
-                        if (typeof wc_variation_form !== 'undefined') {
-                            wc_variation_form.trigger('woocommerce_variation_has_changed');
+                        // Update the variation price container with properly formatted HTML
+                        var $variationPriceContainer = jQuery('.woocommerce-variation-price');
+                        if ($variationPriceContainer.length) {
+                            $variationPriceContainer.html(priceHtml);
+                            console.log('InterSoccer: Updated .woocommerce-variation-price container');
+                            
+                            // Clear the updating flag now that server response is applied
+                            $variationPriceContainer.data('intersoccer-updating', false);
+                        } else {
+                            console.warn('InterSoccer: .woocommerce-variation-price not found, trying fallback');
+                            // Fallback: update price span
+                            var $priceElement = jQuery('.single_variation .price').first();
+                            if ($priceElement.length) {
+                                $priceElement.replaceWith(priceHtml);
+                                console.log('InterSoccer: Updated price via fallback');
+                            }
                         }
                         
-                        // Simple fallback: try to update common price elements
-                        jQuery('.woocommerce-variation-price .woocommerce-Price-amount, .price .woocommerce-Price-amount').each(function() {
-                            jQuery(this).html(price);
-                            console.log('InterSoccer: Updated price element as fallback:', jQuery(this).prop('tagName'), jQuery(this).attr('class'));
-                        });
-                        
-                        // Trigger custom event for late pickup
-                        $form.trigger('intersoccer_price_updated');
+                        // Trigger custom event for late pickup (do NOT trigger woocommerce_variation_has_changed to avoid loops)
+                        $form.trigger('intersoccer_price_updated', {rawPrice: rawPrice});
                     } else {
                         console.error('InterSoccer: Price update failed:', response.data);
                     }
                 },
                 error: function(xhr, status, error) {
+                    // Ignore errors from aborted requests
+                    if (status === 'abort') {
+                        console.log('InterSoccer: Price request aborted (expected for rapid clicking)');
+                        return;
+                    }
                     console.error('InterSoccer: Price update AJAX error:', status, error, xhr.responseText);
                 }
             });
@@ -1434,9 +1607,27 @@ add_action('woocommerce_before_single_product', function () {
         jQuery(document).ready(function($) {
             var $form = $('form.cart, form.variations_form, .woocommerce-product-details form, .single-product form');
             
+            // Prevent WooCommerce from resetting price during our updates
+            $form.on('show_variation', function(event, variation) {
+                var $priceContainer = $('.woocommerce-variation-price');
+                if ($priceContainer.data('intersoccer-updating')) {
+                    console.log('InterSoccer: Blocking WooCommerce price reset (update in progress)');
+                    // Don't let WooCommerce change the price while we're updating
+                    event.stopImmediatePropagation();
+                    return false;
+                }
+            });
+            
             // Handle day checkbox changes
             $form.on('change', '.intersoccer-day-checkbox', function() {
                 console.log('InterSoccer: Day checkbox changed');
+                
+                // Set flag to prevent found_variation handler from also calling updateCampPrice
+                $form.data('intersoccer-checkbox-changed', true);
+                setTimeout(function() {
+                    $form.removeData('intersoccer-checkbox-changed');
+                }, 100);
+                
                 var selectedDays = [];
                 $form.find('.intersoccer-day-checkbox:checked').each(function() {
                     selectedDays.push(jQuery(this).val());
@@ -1450,35 +1641,59 @@ add_action('woocommerce_before_single_product', function () {
                     return;
                 }
                 
-                // Update price immediately by modifying variation data
+                // Optimistic update: Update DOM directly (DO NOT modify variation object or trigger WooCommerce events)
                 var variationForm = $form.data('wc_variation_form');
                 if (variationForm && variationForm.current_variation) {
                     var variation = variationForm.current_variation;
-                    var bookingType = variation.attributes && variation.attributes['attribute_pa_booking-type'];
                     
-                    if (bookingType === 'single-day' || bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || 
-                        (bookingType && (bookingType.includes('single') || bookingType.includes('journée') || bookingType.includes('journee')))) {
-                        
-                        var basePrice = parseFloat(variation.display_regular_price || variation.price);
-                        var newPrice = selectedDays.length > 0 ? basePrice * selectedDays.length : basePrice;
-                        
-                        // Update variation data
-                        variation.display_price = newPrice;
-                        variation.price = newPrice;
-                        
-                        console.log('InterSoccer: Updated variation price to', newPrice, 'for', selectedDays.length, 'days');
-                        
-                        // Trigger WooCommerce price update
-                        $form.trigger('woocommerce_variation_has_changed');
-                        jQuery(document.body).trigger('wc_variation_form');
-                        
-                        // WooCommerce will handle price display update via variation_has_changed event
-                        // No need to manually update DOM - price filter handles it
+                    // Use stored original per-day price to prevent compounding issues
+                    var basePricePerDay = originalPricePerDay || parseFloat(variation.display_regular_price || variation.price);
+                    
+                    // If we don't have the original price stored yet, store it now
+                    if (originalPricePerDay === null && selectedDays.length <= 1) {
+                        originalPricePerDay = basePricePerDay;
+                        console.log('InterSoccer: Stored original per-day price:', originalPricePerDay);
                     }
+                    
+                    var estimatedPrice = selectedDays.length > 0 ? basePricePerDay * selectedDays.length : basePricePerDay;
+                    
+                    // Build price HTML to match WooCommerce structure
+                    var optimisticPriceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + estimatedPrice.toFixed(2) + '</bdi></span></span>';
+                    
+                    // Update DOM directly (do NOT modify variation object to prevent WooCommerce interference)
+                    var $variationPriceContainer = jQuery('.woocommerce-variation-price');
+                    if ($variationPriceContainer.length) {
+                        $variationPriceContainer.html(optimisticPriceHtml);
+                        console.log('InterSoccer: Optimistic price update to CHF', estimatedPrice.toFixed(2), 'for', selectedDays.length, 'days');
+                        
+                        // Add temporary flag to prevent WooCommerce from overwriting during AJAX
+                        $variationPriceContainer.data('intersoccer-updating', true);
+                        setTimeout(function() {
+                            $variationPriceContainer.data('intersoccer-updating', false);
+                        }, 1000);
+                    }
+                    
+                    // DO NOT trigger woocommerce_variation_has_changed - it causes WooCommerce to re-render and flicker
                 }
                 
-                // Call AJAX for cart/session updates
-                updateCampPrice($form, selectedDays);
+                // Cancel any pending price request to prevent race conditions with rapid clicking
+                if (pendingCampPriceRequest && pendingCampPriceRequest.abort) {
+                    pendingCampPriceRequest.abort();
+                    console.log('InterSoccer: Aborted previous price request (rapid clicking detected)');
+                }
+                
+                // Increment sequence number for this request
+                var currentSequence = ++campPriceRequestSequence;
+                console.log('InterSoccer: Starting price request #' + currentSequence);
+                
+                // Call AJAX to confirm exact price from server (handles discounts, special rules, etc.)
+                // Server response will overwrite optimistic update if different
+                pendingCampPriceRequest = updateCampPrice($form, selectedDays);
+                
+                // Track this request's sequence number
+                if (pendingCampPriceRequest) {
+                    pendingCampPriceRequest.requestSequence = currentSequence;
+                }
             });
         });
     </script>
