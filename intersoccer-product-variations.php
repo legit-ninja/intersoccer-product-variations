@@ -2,7 +2,7 @@
 /**
  * Plugin Name: InterSoccer Product Variations
  * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.10.26
+ * Version: 1.11.3
  * Author: Jeremy Lee
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -286,6 +286,7 @@ add_action('init', function () {
             '%s Course Sibling Discount',
             'Coach',
             'Organizer',
+            'Manage Players',
         ];
 
         foreach ($strings as $string) {
@@ -316,7 +317,6 @@ $includes = [
     'includes/woocommerce/late-pickup-settings.php',
     'includes/woocommerce/late-pickup.php',
     'fix-course-holidays.php',
-    'debug-late-pickup.php',
 ];
 
 foreach ($includes as $file) {
@@ -341,18 +341,10 @@ add_action('wp_enqueue_scripts', function () {
 
     if (is_product()) {
         wp_enqueue_script(
-            'intersoccer-product-enhancer',
-            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/product-enhancer.js',
-            ['jquery'],
-            '1.4.55',
-            true
-        );
-
-        wp_enqueue_script(
             'intersoccer-variation-details',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
-            ['jquery', 'intersoccer-product-enhancer'],
-            '1.4.55',
+            ['jquery'],
+            '1.4.54',
             true
         );
 
@@ -373,7 +365,7 @@ add_action('wp_enqueue_scripts', function () {
         'intersoccer-styles',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
-        '1.4.55'
+        '1.4.54'
     );
 });
 
@@ -406,6 +398,33 @@ function intersoccer_refresh_nonce() {
     wp_send_json_success(['nonce' => $nonce]);
 }
 
+// Add custom roles
+add_action('init', function () {
+    add_role('coach', __('Coach', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
+    add_role('organizer', __('Organizer', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
+});
+
+// Register endpoint
+add_action('init', function () {
+    add_rewrite_endpoint('manage-players', EP_ROOT | EP_PAGES);
+});
+
+// Add menu item with high priority (after Dashboard)
+add_filter('woocommerce_account_menu_items', function ($items) {
+    $new_items = [];
+    $inserted = false;
+    foreach ($items as $key => $label) {
+        $new_items[$key] = $label;
+        if ($key === 'dashboard' && !$inserted) {
+            $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
+            $inserted = true;
+        }
+    }
+    if (!$inserted) {
+        $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
+    }
+    return $new_items;
+}, 10);
 
 // Flush permalinks on activation
 add_action('init', function () {
@@ -428,12 +447,10 @@ add_filter('woocommerce_show_variation_price', function () {
 // Found Variation Show Start and End dates
 add_filter('woocommerce_available_variation', function($data, $product, $variation) {
     $product_type = intersoccer_get_product_type($variation->get_parent_id() ?: $variation->get_id());
-    error_log('InterSoccer: Processing variation ' . $variation->get_id() . ' for product type: ' . $product_type);
     if ($product_type === 'course') {
         $variation_id = $variation->get_id();
         $course_start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        $formatted_start_date = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
-        $data['course_start_date'] = $formatted_start_date;
+        $data['course_start_date'] = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
         $end_date = get_post_meta($variation_id, '_end_date', true);
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
@@ -442,55 +459,42 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
         $day_map = ['monday' => 1, 'tuesday' => 2, 'wednesday' => 3, 'thursday' => 4, 'friday' => 5, 'saturday' => 6, 'sunday' => 7];
         $course_day_num = $day_map[$course_day_slug] ?? 1;
 
-        // Calculate end date if not set or recalculate using new logic
+        // Calculate end date if not set
         if (!$end_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) || !strtotime($end_date)) {
-            if ($formatted_start_date && $total_weeks > 0 && class_exists('InterSoccer_Course')) {
-                // Use the new course calculation logic
-                $end_date = InterSoccer_Course::calculate_end_date($variation_id, $total_weeks);
+            if ($data['course_start_date'] && $total_weeks > 0) {
+                $start = new DateTime($course_start_date);
+                $holiday_set = array_flip($holidays);
+                $sessions_needed = $total_weeks;
+                $current_date = clone $start;
+                $weeks_counted = 0;
+                $days_checked = 0;
+                while ($weeks_counted < $sessions_needed && $days_checked < ($total_weeks * 7 * 2)) {
+                    if ($current_date->format('N') == $course_day_num && !isset($holiday_set[$current_date->format('Y-m-d')])) {
+                        $weeks_counted++;
+                    }
+                    $current_date->add(new DateInterval('P1D'));
+                    $days_checked++;
+                }
+                $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ' using new logic: ' . $end_date);
+                    error_log('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
                 }
             } else {
                 $end_date = '';
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date, total_weeks, or InterSoccer_Course class');
+                    error_log('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
                 }
             }
         }
-        $formatted_end_date = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
-        $data['end_date'] = $formatted_end_date;
-
-        $formatted_holidays = array_map(function($date) {
+        $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
+        
+        $data['course_holiday_dates'] = array_map(function($date) {
             return date_i18n('F j, Y', strtotime($date));
         }, $holidays);
-        $data['course_holiday_dates'] = $formatted_holidays;
-        $remaining_sessions = calculate_remaining_sessions($variation_id, $total_weeks);
-        $data['remaining_sessions'] = $remaining_sessions;
-        $data['discount_note'] = calculate_discount_note($variation_id, $remaining_sessions);
-
-        // v2.0 - Calculate and add prorated price directly to variation data
-        // This ensures JavaScript receives the correct price immediately
-        if (class_exists('InterSoccer_Course')) {
-            $prorated_price = InterSoccer_Course::calculate_price($variation->get_parent_id(), $variation_id);
-            $data['display_price'] = $prorated_price;
-            $data['display_regular_price'] = $prorated_price;
-            $data['price'] = $prorated_price;
-            // Wrap price in <span class="price"> to match WooCommerce standard structure
-            $data['price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
-            $data['display_price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
-        }
-
-        // Add course data in the format expected by product-enhancer.js
-        $data['intersoccer_course_data'] = [
-            'start_date' => $course_start_date, // Use raw date format for JavaScript
-            'end_date' => $end_date,
-            'holidays' => $holidays, // Use raw date array for JavaScript
-            'remaining_sessions' => $remaining_sessions,
-            'total_sessions' => $total_weeks
-        ];
-
+        $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
+        $data['discount_note'] = calculate_discount_note($variation_id, $data['remaining_sessions']);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Variation ' . $variation_id . ' data: start=' . $formatted_start_date . ', end=' . $formatted_end_date . ', holidays=' . json_encode($formatted_holidays) . ', sessions=' . $remaining_sessions . ', discount=' . $data['discount_note']);
+            error_log('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
         }
     }
     return $data;
