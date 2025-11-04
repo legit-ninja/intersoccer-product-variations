@@ -195,6 +195,10 @@ deploy_to_server() {
     # Add SSH options
     RSYNC_CMD="$RSYNC_CMD -e 'ssh -p ${SSH_PORT} -i ${SSH_KEY}'"
     
+    # Important: Include rules must come BEFORE exclude rules in rsync
+    # Include README.md before excluding other *.md files
+    RSYNC_CMD="$RSYNC_CMD --include='README.md'"
+    
     # Exclude files/directories
     RSYNC_CMD="$RSYNC_CMD \
         --exclude='.git' \
@@ -203,6 +207,7 @@ deploy_to_server() {
         --exclude='vendor' \
         --exclude='tests' \
         --exclude='cypress' \
+        --exclude='docs' \
         --exclude='.phpunit.result.cache' \
         --exclude='composer.json' \
         --exclude='composer.lock' \
@@ -212,6 +217,9 @@ deploy_to_server() {
         --exclude='*.log' \
         --exclude='debug.log' \
         --exclude='*.sh' \
+        --exclude='*.md' \
+        --exclude='*.list' \
+        --exclude='run-*.php' \
         --exclude='.DS_Store' \
         --exclude='*.swp' \
         --exclude='*~'"

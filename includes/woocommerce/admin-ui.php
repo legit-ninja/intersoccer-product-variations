@@ -2053,10 +2053,10 @@ function intersoccer_render_variation_health_page() {
             <h3><?php _e('Course Holiday Fix (One-time)', 'intersoccer-product-variations'); ?></h3>
             <p><?php _e('Fix existing courses that were created with inflated session counts to work around the old holiday calculation bug.', 'intersoccer-product-variations'); ?></p>
             <?php if ($fix_completed): ?>
-                <p style="color: #28a745;"><strong>✅ <?php _e('Course holiday fix has been completed.', 'intersoccer-product-variations'); ?></strong></p>
+                <p style="color: #28a745;"><strong>✓ <?php _e('Course holiday fix has been completed.', 'intersoccer-product-variations'); ?></strong></p>
                 <button type="button" class="button button-secondary" disabled><?php _e('Fix Already Completed', 'intersoccer-product-variations'); ?></button>
             <?php else: ?>
-                <p style="color: #856404;"><strong>⚠️ <?php _e('This should only be run once after deploying the fixed course logic.', 'intersoccer-product-variations'); ?></strong></p>
+                <p style="color: #856404;"><strong>⚠ <?php _e('This should only be run once after deploying the fixed course logic.', 'intersoccer-product-variations'); ?></strong></p>
                 <button type="button" id="intersoccer-run-course-holiday-fix" class="button button-warning">
                     <?php _e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>
                 </button>
@@ -2898,10 +2898,10 @@ function intersoccer_render_automated_update_orders_page() {
             
             <p>
                 <button type="button" id="start-automated-update" class="button button-primary button-large">
-                    <?php _e('🚀 Start Automated Update', 'intersoccer-product-variations'); ?>
+                    <?php _e('▶ Start Automated Update', 'intersoccer-product-variations'); ?>
                 </button>
                 <button type="button" id="stop-automated-update" class="button button-secondary" style="display: none;">
-                    <?php _e('⏹️ Stop Processing', 'intersoccer-product-variations'); ?>
+                    <?php _e('■ Stop Processing', 'intersoccer-product-variations'); ?>
                 </button>
             </p>
         </div>
@@ -2935,10 +2935,10 @@ function intersoccer_render_automated_update_orders_page() {
             <div id="final-results"></div>
             <p>
                 <button type="button" id="download-results" class="button button-secondary">
-                    <?php _e('📥 Download Results Log', 'intersoccer-product-variations'); ?>
+                    <?php _e('↓ Download Results Log', 'intersoccer-product-variations'); ?>
                 </button>
                 <button type="button" id="start-new-batch" class="button button-primary">
-                    <?php _e('🔄 Process More Orders', 'intersoccer-product-variations'); ?>
+                    <?php _e('↻ Process More Orders', 'intersoccer-product-variations'); ?>
                 </button>
             </p>
         </div>
@@ -2981,8 +2981,8 @@ function intersoccer_render_automated_update_orders_page() {
         $('#stop-automated-update').on('click', function() {
             processingActive = false;
             $(this).hide();
-            $('#start-automated-update').show().text('🚀 Start Automated Update');
-            addStatusLog('⏹️ Processing stopped by user', 'warning');
+            $('#start-automated-update').show().text('▶ Start Automated Update');
+            addStatusLog('■ Processing stopped by user', 'warning');
         });
         
         $('#start-new-batch').on('click', function() {
@@ -3036,8 +3036,8 @@ function intersoccer_render_automated_update_orders_page() {
                     if (data.phase === 'initialized') {
                         totalOrders = data.total_orders;
                         $('#total-orders-count').text(totalOrders);
-                        addStatusLog(`✅ Found ${totalOrders} orders that need updates`, 'success');
-                        addStatusLog('🚀 Starting batch processing...', 'info');
+                        addStatusLog(`✓ Found ${totalOrders} orders that need updates`, 'success');
+                        addStatusLog('▶ Starting batch processing...', 'info');
                         
                         // Start actual processing
                         setTimeout(() => processBatch(1, statuses, scanLimit, batchSize), 1000);
@@ -3125,10 +3125,10 @@ function intersoccer_render_automated_update_orders_page() {
         function completeProcessing() {
             processingActive = false;
             $('#stop-automated-update').hide();
-            $('#start-automated-update').show().text('🚀 Start Automated Update');
+            $('#start-automated-update').show().text('▶ Start Automated Update');
             
             updateProgress(100);
-            addStatusLog('🎉 Processing complete!', 'success');
+            addStatusLog('✓ Processing complete!', 'success');
             
             // Show results
             $('#results-section').show();
@@ -3161,7 +3161,7 @@ function intersoccer_render_automated_update_orders_page() {
         function stopProcessing() {
             processingActive = false;
             $('#stop-automated-update').hide();
-            $('#start-automated-update').show().text('🚀 Start Automated Update');
+            $('#start-automated-update').show().text('▶ Start Automated Update');
         }
         
         // Download results functionality
