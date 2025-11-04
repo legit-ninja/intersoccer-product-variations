@@ -197,6 +197,15 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
             ];
         }
 
+        // Days Selected (for single-day camps)
+        if ($product_type === 'camp' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
+            $item_data[] = [
+                'key' => __('Days Selected', 'intersoccer-product-variations'),
+                'value' => implode(', ', $cart_item['camp_days']),
+                'display' => '<span class="intersoccer-cart-meta">' . esc_html(implode(', ', $cart_item['camp_days'])) . '</span>'
+            ];
+        }
+
         // Discount Note
         if (isset($cart_item['discount_note']) && !empty($cart_item['discount_note'])) {
             $item_data[] = [
