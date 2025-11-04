@@ -1,0 +1,167 @@
+# Database Environment Configuration
+# Last updated: 2025-11-04
+# Purpose: Track remote database configs to prevent deployment issues
+# 
+# ⚠️ DO NOT COMMIT PASSWORDS - This file only tracks configuration, not credentials
+
+environments:
+  staging:
+    url: "staging.intersoccer.ch"
+    
+    database:
+      name: "staging_database"           # Update with actual name
+      prefix: "wp_1244388_"              # ⚠️ Non-standard prefix!
+      charset: "utf8"                    # ⚠️ No emoji support!
+      collation: "utf8_general_ci"
+      mysql_version: "5.7.x"             # Update after checking
+      
+    wpml:
+      installed: true
+      version: "4.6.x"                   # Update after checking
+      string_table_charset: "utf8"       # ⚠️ Critical: No emojis in _e() or __()
+      tables:
+        - "wp_1244388_icl_strings"
+        - "wp_1244388_icl_string_translations"
+        - "wp_1244388_icl_translations"
+      
+    constraints:
+      max_string_length: 191             # UTF8 max for indexed columns
+      supports_emojis: false             # ❌ Use ▶ ■ ↓ ↻ instead
+      supports_4byte_chars: false
+      supports_json: true
+      
+    deployment_rules:
+      - "NO emojis in _e() or __() translatable strings"
+      - "Use basic Unicode only: ▶ ■ ↓ ↻ ✓ ⚠ → ←"
+      - "Emojis OK in error_log() and console.log()"
+      - "Always use $wpdb->prefix, not 'wp_' hardcoded"
+      
+    notes: |
+      Staging has UTF8 (not UTF8MB4) database encoding.
+      This is the MOST RESTRICTIVE environment - code for this first!
+      If it works on staging, it will work on production.
+      
+  production:
+    url: "intersoccer.legit.ninja"
+    
+    database:
+      name: "production_database"        # Update with actual name
+      prefix: "wp_"                      # Standard prefix
+      charset: "utf8mb4"                 # ✅ Full emoji support
+      collation: "utf8mb4_unicode_ci"
+      mysql_version: "8.0.x"             # Update after checking
+      
+    wpml:
+      installed: true
+      version: "4.6.x"                   # Update after checking
+      string_table_charset: "utf8mb4"    # ✅ Emojis supported
+      tables:
+        - "wp_icl_strings"
+        - "wp_icl_string_translations"
+        - "wp_icl_translations"
+      
+    constraints:
+      max_string_length: 255
+      supports_emojis: true              # ✅ Can use emojis
+      supports_4byte_chars: true
+      supports_json: true
+      
+    deployment_rules:
+      - "Emojis allowed but avoid for staging compatibility"
+      - "Still use basic Unicode for consistency: ▶ ■ ↓ ↻"
+      - "Test on staging first before deploying here"
+      
+    notes: |
+      Production has UTF8MB4 encoding - more permissive than staging.
+      However, code for staging compatibility to avoid issues.
+
+# Universal compatibility rules for ALL environments
+compatibility_rules:
+  
+  translatable_strings:
+    description: "Strings that go through WordPress i18n functions"
+    safe_symbols: "▶ ■ □ ● ○ ✓ ✗ ⚠ ★ ☆ ↑ ↓ → ← ↻ ⟳"
+    unsafe_symbols: "🚀 ⏹️ ✅ ❌ ⚠️ 🎉 📥 🔄 😀 👍 💡 🔥"
+    functions:
+      - "_e()"
+      - "__()"
+      - "_n()"
+      - "_x()"
+      - "esc_html__()"
+      - "esc_attr__()"
+    rule: |
+      Use ONLY basic Unicode symbols in translatable strings.
+      These go to WPML database which may be UTF8 (not UTF8MB4).
+    
+  non_translatable:
+    description: "Debug/console output not stored in database"
+    safe_symbols: "ANY (including emojis)"
+    functions:
+      - "error_log()"
+      - "console.log()"
+      - "var_dump()"
+      - "print_r()"
+    rule: |
+      Emojis OK here - not translated, not stored in WPML tables.
+    
+  database_queries:
+    rule: "Always use $wpdb->prefix instead of hardcoded 'wp_'"
+    reason: "Staging uses wp_1244388_ prefix, not standard wp_"
+    example_bad: "FROM wp_icl_strings"
+    example_good: "FROM {$wpdb->prefix}icl_strings"
+
+# How to check your environment
+# Run these commands on remote server to fill in the values above:
+verification_commands:
+  mysql_version: "mysql -u user -p -e 'SELECT VERSION();'"
+  
+  database_charset: |
+    mysql -u user -p -e "
+      SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
+      FROM information_schema.SCHEMATA
+      WHERE TABLE_SCHEMA = 'your_database_name';
+    "
+  
+  wpml_tables: |
+    mysql -u user -p -e "
+      SELECT TABLE_NAME, TABLE_COLLATION
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = 'your_database'
+        AND TABLE_NAME LIKE '%icl_%';
+    "
+  
+  table_prefix: |
+    mysql -u user -p -e "SHOW TABLES LIKE 'wp%';" your_database | head -1
+  
+  server_constraints: |
+    mysql -u user -p -e "
+      SHOW VARIABLES LIKE 'max_allowed_packet';
+      SHOW VARIABLES LIKE 'character_set%';
+      SHOW VARIABLES LIKE 'collation%';
+    "
+
+# Safe Unicode Symbols Reference
+unicode_reference:
+  arrows: "→ ← ↑ ↓ ↔ ↕ ⇒ ⇐ ⇑ ⇓"
+  shapes: "■ □ ▲ △ ▼ ▽ ● ○ ◆ ◇ ★ ☆"
+  checkmarks: "✓ ✔ ✗ ✘"
+  symbols: "⚠ ⚡ ⚙ ⌘ ⎈ ◉"
+  controls: "▶ ◀ ⏵ ⏴ ⏸ ⏹ ⏺ ↻ ⟳"
+  
+  usage_examples:
+    start_button: "▶ Start"
+    stop_button: "■ Stop"
+    download: "↓ Download"
+    refresh: "↻ Refresh"
+    success: "✓ Success"
+    warning: "⚠ Warning"
+    error: "✗ Error"
+
+# Version history
+changelog:
+  - date: "2025-11-04"
+    change: "Initial documentation after emoji UTF8 issue on staging"
+    issue: "Plugin activation failed due to emojis in UTF8 database"
+    fix: "Replaced all emojis with basic Unicode in translatable strings"
+    lesson: "Always code for most restrictive environment (staging UTF8)"
+

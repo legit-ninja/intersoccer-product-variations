@@ -313,26 +313,19 @@ function intersoccer_modify_price_html($price_html, $product) {
         return $price_html;
     }
 
-    // For camps, check selected days
-    if ($product_type === 'camp') {
-        // Check if WooCommerce session is available (not available in admin)
-        if (!WC()->session) {
-            return $price_html;
-        }
-
-        // Check if we have selected days stored in session
-        $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
-        if (!empty($selected_days)) {
-            $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id(), $selected_days);
-            $price_html = wc_price($calculated_price);
-            error_log('InterSoccer: Modified camp variation price HTML for variation ' . $variation->get_id() . ' with ' . count($selected_days) . ' days: ' . $price_html);
-        }
+    // Check if WooCommerce session is available (not available in admin)
+    if (!WC()->session) {
+        return $price_html;
     }
-    // For courses, calculate price based on remaining sessions
-    elseif ($product_type === 'course') {
-        $calculated_price = intersoccer_calculate_price($product->get_id(), $variation->get_id());
-        $price_html = wc_price($calculated_price);
-        error_log('InterSoccer: Modified course variation price HTML for variation ' . $variation->get_id() . ': ' . $price_html . ' (base: ' . $variation->get_price() . ')');
+
+    // Check if we have selected days stored in session (for camps with day selection)
+    $selected_days = WC()->session->get('intersoccer_selected_days_' . $product->get_id());
+    if (!empty($selected_days)) {
+        // Note: This requires a variation to be selected, which may not be available at this point
+        // This logic might need to be moved to a different hook
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('InterSoccer: Camp has selected days but variation not available in price HTML filter');
+        }
     }
 
     return $price_html;
