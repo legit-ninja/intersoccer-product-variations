@@ -381,12 +381,14 @@ function intersoccer_modify_variation_price_html($price_html, $variation, $produ
 
 /**
  * AJAX handler for dynamic price calculation.
+ * NOTE: This handler is DEPRECATED - the active handler is in includes/ajax-handlers.php
+ * Keeping this commented out to avoid duplicate handler conflicts.
  */
-add_action('wp_ajax_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
-add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
-function intersoccer_calculate_dynamic_price_callback() {
+// add_action('wp_ajax_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
+// add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
+function intersoccer_calculate_dynamic_price_callback_DEPRECATED() {
     check_ajax_referer('intersoccer_nonce', 'nonce');
-    error_log('InterSoccer: AJAX dynamic price calculation called');
+    error_log('InterSoccer: AJAX dynamic price calculation called (DEPRECATED HANDLER)');
 
     $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
     $variation_id = isset($_POST['variation_id']) ? (int) $_POST['variation_id'] : 0;
@@ -668,6 +670,10 @@ function intersoccer_add_price_update_script() {
             });
 
             // Update on camp day checkbox change - with debouncing
+            // NOTE: Disabled this handler to prevent duplicate price updates
+            // elementor-widgets.php handles day checkbox changes for single-day camps
+            // This handler was causing race conditions and price doubling (CHF 960 instead of CHF 480)
+            /*
             var debounceCampUpdate = debounce(updateCampPrice, 500);
             $('form.cart').on('change', 'input[name="camp_days_temp[]"]', function() {
                 console.log('InterSoccer: Day checkbox changed event fired');
@@ -689,6 +695,7 @@ function intersoccer_add_price_update_script() {
                 }
                 debounceCampUpdate();
             });
+            */
 
             function debounce(func, wait) {
                 var timeout;
@@ -846,7 +853,11 @@ function intersoccer_calculate_camp_price_callback() {
         error_log('InterSoccer: AJAX camp price calculated - Variation ID: ' . $variation_id . ', Days: ' . count($camp_days) . ', Price: ' . $price);
     }
 
-    wp_send_json_success(['price' => wc_price($price), 'raw_price' => $price]);
+    // Return properly formatted price HTML with WooCommerce structure to maintain CSS styling
+    wp_send_json_success([
+        'price' => '<span class="price">' . wc_price($price) . '</span>',
+        'raw_price' => $price
+    ]);
     wp_die();
 }
 
