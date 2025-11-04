@@ -152,11 +152,38 @@ run_cypress_tests() {
 deploy_to_server() {
     print_header "Deploying to Server"
     
+    # Validate SERVER_PATH
+    if [ -z "$SERVER_PATH" ]; then
+        echo -e "${RED}✗ ERROR: SERVER_PATH is not set!${NC}"
+        echo ""
+        echo "Please set SERVER_PATH in deploy.local.sh to the FULL PATH of this specific plugin:"
+        echo "  SERVER_PATH=\"/var/www/html/wp-content/plugins/intersoccer-product-variations\""
+        echo ""
+        echo "⚠️  DO NOT use the plugins directory path - this would affect other plugins!"
+        exit 1
+    fi
+    
+    # Safety check: Ensure path ends with plugin name
+    if [[ ! "$SERVER_PATH" =~ intersoccer-product-variations/?$ ]]; then
+        echo -e "${YELLOW}⚠️  WARNING: SERVER_PATH should end with 'intersoccer-product-variations'${NC}"
+        echo "Current path: $SERVER_PATH"
+        echo ""
+        echo "Expected format: /path/to/wp-content/plugins/intersoccer-product-variations"
+        echo ""
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Deployment cancelled."
+            exit 1
+        fi
+    fi
+    
     echo -e "Target: ${GREEN}${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}${NC}"
     echo ""
     
-    # Build rsync command
-    RSYNC_CMD="rsync -avz --delete"
+    # Build rsync command WITHOUT --delete flag
+    # Using --delete is dangerous - could delete other plugins if path is wrong!
+    RSYNC_CMD="rsync -avz"
     
     # Add dry-run flag if requested
     if [ "$DRY_RUN" = true ]; then
