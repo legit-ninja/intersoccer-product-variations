@@ -1816,7 +1816,8 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         $required_attrs = [
             'camp' => ['pa_booking-type', 'pa_age-group'], // pa_days-of-week checked on parent
             'course' => ['pa_course-day', '_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
-            'birthday' => [] // Add if needed
+            'birthday' => [], // Add if needed
+            'tournament' => [] // Tournaments are simple fixed-date events with no special requirements
         ];
 
         foreach ($products as $product) {

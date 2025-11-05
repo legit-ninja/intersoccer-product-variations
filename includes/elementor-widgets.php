@@ -730,11 +730,12 @@ add_action('woocommerce_before_single_product', function () {
                 $form.off('intersoccer_price_updated.latePickup').on('intersoccer_price_updated.latePickup', function(event, data) {
                     console.log('InterSoccer Late Pickup: Camp price updated, recalculating with late pickup');
                     
-                    // Update stored base price with the new camp price
+                    // Update stored base price with the new camp price (from AJAX response)
                     var $priceContainer = jQuery('.woocommerce-variation-price');
                     if (data && data.rawPrice) {
-                        $priceContainer.data('intersoccer-base-price', parseFloat(data.rawPrice));
-                        console.log('InterSoccer Late Pickup: Updated base price to:', data.rawPrice);
+                        var newBasePrice = parseFloat(data.rawPrice);
+                        $priceContainer.data('intersoccer-base-price', newBasePrice);
+                        console.log('InterSoccer Late Pickup: Updated base price from AJAX to:', newBasePrice);
                     }
                     
                     // Reapply late pickup cost to the new base price
@@ -949,27 +950,19 @@ add_action('woocommerce_before_single_product', function () {
                     return;
                 }
                 
-                // Get the current price HTML
-                var currentPriceHtml = $priceContainer.html();
-                if (!currentPriceHtml) {
-                    console.log('InterSoccer Late Pickup: No current price HTML, skipping update');
+                // Check if there's a pending AJAX price update
+                // If so, skip updating display - AJAX completion handler will trigger recalculation with correct base
+                var pendingUpdate = $priceContainer.data('intersoccer-updating');
+                if (pendingUpdate) {
+                    console.log('InterSoccer Late Pickup: AJAX price update in progress, skipping display update (will recalculate after AJAX)');
                     return;
                 }
                 
-                // Extract the current numeric price from the HTML
-                var priceMatch = currentPriceHtml.match(/[\d,]+\.?\d*/);
-                if (!priceMatch) {
-                    console.log('InterSoccer Late Pickup: Could not extract price from HTML:', currentPriceHtml);
-                    return;
-                }
-                
-                // Get or calculate the base price (price without late pickup)
+                // Get the base price (must be already stored from variation data)
                 var basePrice = parseFloat($priceContainer.data('intersoccer-base-price'));
                 if (!basePrice || isNaN(basePrice)) {
-                    // First time or base price not stored - use current displayed price
-                    basePrice = parseFloat(priceMatch[0].replace(',', ''));
-                    $priceContainer.data('intersoccer-base-price', basePrice);
-                    console.log('InterSoccer Late Pickup: Stored base price:', basePrice);
+                    console.log('InterSoccer Late Pickup: Base price not available yet, skipping update');
+                    return;
                 }
                 
                 // Calculate new total price
@@ -1386,12 +1379,27 @@ add_action('woocommerce_before_single_product', function () {
                 console.log('InterSoccer: WooCommerce found variation:', variation);
                 console.log('InterSoccer: Variation attributes:', variation.attributes);
 
+                // Only clear and reset base price if variation ID actually changed
+                // Store variation ID on form (more stable than price container which may get HTML replaced)
+                var previousVariationId = $form.data('intersoccer-variation-id');
+                var currentVariationId = variation.variation_id;
+                
+                // Debug: Log the comparison
+                console.log('InterSoccer: Variation ID check - Previous:', previousVariationId, 'Current:', currentVariationId, 'Same?', previousVariationId == currentVariationId);
+                
+                if (previousVariationId != currentVariationId) {
+                    // New variation - store its base price from the variation data
+                    var basePrice = parseFloat(variation.display_price) || 0;
+                    var $priceContainer = jQuery('.woocommerce-variation-price');
+                    $priceContainer.data('intersoccer-base-price', basePrice);
+                    $form.data('intersoccer-variation-id', currentVariationId); // Store ID on form (stable element)
+                    console.log('InterSoccer Late Pickup: New variation detected, storing base price from variation data:', basePrice, 'Variation ID:', currentVariationId);
+                } else {
+                    console.log('InterSoccer Late Pickup: Same variation ID', currentVariationId, ', preserving stored base price');
+                }
+
                 lastVariation = variation;
                 lastVariationId = variation.variation_id;
-                
-                // Clear stored base price for new variation so late pickup calculates from correct base
-                jQuery('.woocommerce-variation-price').removeData('intersoccer-base-price');
-                console.log('InterSoccer Late Pickup: Cleared stored base price for new variation');
 
                 // Extract booking type from variation attributes
                 var variationBookingType = '';
@@ -1409,6 +1417,8 @@ add_action('woocommerce_before_single_product', function () {
                 renderDayCheckboxes(variationBookingType, $daySelection, $dayCheckboxes, $form);
                 
                 // Handle late pickup display
+                // Note: If days are selected and price needs updating, late pickup will calculate
+                // with the current base price (may be stale) but will recalculate when AJAX completes
                 handleLatePickupDisplay(variation.variation_id);
 
                 // Update price for single-day bookings
@@ -1651,6 +1661,12 @@ add_action('woocommerce_before_single_product', function () {
             console.log('InterSoccer: AJAX URL:', '<?php echo admin_url('admin-ajax.php'); ?>');
             console.log('InterSoccer: Nonce:', '<?php echo wp_create_nonce('intersoccer_nonce'); ?>');
 
+            // Set flag to indicate AJAX price update in progress
+            // This prevents late pickup from updating display with stale base price
+            var $variationPriceContainer = jQuery('.woocommerce-variation-price');
+            $variationPriceContainer.data('intersoccer-updating', true);
+            console.log('InterSoccer: Set AJAX updating flag to prevent premature late pickup calculation');
+
             // Make AJAX call to get updated price (return jqXHR for abort capability)
             return jQuery.ajax({
                 url: '<?php echo admin_url('admin-ajax.php'); ?>',
@@ -1675,34 +1691,59 @@ add_action('woocommerce_before_single_product', function () {
                     if (response.success) {
                         var priceHtml = response.data.price;  // Already formatted HTML from server
                         var rawPrice = response.data.raw_price;
-                        console.log('InterSoccer: Updating price display with:', priceHtml);
-                        console.log('InterSoccer: Raw price:', rawPrice);
+                        console.log('InterSoccer: Raw price from AJAX:', rawPrice);
                         
-                        // Update the variation price container with properly formatted HTML
+                        // Get price container (needed in both branches)
                         var $variationPriceContainer = jQuery('.woocommerce-variation-price');
-                        if ($variationPriceContainer.length) {
-                            $variationPriceContainer.html(priceHtml);
-                            console.log('InterSoccer: Updated .woocommerce-variation-price container');
-                            
-                            // Clear the updating flag now that server response is applied
-                            $variationPriceContainer.data('intersoccer-updating', false);
-                        } else {
-                            console.warn('InterSoccer: .woocommerce-variation-price not found, trying fallback');
-                            // Fallback: update price span
-                            var $priceElement = jQuery('.single_variation .price').first();
-                            if ($priceElement.length) {
-                                $priceElement.replaceWith(priceHtml);
-                                console.log('InterSoccer: Updated price via fallback');
-                            }
-                        }
                         
-                        // Trigger custom event for late pickup (do NOT trigger woocommerce_variation_has_changed to avoid loops)
-                        $form.trigger('intersoccer_price_updated', {rawPrice: rawPrice});
+                        // Check if late pickup is active - if so, don't update display yet
+                        // Let late pickup handler update display with final total (camp + late pickup)
+                        // Check DOM for late pickup selection (not variable which may be out of scope)
+                        var $latePickupOption = $form.find('input[name="late_pickup_option"]:checked');
+                        var latePickupActive = $latePickupOption.length > 0 && $latePickupOption.val() !== 'none';
+                        
+                        if (latePickupActive) {
+                            console.log('InterSoccer: Late pickup active, skipping price display update (will update after late pickup calculation)');
+                            // Don't update HTML yet - just trigger event with raw price
+                            // Late pickup handler will update display with total
+                            // Clear updating flag so late pickup can update
+                            $variationPriceContainer.data('intersoccer-updating', false);
+                            $form.trigger('intersoccer_price_updated', {rawPrice: rawPrice});
+                        } else {
+                            console.log('InterSoccer: No late pickup, updating price display with:', priceHtml);
+                            
+                            // Update the variation price container with properly formatted HTML
+                            if ($variationPriceContainer.length) {
+                                $variationPriceContainer.html(priceHtml);
+                                console.log('InterSoccer: Updated .woocommerce-variation-price container');
+                                
+                                // Clear the updating flag now that server response is applied
+                                $variationPriceContainer.data('intersoccer-updating', false);
+                            } else {
+                                console.warn('InterSoccer: .woocommerce-variation-price not found, trying fallback');
+                                // Fallback: update price span
+                                var $priceElement = jQuery('.single_variation .price').first();
+                                if ($priceElement.length) {
+                                    $priceElement.replaceWith(priceHtml);
+                                    console.log('InterSoccer: Updated price via fallback');
+                                }
+                            }
+                            
+                            // Trigger custom event (even though no late pickup to keep flow consistent)
+                            $form.trigger('intersoccer_price_updated', {rawPrice: rawPrice});
+                        }
                     } else {
                         console.error('InterSoccer: Price update failed:', response.data);
+                        // Clear updating flag on failure
+                        var $variationPriceContainer = jQuery('.woocommerce-variation-price');
+                        $variationPriceContainer.data('intersoccer-updating', false);
                     }
                 },
                 error: function(xhr, status, error) {
+                    // Clear updating flag on error
+                    var $variationPriceContainer = jQuery('.woocommerce-variation-price');
+                    $variationPriceContainer.data('intersoccer-updating', false);
+                    
                     // Ignore errors from aborted requests
                     if (status === 'abort') {
                         console.log('InterSoccer: Price request aborted (expected for rapid clicking)');

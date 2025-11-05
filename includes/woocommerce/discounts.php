@@ -16,6 +16,7 @@ function intersoccer_build_cart_context($cart_items) {
     $context = array(
         'camps_by_child' => array(),
         'courses_by_child' => array(),
+        'tournaments_by_child' => array(),
         'courses_by_season_child' => array(),
         'all_items' => array()
     );
@@ -62,13 +63,19 @@ function intersoccer_build_cart_context($cart_items) {
                     $context['courses_by_season_child'][$season][$assigned_player] = array();
                 }
                 $context['courses_by_season_child'][$season][$assigned_player][] = $item_data;
+            } elseif ($product_type === 'tournament') {
+                if (!isset($context['tournaments_by_child'][$assigned_player])) {
+                    $context['tournaments_by_child'][$assigned_player] = array();
+                }
+                $context['tournaments_by_child'][$assigned_player][] = $item_data;
             }
         }
     }
     
     error_log("InterSoccer Precise: Built cart context with " . count($context['all_items']) . " items, " . 
               count($context['camps_by_child']) . " children with camps, " . 
-              count($context['courses_by_child']) . " children with courses");
+              count($context['courses_by_child']) . " children with courses, " . 
+              count($context['tournaments_by_child']) . " children with tournaments");
     
     return $context;
 }
@@ -98,6 +105,14 @@ function intersoccer_determine_precise_discount_type($fee_name) {
         return 'course_other';
     }
     
+    // Tournament discounts
+    if (strpos($fee_name_lower, 'tournament') !== false) {
+        if (strpos($fee_name_lower, 'sibling') !== false || strpos($fee_name_lower, 'multi-child') !== false) {
+            return 'tournament_multi_child';
+        }
+        return 'tournament_other';
+    }
+    
     // Percentage-based discounts
     if (preg_match('/(\d+)%/', $fee_name)) {
         return 'percentage_discount';
@@ -125,6 +140,10 @@ function intersoccer_allocate_combo_discount($combo_discount, $cart_context, $or
             $allocations = intersoccer_allocate_course_same_season_discount($combo_discount, $cart_context, $order);
             break;
             
+        case 'tournament_multi_child':
+            $allocations = intersoccer_allocate_tournament_multi_child_discount($combo_discount, $cart_context, $order);
+            break;
+            
         default:
             // For other discount types, try to distribute proportionally
             $allocations = intersoccer_allocate_proportional_discount($combo_discount, $order);
@@ -144,7 +163,8 @@ function intersoccer_get_discount_rates() {
     
     $rates = [
         'camp' => [],
-        'course' => []
+        'course' => [],
+        'tournament' => []
     ];
 
     foreach ($rules as $rule) {
@@ -155,7 +175,7 @@ function intersoccer_get_discount_rates() {
         $condition = $rule['condition'] ?? 'none';
         $rate = floatval($rule['rate'] ?? 0) / 100;
 
-        if (in_array($type, ['camp', 'course']) && $condition !== 'none') {
+        if (in_array($type, ['camp', 'course', 'tournament']) && $condition !== 'none') {
             $rates[$type][$condition] = $rate;
         }
     }
@@ -173,6 +193,13 @@ function intersoccer_get_discount_rates() {
             '2nd_child' => 0.20,
             '3rd_plus_child' => 0.30,
             'same_season_course' => 0.50
+        ];
+    }
+    
+    if (empty($rates['tournament'])) {
+        $rates['tournament'] = [
+            '2nd_child' => 0.20,
+            '3rd_plus_child' => 0.30
         ];
     }
 
@@ -303,6 +330,41 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             }
         }
     }
+
+    // Apply Tournament Multi-Child Discounts (20% 2nd, 30% 3rd+)
+    $tournament_children = $context['tournaments_by_child'];
+    if (count($tournament_children) >= 2) {
+        // Calculate per-child totals
+        $child_totals = [];
+        foreach ($tournament_children as $child => $items) {
+            $total = array_sum(array_map(function($item) { return $item['price'] * $item['quantity']; }, $items));
+            $child_totals[$child] = $total;
+        }
+        // Sort children by total DESC (highest first gets 0%)
+        arsort($child_totals);
+        $sorted_children = array_keys($child_totals);
+        
+        foreach ($sorted_children as $index => $child) {
+            $percent = 0;
+            if ($index == 1) $percent = 0.20;  // 20% for 2nd
+            elseif ($index >= 2) $percent = 0.30;  // 30% for 3rd+
+            
+            if ($percent > 0) {
+                $template = intersoccer_translate_string('%s Tournament Sibling Discount', 'intersoccer-product-variations', '%s Tournament Sibling Discount');
+                $fallback = sprintf($template, $percent * 100);
+                $message = intersoccer_get_discount_message('tournament_multi_child_' . ($index + 1), 'cart_message', $fallback);
+                foreach ($tournament_children[$child] as $item) {
+                    $cart_key = $item['cart_key'];
+                    $base_price = $cart->cart_contents[$cart_key]['base_price'];
+                    $discounted_price = $base_price * (1 - $percent);
+                    $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
+                    $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
+                    $cart->cart_contents[$cart_key]['discount_note'] = $message;
+                    error_log('InterSoccer: Applied ' . ($percent * 100) . '% tournament discount to item ' . $item['product_id'] . ' for child ' . $child);
+                }
+            }
+        }
+    }
 }
 /**
  * Apply camp combo discounts for multiple children
@@ -395,6 +457,58 @@ function intersoccer_apply_course_combo_discounts($courses_by_child) {
                 $discount_label = sprintf(__('%d%% Sibling Course Discount', 'intersoccer-product-variations'), $discount_percentage);
             } else {
                 $discount_label = sprintf(__('%d%% Multi-Child Course Discount', 'intersoccer-product-variations'), $discount_percentage);
+            }
+            
+            WC()->cart->add_fee($discount_label, -$discount_amount);
+            
+            error_log(sprintf(
+                'InterSoccer: Applied %s: -CHF %.2f (Child %d)',
+                $discount_label,
+                $discount_amount,
+                $child_id + 1
+            ));
+        }
+    }
+}
+
+/**
+ * Apply tournament combo discounts for multiple children
+ * 20% discount for 2nd child, 30% for 3rd and additional children
+ */
+function intersoccer_apply_tournament_combo_discounts($tournaments_by_child) {
+    $rates = intersoccer_get_discount_rates()['tournament'];
+    $second_child_rate = $rates['2nd_child'] ?? 0.20;
+    $third_plus_rate = $rates['3rd_plus_child'] ?? 0.30;
+    
+    $children_with_tournaments = array_keys($tournaments_by_child);
+    
+    if (count($children_with_tournaments) < 2) {
+        return;
+    }
+    
+    // Sort children by total tournament value (descending)
+    $children_totals = [];
+    foreach ($tournaments_by_child as $child_id => $tournaments) {
+        $total = array_sum(array_column($tournaments, 'price'));
+        $children_totals[$child_id] = $total;
+    }
+    arsort($children_totals);
+    
+    $sorted_children = array_keys($children_totals);
+    
+    for ($i = 1; $i < count($sorted_children); $i++) {
+        $child_id = $sorted_children[$i];
+        $discount_percentage = ($i === 1) ? ($second_child_rate * 100) : ($third_plus_rate * 100);
+        $discount_rate = ($i === 1) ? $second_child_rate : $third_plus_rate;
+        
+        foreach ($tournaments_by_child[$child_id] as $tournament) {
+            $discount_amount = $tournament['price'] * $discount_rate;
+            
+            // Enhanced discount label
+            if ($i === 1) {
+                $discount_label = sprintf(__('%d%% Sibling Tournament Discount', 'intersoccer-product-variations'), $discount_percentage);
+            } else {
+                $discount_label = sprintf(__('%d%% Multi-Child Tournament Discount', 'intersoccer-product-variations'), $discount_percentage);
             }
             
             WC()->cart->add_fee($discount_label, -$discount_amount);

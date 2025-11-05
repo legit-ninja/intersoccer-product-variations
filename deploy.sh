@@ -7,8 +7,8 @@
 # This script deploys the plugin to the dev server and can run tests.
 #
 # Usage:
-#   ./deploy.sh                 # Deploy to dev server
-#   ./deploy.sh --test          # Run tests before deploying
+#   ./deploy.sh                 # Deploy to dev server (PHPUnit tests always run)
+#   ./deploy.sh --test          # Deploy and run Cypress E2E tests after deployment
 #   ./deploy.sh --no-cache      # Deploy and clear server caches
 #   ./deploy.sh --dry-run       # Show what would be uploaded
 #
@@ -43,7 +43,7 @@ fi
 
 # Parse command line arguments
 DRY_RUN=false
-RUN_TESTS=false
+RUN_CYPRESS_TESTS=false
 CLEAR_CACHE=false
 
 while [[ $# -gt 0 ]]; do
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --test)
-            RUN_TESTS=true
+            RUN_CYPRESS_TESTS=true
             shift
             ;;
         --no-cache|--clear-cache)
@@ -65,9 +65,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --dry-run        Show what would be uploaded without uploading"
-            echo "  --test           Run PHPUnit tests before deploying"
+            echo "  --test           Run Cypress E2E tests AFTER deployment (from intersoccer-ui-tests repo)"
             echo "  --clear-cache    Clear server caches after deployment"
             echo "  --help           Show this help message"
+            echo ""
+            echo "Note: PHPUnit tests ALWAYS run before deployment (cannot be skipped)"
             exit 0
             ;;
         *)
@@ -126,25 +128,56 @@ run_phpunit_tests() {
 }
 
 run_cypress_tests() {
-    print_header "Running Cypress Tests"
+    print_header "Running Cypress E2E Tests"
     
-    if [ ! -d "cypress" ]; then
-        echo -e "${YELLOW}⚠ Cypress not configured yet${NC}"
-        return 0
-    fi
+    # Path to intersoccer-ui-tests repository (sibling directory)
+    CYPRESS_REPO="../intersoccer-ui-tests"
     
-    if [ ! -f "node_modules/.bin/cypress" ]; then
-        echo -e "${YELLOW}⚠ Cypress not installed. Run: npm install${NC}"
+    if [ ! -d "$CYPRESS_REPO" ]; then
+        echo -e "${RED}✗ Cypress tests repository not found at: $CYPRESS_REPO${NC}"
+        echo ""
+        echo "Expected location: /home/jeremy-lee/projects/underdog/intersoccer/intersoccer-ui-tests"
+        echo ""
+        echo "Please ensure the intersoccer-ui-tests repository is cloned at the correct location."
         return 1
     fi
     
-    npm run cypress:run
+    echo "Running tests from: $CYPRESS_REPO"
+    echo "Target server: https://${SERVER_HOST}"
+    echo ""
     
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ All Cypress tests passed${NC}"
+    # Change to Cypress repo directory
+    cd "$CYPRESS_REPO"
+    
+    # Check if Cypress is installed
+    if [ ! -f "node_modules/.bin/cypress" ]; then
+        echo -e "${YELLOW}⚠ Cypress not installed in ui-tests repo. Installing...${NC}"
+        npm install
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}✗ Failed to install Cypress dependencies${NC}"
+            return 1
+        fi
+    fi
+    
+    # Run Cypress tests
+    # Set CYPRESS_BASE_URL to the target server
+    CYPRESS_BASE_URL="https://${SERVER_HOST}" npm run cypress:run --env environment=dev
+    
+    CYPRESS_EXIT_CODE=$?
+    
+    # Return to original directory
+    cd - > /dev/null
+    
+    if [ $CYPRESS_EXIT_CODE -eq 0 ]; then
+        echo ""
+        echo -e "${GREEN}✓ All Cypress E2E tests passed${NC}"
         return 0
     else
-        echo -e "${RED}✗ Cypress tests failed${NC}"
+        echo ""
+        echo -e "${RED}✗ Cypress E2E tests failed${NC}"
+        echo ""
+        echo "Test failures found. Please review the Cypress output above."
+        echo "Note: Code has already been deployed. You may need to fix and redeploy."
         return 1
     fi
 }
@@ -303,41 +336,82 @@ echo "Configuration:"
 echo "  Server: ${SERVER_USER}@${SERVER_HOST}"
 echo "  Path: ${SERVER_PATH}"
 echo "  SSH Port: ${SSH_PORT}"
+if [ "$RUN_CYPRESS_TESTS" = true ]; then
+    echo "  Cypress Tests: Will run AFTER deployment"
+fi
 echo ""
 
-# Run tests if requested
-if [ "$RUN_TESTS" = true ]; then
+# ALWAYS run PHPUnit tests before deployment (cannot be skipped)
+if [ "$DRY_RUN" = false ]; then
     run_phpunit_tests
     if [ $? -ne 0 ]; then
-        echo -e "${RED}✗ Tests failed. Aborting deployment.${NC}"
+        echo ""
+        echo -e "${RED}✗ PHPUnit tests failed. Deployment BLOCKED.${NC}"
+        echo ""
+        echo "Fix the failing tests before deploying:"
+        echo "  ./vendor/bin/phpunit --testdox"
+        echo ""
         exit 1
     fi
-    
-    # Uncomment when Cypress is set up
-    # run_cypress_tests
-    # if [ $? -ne 0 ]; then
-    #     echo -e "${RED}✗ Tests failed. Aborting deployment.${NC}"
-    #     exit 1
-    # fi
+    echo ""
+else
+    echo -e "${YELLOW}DRY RUN MODE - Skipping PHPUnit tests${NC}"
+    echo ""
 fi
 
 # Deploy to server
 deploy_to_server
 
-# Clear caches if requested
-if [ "$CLEAR_CACHE" = true ] && [ "$DRY_RUN" = false ]; then
-    clear_server_caches
+# Clear caches if requested or if running Cypress tests
+if [ "$DRY_RUN" = false ]; then
+    if [ "$CLEAR_CACHE" = true ] || [ "$RUN_CYPRESS_TESTS" = true ]; then
+        clear_server_caches
+    fi
+fi
+
+# Run Cypress E2E tests if requested (AFTER deployment and cache clearing)
+if [ "$RUN_CYPRESS_TESTS" = true ] && [ "$DRY_RUN" = false ]; then
+    echo ""
+    echo -e "${BLUE}Waiting 3 seconds for server to stabilize...${NC}"
+    sleep 3
+    echo ""
+    
+    run_cypress_tests
+    CYPRESS_RESULT=$?
+    
+    if [ $CYPRESS_RESULT -ne 0 ]; then
+        echo ""
+        echo -e "${YELLOW}⚠ WARNING: Cypress tests failed but code is already deployed.${NC}"
+        echo "You may need to fix issues and redeploy."
+        echo ""
+    fi
 fi
 
 # Success message
 if [ "$DRY_RUN" = false ]; then
     print_header "Deployment Complete"
     echo -e "${GREEN}✓ Plugin successfully deployed to ${SERVER_HOST}${NC}"
+    
+    if [ "$RUN_CYPRESS_TESTS" = true ]; then
+        if [ $CYPRESS_RESULT -eq 0 ]; then
+            echo -e "${GREEN}✓ All Cypress E2E tests passed${NC}"
+        else
+            echo -e "${YELLOW}⚠ Deployment succeeded but some Cypress tests failed${NC}"
+            echo "  Check test output above for details"
+        fi
+    fi
+    
     echo ""
     echo "Next steps:"
     echo "  1. Clear browser cache and hard refresh (Ctrl+Shift+R)"
     echo "  2. Test the changes on: https://${SERVER_HOST}/shop/"
     echo "  3. Check browser console for any errors"
+    
+    if [ "$RUN_CYPRESS_TESTS" = false ]; then
+        echo ""
+        echo "Tip: Run with --test flag to run Cypress E2E tests:"
+        echo "  ./deploy.sh --test"
+    fi
     echo ""
 else
     echo ""

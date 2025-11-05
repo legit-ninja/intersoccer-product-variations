@@ -195,6 +195,7 @@ function intersoccer_register_wpml_strings() {
         $template_strings = [
             'camp_combo_discount_template' => '%d%% Camp Combo Discount (Child %d)',
             'course_multi_child_discount_template' => '%d%% Course Multi-Child Discount (Child %d)',
+            'tournament_multi_child_discount_template' => '%d%% Tournament Multi-Child Discount (Child %d)',
             'same_season_course_discount_template' => '50%% Same Season Course Discount (Child %d, %s)',
             'discount_information_label' => 'Discount Information',
             'discounts_applied_label' => 'Discounts Applied',
@@ -678,6 +679,16 @@ function intersoccer_initialize_default_messages() {
                 'cart_message' => '50% Same Season Course Discount',
                 'admin_description' => 'Same child, multiple courses in same season',
                 'customer_note' => 'You saved 50% on this course because your child is enrolled in multiple courses this season.'
+            ],
+            'tournament_2nd_child' => [
+                'cart_message' => '20% Tournament Sibling Discount',
+                'admin_description' => 'Second child tournament discount',
+                'customer_note' => 'You saved 20% on this tournament because you have multiple children enrolled in tournaments.'
+            ],
+            'tournament_3rd_plus_child' => [
+                'cart_message' => '30% Multi-Child Tournament Discount',
+                'admin_description' => 'Third or additional child tournament discount',
+                'customer_note' => 'You saved 30% on this tournament for your third (or additional) child enrolled in tournaments.'
             ]
         ];
         
@@ -769,6 +780,15 @@ function intersoccer_emergency_discount_fallback() {
             error_log("InterSoccer: Using emergency fallback for same-season course discounts");
             if (function_exists('intersoccer_apply_same_season_course_discounts')) {
                 return intersoccer_apply_same_season_course_discounts($courses_by_season_child);
+            }
+        }
+    }
+    
+    if (!function_exists('intersoccer_apply_tournament_combo_discounts_with_messages')) {
+        function intersoccer_apply_tournament_combo_discounts_with_messages($tournaments_by_child) {
+            error_log("InterSoccer: Using emergency fallback for tournament combo discounts");
+            if (function_exists('intersoccer_apply_tournament_combo_discounts')) {
+                return intersoccer_apply_tournament_combo_discounts($tournaments_by_child);
             }
         }
     }

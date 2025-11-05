@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 /**
  * Main product type detection function - delegates to class method
  * @param int $product_id
- * @return string|null 'camp', 'course', 'birthday', or null
+ * @return string|null 'camp', 'course', 'birthday', 'tournament', or null
  */
 if (!function_exists('intersoccer_get_product_type')) {
 function intersoccer_get_product_type($product_id) {
@@ -34,7 +34,7 @@ class InterSoccer_Product_Types {
      * Get product type for a given product ID.
      *
      * @param int $product_id The product ID.
-     * @return string|null Product type ('camp', 'course', 'birthday', or null).
+     * @return string|null Product type ('camp', 'course', 'birthday', 'tournament', or null).
      */
     public static function get_product_type($product_id) {
         if (!$product_id) {
@@ -56,7 +56,7 @@ class InterSoccer_Product_Types {
 
         // Check existing meta first
         $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
-        if ($product_type && in_array($product_type, ['camp', 'course', 'birthday'])) {
+        if ($product_type && in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
             set_transient($transient_key, $product_type, HOUR_IN_SECONDS);
             return $product_type;
         }
@@ -94,7 +94,7 @@ class InterSoccer_Product_Types {
         
         if (!empty($activity_types)) {
             $type = strtolower(trim($activity_types[0]));
-            if (in_array($type, ['camp', 'course', 'birthday'])) {
+            if (in_array($type, ['camp', 'course', 'birthday', 'tournament'])) {
                 return $type;
             }
         }
@@ -110,7 +110,7 @@ class InterSoccer_Product_Types {
                 
                 if (is_array($terms)) {
                     foreach ($terms as $term) {
-                        if (in_array($term->slug, ['camp', 'course', 'birthday'], true)) {
+                        if (in_array($term->slug, ['camp', 'course', 'birthday', 'tournament'], true)) {
                             return $term->slug;
                         }
                     }
@@ -139,6 +139,8 @@ class InterSoccer_Product_Types {
             return 'course';
         } elseif (in_array('birthdays', $categories, true)) {
             return 'birthday';
+        } elseif (in_array('tournaments', $categories, true)) {
+            return 'tournament';
         }
         
         return null;
@@ -199,6 +201,15 @@ function intersoccer_is_course($product_id) {
  */
 function intersoccer_is_birthday($product_id) {
     return intersoccer_get_product_type($product_id) === 'birthday';
+}
+
+/**
+ * Check if product is a tournament
+ * @param int $product_id
+ * @return bool
+ */
+function intersoccer_is_tournament($product_id) {
+    return intersoccer_get_product_type($product_id) === 'tournament';
 }
 
 /**

@@ -485,6 +485,14 @@ msgstr ""
 msgid "%d%% Sibling Camp Discount"
 msgstr ""
 
+# wpml-name: %d%% Multi-Child Tournament Discount
+msgid "%d%% Multi-Child Tournament Discount"
+msgstr ""
+
+# wpml-name: %d%% Sibling Tournament Discount
+msgid "%d%% Sibling Tournament Discount"
+msgstr ""
+
 # wpml-name: You saved 50% on this course because your child is enrolled in multiple courses this season.
 msgid "You saved 50% on this course because your child is enrolled in multiple courses this season."
 msgstr ""
@@ -567,6 +575,18 @@ msgstr ""
 
 # wpml-name: %d%% Camp Combo Discount (Child %d)
 msgid "%d%% Camp Combo Discount (Child %d)"
+msgstr ""
+
+# wpml-name: %d%% Tournament Multi-Child Discount (Child %d)
+msgid "%d%% Tournament Multi-Child Discount (Child %d)"
+msgstr ""
+
+# wpml-name: 30% Multi-Child Tournament Discount
+msgid "30% Multi-Child Tournament Discount"
+msgstr ""
+
+# wpml-name: 20% Tournament Sibling Discount
+msgid "20% Tournament Sibling Discount"
 msgstr ""
 
 # wpml-name: Please select at least one day for this single-day camp.
