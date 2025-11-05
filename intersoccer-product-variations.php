@@ -1,9 +1,10 @@
 <?php
 /**
  * Plugin Name: InterSoccer Product Variations
- * Description: Custom plugin for InterSoccer Switzerland to manage events and bookings.
- * Version: 1.11.3
- * Author: Jeremy Lee
+ * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
+ * Author: InterSoccer
+ * Version: 1.11.4
+ * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
  */
