@@ -1,5 +1,5 @@
 *.log
-
+debug.log*
 # Composer dependencies
 vendor/
 
