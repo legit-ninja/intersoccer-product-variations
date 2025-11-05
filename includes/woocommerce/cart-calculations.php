@@ -380,6 +380,42 @@ function intersoccer_modify_variation_price_html($price_html, $variation, $produ
 }
 
 /**
+ * Modify variation data to include prorated course price
+ * Similar to camp price flicker fix - inject correct price into variation data
+ */
+add_filter('woocommerce_available_variation', 'intersoccer_inject_course_prorated_price', 10, 3);
+function intersoccer_inject_course_prorated_price($variation_data, $product, $variation) {
+    $product_id = $product->get_id();
+    $product_type = intersoccer_get_product_type($product_id);
+    
+    // Only modify for course products
+    if ($product_type !== 'course') {
+        return $variation_data;
+    }
+    
+    $variation_id = $variation->get_id();
+    
+    // Calculate prorated price
+    $prorated_price = InterSoccer_Course::calculate_price($product_id, $variation_id);
+    
+    // Inject prorated price into variation data
+    // This ensures WooCommerce displays the correct price immediately
+    $variation_data['display_price'] = $prorated_price;
+    $variation_data['display_regular_price'] = $prorated_price;
+    $variation_data['display_sale_price'] = $prorated_price;
+    $variation_data['price'] = $prorated_price;
+    
+    // Update the price HTML to match
+    $variation_data['price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
+    
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log('InterSoccer: Injected prorated price ' . $prorated_price . ' into variation data for course variation ' . $variation_id);
+    }
+    
+    return $variation_data;
+}
+
+/**
  * AJAX handler for dynamic price calculation.
  * NOTE: This handler is DEPRECATED - the active handler is in includes/ajax-handlers.php
  * Keeping this commented out to avoid duplicate handler conflicts.
