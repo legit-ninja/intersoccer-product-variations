@@ -159,9 +159,12 @@ run_cypress_tests() {
         fi
     fi
     
-    # Run Cypress tests
-    # Set CYPRESS_BASE_URL to the target server
-    CYPRESS_BASE_URL="https://${SERVER_HOST}" npm run cypress:run --env environment=dev
+    # Run Cypress tests using npx (matches your local command)
+    # Spec file: cypress/e2e/player_management.spec.js
+    echo "Running: npx cypress run --spec cypress/e2e/player_management.spec.js --env environment=dev"
+    echo ""
+    
+    npx cypress run --spec cypress/e2e/player_management.spec.js --env environment=dev
     
     CYPRESS_EXIT_CODE=$?
     
