@@ -358,6 +358,11 @@ add_action('wp_enqueue_scripts', function () {
                 'user_id' => get_current_user_id(),
                 'server_time' => current_time('c'),
                 'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
+                'i18n' => [
+                    'start_date' => __('Start Date', 'intersoccer-product-variations'),
+                    'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
+                    'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+                ],
             ]
         );
     }

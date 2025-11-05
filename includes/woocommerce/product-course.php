@@ -618,7 +618,7 @@ function intersoccer_course_info_shortcode($atts) {
     if ($product->is_type('variable')) {
         // Always show the course info container - JavaScript will populate it
         ob_start();
-        echo '<div id="intersoccer-course-info" class="intersoccer-course-info" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+        echo '<div id="intersoccer-course-info" class="intersoccer-course-info" style="display: none;">';
         echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
         echo '<div id="intersoccer-course-details"></div>';
         echo '</div>';
@@ -672,7 +672,7 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
             echo '<div class="intersoccer-course-info">';
             echo '<strong>' . __('Course Information:', 'intersoccer-product-variations') . '</strong><br>';
         } else {
-            echo '<div class="intersoccer-course-info" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">';
+            echo '<div class="intersoccer-course-info">';
             echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
         }
         echo '<div class="intersoccer-course-details">';
@@ -717,6 +717,36 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
             echo '</div>';
         }
     }
+}
+
+/**
+ * Display course info container after variations table for variable products
+ */
+add_action('woocommerce_after_variations_table', 'intersoccer_display_course_info_container');
+function intersoccer_display_course_info_container() {
+    global $product;
+    
+    if (!$product || !is_a($product, 'WC_Product')) {
+        return;
+    }
+    
+    $product_id = $product->get_id();
+    $product_type = intersoccer_get_product_type($product_id);
+    
+    if ($product_type !== 'course') {
+        return;
+    }
+    
+    // Only for variable products
+    if (!$product->is_type('variable')) {
+        return;
+    }
+    
+    // Output container that JavaScript will populate
+    echo '<div id="intersoccer-course-info" class="intersoccer-course-info" style="display: none;">';
+    echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
+    echo '<div id="intersoccer-course-details"></div>';
+    echo '</div>';
 }
 
 /**

@@ -100,13 +100,53 @@
             });
         }
 
-        // Function to update course information display - DISABLED
-        // Course info now only displays in the variation table, not at the top of the page
+        // Function to update course information display
         function updateCourseInfo(productId, variationId) {
-            console.log('InterSoccer: updateCourseInfo disabled - course info displays in variation table only');
-            // Function disabled - course info container removed from page
-            // Course information is now displayed in the variation details table
+            console.log('InterSoccer: updateCourseInfo called for variation', variationId);
+            
+            if (!variationId) {
+                $('#intersoccer-course-info').hide();
                 return;
+            }
+            
+            // Make AJAX call to get course info HTML
+            $.ajax({
+                url: intersoccerCheckout.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'intersoccer_get_course_info',
+                    nonce: intersoccerCheckout.nonce,
+                    product_id: productId,
+                    variation_id: variationId
+                },
+                success: function(response) {
+                    if (response.success && response.data.is_course) {
+                        const data = response.data;
+                        let html = '';
+                        
+                        if (data.start_date) {
+                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.start_date ? intersoccerCheckout.i18n.start_date : 'Start Date') + ':</strong> ' + data.start_date + '</p>';
+                        }
+                        if (data.total_weeks) {
+                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.total_sessions ? intersoccerCheckout.i18n.total_sessions : 'Total Sessions') + ':</strong> ' + data.total_weeks + '</p>';
+                        }
+                        if (data.remaining_sessions && data.remaining_sessions !== data.total_weeks) {
+                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.remaining_sessions ? intersoccerCheckout.i18n.remaining_sessions : 'Remaining Sessions') + ':</strong> ' + data.remaining_sessions + '</p>';
+                        }
+                        
+                        $('#intersoccer-course-details').html(html);
+                        $('#intersoccer-course-info').show();
+                        
+                        console.log('InterSoccer: Course info displayed for variation', variationId);
+                    } else {
+                        $('#intersoccer-course-info').hide();
+                    }
+                },
+                error: function() {
+                    console.error('InterSoccer: Failed to fetch course info for variation', variationId);
+                    $('#intersoccer-course-info').hide();
+                }
+            });
         }
 
         // Form observer setup
