@@ -127,11 +127,21 @@
                         if (data.start_date) {
                             html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.start_date ? intersoccerCheckout.i18n.start_date : 'Start Date') + ':</strong> ' + data.start_date + '</p>';
                         }
+                        if (data.end_date) {
+                            html += '<p><strong>End Date:</strong> ' + data.end_date + '</p>';
+                        }
                         if (data.total_weeks) {
                             html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.total_sessions ? intersoccerCheckout.i18n.total_sessions : 'Total Sessions') + ':</strong> ' + data.total_weeks + '</p>';
                         }
                         if (data.remaining_sessions && data.remaining_sessions !== data.total_weeks) {
                             html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.remaining_sessions ? intersoccerCheckout.i18n.remaining_sessions : 'Remaining Sessions') + ':</strong> ' + data.remaining_sessions + '</p>';
+                        }
+                        if (data.holidays && data.holidays.length > 0) {
+                            html += '<p><strong>Holidays:</strong></p><ul style="margin-left: 20px;">';
+                            data.holidays.forEach(function(holiday) {
+                                html += '<li>' + holiday + '</li>';
+                            });
+                            html += '</ul>';
                         }
                         
                         $('#intersoccer-course-details').html(html);

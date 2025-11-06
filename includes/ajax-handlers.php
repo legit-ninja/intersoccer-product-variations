@@ -426,11 +426,30 @@ function intersoccer_get_course_info() {
         $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
     }
 
+    // Get holidays
+    $holidays = get_post_meta($variation_id, '_course_holiday_dates', true);
+    if (!is_array($holidays)) {
+        $holidays = [];
+    }
+
+    // Calculate end date
+    $end_date = '';
+    if (class_exists('InterSoccer_Course') && $start_date && $total_weeks) {
+        $end_date = InterSoccer_Course::calculate_end_date($variation_id, $total_weeks);
+    }
+
     $response = [
         'is_course' => true,
         'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
+        'end_date' => $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '',
         'total_weeks' => $total_weeks,
-        'remaining_sessions' => $remaining_sessions
+        'remaining_sessions' => $remaining_sessions,
+        'holidays' => array_map(function($holiday) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
+                return date_i18n('F j, Y', strtotime($holiday));
+            }
+            return $holiday;
+        }, $holidays)
     ];
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
