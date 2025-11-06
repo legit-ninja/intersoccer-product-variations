@@ -44,6 +44,7 @@ class CoursePriceCalculationTest extends TestCase {
 
     public function testFullPriceCourse() {
         // Test a course that hasn't started yet (all sessions remaining)
+        // CRITICAL: Future courses should ALWAYS return base_price, not session_rate * total_weeks
         $product_id = 123;
         $variation_id = 456;
 
@@ -67,8 +68,15 @@ class CoursePriceCalculationTest extends TestCase {
         // Calculate price
         $price = InterSoccer_Course::calculate_price($product_id, $variation_id);
 
-        // Should return full price since all sessions remain
-        $this->assertEquals(500.00, $price);
+        // Should return full base price since course hasn't started
+        $this->assertEquals(500.00, $price, 'Future course should return base_price');
+        
+        // REGRESSION TEST: Verify that even if we set a session_rate, future courses use base_price
+        update_post_meta($variation_id, '_course_weekly_discount', 45.00); // 45 CHF per session
+        $price_with_rate = InterSoccer_Course::calculate_price($product_id, $variation_id);
+        
+        // Should still return base price of 500, NOT 450 (45 * 10 sessions)
+        $this->assertEquals(500.00, $price_with_rate, 'Future course with session_rate should still return base_price, not session_rate * total_weeks');
     }
 
     public function testProratedCoursePrice() {
@@ -162,6 +170,38 @@ class CoursePriceCalculationTest extends TestCase {
         // Should have more than 8/10ths remaining
         $this->assertGreaterThan(320.00, $price); // More than 8/10ths of 400
         $this->assertLessThanOrEqual(400.00, $price);
+    }
+
+    public function testFutureCourseWithSessionRate() {
+        // REGRESSION TEST: Ensure session_rate is completely bypassed for future courses
+        // Bug: Customers booking early were seeing session_rate * total_weeks instead of base_price
+        $product_id = 123;
+        $variation_id = 789;
+
+        // Mock course data with future start date and session rate
+        $future_date = date('Y-m-d', strtotime('+2 months')); // 2 months in the future
+        update_post_meta($variation_id, 'attribute_pa_course-day', 'wednesday');
+        update_post_meta($variation_id, '_course_start_date', $future_date);
+        update_post_meta($variation_id, '_course_total_weeks', 12);
+        update_post_meta($variation_id, '_course_weekly_discount', 50.00); // 50 CHF per session
+        update_post_meta($variation_id, '_course_holiday_dates', []);
+
+        // Mock product with base price
+        $mock_product = $this->createMock(WC_Product::class);
+        $mock_product->method('get_price')->willReturn(550.00); // Base price
+
+        // Mock wc_get_product
+        global $mock_wc_get_product;
+        $mock_wc_get_product = function($id) use ($mock_product) {
+            return $mock_product;
+        };
+
+        // Calculate price
+        $price = InterSoccer_Course::calculate_price($product_id, $variation_id);
+
+        // CRITICAL: Should return base_price (550.00), NOT session_rate * total_weeks (50 * 12 = 600.00)
+        $this->assertEquals(550.00, $price, 'Future course must return base_price, not session_rate * total_weeks');
+        $this->assertNotEquals(600.00, $price, 'Future course should not calculate using session_rate');
     }
 }
 

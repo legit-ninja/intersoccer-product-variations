@@ -411,6 +411,19 @@ class InterSoccer_Course {
 
         error_log('InterSoccer: Course price calculation for variation ' . ($variation_id ?: $product_id) . ' - base_price: ' . $base_price . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate);
 
+        // CRITICAL FIX: Don't apply pro-rated pricing to courses with future start dates
+        // Customers booking early should pay full base price, not a calculated session price
+        $start_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_start_date', '');
+        if ($start_date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
+            $start = new DateTime($start_date);
+            $current = new DateTime(current_time('Y-m-d'));
+            
+            if ($current < $start) {
+                error_log('InterSoccer: Course has not started yet (start: ' . $start_date . ') - returning full base price: ' . $base_price);
+                return $base_price;
+            }
+        }
+
         if (is_null($remaining_sessions)) {
             $remaining_sessions = self::calculate_remaining_sessions($variation_id, $total_weeks);
             error_log('InterSoccer: Calculated remaining_sessions: ' . $remaining_sessions);
