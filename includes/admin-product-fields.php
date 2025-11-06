@@ -227,16 +227,11 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
     $end_date = calculate_course_end_date($variation_id, $start_date, $total_weeks, $holiday_dates, $course_days);
     update_post_meta($variation_id, '_end_date', $end_date);
 
-    // Update variation price to full course price if session rate is set
-    if ($weekly_discount > 0) {
-        $full_price = $weekly_discount * $total_weeks;
-        update_post_meta($variation_id, '_price', $full_price);
-        update_post_meta($variation_id, '_regular_price', $full_price);
-        wc_delete_product_transients($variation_id); // Clear transients
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Updated variation ' . $variation_id . ' price to full course price: ' . $full_price);
-        }
-    }
+    // IMPORTANT: We do NOT automatically set the Regular Price here
+    // The Regular Price is a static price manually set by the admin
+    // The session rate is ONLY used for frontend calculation after the course starts
+    // Clear transients to ensure changes take effect
+    wc_delete_product_transients($variation_id);
 
     // Sync course metadata to WPML translations
     intersoccer_sync_course_metadata_to_translations($variation_id, $start_date, $total_weeks, $holiday_dates, $weekly_discount, $end_date);
@@ -602,13 +597,10 @@ function intersoccer_sync_course_metadata_to_translations($variation_id, $start_
         update_post_meta($translated_variation_id, '_course_weekly_discount', $weekly_discount);
         update_post_meta($translated_variation_id, '_end_date', $end_date);
 
-        // Sync price metadata if session rate is set
-        if ($weekly_discount > 0) {
-            $full_price = $weekly_discount * $total_weeks;
-            update_post_meta($translated_variation_id, '_price', $full_price);
-            update_post_meta($translated_variation_id, '_regular_price', $full_price);
-            wc_delete_product_transients($translated_variation_id);
-        }
+        // IMPORTANT: We do NOT automatically set the Regular Price
+        // The Regular Price is manually set by the admin and should remain static
+        // Clear transients to ensure changes take effect
+        wc_delete_product_transients($translated_variation_id);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');

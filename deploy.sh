@@ -344,26 +344,28 @@ if [ "$RUN_CYPRESS_TESTS" = true ]; then
 fi
 echo ""
 
-# ALWAYS run PHPUnit tests before deployment (cannot be skipped)
-if [ "$DRY_RUN" = false ]; then
-    run_phpunit_tests
-    if [ $? -ne 0 ]; then
-        echo ""
-        echo -e "${RED}✗ PHPUnit tests failed. Deployment BLOCKED.${NC}"
-        echo ""
-        echo "Fix the failing tests before deploying:"
-        echo "  ./vendor/bin/phpunit --testdox"
-        echo ""
-        exit 1
-    fi
+# ALWAYS run PHPUnit tests (even in dry-run mode)
+run_phpunit_tests
+if [ $? -ne 0 ]; then
     echo ""
-else
-    echo -e "${YELLOW}DRY RUN MODE - Skipping PHPUnit tests${NC}"
+    echo -e "${RED}✗ PHPUnit tests failed. Deployment BLOCKED.${NC}"
     echo ""
+    echo "Fix the failing tests before deploying:"
+    echo "  ./vendor/bin/phpunit --testdox"
+    echo ""
+    exit 1
 fi
+echo ""
 
-# Deploy to server
-deploy_to_server
+# Deploy to server (skip if dry-run)
+if [ "$DRY_RUN" = false ]; then
+    deploy_to_server
+else
+    echo -e "${YELLOW}DRY RUN MODE - Skipping deployment${NC}"
+    echo -e "${GREEN}✓ PHPUnit tests passed. Ready to deploy.${NC}"
+    echo ""
+    exit 0
+fi
 
 # Clear caches if requested or if running Cypress tests
 if [ "$DRY_RUN" = false ]; then
