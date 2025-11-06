@@ -124,8 +124,8 @@ add_action('woocommerce_before_single_product', function () {
     ob_start();
 ?>
     <tr class="intersoccer-player-selection intersoccer-injected">
-        <th><label for="player_assignment_select"><?php esc_html_e('Select an Attendee', 'intersoccer-product-variations'); ?></label></th>
-        <td>
+        <th class="label"><label for="player_assignment_select"><?php esc_html_e('Select an Attendee', 'intersoccer-product-variations'); ?></label></th>
+        <td class="value">
             <div class="intersoccer-player-content">
                 <?php if (!$user_id) : ?>
                     <p class="intersoccer-login-prompt">Please <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">log in</a> or <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">register</a> to select an attendee.</p>
@@ -430,7 +430,10 @@ add_action('woocommerce_before_single_product', function () {
                                             console.warn('InterSoccer: Invalid player data:', player);
                                         }
                                     });
-                                    $playerContent.html($select);
+                                    
+                                    // Wrap select in container to match WooCommerce variations styling
+                                    var $container = $('<div class="select_container"></div>').append($select);
+                                    $playerContent.html($container);
                                     $playerContent.append('<span class="error-message" style="color: red; display: none;"></span>');
                                     $playerContent.append('<span class="intersoccer-attendee-notification" style="color: red; display: none; margin-top: 10px;">Please select an attendee to add to cart.</span>');
                                     
