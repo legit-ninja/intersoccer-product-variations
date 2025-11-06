@@ -408,8 +408,41 @@ function intersoccer_inject_course_prorated_price($variation_data, $product, $va
     // Update the price HTML to match
     $variation_data['price_html'] = '<span class="price">' . wc_price($prorated_price) . '</span>';
     
+    // PERFORMANCE OPTIMIZATION: Inject course info directly into variation data
+    // This eliminates the need for a separate AJAX call
+    $start_date = get_post_meta($variation_id, '_course_start_date', true);
+    $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+    $holidays = get_post_meta($variation_id, '_course_holiday_dates', true);
+    
+    if (!is_array($holidays)) {
+        $holidays = [];
+    }
+    
+    // Calculate end date and remaining sessions
+    $end_date = '';
+    $remaining_sessions = 0;
+    if (class_exists('InterSoccer_Course') && $start_date && $total_weeks) {
+        $end_date = InterSoccer_Course::calculate_end_date($variation_id, $total_weeks);
+        $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+    }
+    
+    // Inject course info into variation data
+    $variation_data['course_info'] = [
+        'is_course' => true,
+        'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
+        'end_date' => $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '',
+        'total_weeks' => $total_weeks,
+        'remaining_sessions' => $remaining_sessions,
+        'holidays' => array_map(function($holiday) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
+                return date_i18n('F j, Y', strtotime($holiday));
+            }
+            return $holiday;
+        }, $holidays)
+    ];
+    
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Injected prorated price ' . $prorated_price . ' into variation data for course variation ' . $variation_id);
+        error_log('InterSoccer: Injected prorated price ' . $prorated_price . ' and course info into variation data for course variation ' . $variation_id);
     }
     
     return $variation_data;

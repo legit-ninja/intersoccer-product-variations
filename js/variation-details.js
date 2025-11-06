@@ -101,7 +101,7 @@
         }
 
         // Function to update course information display
-        function updateCourseInfo(productId, variationId) {
+        function updateCourseInfo(productId, variationId, variationData) {
             console.log('InterSoccer: updateCourseInfo called for variation', variationId);
             
             if (!variationId) {
@@ -109,54 +109,87 @@
                 return;
             }
             
-            // Make AJAX call to get course info HTML
-            $.ajax({
-                url: intersoccerCheckout.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'intersoccer_get_course_info',
-                    nonce: intersoccerCheckout.nonce,
-                    product_id: productId,
-                    variation_id: variationId
-                },
-                success: function(response) {
-                    if (response.success && response.data.is_course) {
-                        const data = response.data;
-                        let html = '';
-                        
-                        if (data.start_date) {
-                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.start_date ? intersoccerCheckout.i18n.start_date : 'Start Date') + ':</strong> ' + data.start_date + '</p>';
+            // PERFORMANCE OPTIMIZATION: Use pre-injected course info from variation data
+            // This eliminates the AJAX call and displays info instantly
+            if (variationData && variationData.course_info && variationData.course_info.is_course) {
+                const data = variationData.course_info;
+                let html = '';
+                
+                if (data.start_date) {
+                    html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.start_date ? intersoccerCheckout.i18n.start_date : 'Start Date') + ':</strong> ' + data.start_date + '</p>';
+                }
+                if (data.end_date) {
+                    html += '<p><strong>End Date:</strong> ' + data.end_date + '</p>';
+                }
+                if (data.total_weeks) {
+                    html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.total_sessions ? intersoccerCheckout.i18n.total_sessions : 'Total Sessions') + ':</strong> ' + data.total_weeks + '</p>';
+                }
+                if (data.remaining_sessions && data.remaining_sessions !== data.total_weeks) {
+                    html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.remaining_sessions ? intersoccerCheckout.i18n.remaining_sessions : 'Remaining Sessions') + ':</strong> ' + data.remaining_sessions + '</p>';
+                }
+                if (data.holidays && data.holidays.length > 0) {
+                    html += '<p><strong>Holidays:</strong></p><ul style="margin-left: 20px;">';
+                    data.holidays.forEach(function(holiday) {
+                        html += '<li>' + holiday + '</li>';
+                    });
+                    html += '</ul>';
+                }
+                
+                $('#intersoccer-course-details').html(html);
+                $('#intersoccer-course-info').show();
+                
+                console.log('InterSoccer: Course info displayed instantly from variation data (no AJAX)');
+            } else {
+                // Fallback to AJAX if course info not in variation data (backward compatibility)
+                console.log('InterSoccer: Course info not in variation data, using AJAX fallback');
+                $.ajax({
+                    url: intersoccerCheckout.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'intersoccer_get_course_info',
+                        nonce: intersoccerCheckout.nonce,
+                        product_id: productId,
+                        variation_id: variationId
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.is_course) {
+                            const data = response.data;
+                            let html = '';
+                            
+                            if (data.start_date) {
+                                html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.start_date ? intersoccerCheckout.i18n.start_date : 'Start Date') + ':</strong> ' + data.start_date + '</p>';
+                            }
+                            if (data.end_date) {
+                                html += '<p><strong>End Date:</strong> ' + data.end_date + '</p>';
+                            }
+                            if (data.total_weeks) {
+                                html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.total_sessions ? intersoccerCheckout.i18n.total_sessions : 'Total Sessions') + ':</strong> ' + data.total_weeks + '</p>';
+                            }
+                            if (data.remaining_sessions && data.remaining_sessions !== data.total_weeks) {
+                                html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.remaining_sessions ? intersoccerCheckout.i18n.remaining_sessions : 'Remaining Sessions') + ':</strong> ' + data.remaining_sessions + '</p>';
+                            }
+                            if (data.holidays && data.holidays.length > 0) {
+                                html += '<p><strong>Holidays:</strong></p><ul style="margin-left: 20px;">';
+                                data.holidays.forEach(function(holiday) {
+                                    html += '<li>' + holiday + '</li>';
+                                });
+                                html += '</ul>';
+                            }
+                            
+                            $('#intersoccer-course-details').html(html);
+                            $('#intersoccer-course-info').show();
+                            
+                            console.log('InterSoccer: Course info displayed via AJAX fallback');
+                        } else {
+                            $('#intersoccer-course-info').hide();
                         }
-                        if (data.end_date) {
-                            html += '<p><strong>End Date:</strong> ' + data.end_date + '</p>';
-                        }
-                        if (data.total_weeks) {
-                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.total_sessions ? intersoccerCheckout.i18n.total_sessions : 'Total Sessions') + ':</strong> ' + data.total_weeks + '</p>';
-                        }
-                        if (data.remaining_sessions && data.remaining_sessions !== data.total_weeks) {
-                            html += '<p><strong>' + (intersoccerCheckout.i18n && intersoccerCheckout.i18n.remaining_sessions ? intersoccerCheckout.i18n.remaining_sessions : 'Remaining Sessions') + ':</strong> ' + data.remaining_sessions + '</p>';
-                        }
-                        if (data.holidays && data.holidays.length > 0) {
-                            html += '<p><strong>Holidays:</strong></p><ul style="margin-left: 20px;">';
-                            data.holidays.forEach(function(holiday) {
-                                html += '<li>' + holiday + '</li>';
-                            });
-                            html += '</ul>';
-                        }
-                        
-                        $('#intersoccer-course-details').html(html);
-                        $('#intersoccer-course-info').show();
-                        
-                        console.log('InterSoccer: Course info displayed for variation', variationId);
-                    } else {
+                    },
+                    error: function() {
+                        console.error('InterSoccer: Failed to fetch course info for variation', variationId);
                         $('#intersoccer-course-info').hide();
                     }
-                },
-                error: function() {
-                    console.error('InterSoccer: Failed to fetch course info for variation', variationId);
-                    $('#intersoccer-course-info').hide();
-                }
-            });
+                });
+            }
         }
 
         // Form observer setup
@@ -356,7 +389,9 @@
                             const variationId = $form.find('input[name="variation_id"]').val();
                             if (variationId && variationId !== '0') {
                                 console.log("InterSoccer: Found variation ID from pre-selected attributes, displaying course info:", variationId);
-                                updateCourseInfo(productId, parseInt(variationId));
+                                // For pre-selected variations, variation data may not be readily available
+                                // Use AJAX fallback (third parameter is undefined)
+                                updateCourseInfo(productId, parseInt(variationId), undefined);
 
                                 // Note: Price for pre-selected variations is handled by PHP filter
                             } else {
@@ -438,8 +473,8 @@
                             updateFormData(playerId, remainingWeeks, variationId);
                             updateAddToCartButtonState(playerId, bookingType);
 
-                            // Display course information
-                            updateCourseInfo(productId, variationId);
+                            // Display course information - pass variation data for instant display
+                            updateCourseInfo(productId, variationId, variation);
 
                             // Update price display with prorated course price
                             updateProductPrice(productId, variationId, remainingWeeks)

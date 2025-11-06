@@ -345,7 +345,7 @@ add_action('wp_enqueue_scripts', function () {
             'intersoccer-variation-details',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
             ['jquery'],
-            '1.4.54',
+            '1.4.55', // Bumped for course info holidays/end_date fix
             true
         );
 
@@ -371,7 +371,7 @@ add_action('wp_enqueue_scripts', function () {
         'intersoccer-styles',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
-        '1.4.54'
+        '1.4.55' // Bumped to match JS version
     );
 });
 
