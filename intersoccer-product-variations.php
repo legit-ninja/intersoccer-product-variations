@@ -345,7 +345,7 @@ add_action('wp_enqueue_scripts', function () {
             'intersoccer-variation-details',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
             ['jquery'],
-            '1.4.62', // Bumped for player selection styling fix
+            '1.4.63', // Bumped for holiday white text color fix
             true
         );
 
@@ -371,7 +371,7 @@ add_action('wp_enqueue_scripts', function () {
         'intersoccer-styles',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
         [],
-        '1.4.62' // Bumped to match JS version
+        '1.4.63' // Bumped to match JS version
     );
 });
 
