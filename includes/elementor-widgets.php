@@ -631,7 +631,14 @@ add_action('woocommerce_before_single_product', function () {
                         $dayNotification.hide();
                     }
 
-                    $dayCheckboxes.find('input.intersoccer-day-checkbox').off('change').on('change', function() {
+                    var lastCampDayChangeTime = 0;
+                    $dayCheckboxes.find('input.intersoccer-day-checkbox').off('change click').on('change click', function(e) {
+                        var now = Date.now();
+                        if (now - lastCampDayChangeTime < 100) {
+                            return;
+                        }
+                        lastCampDayChangeTime = now;
+                        
                         var $checkbox = $(this);
 
                         selectedDays = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').map(function() { return $(this).val(); }).get();
@@ -848,8 +855,15 @@ add_action('woocommerce_before_single_product', function () {
                 
                 $daysContainer.append($dayCheckboxesContainer);
                 
-                // Handle radio button changes
-                $optionsContainer.find('.intersoccer-late-pickup-radio').on('change', function() {
+                // Handle radio button changes (both change and click for iOS Safari)
+                var lastRadioChangeTime = 0;
+                $optionsContainer.find('.intersoccer-late-pickup-radio').on('change click', function(e) {
+                    var now = Date.now();
+                    if (now - lastRadioChangeTime < 100) {
+                        return;
+                    }
+                    lastRadioChangeTime = now;
+                    
                     selectedLatePickupOption = $(this).val();
                     console.log('InterSoccer Late Pickup: Option changed to:', selectedLatePickupOption);
                     
@@ -865,8 +879,15 @@ add_action('woocommerce_before_single_product', function () {
                     updateLatePickupFormData(settings);
                 });
                 
-                // Handle day checkbox changes
-                $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox').on('change', function() {
+                // Handle day checkbox changes (both change and click for iOS Safari)
+                var lastCheckboxChangeTime = 0;
+                $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox').on('change click', function(e) {
+                    var now = Date.now();
+                    if (now - lastCheckboxChangeTime < 100) {
+                        return;
+                    }
+                    lastCheckboxChangeTime = now;
+                    
                     selectedLatePickupDays = $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox:checked').map(function() {
                         return $(this).val();
                     }).get();
