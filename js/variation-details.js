@@ -146,7 +146,7 @@
                 }
                 
                 if (data.holidays && data.holidays.length > 0) {
-                    let holidayHtml = '<div style="background: white; padding: 8px;"><ul style="margin: 0; padding-left: 20px;">';
+                    let holidayHtml = '<div style="color: white; padding: 8px;"><ul style="margin: 0; padding-left: 20px;">';
                     data.holidays.forEach(function(holiday) {
                         holidayHtml += '<li>' + holiday + '</li>';
                     });
