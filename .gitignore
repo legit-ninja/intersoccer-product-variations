@@ -8,6 +8,7 @@ vendor/
 
 # Debug scripts (keep locally for development)
 debug-course-prices.php
+@todo.list
 
 # Local test files
 run-tests.php
