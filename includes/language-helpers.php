@@ -18,14 +18,14 @@ if (!defined('ABSPATH')) {
 function intersoccer_get_current_language() {
     // Log function call for debugging
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: intersoccer_get_current_language() called');
+        intersoccer_debug('InterSoccer: intersoccer_get_current_language() called');
     }
 
     // Check for WPML
     if (function_exists('icl_get_current_language')) {
         $lang = icl_get_current_language();
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: WPML detected, current language: ' . $lang);
+            intersoccer_debug('InterSoccer: WPML detected, current language: ' . $lang);
         }
         return $lang;
     }
@@ -34,7 +34,7 @@ function intersoccer_get_current_language() {
     if (function_exists('pll_current_language')) {
         $lang = pll_current_language();
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Polylang detected, current language: ' . $lang);
+            intersoccer_debug('InterSoccer: Polylang detected, current language: ' . $lang);
         }
         return $lang ? $lang : 'en';
     }
@@ -44,7 +44,7 @@ function intersoccer_get_current_language() {
     $lang = substr($locale, 0, 2); // Extract language code from locale (e.g., 'en' from 'en_US')
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: No multilingual plugin detected, using WordPress locale: ' . $locale . ' -> ' . $lang);
+        intersoccer_debug('InterSoccer: No multilingual plugin detected, using WordPress locale: ' . $locale . ' -> ' . $lang);
     }
 
     return $lang;
@@ -58,7 +58,7 @@ function intersoccer_get_current_language() {
  */
 function intersoccer_get_available_languages() {
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: intersoccer_get_available_languages() called');
+        intersoccer_debug('InterSoccer: intersoccer_get_available_languages() called');
     }
 
     // Check for WPML
@@ -71,7 +71,7 @@ function intersoccer_get_available_languages() {
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: WPML languages: ' . print_r($available, true));
+            intersoccer_debug('InterSoccer: WPML languages: ' . print_r($available, true));
         }
         return $available;
     }
@@ -88,7 +88,7 @@ function intersoccer_get_available_languages() {
 
         if (!empty($available)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Polylang languages: ' . print_r($available, true));
+                intersoccer_debug('InterSoccer: Polylang languages: ' . print_r($available, true));
             }
             return $available;
         }
@@ -102,7 +102,7 @@ function intersoccer_get_available_languages() {
     ];
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
+        intersoccer_debug('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
     }
     return $fallback;
 }
@@ -173,7 +173,7 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
         $name = $name ?: md5($string);
         icl_register_string($context, $name, $string);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Registered WPML string - Context: {$context}, Name: {$name}, String: {$string}");
+            intersoccer_debug("InterSoccer: Registered WPML string - Context: {$context}, Name: {$name}, String: {$string}");
         }
         return true;
     }
@@ -183,13 +183,13 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
         $name = $name ?: $string;
         pll_register_string($name, $string, $context);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Registered Polylang string - Context: {$context}, Name: {$name}, String: {$string}");
+            intersoccer_debug("InterSoccer: Registered Polylang string - Context: {$context}, Name: {$name}, String: {$string}");
         }
         return true;
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("InterSoccer: No multilingual plugin available for string registration: {$string}");
+        intersoccer_debug("InterSoccer: No multilingual plugin available for string registration: {$string}");
     }
     return false;
 }
@@ -207,7 +207,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
     // Validate inputs
     if (empty($rule_id) || empty($message_type)) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Invalid parameters for discount message - Rule ID: {$rule_id}, Type: {$message_type}");
+            intersoccer_debug("InterSoccer: Invalid parameters for discount message - Rule ID: {$rule_id}, Type: {$message_type}");
         }
         return $fallback;
     }
@@ -227,7 +227,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
 
         if (!$rule) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("InterSoccer: Rule not found for ID: {$rule_id}");
+                intersoccer_debug("InterSoccer: Rule not found for ID: {$rule_id}");
             }
             return $fallback;
         }
@@ -244,14 +244,14 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
             $message_data = $discount_messages[$message_key]['en'] ?? [];
             $message = $message_data[$message_type] ?? '';
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("InterSoccer: Falling back to English for rule {$rule_id}, type {$message_type}");
+                intersoccer_debug("InterSoccer: Falling back to English for rule {$rule_id}, type {$message_type}");
             }
         }
 
         // Use fallback if still empty
         if (empty($message)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("InterSoccer: No message found for rule {$rule_id}, type {$message_type}, using fallback");
+                intersoccer_debug("InterSoccer: No message found for rule {$rule_id}, type {$message_type}, using fallback");
             }
             $message = $fallback;
         }
@@ -263,7 +263,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
 
             if ($translated !== $message) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log("InterSoccer: Applied translation for {$string_name}");
+                    intersoccer_debug("InterSoccer: Applied translation for {$string_name}");
                 }
             }
 
@@ -274,7 +274,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
 
     } catch (Exception $e) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Error getting discount message - Rule: {$rule_id}, Type: {$message_type}, Error: " . $e->getMessage());
+            intersoccer_debug("InterSoccer: Error getting discount message - Rule: {$rule_id}, Type: {$message_type}, Error: " . $e->getMessage());
         }
         return $fallback;
     }
@@ -289,11 +289,11 @@ function intersoccer_init_language_support() {
 
     if ($multilingual_plugin) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Multilingual support initialized with {$multilingual_plugin}");
+            intersoccer_debug("InterSoccer: Multilingual support initialized with {$multilingual_plugin}");
         }
     } else {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: No multilingual plugin detected, using WordPress defaults");
+            intersoccer_debug("InterSoccer: No multilingual plugin detected, using WordPress defaults");
         }
     }
 
@@ -302,7 +302,7 @@ function intersoccer_init_language_support() {
     $available_langs = intersoccer_get_available_languages();
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("InterSoccer: Language support test - Current: {$current_lang}, Available: " . implode(', ', array_keys($available_langs)));
+        intersoccer_debug("InterSoccer: Language support test - Current: {$current_lang}, Available: " . implode(', ', array_keys($available_langs)));
     }
 }
 
@@ -313,6 +313,6 @@ add_action('admin_init', 'intersoccer_init_language_support', 15);
 add_action('init', 'intersoccer_init_language_support', 15);
 
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('InterSoccer: Language helper functions loaded');
+    intersoccer_debug('InterSoccer: Language helper functions loaded');
 }
 ?>

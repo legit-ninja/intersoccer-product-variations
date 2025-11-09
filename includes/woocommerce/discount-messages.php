@@ -42,7 +42,7 @@ function intersoccer_get_discount_message_basic($rule_id, $message_type = 'cart_
         }
         
         if (!$rule) {
-            error_log("InterSoccer: Rule not found for ID: {$rule_id}");
+            intersoccer_debug("InterSoccer: Rule not found for ID: {$rule_id}");
             return $fallback;
         }
         
@@ -76,7 +76,7 @@ function intersoccer_get_discount_message_basic($rule_id, $message_type = 'cart_
         return $message;
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error in intersoccer_get_discount_message_basic: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error in intersoccer_get_discount_message_basic: " . $e->getMessage());
         return $fallback;
     }
 }
@@ -116,7 +116,7 @@ function intersoccer_get_current_language_safe() {
         return 'en';
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error detecting language: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error detecting language: " . $e->getMessage());
         return 'en';
     }
 }
@@ -174,7 +174,7 @@ function intersoccer_get_available_languages_safe() {
         ];
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error getting available languages: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error getting available languages: " . $e->getMessage());
         return ['en' => 'English'];
     }
 }
@@ -204,7 +204,7 @@ function intersoccer_register_wpml_strings() {
 
         foreach ($template_strings as $string_name => $string_value) {
             icl_register_string($context, $string_name, $string_value);
-            error_log("InterSoccer: Registered WPML template string: {$string_name}");
+            intersoccer_debug("InterSoccer: Registered WPML template string: {$string_name}");
         }
 
         // Register discount rule messages from database
@@ -221,14 +221,14 @@ function intersoccer_register_wpml_strings() {
                         if (!empty($message)) {
                             $string_name = "intersoccer_discount_{$rule['id']}_{$type}";
                             icl_register_string($context, $string_name, $message);
-                            error_log("InterSoccer: Registered WPML discount string: {$string_name}");
+                            intersoccer_debug("InterSoccer: Registered WPML discount string: {$string_name}");
                         }
                     }
                 }
             }
         }
     } catch (Exception $e) {
-        error_log("InterSoccer: Error registering WPML strings: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error registering WPML strings: " . $e->getMessage());
     }
 }
 add_action('init', 'intersoccer_register_wpml_strings', 20);
@@ -296,14 +296,14 @@ function intersoccer_apply_camp_combo_discounts_with_messages($camps_by_child) {
             
             WC()->cart->add_fee($discount_label, -$discount_amount);
             
-            error_log(sprintf(
+            intersoccer_debug(sprintf(
                 'InterSoccer: Applied camp discount with custom message: %s, Amount: -CHF %.2f',
                 $discount_label,
                 $discount_amount
             ));
         }
     } catch (Exception $e) {
-        error_log("InterSoccer: Error in camp combo discounts with messages: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error in camp combo discounts with messages: " . $e->getMessage());
         // Fallback to basic discount application
         if (function_exists('intersoccer_apply_camp_combo_discounts')) {
             intersoccer_apply_camp_combo_discounts($camps_by_child);
@@ -346,7 +346,7 @@ function intersoccer_apply_course_combo_discounts_with_messages($courses_by_chil
                             
                             // Update the price to prorated amount
                             $course['price'] = $prorated_price;
-                            error_log('InterSoccer: Prorated course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price . ', Remaining Sessions: ' . $remaining_sessions);
+                            intersoccer_debug('InterSoccer: Prorated course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price . ', Remaining Sessions: ' . $remaining_sessions);
                         }
                     }
                 }
@@ -390,7 +390,7 @@ function intersoccer_apply_course_combo_discounts_with_messages($courses_by_chil
                 
                 WC()->cart->add_fee($discount_label, -$discount_amount);
                 
-                error_log(sprintf(
+                intersoccer_debug(sprintf(
                     'InterSoccer: Applied course multi-child discount with custom message: %s, Amount: -CHF %.2f',
                     $discount_label,
                     $discount_amount
@@ -398,7 +398,7 @@ function intersoccer_apply_course_combo_discounts_with_messages($courses_by_chil
             }
         }
     } catch (Exception $e) {
-        error_log("InterSoccer: Error in course combo discounts with messages: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error in course combo discounts with messages: " . $e->getMessage());
         // Fallback to basic discount application
         if (function_exists('intersoccer_apply_course_combo_discounts')) {
             intersoccer_apply_course_combo_discounts($courses_by_child);
@@ -439,7 +439,7 @@ function intersoccer_apply_same_season_course_discounts_with_messages($courses_b
                                 
                                 // Update the price to prorated amount
                                 $course['price'] = $prorated_price;
-                                error_log('InterSoccer: Prorated same-season course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price);
+                                intersoccer_debug('InterSoccer: Prorated same-season course price - Product: ' . $product_id . ', Original: ' . $original_price . ', Prorated: ' . $prorated_price);
                             }
                         }
                     }
@@ -472,7 +472,7 @@ function intersoccer_apply_same_season_course_discounts_with_messages($courses_b
                     
                     WC()->cart->add_fee($discount_label, -$discount_amount);
                     
-                    error_log(sprintf(
+                    intersoccer_debug(sprintf(
                         'InterSoccer: Applied same-season discount with custom message: %s, Amount: -CHF %.2f',
                         $discount_label,
                         $discount_amount
@@ -481,7 +481,7 @@ function intersoccer_apply_same_season_course_discounts_with_messages($courses_b
             }
         }
     } catch (Exception $e) {
-        error_log("InterSoccer: Error in same-season course discounts with messages: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error in same-season course discounts with messages: " . $e->getMessage());
         // Fallback to basic discount application
         if (function_exists('intersoccer_apply_same_season_course_discounts')) {
             intersoccer_apply_same_season_course_discounts($courses_by_season_child);
@@ -541,7 +541,7 @@ function intersoccer_add_discount_messages_to_cart($item_data, $cart_item) {
         return $item_data;
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error adding discount messages to cart: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error adding discount messages to cart: " . $e->getMessage());
         return $item_data;
     }
 }
@@ -574,7 +574,7 @@ function intersoccer_get_rule_id_from_discount($discount) {
                 return '';
         }
     } catch (Exception $e) {
-        error_log("InterSoccer: Error determining rule ID from discount: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error determining rule ID from discount: " . $e->getMessage());
         return '';
     }
 }
@@ -637,7 +637,7 @@ function intersoccer_add_discount_email_content($order, $sent_to_admin = false) 
         echo '</ul>';
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error adding discount email content: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error adding discount email content: " . $e->getMessage());
     }
 }
 add_action('woocommerce_email_order_details', 'intersoccer_add_discount_email_content', 25, 2);
@@ -707,11 +707,11 @@ function intersoccer_initialize_default_messages() {
         
         if ($updated) {
             update_option('intersoccer_discount_messages', $discount_messages);
-            error_log('InterSoccer: Initialized default discount messages');
+            intersoccer_debug('InterSoccer: Initialized default discount messages');
         }
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error initializing default messages: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error initializing default messages: " . $e->getMessage());
     }
 }
 add_action('admin_init', 'intersoccer_initialize_default_messages');
@@ -736,11 +736,11 @@ function intersoccer_validate_discount_message_functions() {
     }
     
     if (!empty($missing_functions)) {
-        error_log("InterSoccer: Missing required functions for discount messages: " . implode(', ', $missing_functions));
+        intersoccer_debug("InterSoccer: Missing required functions for discount messages: " . implode(', ', $missing_functions));
         return false;
     }
     
-    error_log("InterSoccer: All required functions for discount messages are available");
+    intersoccer_debug("InterSoccer: All required functions for discount messages are available");
     return true;
 }
 
@@ -759,7 +759,7 @@ function intersoccer_emergency_discount_fallback() {
     // If the main discount functions are missing, provide basic fallbacks
     if (!function_exists('intersoccer_apply_camp_combo_discounts_with_messages')) {
         function intersoccer_apply_camp_combo_discounts_with_messages($camps_by_child) {
-            error_log("InterSoccer: Using emergency fallback for camp combo discounts");
+            intersoccer_debug("InterSoccer: Using emergency fallback for camp combo discounts");
             if (function_exists('intersoccer_apply_camp_combo_discounts')) {
                 return intersoccer_apply_camp_combo_discounts($camps_by_child);
             }
@@ -768,7 +768,7 @@ function intersoccer_emergency_discount_fallback() {
     
     if (!function_exists('intersoccer_apply_course_combo_discounts_with_messages')) {
         function intersoccer_apply_course_combo_discounts_with_messages($courses_by_child) {
-            error_log("InterSoccer: Using emergency fallback for course combo discounts");
+            intersoccer_debug("InterSoccer: Using emergency fallback for course combo discounts");
             if (function_exists('intersoccer_apply_course_combo_discounts')) {
                 return intersoccer_apply_course_combo_discounts($courses_by_child);
             }
@@ -777,7 +777,7 @@ function intersoccer_emergency_discount_fallback() {
     
     if (!function_exists('intersoccer_apply_same_season_course_discounts_with_messages')) {
         function intersoccer_apply_same_season_course_discounts_with_messages($courses_by_season_child) {
-            error_log("InterSoccer: Using emergency fallback for same-season course discounts");
+            intersoccer_debug("InterSoccer: Using emergency fallback for same-season course discounts");
             if (function_exists('intersoccer_apply_same_season_course_discounts')) {
                 return intersoccer_apply_same_season_course_discounts($courses_by_season_child);
             }
@@ -786,7 +786,7 @@ function intersoccer_emergency_discount_fallback() {
     
     if (!function_exists('intersoccer_apply_tournament_combo_discounts_with_messages')) {
         function intersoccer_apply_tournament_combo_discounts_with_messages($tournaments_by_child) {
-            error_log("InterSoccer: Using emergency fallback for tournament combo discounts");
+            intersoccer_debug("InterSoccer: Using emergency fallback for tournament combo discounts");
             if (function_exists('intersoccer_apply_tournament_combo_discounts')) {
                 return intersoccer_apply_tournament_combo_discounts($tournaments_by_child);
             }
@@ -806,19 +806,19 @@ add_action('plugins_loaded', 'intersoccer_emergency_discount_fallback', 5);
  */
 function intersoccer_get_current_language() {
     // Log function call for debugging
-    error_log('InterSoccer: intersoccer_get_current_language() called');
+    intersoccer_debug('InterSoccer: intersoccer_get_current_language() called');
     
     // Check for WPML
     if (function_exists('icl_get_current_language')) {
         $lang = icl_get_current_language();
-        error_log('InterSoccer: WPML detected, current language: ' . $lang);
+        intersoccer_debug('InterSoccer: WPML detected, current language: ' . $lang);
         return $lang;
     }
     
     // Check for Polylang
     if (function_exists('pll_current_language')) {
         $lang = pll_current_language();
-        error_log('InterSoccer: Polylang detected, current language: ' . $lang);
+        intersoccer_debug('InterSoccer: Polylang detected, current language: ' . $lang);
         return $lang ? $lang : 'en';
     }
     
@@ -826,7 +826,7 @@ function intersoccer_get_current_language() {
     $locale = get_locale();
     $lang = substr($locale, 0, 2); // Extract language code from locale (e.g., 'en' from 'en_US')
     
-    error_log('InterSoccer: No multilingual plugin detected, using WordPress locale: ' . $locale . ' -> ' . $lang);
+    intersoccer_debug('InterSoccer: No multilingual plugin detected, using WordPress locale: ' . $locale . ' -> ' . $lang);
     
     return $lang;
 }
@@ -898,7 +898,7 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
     if (function_exists('icl_register_string')) {
         $name = $name ?: md5($string);
         icl_register_string($context, $name, $string);
-        error_log("InterSoccer: Registered WPML string - Context: {$context}, Name: {$name}, String: {$string}");
+        intersoccer_debug("InterSoccer: Registered WPML string - Context: {$context}, Name: {$name}, String: {$string}");
         return true;
     }
     
@@ -906,11 +906,11 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
     if (function_exists('pll_register_string')) {
         $name = $name ?: $string;
         pll_register_string($name, $string, $context);
-        error_log("InterSoccer: Registered Polylang string - Context: {$context}, Name: {$name}, String: {$string}");
+        intersoccer_debug("InterSoccer: Registered Polylang string - Context: {$context}, Name: {$name}, String: {$string}");
         return true;
     }
     
-    error_log("InterSoccer: No multilingual plugin available for string registration: {$string}");
+    intersoccer_debug("InterSoccer: No multilingual plugin available for string registration: {$string}");
     return false;
 }
 
@@ -926,7 +926,7 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
 function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_message', $fallback = '') {
     // Validate inputs
     if (empty($rule_id) || empty($message_type)) {
-        error_log("InterSoccer: Invalid parameters for discount message - Rule ID: {$rule_id}, Type: {$message_type}");
+        intersoccer_debug("InterSoccer: Invalid parameters for discount message - Rule ID: {$rule_id}, Type: {$message_type}");
         return $fallback;
     }
     
@@ -944,7 +944,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
         }
         
         if (!$rule) {
-            error_log("InterSoccer: Rule not found for ID: {$rule_id}");
+            intersoccer_debug("InterSoccer: Rule not found for ID: {$rule_id}");
             return $fallback;
         }
         
@@ -959,12 +959,12 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
         if (empty($message) && $current_lang !== 'en') {
             $message_data = $discount_messages[$message_key]['en'] ?? [];
             $message = $message_data[$message_type] ?? '';
-            error_log("InterSoccer: Falling back to English for rule {$rule_id}, type {$message_type}");
+            intersoccer_debug("InterSoccer: Falling back to English for rule {$rule_id}, type {$message_type}");
         }
         
         // Use fallback if still empty
         if (empty($message)) {
-            error_log("InterSoccer: No message found for rule {$rule_id}, type {$message_type}, using fallback");
+            intersoccer_debug("InterSoccer: No message found for rule {$rule_id}, type {$message_type}, using fallback");
             $message = $fallback;
         }
         
@@ -974,7 +974,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
             $translated = intersoccer_translate_string($message, 'intersoccer-product-variations', $string_name);
             
             if ($translated !== $message) {
-                error_log("InterSoccer: Applied translation for {$string_name}");
+                intersoccer_debug("InterSoccer: Applied translation for {$string_name}");
             }
             
             return $translated;
@@ -983,7 +983,7 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
         return $fallback;
         
     } catch (Exception $e) {
-        error_log("InterSoccer: Error getting discount message - Rule: {$rule_id}, Type: {$message_type}, Error: " . $e->getMessage());
+        intersoccer_debug("InterSoccer: Error getting discount message - Rule: {$rule_id}, Type: {$message_type}, Error: " . $e->getMessage());
         return $fallback;
     }
 }
@@ -996,16 +996,16 @@ function intersoccer_init_language_support() {
     $multilingual_plugin = intersoccer_get_multilingual_plugin();
     
     if ($multilingual_plugin) {
-        error_log("InterSoccer: Multilingual support initialized with {$multilingual_plugin}");
+        intersoccer_debug("InterSoccer: Multilingual support initialized with {$multilingual_plugin}");
     } else {
-        error_log("InterSoccer: No multilingual plugin detected, using WordPress defaults");
+        intersoccer_debug("InterSoccer: No multilingual plugin detected, using WordPress defaults");
     }
     
     // Test the functions
     $current_lang = intersoccer_get_current_language();
     $available_langs = intersoccer_get_available_languages();
     
-    error_log("InterSoccer: Language support test - Current: {$current_lang}, Available: " . implode(', ', array_keys($available_langs)));
+    intersoccer_debug("InterSoccer: Language support test - Current: {$current_lang}, Available: " . implode(', ', array_keys($available_langs)));
 }
 
 // Initialize on admin_init to ensure all plugins are loaded
@@ -1014,9 +1014,9 @@ add_action('admin_init', 'intersoccer_init_language_support', 15);
 // Initialize on init for frontend
 add_action('init', 'intersoccer_init_language_support', 15);
 
-error_log('InterSoccer: Language helper functions loaded');
+intersoccer_debug('InterSoccer: Language helper functions loaded');
 
 add_action('admin_init', 'intersoccer_initialize_default_messages');
 
-error_log('InterSoccer: Loaded discount messages integration with WPML support');
+intersoccer_debug('InterSoccer: Loaded discount messages integration with WPML support');
 ?>

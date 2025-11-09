@@ -13,9 +13,7 @@ if (!defined('ABSPATH')) exit;
 add_action('woocommerce_before_single_product', function () {
     global $product;
     if (!is_a($product, 'WC_Product')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: No valid product found');
-        }
+        intersoccer_warning('Elementor: No valid product found');
         return;
     }
 
@@ -23,25 +21,19 @@ add_action('woocommerce_before_single_product', function () {
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = intersoccer_get_product_type($product_id);
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("InterSoccer: Initializing wp_footer for product ID: $product_id, type: $product_type");
-    }
+    intersoccer_debug("Elementor: Initializing wp_footer for product ID: $product_id, type: $product_type");
 
     // Preload days for Camps
     $preloaded_days = [];
     if ($product_type === 'camp') {
         $attributes = $product->get_attributes();
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Checking pa_days-of-week attribute for product ' . $product_id);
-            error_log('InterSoccer: Product attributes: ' . json_encode(array_keys($attributes)));
-        }
+        intersoccer_debug('Elementor: Checking pa_days-of-week attribute for product ' . $product_id);
+        intersoccer_debug('Elementor: Product attributes: ' . json_encode(array_keys($attributes)));
 
         if (isset($attributes['pa_days-of-week']) && $attributes['pa_days-of-week'] instanceof WC_Product_Attribute) {
             // Get terms with both names and slugs for multilingual support
             $terms = wc_get_product_terms($product_id, 'pa_days-of-week', ['fields' => 'all']);
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Retrieved terms for pa_days-of-week: ' . json_encode($terms));
-            }
+            intersoccer_debug('Elementor: Retrieved terms for pa_days-of-week: ' . json_encode($terms));
             
             if (!empty($terms)) {
                 // Map of day slugs to English names (assuming slugs are in English)
@@ -56,18 +48,12 @@ add_action('woocommerce_before_single_product', function () {
                 $english_days = [];
                 foreach ($terms as $term) {
                     $slug = strtolower($term->slug);
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('InterSoccer: Processing term: ' . $term->name . ' (slug: ' . $term->slug . ')');
-                    }
+                    intersoccer_debug('Elementor: Processing term: ' . $term->name . ' (slug: ' . $term->slug . ')');
                     if (isset($day_map[$slug])) {
                         $english_days[] = $day_map[$slug];
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            error_log('InterSoccer: Mapped to English: ' . $day_map[$slug]);
-                        }
+                        intersoccer_debug('Elementor: Mapped to English: ' . $day_map[$slug]);
                     } else {
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            error_log('InterSoccer: No mapping found for slug: ' . $slug);
-                        }
+                        intersoccer_warning('Elementor: No mapping found for slug: ' . $slug);
                     }
                 }
 
@@ -79,38 +65,26 @@ add_action('woocommerce_before_single_product', function () {
                         return $pos_a - $pos_b;
                     });
                     $preloaded_days = $english_days;
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('InterSoccer: Final preloaded days: ' . json_encode($preloaded_days));
-                    }
+                    intersoccer_debug('Elementor: Final preloaded days: ' . json_encode($preloaded_days));
                 } else {
                     // Fallback to default English days
                     $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('InterSoccer: Using fallback days: ' . json_encode($preloaded_days));
-                    }
+                    intersoccer_debug('Elementor: Using fallback days: ' . json_encode($preloaded_days));
                 }
             } else {
                 // Fallback to default English days
                 $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: No terms found, using fallback days: ' . json_encode($preloaded_days));
-                }
+                intersoccer_debug('Elementor: No terms found, using fallback days: ' . json_encode($preloaded_days));
             }
         } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: pa_days-of-week attribute not found or not valid');
-            }
+            intersoccer_debug('Elementor: pa_days-of-week attribute not found or not valid');
         }
     } else {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Product is not a camp, skipping day preloading');
-        }
+        intersoccer_debug('Elementor: Product is not a camp, skipping day preloading');
     }
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
-        error_log('InterSoccer: Product attributes for ' . $product_id . ': ' . json_encode(array_keys($product->get_attributes())));
-        error_log('InterSoccer: Product type: ' . $product_type);
-    }
+    intersoccer_debug('Elementor: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
+    intersoccer_debug('Elementor: Product attributes for ' . $product_id . ': ' . json_encode(array_keys($product->get_attributes())));
+    intersoccer_debug('Elementor: Product type: ' . $product_type);
 
     // Course info container removed - course details now only display in variation table
     // if ($product_type === 'course') {
@@ -157,18 +131,18 @@ add_action('woocommerce_before_single_product', function () {
     // Late Pickup HTML - Generate for ALL camp products (show/hide based on variation)
     $late_pickup_html = '';
     
-    error_log('=== InterSoccer Late Pickup: Starting HTML generation ===');
-    error_log('Product type: ' . $product_type);
-    error_log('Is variable: ' . ($is_variable ? 'yes' : 'no'));
+    intersoccer_debug('=== Late Pickup: Starting HTML generation ===');
+    intersoccer_debug('Product type: ' . $product_type);
+    intersoccer_debug('Is variable: ' . ($is_variable ? 'yes' : 'no'));
     
     if ($product_type === 'camp' && $is_variable) {
-        error_log('InterSoccer Late Pickup: Product IS camp and IS variable, proceeding...');
+        intersoccer_debug('Late Pickup: Product IS camp and IS variable, proceeding...');
         
         // Get late pickup pricing from settings
         $per_day_cost = floatval(get_option('intersoccer_late_pickup_per_day', 25));
         $full_week_cost = floatval(get_option('intersoccer_late_pickup_full_week', 90));
         
-        error_log('InterSoccer Late Pickup: Loaded pricing - Per Day: ' . $per_day_cost . ' CHF, Full Week: ' . $full_week_cost . ' CHF');
+        intersoccer_debug('Late Pickup: Loaded pricing - Per Day: ' . $per_day_cost . ' CHF, Full Week: ' . $full_week_cost . ' CHF');
         
         // Get variation settings for late pickup and available days
         $variations = $product->get_available_variations();
@@ -203,13 +177,13 @@ add_action('woocommerce_before_single_product', function () {
             ];
         }
         
-        error_log('InterSoccer Late Pickup (Elementor): Total variations: ' . count($variations));
-        error_log('InterSoccer Late Pickup (Elementor): Variations with late pickup enabled: ' . count($variation_settings));
-        error_log('InterSoccer Late Pickup (Elementor): Variation settings: ' . json_encode($variation_settings));
+        intersoccer_debug('Late Pickup (Elementor): Total variations: ' . count($variations));
+        intersoccer_debug('Late Pickup (Elementor): Variations with late pickup enabled: ' . count($variation_settings));
+        intersoccer_debug('Late Pickup (Elementor): Variation settings: ' . json_encode($variation_settings));
         
         // ALWAYS generate the HTML for camp products, even if no variations have it enabled yet
         // The JavaScript will show/hide it based on the selected variation
-        error_log('InterSoccer Late Pickup: Generating HTML now...');
+        intersoccer_debug('Late Pickup: Generating HTML now...');
         ob_start();
 ?>
     <tr class="intersoccer-late-pickup-row intersoccer-injected" style="display: none;" data-variation-settings="<?php echo esc_attr(json_encode($variation_settings, JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS)); ?>">
@@ -223,13 +197,13 @@ add_action('woocommerce_before_single_product', function () {
     </tr>
 <?php
         $late_pickup_html = ob_get_clean();
-        error_log('InterSoccer Late Pickup: HTML generated, length: ' . strlen($late_pickup_html));
-        error_log('InterSoccer Late Pickup: HTML content preview: ' . substr($late_pickup_html, 0, 200));
+        intersoccer_debug('Late Pickup: HTML generated, length: ' . strlen($late_pickup_html));
+        intersoccer_debug('Late Pickup: HTML content preview: ' . substr($late_pickup_html, 0, 200));
     } else {
-        error_log('InterSoccer Late Pickup: NOT generating HTML (product_type=' . $product_type . ', is_variable=' . ($is_variable ? 'yes' : 'no') . ')');
+        intersoccer_debug('Late Pickup: NOT generating HTML (product_type=' . $product_type . ', is_variable=' . ($is_variable ? 'yes' : 'no') . ')');
     }
     
-    error_log('InterSoccer Late Pickup: Final $late_pickup_html empty? ' . (empty($late_pickup_html) ? 'YES' : 'NO'));
+    intersoccer_debug('Late Pickup: Final $late_pickup_html empty? ' . (empty($late_pickup_html) ? 'YES' : 'NO'));
 ?>
     <script>
         jQuery(document).ready(function($) {
@@ -1573,21 +1547,15 @@ add_action('woocommerce_before_single_product', function () {
             $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
             foreach ($days as $day) {
                 $translated = icl_t('intersoccer-product-variations', $day, $day);
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: WPML translation for ' . $day . ': ' . $translated);
-                }
+                intersoccer_debug('Elementor: WPML translation for ' . $day . ': ' . $translated);
                 if ($translated !== $day) { // Only include if actually translated
                     $translations[$day] = $translated;
                 }
             }
         } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: icl_t function not available');
-            }
+            intersoccer_debug('Elementor: icl_t function not available');
         }
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Final translations array: ' . json_encode($translations));
-        }
+        intersoccer_debug('Elementor: Final translations array: ' . json_encode($translations));
         echo json_encode($translations);
         ?>;
 

@@ -11,6 +11,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!function_exists('intersoccer_get_default_discount_rules')) {
+    require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/woocommerce/discounts.php';
+}
+
+add_action('admin_init', 'intersoccer_bootstrap_discount_defaults');
+function intersoccer_bootstrap_discount_defaults() {
+    $existing = get_option('intersoccer_discount_rules', []);
+    $merged = intersoccer_merge_default_discount_rules($existing);
+    if ($merged !== $existing) {
+        update_option('intersoccer_discount_rules', $merged);
+        intersoccer_debug('InterSoccer: Seeded default discount rules (admin_init).');
+    }
+}
+
 /**
  * Register admin submenu for Discounts, Update Orders, and Variation Health Checker.
  */
@@ -57,7 +71,7 @@ function intersoccer_add_admin_submenus() {
         'intersoccer_render_automated_update_orders_page',
     );
 
-    error_log('InterSoccer: Registered admin submenus including Variation Health Checker');
+    intersoccer_debug('InterSoccer: Registered admin submenus including Variation Health Checker');
 }
 
 /**
@@ -74,7 +88,65 @@ function intersoccer_register_discount_settings() {
             'default' => []
         ]
     );
-    error_log('InterSoccer: Registered discount settings in wp_options');
+    intersoccer_debug('InterSoccer: Registered discount settings in wp_options');
+}
+
+add_action('admin_enqueue_scripts', 'intersoccer_enqueue_discount_admin_assets');
+function intersoccer_enqueue_discount_admin_assets($hook) {
+    if (strpos($hook, 'intersoccer-discounts') === false) {
+        return;
+    }
+
+    wp_enqueue_style('wp-components');
+    wp_enqueue_script(
+        'intersoccer-admin-discounts',
+        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/admin-discounts.js',
+        ['jquery'],
+        '1.0.0',
+        true
+    );
+
+    wp_localize_script('intersoccer-admin-discounts', 'IntersoccerDiscounts', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('intersoccer_discounts_ajax'),
+        'types' => [
+            ['value' => 'general', 'label' => __('General', 'intersoccer-product-variations')],
+            ['value' => 'camp', 'label' => __('Camp', 'intersoccer-product-variations')],
+            ['value' => 'course', 'label' => __('Course', 'intersoccer-product-variations')],
+            ['value' => 'tournament', 'label' => __('Tournament', 'intersoccer-product-variations')],
+            ['value' => 'birthday', 'label' => __('Birthday', 'intersoccer-product-variations')],
+        ],
+        'conditions' => [
+            ['value' => 'none', 'label' => __('None', 'intersoccer-product-variations')],
+            ['value' => '2nd_child', 'label' => __('2nd Child', 'intersoccer-product-variations')],
+            ['value' => '3rd_plus_child', 'label' => __('3rd or Additional Child', 'intersoccer-product-variations')],
+            ['value' => 'same_season_course', 'label' => __('Same Season Course (Same Child)', 'intersoccer-product-variations')],
+        ],
+        'labels' => [
+            'name' => __('Name', 'intersoccer-product-variations'),
+            'type' => __('Type', 'intersoccer-product-variations'),
+            'condition' => __('Condition', 'intersoccer-product-variations'),
+            'rate' => __('Discount Rate (%)', 'intersoccer-product-variations'),
+            'active' => __('Active', 'intersoccer-product-variations'),
+            'actions' => __('Actions', 'intersoccer-product-variations'),
+        ],
+        'strings' => [
+            'loading' => __('Loading discount rules…', 'intersoccer-product-variations'),
+            'loadError' => __('Unable to load discount rules. Please refresh and try again.', 'intersoccer-product-variations'),
+            'add' => __('Add Discount', 'intersoccer-product-variations'),
+            'remove' => __('Remove', 'intersoccer-product-variations'),
+            'save' => __('Save Changes', 'intersoccer-product-variations'),
+            'saving' => __('Saving changes…', 'intersoccer-product-variations'),
+            'saveSuccess' => __('Discount rules saved successfully.', 'intersoccer-product-variations'),
+            'saveError' => __('Unable to save discount rules. Please try again.', 'intersoccer-product-variations'),
+            'empty' => __('No discount rules configured yet. Use "Add Discount" to create one.', 'intersoccer-product-variations'),
+            'missingName' => __('Each discount must have a name.', 'intersoccer-product-variations'),
+            'invalidRate' => __('Discount rates must be numbers between 0 and 100.', 'intersoccer-product-variations'),
+            'unsavedChanges' => __('You have unsaved changes.', 'intersoccer-product-variations'),
+            'activeLabel' => __('Active', 'intersoccer-product-variations'),
+            'namePlaceholder' => __('e.g., Sibling Discount', 'intersoccer-product-variations'),
+        ],
+    ]);
 }
 
 /**
@@ -84,24 +156,8 @@ function intersoccer_register_discount_settings() {
  * @return array Sanitized rules.
  */
 function intersoccer_sanitize_discount_rules($rules) {
-    if (!is_array($rules)) {
-        return [];
-    }
-    $sanitized = [];
-    foreach ($rules as $rule) {
-        $sanitized_rule = [
-            'id' => isset($rule['id']) ? sanitize_key($rule['id']) : wp_generate_uuid4(),
-            'name' => isset($rule['name']) ? sanitize_text_field($rule['name']) : '',
-            'type' => in_array($rule['type'], ['camp', 'course', 'general']) ? $rule['type'] : 'general',
-            'condition' => in_array($rule['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'none']) ? $rule['condition'] : 'none',
-            'rate' => min(max(floatval($rule['rate']), 0), 100),
-            'active' => isset($rule['active']) ? (bool) $rule['active'] : true
-        ];
-        if (!empty($sanitized_rule['name'])) {
-            $sanitized[$sanitized_rule['id']] = $sanitized_rule;
-        }
-    }
-    error_log('InterSoccer: Sanitized discount rules: ' . print_r($sanitized, true));
+    $sanitized = intersoccer_normalize_discount_rules($rules);
+    intersoccer_debug('InterSoccer: Sanitized discount rules: ' . print_r($sanitized, true));
     return $sanitized;
 }
 
@@ -186,139 +242,26 @@ function intersoccer_render_discounts_page() {
         wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
-    $table = new InterSoccer_Discounts_Table();
-    $table->prepare_items();
     ?>
     <div class="wrap">
         <h1><?php _e('Manage Discounts', 'intersoccer-product-variations'); ?></h1>
-        <p><?php _e('Add, edit, or delete discount rules for Camps, Courses, or other products. Rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href="' . admin_url('edit.php?post_type=shop_coupon') . '">WooCommerce > Coupons</a>.', 'intersoccer-product-variations'); ?></p>
-        <form id="intersoccer-discounts-form" method="post">
-            <h2><?php _e('Add New Discount', 'intersoccer-product-variations'); ?></h2>
-            <table class="form-table">
-                <tr>
-                    <th><label for="discount_name"><?php _e('Name', 'intersoccer-product-variations'); ?></label></th>
-                    <td><input type="text" id="discount_name" name="discount[name]" class="regular-text" required></td>
-                </tr>
-                <tr>
-                    <th><label for="discount_type"><?php _e('Type', 'intersoccer-product-variations'); ?></label></th>
-                    <td>
-                        <select id="discount_type" name="discount[type]">
-                            <option value="general"><?php _e('General', 'intersoccer-product-variations'); ?></option>
-                            <option value="camp"><?php _e('Camp', 'intersoccer-product-variations'); ?></option>
-                            <option value="course"><?php _e('Course', 'intersoccer-product-variations'); ?></option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="discount_condition"><?php _e('Condition', 'intersoccer-product-variations'); ?></label></th>
-                    <td>
-                        <select id="discount_condition" name="discount[condition]">
-                            <option value="none"><?php _e('None', 'intersoccer-product-variations'); ?></option>
-                            <option value="2nd_child"><?php _e('2nd Child', 'intersoccer-product-variations'); ?></option>
-                            <option value="3rd_plus_child"><?php _e('3rd or Additional Child', 'intersoccer-product-variations'); ?></option>
-                            <option value="same_season_course"><?php _e('Same Season Course (Same Child)', 'intersoccer-product-variations'); ?></option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="discount_rate"><?php _e('Discount Rate (%)', 'intersoccer-product-variations'); ?></label></th>
-                    <td><input type="number" id="discount_rate" name="discount[rate]" min="0" max="100" step="0.1" required></td>
-                </tr>
-                <tr>
-                    <th><label for="discount_active"><?php _e('Active', 'intersoccer-product-variations'); ?></label></th>
-                    <td><input type="checkbox" id="discount_active" name="discount[active]" checked></td>
-                </tr>
-            </table>
-            <p><button type="button" id="intersoccer-add-discount" class="button button-primary"><?php _e('Add Discount', 'intersoccer-product-variations'); ?></button></p>
-            <?php wp_nonce_field('intersoccer_save_discount', 'intersoccer_discount_nonce'); ?>
-        </form>
-        <form id="intersoccer-discounts-table-form" method="post">
-            <?php $table->display(); ?>
-            <?php wp_nonce_field('intersoccer_bulk_discounts', 'intersoccer_bulk_nonce'); ?>
-        </form>
-        <div id="intersoccer-discount-status"></div>
+        <p><?php _e('Add, edit, or delete discount rules for Camps, Courses, Tournaments, or other products. These rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href="' . admin_url('edit.php?post_type=shop_coupon') . '">WooCommerce > Coupons</a>.', 'intersoccer-product-variations'); ?></p>
+        <div id="intersoccer-discount-app" class="intersoccer-discount-app">
+            <p class="intersoccer-discount-loading"><?php esc_html_e('Loading discount rules…', 'intersoccer-product-variations'); ?></p>
+        </div>
+        <style>
+            .intersoccer-discount-app .wp-list-table td input[type="text"],
+            .intersoccer-discount-app .wp-list-table td input[type="number"],
+            .intersoccer-discount-app .wp-list-table td select {
+                width: 100%;
+            }
+            .intersoccer-discount-app .notice { display: none; }
+            .intersoccer-discount-app .notice.is-visible { display: block; }
+            .intersoccer-discount-toolbar { margin-top: 1rem; }
+            .intersoccer-discount-toolbar .button { margin-right: 10px; }
+            .intersoccer-discount-loading { font-style: italic; }
+        </style>
     </div>
-    <script>
-        jQuery(document).ready(function($) {
-            console.log('InterSoccer: Discounts page script loaded');
-            $('#intersoccer-add-discount').on('click', function() {
-                console.log('InterSoccer: Add Discount button clicked');
-                $('#intersoccer-discount-status').text('<?php _e('Saving...', 'intersoccer-product-variations'); ?>').removeClass('error');
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intersoccer_save_discount',
-                        nonce: $('#intersoccer_discount_nonce').val(),
-                        discount: {
-                            name: $('#discount_name').val(),
-                            type: $('#discount_type').val(),
-                            condition: $('#discount_condition').val(),
-                            rate: $('#discount_rate').val(),
-                            active: $('#discount_active').is(':checked')
-                        }
-                    },
-                    success: function(response) {
-                        console.log('InterSoccer: AJAX success', response);
-                        if (response.success) {
-                            $('#intersoccer-discount-status').text('<?php _e('Discount saved successfully!', 'intersoccer-product-variations'); ?>');
-                            window.location.reload();
-                        } else {
-                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('InterSoccer: AJAX error', xhr.responseText, status, error);
-                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while saving the discount: ', 'intersoccer-product-variations'); ?>' + error).addClass('error');
-                    }
-                });
-            });
-
-            $('#intersoccer-discounts-table-form').on('submit', function(e) {
-                e.preventDefault();
-                console.log('InterSoccer: Bulk form submitted');
-                var action = $('#bulk-action-selector-top').val() || $('#bulk-action-selector-bottom').val();
-                var discountIds = $('input[name="discount_ids[]"]:checked').map(function() {
-                    return $(this).val();
-                }).get();
-
-                if (!action || discountIds.length === 0) {
-                    alert('<?php _e('Please select an action and at least one discount.', 'intersoccer-product-variations'); ?>');
-                    return;
-                }
-
-                $('#intersoccer-discount-status').text('<?php _e('Processing...', 'intersoccer-product-variations'); ?>').removeClass('error');
-
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intersoccer_bulk_discounts',
-                        nonce: $('#intersoccer_bulk_nonce').val(),
-                        bulk_action: action,
-                        discount_ids: discountIds
-                    },
-                    success: function(response) {
-                        console.log('InterSoccer: Bulk AJAX success', response);
-                        if (response.success) {
-                            $('#intersoccer-discount-status').text('<?php _e('Action completed successfully!', 'intersoccer-product-variations'); ?>');
-                            window.location.reload();
-                        } else {
-                            $('#intersoccer-discount-status').text('<?php _e('Error: ', 'intersoccer-product-variations'); ?>' + (response.data.message || 'Unknown error')).addClass('error');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('InterSoccer: Bulk AJAX error', xhr.responseText, status, error);
-                        $('#intersoccer-discount-status').text('<?php _e('An error occurred while processing the action: ', 'intersoccer-product-variations'); ?>' + error).addClass('error');
-                    }
-                });
-            });
-        });
-    </script>
-    <style>
-        #intersoccer-discount-status { margin-top: 10px; color: green; }
-        #intersoccer-discount-status.error { color: red; }
-    </style>
     <?php
 }
 
@@ -327,20 +270,20 @@ function intersoccer_render_discounts_page() {
  */
 add_action('wp_ajax_intersoccer_save_discount', 'intersoccer_save_discount_callback');
 function intersoccer_save_discount_callback() {
-    error_log('InterSoccer: intersoccer_save_discount AJAX called');
+    intersoccer_debug('InterSoccer: intersoccer_save_discount AJAX called');
     check_ajax_referer('intersoccer_save_discount', 'nonce');
-    error_log('InterSoccer: Nonce validated');
+    intersoccer_debug('InterSoccer: Nonce validated');
 
     if (!current_user_can('manage_woocommerce')) {
-        error_log('InterSoccer: Permission denied for user ' . get_current_user_id());
+        intersoccer_debug('InterSoccer: Permission denied for user ' . get_current_user_id());
         wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
         wp_die();
     }
-    error_log('InterSoccer: Permission check passed');
+    intersoccer_debug('InterSoccer: Permission check passed');
 
     $discount = isset($_POST['discount']) && is_array($_POST['discount']) ? $_POST['discount'] : [];
     if (empty($discount['name']) || empty($discount['rate'])) {
-        error_log('InterSoccer: Missing name or rate in discount data: ' . print_r($discount, true));
+        intersoccer_debug('InterSoccer: Missing name or rate in discount data: ' . print_r($discount, true));
         wp_send_json_error(['message' => __('Name and discount rate are required.', 'intersoccer-product-variations')]);
         wp_die();
     }
@@ -357,7 +300,7 @@ function intersoccer_save_discount_callback() {
 
     $rules[$new_rule['id']] = $new_rule;
     update_option('intersoccer_discount_rules', $rules);
-    error_log('InterSoccer: Saved new discount rule: ' . print_r($new_rule, true));
+    intersoccer_debug('InterSoccer: Saved new discount rule: ' . print_r($new_rule, true));
 
     wp_send_json_success(['message' => __('Discount saved.', 'intersoccer-product-variations')]);
     wp_die();
@@ -368,7 +311,7 @@ function intersoccer_save_discount_callback() {
  */
 add_action('wp_ajax_intersoccer_bulk_discounts', 'intersoccer_bulk_discounts_callback');
 function intersoccer_bulk_discounts_callback() {
-    error_log('InterSoccer: intersoccer_bulk_discounts AJAX called');
+    intersoccer_debug('InterSoccer: intersoccer_bulk_discounts AJAX called');
     check_ajax_referer('intersoccer_bulk_discounts', 'nonce');
 
     if (!current_user_can('manage_woocommerce')) {
@@ -391,13 +334,13 @@ function intersoccer_bulk_discounts_callback() {
         }
         if ($action === 'delete') {
             unset($rules[$id]);
-            error_log('InterSoccer: Deleted discount rule ID ' . $id);
+            intersoccer_debug('InterSoccer: Deleted discount rule ID ' . $id);
         } elseif ($action === 'activate') {
             $rules[$id]['active'] = true;
-            error_log('InterSoccer: Activated discount rule ID ' . $id);
+            intersoccer_debug('InterSoccer: Activated discount rule ID ' . $id);
         } elseif ($action === 'deactivate') {
             $rules[$id]['active'] = false;
-            error_log('InterSoccer: Deactivated discount rule ID ' . $id);
+            intersoccer_debug('InterSoccer: Deactivated discount rule ID ' . $id);
         }
     }
 
@@ -496,7 +439,7 @@ function intersoccer_sanitize_discount_messages($messages) {
  * @return array Array of language_code => language_name
  */
 function intersoccer_get_available_languages() {
-    error_log('InterSoccer: intersoccer_get_available_languages() called');
+    intersoccer_debug('InterSoccer: intersoccer_get_available_languages() called');
     
     // Check for WPML
     if (function_exists('icl_get_languages')) {
@@ -507,7 +450,7 @@ function intersoccer_get_available_languages() {
             $available[$lang_code] = $lang_info['native_name'];
         }
         
-        error_log('InterSoccer: WPML languages: ' . print_r($available, true));
+        intersoccer_debug('InterSoccer: WPML languages: ' . print_r($available, true));
         return $available;
     }
     
@@ -522,7 +465,7 @@ function intersoccer_get_available_languages() {
         }
         
         if (!empty($available)) {
-            error_log('InterSoccer: Polylang languages: ' . print_r($available, true));
+            intersoccer_debug('InterSoccer: Polylang languages: ' . print_r($available, true));
             return $available;
         }
     }
@@ -534,7 +477,7 @@ function intersoccer_get_available_languages() {
         'fr' => 'Français'
     ];
     
-    error_log('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
+    intersoccer_debug('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
     return $fallback;
 }
 
@@ -829,14 +772,13 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
 
         $this->set_pagination_args([
             'total_items' => $total_items,
-            'per_page' => $per_page,
-            'total_pages' => ceil($total_items / $per_page)
+            'per_page' => $per_page
         ]);
 
         $this->items = array_slice($this->all_items, ($current_page - 1) * $per_page, $per_page);
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Enhanced preview found ' . count($this->all_items) . ' orders with missing metadata, showing page ' . $current_page . ' (' . count($this->items) . ' items)');
+            intersoccer_debug('InterSoccer: Enhanced preview found ' . count($this->all_items) . ' orders with missing metadata, showing page ' . $current_page . ' (' . count($this->items) . ' items)');
         }
     }
 
@@ -1401,7 +1343,7 @@ add_action('admin_footer', 'intersoccer_update_orders_scripts');
 function intersoccer_update_order_metadata($order) {
     if (!($order instanceof WC_Order)) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Skipped order ' . $order->get_id() . ' - Not a WC_Order (type: ' . get_class($order) . ')');
+            intersoccer_debug('InterSoccer: Skipped order ' . $order->get_id() . ' - Not a WC_Order (type: ' . get_class($order) . ')');
         }
         return false;
     }
@@ -1410,7 +1352,7 @@ function intersoccer_update_order_metadata($order) {
     $order_id = $order->get_id();
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Processing metadata update for order ' . $order_id . ' (customer ID: ' . $order->get_customer_id() . ')');
+        intersoccer_debug('InterSoccer: Processing metadata update for order ' . $order_id . ' (customer ID: ' . $order->get_customer_id() . ')');
     }
 
     foreach ($order->get_items() as $item_id => $item) {
@@ -1419,13 +1361,13 @@ function intersoccer_update_order_metadata($order) {
         $product_type = InterSoccer_Product_Types::get_product_type($product_id);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Product ID: ' . $product_id . ', Variation ID: ' . $variation_id . ', Detected Type: ' . ($product_type ?: 'None'));
+            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Product ID: ' . $product_id . ', Variation ID: ' . $variation_id . ', Detected Type: ' . ($product_type ?: 'None'));
         }
 
         // Skip non-relevant products
         if (!in_array($product_type, ['camp', 'course', 'birthday'])) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping: Not a relevant product type.');
+                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping: Not a relevant product type.');
             }
             continue;
         }
@@ -1435,7 +1377,7 @@ function intersoccer_update_order_metadata($order) {
         $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Existing meta keys: ' . implode(', ', $existing_keys));
+            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Existing meta keys: ' . implode(', ', $existing_keys));
         }
 
         $item_updated = false;
@@ -1446,7 +1388,7 @@ function intersoccer_update_order_metadata($order) {
         $player_details = intersoccer_get_player_details($user_id, $assigned_player);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Player details from helper: ' . (empty($player_details['name']) ? 'Empty' : $player_details['name']));
+            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Player details from helper: ' . (empty($player_details['name']) ? 'Empty' : $player_details['name']));
         }
 
         // Build potential updates array (SAME LOGIC AS WORKING DEEP DEBUG)
@@ -1503,7 +1445,7 @@ function intersoccer_update_order_metadata($order) {
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Potential updates count: ' . count($potential_updates));
+            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Potential updates count: ' . count($potential_updates));
         }
 
         // Apply updates (SAME LOGIC AS WORKING DEEP DEBUG)
@@ -1511,30 +1453,30 @@ function intersoccer_update_order_metadata($order) {
             // Skip null or empty values (except for Medical Conditions which can be 'None')
             if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping ' . $key . ' - value is null/empty');
+                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping ' . $key . ' - value is null/empty');
                 }
                 continue;
             }
             
             if (!in_array($key, $existing_keys)) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - SHOULD UPDATE: ' . $key . ' = ' . $value . ' (missing from existing keys)');
+                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - SHOULD UPDATE: ' . $key . ' = ' . $value . ' (missing from existing keys)');
                 }
                 
                 try {
                     $item->add_meta_data($key, $value);
                     $item_updated = true;
                     if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - ADDED: ' . $key . ' = ' . $value);
+                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - ADDED: ' . $key . ' = ' . $value);
                     }
                 } catch (Exception $e) {
                     if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED TO ADD ' . $key . ': ' . $e->getMessage());
+                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED TO ADD ' . $key . ': ' . $e->getMessage());
                     }
                 }
             } else {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Already exists: ' . $key);
+                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Already exists: ' . $key);
                 }
             }
         }
@@ -1545,16 +1487,16 @@ function intersoccer_update_order_metadata($order) {
                 $item->save();
                 $overall_updated = true;
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Item saved successfully');
+                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Item saved successfully');
                 }
             } catch (Exception $e) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED to save item: ' . $e->getMessage());
+                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED to save item: ' . $e->getMessage());
                 }
             }
         } else {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - No updates needed');
+                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - No updates needed');
             }
         }
     }
@@ -1564,17 +1506,17 @@ function intersoccer_update_order_metadata($order) {
         try {
             $order->save();
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Order ' . $order_id . ' - Order saved successfully');
+                intersoccer_debug('InterSoccer: Order ' . $order_id . ' - Order saved successfully');
             }
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Order ' . $order_id . ' - FAILED to save order: ' . $e->getMessage());
+                intersoccer_debug('InterSoccer: Order ' . $order_id . ' - FAILED to save order: ' . $e->getMessage());
             }
         }
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Order ' . $order_id . ' - Update completed. Updated: ' . ($overall_updated ? 'YES' : 'NO'));
+        intersoccer_debug('InterSoccer: Order ' . $order_id . ' - Update completed. Updated: ' . ($overall_updated ? 'YES' : 'NO'));
     }
 
     return $overall_updated;
@@ -1658,7 +1600,7 @@ function intersoccer_update_processing_orders_callback() {
     foreach ($order_ids as $order_id) {
         $order = wc_get_order($order_id);
         if (!$order || $order->get_status() !== 'processing') {
-            error_log('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
+            intersoccer_debug('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
             continue;
         }
 
@@ -1668,7 +1610,7 @@ function intersoccer_update_processing_orders_callback() {
             $product = wc_get_product($variation_id ?: $product_id);
 
             if (!$product) {
-                error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+                intersoccer_debug('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
                 continue;
             }
 
@@ -1676,19 +1618,19 @@ function intersoccer_update_processing_orders_callback() {
 
             if ($remove_assigned_player) {
                 $item->delete_meta_data('assigned_player');
-                error_log('InterSoccer: Removed assigned_player from order item ' . $item_id . ' in order ' . $order_id);
+                intersoccer_debug('InterSoccer: Removed assigned_player from order item ' . $item_id . ' in order ' . $order_id);
             }
 
             if ($fix_incorrect && $product_type === 'camp') {
                 $item->delete_meta_data('Days-of-week');
-                error_log('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
+                intersoccer_debug('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
             }
 
             $item->save();
         }
 
         $order->save();
-        error_log('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
+        intersoccer_debug('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
     }
 
     wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-product-variations')]);
@@ -1823,7 +1765,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         foreach ($products as $product) {
             $product_id = $product->get_id();
             $type = InterSoccer_Product_Types::get_product_type($product_id);
-            error_log('InterSoccer: Processing product ' . $product_id . ' with type: ' . ($type ?: 'null'));
+            intersoccer_debug('InterSoccer: Processing product ' . $product_id . ' with type: ' . ($type ?: 'null'));
             $attributes = [];
 
             if ($product instanceof WC_Product_Variation) {
@@ -1849,18 +1791,18 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                     $parent_attributes = $parent_product->get_attributes();
                     if (empty($parent_attributes['pa_days-of-week'])) {
                         $missing[] = 'pa_days-of-week (parent)';
-                        error_log('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $variation_id);
+                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $variation_id);
                     } else {
-                        error_log('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $variation_id);
+                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $variation_id);
                     }
                 }
 
                 // Course-specific health checks
                 if ($type === 'course') {
-                    error_log('InterSoccer: Processing course variation ' . $variation_id . ' with type: ' . $type);
+                    intersoccer_debug('InterSoccer: Processing course variation ' . $variation_id . ' with type: ' . $type);
                     $issues = $this->check_course_health($variation_id, $product);
                     $missing = array_merge($missing, $issues);
-                    error_log('InterSoccer: Course health issues for ' . $variation_id . ': ' . json_encode($issues));
+                    intersoccer_debug('InterSoccer: Course health issues for ' . $variation_id . ': ' . json_encode($issues));
                 }
 
                 $is_healthy = empty($missing);
@@ -1903,18 +1845,18 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                         $parent_attributes = $product->get_attributes();
                         if (empty($parent_attributes['pa_days-of-week'])) {
                             $missing[] = 'pa_days-of-week (parent)';
-                            error_log('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $var_id);
+                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $var_id);
                         } else {
-                            error_log('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $var_id);
+                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $var_id);
                         }
                     }
 
                     // Course-specific health checks
                     if ($type === 'course') {
-                        error_log('InterSoccer: Processing course variation ' . $var_id . ' with type: ' . $type);
+                        intersoccer_debug('InterSoccer: Processing course variation ' . $var_id . ' with type: ' . $type);
                         $issues = $this->check_course_health($var_id, $var_product);
                         $missing = array_merge($missing, $issues);
-                        error_log('InterSoccer: Course health issues for ' . $var_id . ': ' . json_encode($issues));
+                        intersoccer_debug('InterSoccer: Course health issues for ' . $var_id . ': ' . json_encode($issues));
                     }
 
                     $is_healthy = empty($missing);
@@ -1934,7 +1876,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
             }
         }
 
-        error_log('InterSoccer: Prepared ' . count($data) . ' variations for health check, unhealthy_only=' . ($unhealthy_only ? 'true' : 'false'));
+        intersoccer_debug('InterSoccer: Prepared ' . count($data) . ' variations for health check, unhealthy_only=' . ($unhealthy_only ? 'true' : 'false'));
         return $data;
     }
 
@@ -1948,7 +1890,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
     public function check_course_health($variation_id, $product) {
         $issues = [];
 
-        error_log('InterSoccer: Checking course health for variation ' . $variation_id);
+        intersoccer_debug('InterSoccer: Checking course health for variation ' . $variation_id);
 
         // Get course metadata
         $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
@@ -1956,7 +1898,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         $session_rate = floatval(intersoccer_get_course_meta($variation_id, '_course_weekly_discount', 0));
         $base_price = floatval($product->get_price());
 
-        error_log('InterSoccer: Course data - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate . ', base_price: ' . $base_price);
+        intersoccer_debug('InterSoccer: Course data - start_date: ' . $start_date . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate . ', base_price: ' . $base_price);
 
         // Check if start date is in the future
         $current_date = current_time('Y-m-d');
@@ -2160,7 +2102,7 @@ function intersoccer_render_variation_health_page() {
         });
     </script>
     <?php
-    error_log('InterSoccer: Rendered Variation Health Checker page');
+    intersoccer_debug('InterSoccer: Rendered Variation Health Checker page');
 }
 
 /**
@@ -2186,7 +2128,7 @@ function intersoccer_refresh_variation_attributes_callback() {
     foreach ($variation_ids as $variation_id) {
         $product = wc_get_product($variation_id);
         if (!$product || !($product instanceof WC_Product_Variation)) {
-            error_log('InterSoccer: Invalid variation ID ' . $variation_id);
+            intersoccer_debug('InterSoccer: Invalid variation ID ' . $variation_id);
             continue;
         }
 
@@ -2208,11 +2150,11 @@ function intersoccer_refresh_variation_attributes_callback() {
                         $term = get_term_by('slug', $default, $taxonomy);
                         if ($term) {
                             wp_set_object_terms($variation_id, $term->term_id, $taxonomy);
-                            error_log('InterSoccer: Set default attribute ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
+                            intersoccer_debug('InterSoccer: Set default attribute ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
                         }
                     } else {
                         update_post_meta($variation_id, $key, $default);
-                        error_log('InterSoccer: Set default meta ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
+                        intersoccer_debug('InterSoccer: Set default meta ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
                     }
                 }
             }
@@ -2225,7 +2167,7 @@ function intersoccer_refresh_variation_attributes_callback() {
                     $term = get_term_by('slug', $default_days, 'pa_days-of-week');
                     if ($term) {
                         wp_set_object_terms($parent_id, $term->term_id, 'pa_days-of-week');
-                        error_log('InterSoccer: Set default pa_days-of-week to ' . $default_days . ' for parent product ' . $parent_id);
+                        intersoccer_debug('InterSoccer: Set default pa_days-of-week to ' . $default_days . ' for parent product ' . $parent_id);
                     }
                 }
             }
@@ -2328,23 +2270,23 @@ function intersoccer_export_order_analysis_callback() {
  */
 add_action('wp_ajax_intersoccer_batch_update_orders', 'intersoccer_batch_update_orders_callback');
 function intersoccer_batch_update_orders_callback() {
-    error_log('InterSoccer: AJAX batch update called - checking permissions and nonce');
+    intersoccer_debug('InterSoccer: AJAX batch update called - checking permissions and nonce');
     
     // Check user permissions first
     if (!current_user_can('manage_woocommerce')) {
-        error_log('InterSoccer: User ' . get_current_user_id() . ' lacks manage_woocommerce capability');
+        intersoccer_debug('InterSoccer: User ' . get_current_user_id() . ' lacks manage_woocommerce capability');
         wp_send_json_error(['message' => 'You do not have permission to perform this action.']);
         return;
     }
     
     // Check nonce - use the same nonce action as your form
     if (!check_ajax_referer('intersoccer_update_orders', 'nonce', false)) {
-        error_log('InterSoccer: Nonce verification failed');
+        intersoccer_debug('InterSoccer: Nonce verification failed');
         wp_send_json_error(['message' => 'Security check failed. Please refresh the page and try again.']);
         return;
     }
     
-    error_log('InterSoccer: Permissions and nonce verified successfully');
+    intersoccer_debug('InterSoccer: Permissions and nonce verified successfully');
 
     $order_ids = isset($_POST['order_ids']) && is_array($_POST['order_ids']) ? array_map('intval', $_POST['order_ids']) : [];
     $batch_size = isset($_POST['batch_size']) ? intval($_POST['batch_size']) : 5;
@@ -2405,7 +2347,7 @@ function intersoccer_batch_update_orders_callback() {
                 'error' => 'Exception: ' . $e->getMessage(),
                 'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
             ];
-            error_log('InterSoccer: Exception updating order ' . $order_id . ': ' . $e->getMessage());
+            intersoccer_debug('InterSoccer: Exception updating order ' . $order_id . ': ' . $e->getMessage());
         }
     }
 
@@ -2693,7 +2635,7 @@ function intersoccer_automated_batch_update_callback() {
     set_time_limit(60); // 60 seconds per batch
     ini_set('memory_limit', '512M'); // Increase memory if needed
     
-    error_log('InterSoccer: Automated batch update started');
+    intersoccer_debug('InterSoccer: Automated batch update started');
     
     if (!current_user_can('manage_woocommerce')) {
         wp_send_json_error(['message' => 'Insufficient permissions']);
@@ -2713,7 +2655,7 @@ function intersoccer_automated_batch_update_callback() {
     
     // Initialize or continue processing
     if ($batch_index === 0) {
-        error_log('InterSoccer: Starting new batch processing session');
+        intersoccer_debug('InterSoccer: Starting new batch processing session');
         // Get all orders that need updating
         $orders_to_process = intersoccer_get_orders_needing_updates($order_statuses, $scan_limit);
         
@@ -2773,14 +2715,14 @@ function intersoccer_automated_batch_update_callback() {
         } catch (Exception $e) {
             $results[] = ['order_id' => $order_id, 'status' => 'error', 'message' => $e->getMessage()];
             $error_count++;
-            error_log('InterSoccer: Error processing order ' . $order_id . ': ' . $e->getMessage());
+            intersoccer_debug('InterSoccer: Error processing order ' . $order_id . ': ' . $e->getMessage());
         }
     }
     
     $processed_count = $start_index + count($batch_orders);
     $progress = round(($processed_count / $total_orders) * 100, 1);
     
-    error_log("InterSoccer: Processed batch {$batch_index}, orders {$start_index}-" . ($start_index + count($batch_orders)) . " of {$total_orders}");
+    intersoccer_debug("InterSoccer: Processed batch {$batch_index}, orders {$start_index}-" . ($start_index + count($batch_orders)) . " of {$total_orders}");
     
     wp_send_json_success([
         'phase' => 'processing',
@@ -2798,7 +2740,7 @@ function intersoccer_automated_batch_update_callback() {
 
 // Function to get all orders that need updates (efficient version)
 function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
-    error_log('InterSoccer: Scanning for orders needing updates, limit: ' . $limit);
+    intersoccer_debug('InterSoccer: Scanning for orders needing updates, limit: ' . $limit);
     
     $orders = wc_get_orders([
         'status' => $statuses,
@@ -2842,7 +2784,7 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
         }
     }
     
-    error_log('InterSoccer: Found ' . count($orders_needing_updates) . ' orders needing updates out of ' . count($orders) . ' scanned');
+    intersoccer_debug('InterSoccer: Found ' . count($orders_needing_updates) . ' orders needing updates out of ' . count($orders) . ' scanned');
     return $orders_needing_updates;
 }
 
@@ -3394,7 +3336,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             $item->save();
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Cleared player assignment for order item ' . $item_id);
+                intersoccer_debug('InterSoccer: Cleared player assignment for order item ' . $item_id);
             }
             continue;
         }
@@ -3402,7 +3344,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         // Validate player exists
         if (!isset($players[$selected_index])) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Invalid player index ' . $selected_index . ' for customer ' . $customer_id);
+                intersoccer_debug('InterSoccer: Invalid player index ' . $selected_index . ' for customer ' . $customer_id);
             }
             continue;
         }
@@ -3436,7 +3378,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         $item->save();
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log(sprintf(
+            intersoccer_debug(sprintf(
                 'InterSoccer: Updated player assignment for order item %d | Player: %s (index: %d) | Customer: %d',
                 $item_id,
                 $player_name,
@@ -3445,6 +3387,55 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             ));
         }
     }
+}
+
+add_action('wp_ajax_intersoccer_get_discount_rules', 'intersoccer_get_discount_rules_ajax');
+function intersoccer_get_discount_rules_ajax() {
+    check_ajax_referer('intersoccer_discounts_ajax', 'nonce');
+
+    if (!current_user_can('manage_woocommerce')) {
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
+    }
+
+    $rules = get_option('intersoccer_discount_rules', []);
+    $merged = intersoccer_merge_default_discount_rules($rules);
+    if ($merged !== $rules) {
+        update_option('intersoccer_discount_rules', $merged);
+        intersoccer_debug('InterSoccer: intersoccer_get_discount_rules populated defaults (count: ' . count($merged) . ')');
+    } else {
+        intersoccer_debug('InterSoccer: intersoccer_get_discount_rules returning existing rules (count: ' . count($merged) . ')');
+    }
+    wp_send_json_success([
+        'rules' => array_values($merged),
+    ]);
+}
+
+add_action('wp_ajax_intersoccer_save_discount_rules', 'intersoccer_save_discount_rules_ajax');
+function intersoccer_save_discount_rules_ajax() {
+    check_ajax_referer('intersoccer_discounts_ajax', 'nonce');
+
+    if (!current_user_can('manage_woocommerce')) {
+        wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'intersoccer-product-variations')]);
+    }
+
+    $raw_rules = isset($_POST['rules']) ? wp_unslash($_POST['rules']) : '';
+    if (is_string($raw_rules)) {
+        $decoded_rules = json_decode($raw_rules, true);
+    } else {
+        $decoded_rules = $raw_rules;
+    }
+
+    if (!is_array($decoded_rules)) {
+        wp_send_json_error(['message' => __('Invalid discounts payload.', 'intersoccer-product-variations')]);
+    }
+
+    $sanitized = intersoccer_sanitize_discount_rules($decoded_rules);
+    update_option('intersoccer_discount_rules', $sanitized);
+
+    wp_send_json_success([
+        'rules' => array_values($sanitized),
+        'message' => __('Discount rules saved successfully.', 'intersoccer-product-variations'),
+    ]);
 }
 
 ?>

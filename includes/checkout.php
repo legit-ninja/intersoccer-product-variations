@@ -21,7 +21,7 @@ if (defined('INTERSOCCER_CHECKOUT_LOADED')) {
 define('INTERSOCCER_CHECKOUT_LOADED', true);
 
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('InterSoccer: checkout.php loaded at ' . current_time('c'));
+    intersoccer_debug('InterSoccer: checkout.php loaded at ' . current_time('c'));
 }
 
 /**
@@ -30,14 +30,14 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 // add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_data', 10, 3);
 // function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
 //     if (defined('WP_DEBUG') && WP_DEBUG) {
-//         error_log('InterSoccer: Adding custom data to cart for product ' . $product_id . ' / variation ' . $variation_id . '. POST data: ' . json_encode($_POST));
+//         intersoccer_debug('InterSoccer: Adding custom data to cart for product ' . $product_id . ' / variation ' . $variation_id . '. POST data: ' . json_encode($_POST));
 //     }
 
 //     // Assigned player (index from select)
 //     if (isset($_POST['player_assignment'])) {
 //         $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
 //         if (defined('WP_DEBUG') && WP_DEBUG) {
-//             error_log('InterSoccer: Added assigned_player to cart: ' . $cart_item_data['assigned_player']);
+//             intersoccer_debug('InterSoccer: Added assigned_player to cart: ' . $cart_item_data['assigned_player']);
 //         }
 //     }
 
@@ -45,7 +45,7 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //     if (isset($_POST['camp_days']) && is_array($_POST['camp_days'])) {
 //         $cart_item_data['camp_days'] = array_map('sanitize_text_field', $_POST['camp_days']);
 //         if (defined('WP_DEBUG') && WP_DEBUG) {
-//             error_log('InterSoccer: Added camp_days to cart: ' . json_encode($cart_item_data['camp_days']));
+//             intersoccer_debug('InterSoccer: Added camp_days to cart: ' . json_encode($cart_item_data['camp_days']));
 //         }
 //     }
 
@@ -64,7 +64,7 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //     $product_type = intersoccer_get_product_type($product_id);
 
 //     if (defined('WP_DEBUG') && WP_DEBUG) {
-//         error_log('InterSoccer: Adding custom meta to order item for product ' . $product_id . ' / variation ' . $variation_id . '. Cart values: ' . json_encode($values));
+//         intersoccer_debug('InterSoccer: Adding custom meta to order item for product ' . $product_id . ' / variation ' . $variation_id . '. Cart values: ' . json_encode($values));
 //     }
 
 //     // Assigned Attendee (name + index)
@@ -79,16 +79,16 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //                 $item->add_meta_data('Assigned Attendee', $attendee_name);
 //                 $item->add_meta_data('assigned_player', $index);
 //                 if (defined('WP_DEBUG') && WP_DEBUG) {
-//                     error_log('InterSoccer: Added Assigned Attendee to order meta: ' . $attendee_name . ' (index: ' . $index . ')');
+//                     intersoccer_debug('InterSoccer: Added Assigned Attendee to order meta: ' . $attendee_name . ' (index: ' . $index . ')');
 //                 }
 //             } else {
 //                 if (defined('WP_DEBUG') && WP_DEBUG) {
-//                     error_log('InterSoccer: Invalid player index ' . $index . ' for user ' . $user_id);
+//                     intersoccer_debug('InterSoccer: Invalid player index ' . $index . ' for user ' . $user_id);
 //                 }
 //             }
 //         } else {
 //             if (defined('WP_DEBUG') && WP_DEBUG) {
-//                 error_log('InterSoccer: No user ID available for order ' . $order->get_id());
+//                 intersoccer_debug('InterSoccer: No user ID available for order ' . $order->get_id());
 //             }
 //         }
 //     }
@@ -97,7 +97,7 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //     if (isset($values['camp_days']) && !empty($values['camp_days'])) {
 //         $item->add_meta_data('Days Selected', implode(', ', $values['camp_days']));
 //         if (defined('WP_DEBUG') && WP_DEBUG) {
-//             error_log('InterSoccer: Added Days Selected to order meta: ' . implode(', ', $values['camp_days']));
+//             intersoccer_debug('InterSoccer: Added Days Selected to order meta: ' . implode(', ', $values['camp_days']));
 //         }
 //     }
 
@@ -146,7 +146,7 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //             if (!empty($terms)) {
 //                 $item->add_meta_data($label, implode(', ', $terms));
 //                 if (defined('WP_DEBUG') && WP_DEBUG) {
-//                     error_log('InterSoccer: Added parent attribute to order meta: ' . $label . ' = ' . implode(', ', $terms));
+//                     intersoccer_debug('InterSoccer: Added parent attribute to order meta: ' . $label . ' = ' . implode(', ', $terms));
 //                 }
 //             }
 //         } else {
@@ -154,7 +154,7 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 //             if (!empty($options)) {
 //                 $item->add_meta_data($label, implode(', ', $options));
 //                 if (defined('WP_DEBUG') && WP_DEBUG) {
-//                     error_log('InterSoccer: Added custom parent attribute to order meta: ' . $label . ' = ' . implode(', ', $options));
+//                     intersoccer_debug('InterSoccer: Added custom parent attribute to order meta: ' . $label . ' = ' . implode(', ', $options));
 //                 }
 //             }
 //         }
@@ -167,6 +167,6 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 // }
 
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('InterSoccer: checkout.php handlers registered');
+    intersoccer_debug('InterSoccer: checkout.php handlers registered');
 }
 ?>

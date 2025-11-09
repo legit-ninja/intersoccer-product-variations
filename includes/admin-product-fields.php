@@ -244,20 +244,20 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
 add_action('woocommerce_product_after_variable_attributes', 'intersoccer_add_camp_variation_fields_after_attributes', 20, 3);
 function intersoccer_add_camp_variation_fields_after_attributes($loop, $variation_data, $variation) {
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
+        intersoccer_debug('Admin: intersoccer_add_camp_variation_fields_after_attributes called for loop ' . $loop . ', variation ID ' . $variation->ID);
     }
     intersoccer_add_camp_late_pickup_field($variation->ID, $loop);
 }
 
 function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: Checking camp late pickup field for variation ' . $variation_id . ', loop ' . $loop);
+        intersoccer_debug('Admin: Checking camp late pickup field for variation ' . $variation_id . ', loop ' . $loop);
     }
 
     $product = wc_get_product($variation_id);
     if (!$product) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer Admin: Invalid product for variation ' . $variation_id);
+            intersoccer_warning('Admin: Invalid product for variation ' . $variation_id);
         }
         return;
     }
@@ -266,28 +266,28 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     $parent_product = wc_get_product($product->get_parent_id());
     if (!$parent_product) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer Admin: No parent product found for variation ' . $variation_id);
+            intersoccer_warning('Admin: No parent product found for variation ' . $variation_id);
         }
         return;
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: Parent product ID: ' . $parent_product->get_id());
+        intersoccer_debug('Admin: Parent product ID: ' . $parent_product->get_id());
     }
     $is_camp = intersoccer_is_camp($parent_product->get_id());
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: Is parent product a camp? ' . ($is_camp ? 'true' : 'false'));
+        intersoccer_debug('Admin: Is parent product a camp? ' . ($is_camp ? 'true' : 'false'));
     }
 
     if (!$is_camp) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer Admin: Parent product is not a camp, skipping late pickup field');
+            intersoccer_debug('Admin: Parent product is not a camp, skipping late pickup field');
         }
         return;
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: Adding late pickup field for camp variation ' . $variation_id);
+        intersoccer_debug('Admin: Adding late pickup field for camp variation ' . $variation_id);
     }
 
     echo '<div style="margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd;">';
@@ -312,7 +312,7 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Admin: Late pickup field for variation ' . $variation_id . ': DB value="' . ($db_value ?: 'NULL') . '", get_post_meta="' . $saved_value . '", checked="' . $checked . '", loop=' . $loop);
+        intersoccer_debug('Admin: Late pickup field for variation ' . $variation_id . ': DB value="' . ($db_value ?: 'NULL') . '", get_post_meta="' . $saved_value . '", checked="' . $checked . '", loop=' . $loop);
     }
     
     echo '<p class="form-field _intersoccer_enable_late_pickup_field" style="margin: 5px 0;">';
@@ -427,10 +427,10 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
-        error_log('InterSoccer Save: POST data keys: ' . implode(', ', array_keys($_POST)));
+        intersoccer_debug('Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
+        intersoccer_debug('Save: POST data keys: ' . implode(', ', array_keys($_POST)));
         if (isset($_POST['_intersoccer_enable_late_pickup'])) {
-            error_log('InterSoccer Save: _intersoccer_enable_late_pickup structure: ' . json_encode($_POST['_intersoccer_enable_late_pickup']));
+            intersoccer_debug('Save: _intersoccer_enable_late_pickup structure: ' . json_encode($_POST['_intersoccer_enable_late_pickup']));
         }
     }
 
@@ -473,7 +473,7 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer Save: Final enable_late_pickup = ' . $enable_late_pickup . ' for variation ' . $variation_id);
+        intersoccer_debug('Save: Final enable_late_pickup = ' . $enable_late_pickup . ' for variation ' . $variation_id);
     }
 
     update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
@@ -514,7 +514,7 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     if (!empty($camp_days_available)) {
         update_post_meta($variation_id, '_intersoccer_camp_days_available', $camp_days_available);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer Save: Camp days available for variation ' . $variation_id . ': ' . json_encode($camp_days_available));
+            intersoccer_debug('Save: Camp days available for variation ' . $variation_id . ': ' . json_encode($camp_days_available));
         }
     }
     
@@ -522,7 +522,7 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     if (!empty($late_pickup_days_available)) {
         update_post_meta($variation_id, '_intersoccer_late_pickup_days_available', $late_pickup_days_available);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer Save: Late pickup days available for variation ' . $variation_id . ': ' . json_encode($late_pickup_days_available));
+            intersoccer_debug('Save: Late pickup days available for variation ' . $variation_id . ': ' . json_encode($late_pickup_days_available));
         }
     }
     
@@ -535,8 +535,8 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
         $saved_value = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
-        error_log('InterSoccer Save: Updated meta for variation ' . $variation_id . ' to "' . $enable_late_pickup . '" (verified: "' . $saved_value . '")');
-        error_log('InterSoccer Save: Cleared product transients for variation ' . $variation_id . ' and parent ' . $parent_id);
+        intersoccer_debug('Save: Updated meta for variation ' . $variation_id . ' to "' . $enable_late_pickup . '" (verified: "' . $saved_value . '")');
+        intersoccer_debug('Save: Cleared product transients for variation ' . $variation_id . ' and parent ' . $parent_id);
     }
 }
 
@@ -603,7 +603,7 @@ function intersoccer_sync_course_metadata_to_translations($variation_id, $start_
         wc_delete_product_transients($translated_variation_id);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
+            intersoccer_debug('Synced course metadata from variation ' . $variation_id . ' to translated variation ' . $translated_variation_id . ' (' . $lang_code . ')');
         }
     }
 }
@@ -648,7 +648,7 @@ function intersoccer_sync_course_metadata_on_translation_complete($post_id, $dat
         if ($original_value !== '' && $original_value !== null) {
             update_post_meta($post_id, $key, $original_value);
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Synced ' . $key . ' from original variation ' . $original_variation_id . ' to translated variation ' . $post_id);
+                intersoccer_debug('Synced ' . $key . ' from original variation ' . $original_variation_id . ' to translated variation ' . $post_id);
             }
         }
     }

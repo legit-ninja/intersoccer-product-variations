@@ -11,6 +11,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/course/class-course-context.php';
+require_once __DIR__ . '/course/class-course-meta-repository.php';
+require_once __DIR__ . '/course/class-course-schedule-calculator.php';
+require_once __DIR__ . '/course/class-course-pricing-calculator.php';
+
 /**
  * Get course metadata with WPML fallback to original language
  *
@@ -26,7 +31,11 @@ function intersoccer_get_course_meta($variation_id, $meta_key, $default = null) 
     // If value exists and is not empty, return it
     if ($value !== '' && $value !== null) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Found ' . $meta_key . ' directly on variation ' . $variation_id . ': ' . (is_array($value) ? json_encode($value) : $value));
+            intersoccer_debug('Found {meta_key} directly on variation {variation_id}: {value}', [
+                'meta_key' => $meta_key,
+                'variation_id' => $variation_id,
+                'value' => $value,
+            ]);
         }
         return $value;
     }
@@ -42,27 +51,42 @@ function intersoccer_get_course_meta($variation_id, $meta_key, $default = null) 
             $original_value = get_post_meta($original_variation_id, $meta_key, true);
             if ($original_value !== '' && $original_value !== null) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Using metadata from original variation ' . $original_variation_id . ' for ' . $meta_key . ' on translated variation ' . $variation_id . ': ' . (is_array($original_value) ? json_encode($original_value) : $original_value));
+                    intersoccer_debug('Using metadata from original variation {original} for {meta_key} on translated variation {variation}: {value}', [
+                        'original' => $original_variation_id,
+                        'meta_key' => $meta_key,
+                        'variation' => $variation_id,
+                        'value' => $original_value,
+                    ]);
                 }
                 return $original_value;
             } else {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Original variation ' . $original_variation_id . ' also has empty ' . $meta_key);
+                    intersoccer_debug('Original variation {original} also has empty {meta_key}', [
+                        'original' => $original_variation_id,
+                        'meta_key' => $meta_key,
+                    ]);
                 }
             }
         } else {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Could not find original variation for ' . $variation_id . ' (original_id: ' . ($original_variation_id ?: 'null') . ')');
+                intersoccer_warning('Could not find original variation for {variation_id} (original_id: {original})', [
+                    'variation_id' => $variation_id,
+                    'original' => $original_variation_id ?: 'null',
+                ]);
             }
         }
     } else {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: WPML not detected for metadata fallback');
+            intersoccer_debug('WPML not detected for metadata fallback');
         }
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Returning default for ' . $meta_key . ' on variation ' . $variation_id . ': ' . (is_array($default) ? json_encode($default) : $default));
+        intersoccer_debug('Returning default for {meta_key} on variation {variation}: {value}', [
+            'meta_key' => $meta_key,
+            'variation' => $variation_id,
+            'value' => $default,
+        ]);
     }
     return $default;
 }
@@ -74,60 +98,150 @@ if (!class_exists('InterSoccer_Course')) {
 class InterSoccer_Course {
 
     /**
+     * Runtime cache for course prices keyed by canonical variation and meta signature.
+     *
+     * @var array<string,float>
+     */
+    protected static $price_cache = [];
+    /**
+     * Runtime stats for instrumentation during a single request.
+     *
+     * @var array<string,array<int,int>>
+     */
+    protected static $runtime_stats = [];
+    /** @var InterSoccer_Course_Meta_Repository|null */
+    protected static $meta_repository_instance = null;
+    /** @var InterSoccer_Course_Schedule_Calculator|null */
+    protected static $schedule_calculator_instance = null;
+    /** @var InterSoccer_Course_Pricing_Calculator|null */
+    protected static $pricing_calculator_instance = null;
+
+    /**
+     * Reset runtime cache (useful for tests and long-running processes).
+     */
+    public static function reset_runtime_cache() {
+        self::$price_cache = [];
+        self::$runtime_stats = [];
+        self::$meta_repository_instance = null;
+        self::$schedule_calculator_instance = null;
+        self::$pricing_calculator_instance = null;
+        if (class_exists('InterSoccer_Course_Meta_Repository')) {
+            InterSoccer_Course_Meta_Repository::reset_runtime_state();
+        }
+    }
+
+    /**
+     * Retrieve runtime instrumentation stats (primarily for tests).
+     *
+     * @return array<string,array<int,int>>
+     */
+    public static function get_runtime_stats() {
+        return self::$runtime_stats;
+    }
+
+    /**
+     * Increment a runtime stat counter for the given canonical variation.
+     *
+     * @param string $bucket Stat name (e.g., price_computations, cache_hits).
+     * @param int    $canonical_variation_id Canonical variation identifier.
+     * @return void
+     */
+    protected static function record_runtime_stat($bucket, $canonical_variation_id) {
+        if (!isset(self::$runtime_stats[$bucket])) {
+            self::$runtime_stats[$bucket] = [];
+        }
+        if (!isset(self::$runtime_stats[$bucket][$canonical_variation_id])) {
+            self::$runtime_stats[$bucket][$canonical_variation_id] = 0;
+        }
+        self::$runtime_stats[$bucket][$canonical_variation_id]++;
+    }
+
+    protected static function meta_repository() {
+        if (!self::$meta_repository_instance) {
+            self::$meta_repository_instance = new InterSoccer_Course_Meta_Repository();
+        }
+        return self::$meta_repository_instance;
+    }
+
+    protected static function schedule_calculator() {
+        if (!self::$schedule_calculator_instance) {
+            self::$schedule_calculator_instance = new InterSoccer_Course_Schedule_Calculator();
+        }
+        return self::$schedule_calculator_instance;
+    }
+
+    protected static function pricing_calculator() {
+        if (!self::$pricing_calculator_instance) {
+            self::$pricing_calculator_instance = new InterSoccer_Course_Pricing_Calculator(self::schedule_calculator());
+        }
+        return self::$pricing_calculator_instance;
+    }
+
+    protected static function resolve_product_id_for_context($product_id, $variation_id) {
+        if ($product_id) {
+            return (int) $product_id;
+        }
+        if ($variation_id) {
+            $product = wc_get_product($variation_id);
+            if ($product && method_exists($product, 'get_parent_id')) {
+                $parent = $product->get_parent_id();
+                if ($parent) {
+                    return (int) $parent;
+                }
+            }
+        }
+        return 0;
+    }
+
+    protected static function build_context($product_id, $variation_id, array $options = []) {
+        $resolved_product_id = self::resolve_product_id_for_context($product_id, $variation_id);
+        return self::meta_repository()->build_context($resolved_product_id, $variation_id, $options);
+    }
+
+    /**
+     * Resolve a canonical variation ID for WPML translations.
+     *
+     * @param int $variation_id Variation ID (may be translated).
+     * @return int Canonical/original variation ID when available.
+     */
+    protected static function get_canonical_variation_id($variation_id) {
+        if (!$variation_id) {
+            return 0;
+        }
+
+        if (!function_exists('apply_filters') || (!defined('ICL_SITEPRESS_VERSION') && !function_exists('icl_get_current_language'))) {
+            return (int) $variation_id;
+        }
+
+        $default_lang = apply_filters('wpml_default_language', null);
+        if (empty($default_lang)) {
+            return (int) $variation_id;
+        }
+
+        $original_id = apply_filters('wpml_object_id', $variation_id, 'product_variation', true, $default_lang);
+        if (!empty($original_id)) {
+            return (int) $original_id;
+        }
+
+        return (int) $variation_id;
+    }
+
+    /**
      * Get the course day number from variation attribute (1=Monday, 7=Sunday).
      *
      * @param int $variation_id Variation ID.
      * @return int Course day number or 0 if invalid.
      */
     public static function get_course_day($variation_id) {
-        $attribute_slug = get_post_meta($variation_id, 'attribute_pa_course-day', true);
-        if (!$attribute_slug) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Missing attribute_pa_course-day for variation ' . $variation_id);
-            }
-            return 0;
-        }
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Attribute slug for pa_course-day: ' . $attribute_slug . ' for variation ' . $variation_id);
-        }
+        $context = self::build_context(0, $variation_id, ['include_base_price' => false]);
+        $course_day_num = self::schedule_calculator()->get_course_day($context);
 
-        $day_map = [
-            // English
-            'monday' => 1,
-            'tuesday' => 2,
-            'wednesday' => 3,
-            'thursday' => 4,
-            'friday' => 5,
-            'saturday' => 6,
-            'sunday' => 7,
-            // French
-            'lundi' => 1,
-            'mardi' => 2,
-            'mercredi' => 3,
-            'jeudi' => 4,
-            'vendredi' => 5,
-            'samedi' => 6,
-            'dimanche' => 7,
-            // German
-            'montag' => 1,
-            'dienstag' => 2,
-            'mittwoch' => 3,
-            'donnerstag' => 4,
-            'freitag' => 5,
-            'samstag' => 6,
-            'sonntag' => 7
-        ];
-
-        $course_day_num = $day_map[$attribute_slug] ?? 0;
         if ($course_day_num === 0) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Invalid course day slug: ' . $attribute_slug . ' for variation ' . $variation_id);
-            }
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Resolved course_day number: ' . $course_day_num . ' for variation ' . $variation_id);
+                intersoccer_warning('Invalid course day slug for variation {variation}', ['variation' => $variation_id]);
             }
         }
+
         return $course_day_num;
     }
 
@@ -144,120 +258,33 @@ class InterSoccer_Course {
      * @return string End date in 'Y-m-d' or empty.
      */
     public static function calculate_end_date($variation_id, $total_weeks) {
-        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        if (!$start_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) || !strtotime($start_date)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Invalid/missing _course_start_date for variation ' . $variation_id . ': ' . ($start_date ?: 'not set'));
-            }
-            return '';
+        $context = self::build_context(0, $variation_id, ['include_base_price' => false]);
+
+        if ($total_weeks && $total_weeks !== $context->get_total_weeks()) {
+            $context = new InterSoccer_Course_Context(
+                $context->get_product_id(),
+                $context->get_variation_id(),
+                $context->get_canonical_variation_id(),
+                $context->get_base_price(),
+                max(0, (int) $total_weeks),
+                $context->get_session_rate(),
+                $context->get_start_date(),
+                $context->get_holidays()
+            );
         }
 
-        $course_day = self::get_course_day($variation_id);
-        if (empty($course_day)) {
-            return '';
-        }
-        $course_day = (int) $course_day; // Ensure it's an integer
+        $end_date = self::schedule_calculator()->calculate_end_date($context);
 
-        $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
-        $holiday_set = array_flip($holidays);
-
-        // Count holidays on the course day to determine how much to extend the duration
-        $holiday_count_on_course_day = 0;
-        foreach ($holidays as $holiday) {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Invalid holiday date format for variation ' . $variation_id . ': ' . $holiday);
-                }
-                continue;
-            }
-            $holiday_date = new DateTime($holiday);
-            if ($holiday_date->format('N') == $course_day) {
-                $holiday_count_on_course_day++;
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Holiday on course day ' . $course_day . ' for variation ' . $variation_id . ': ' . $holiday);
-                }
-            }
+        if ($end_date) {
+            update_post_meta($variation_id, '_end_date', $end_date);
+            return $end_date;
         }
 
-        try {
-            $start = new DateTime($start_date);
-
-            // Needed sessions = actual events customer participates in
-            $sessions_needed = $total_weeks;
-
-            // Total occurrences needed = sessions_needed + holidays
-            // This is the key fix: holidays are ADDED to extend the duration
-            $total_occurrences_needed = $sessions_needed + $holiday_count_on_course_day;
-
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Calculating end date for variation ' . $variation_id . ': sessions_needed=' . $sessions_needed . ', holidays_on_course_day=' . $holiday_count_on_course_day . ', total_occurrences_needed=' . $total_occurrences_needed);
-            }
-
-            $current_date = clone $start;
-            $occurrences_counted = 0;
-            $sessions_counted = 0;
-            $days_checked = 0;
-            $max_days = $total_occurrences_needed * 10; // Safe buffer
-            $end_date = '';
-
-            while ($occurrences_counted < $total_occurrences_needed && $days_checked < $max_days) {
-                $day = $current_date->format('Y-m-d');
-                $current_day_num = $current_date->format('N');
-
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Checking day ' . $day . ' (day num: ' . $current_day_num . ') against course_day ' . $course_day . ' for variation ' . $variation_id);
-                }
-
-                if ((int) $current_day_num === (int) $course_day) {
-                    $occurrences_counted++;
-                    $is_holiday = isset($holiday_set[$day]);
-
-                    if (!$is_holiday) {
-                        $sessions_counted++;
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                error_log('InterSoccer: Session #' . $sessions_counted . ' on ' . $day . ' (occurrence ' . $occurrences_counted . '/' . $total_occurrences_needed . ')');
-                            }
-                        }
-                    } else {
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                error_log('InterSoccer: Holiday on ' . $day . ' (occurrence ' . $occurrences_counted . '/' . $total_occurrences_needed . ') - extends duration');
-                            }
-                        }
-                    }
-
-                    // End date is set when we've counted all needed occurrences (sessions + holidays)
-                    if ($occurrences_counted === $total_occurrences_needed) {
-                        $end_date = $day;
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                error_log('InterSoccer: Final end_date for variation ' . $variation_id . ': ' . $end_date . ' (sessions: ' . $sessions_counted . ', holidays: ' . $holiday_count_on_course_day . ', total occurrences: ' . $total_occurrences_needed . ')');
-                            }
-                        }
-                        break;
-                    }
-                }
-
-                $current_date->add(new DateInterval('P1D'));
-                $days_checked++;
-            }
-
-            if ($end_date && $sessions_counted == $sessions_needed) {
-                update_post_meta($variation_id, '_end_date', $end_date);
-                return $end_date;
-            } else {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log('InterSoccer: Failed to calculate end_date for variation ' . $variation_id . ' - sessions_counted: ' . $sessions_counted . ', sessions_needed: ' . $sessions_needed . ', days_checked: ' . $days_checked);
-                }
-                return '';
-            }
-        } catch (Exception $e) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: DateTime exception in calculate_end_date for variation ' . $variation_id . ': ' . $e->getMessage());
-            }
-            return '';
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            intersoccer_warning('Failed to calculate end_date for variation {variation}', ['variation' => $variation_id]);
         }
+
+        return '';
     }
 
     /**
@@ -268,42 +295,22 @@ class InterSoccer_Course {
      * @return int Total sessions.
      */
     public static function calculate_total_sessions($variation_id, $total_weeks) {
-        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        if (!$start_date) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Missing start_date in calculate_total_sessions for variation ' . $variation_id);
-            }
-            return 0;
+        $context = self::build_context(0, $variation_id, ['include_base_price' => false]);
+
+        if ($total_weeks && $total_weeks !== $context->get_total_weeks()) {
+            $context = new InterSoccer_Course_Context(
+                $context->get_product_id(),
+                $context->get_variation_id(),
+                $context->get_canonical_variation_id(),
+                $context->get_base_price(),
+                max(0, (int) $total_weeks),
+                $context->get_session_rate(),
+                $context->get_start_date(),
+                $context->get_holidays()
+            );
         }
 
-        $end_date = self::calculate_end_date($variation_id, $total_weeks);
-        if (!$end_date) {
-            return 0;
-        }
-
-        $course_day = self::get_course_day($variation_id);
-        if (empty($course_day)) {
-            return 0;
-        }
-
-        $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
-        $holiday_set = array_flip($holidays);
-
-        $start = new DateTime($start_date);
-        $end = new DateTime($end_date);
-        $total = 0;
-        $date = clone $start;
-        while ($date <= $end) {
-            if ($date->format('N') == $course_day && !isset($holiday_set[$date->format('Y-m-d')])) {
-                $total++;
-            }
-            $date->add(new DateInterval('P1D'));
-        }
-
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Total sessions for variation ' . $variation_id . ': ' . $total . ' (should match total_weeks: ' . $total_weeks . ')');
-        }
-        return $total;
+        return self::schedule_calculator()->calculate_total_sessions($context);
     }
 
     /**
@@ -314,79 +321,37 @@ class InterSoccer_Course {
      * @return int Remaining sessions.
      */
     public static function calculate_remaining_sessions($variation_id, $total_weeks) {
-        error_log('InterSoccer: calculate_remaining_sessions called for variation ' . $variation_id . ' with total_weeks: ' . $total_weeks);
+        intersoccer_debug('calculate_remaining_sessions called for variation {variation} with total_weeks {weeks}', [
+            'variation' => $variation_id,
+            'weeks' => $total_weeks,
+        ]);
 
-        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        if (!$start_date) {
-            error_log('InterSoccer: Missing start_date in calculate_remaining_sessions for variation ' . $variation_id . ' - returning all sessions: ' . $total_weeks);
-            return $total_weeks; // If no start date, assume all sessions remaining
+        $context = self::build_context(0, $variation_id, [
+            'include_base_price' => false,
+            'base_price' => 0,
+        ]);
+
+        if ($total_weeks && $total_weeks !== $context->get_total_weeks()) {
+            // Preserve legacy behaviour where callers pass an explicit total weeks value.
+            $context = new InterSoccer_Course_Context(
+                $context->get_product_id(),
+                $context->get_variation_id(),
+                $context->get_canonical_variation_id(),
+                $context->get_base_price(),
+                max(0, (int) $total_weeks),
+                $context->get_session_rate(),
+                $context->get_start_date(),
+                $context->get_holidays()
+            );
         }
 
-        error_log('InterSoccer: Course start_date: ' . $start_date);
+        $remaining = self::schedule_calculator()->calculate_remaining_sessions($context);
 
-        $course_day = self::get_course_day($variation_id);
-        if (empty($course_day)) {
-            error_log('InterSoccer: No course_day found for variation ' . $variation_id . ' - returning all sessions: ' . $total_weeks);
-            return $total_weeks;
-        }
-
-        error_log('InterSoccer: Course day number: ' . $course_day);
-
-        $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
-        $holiday_set = array_flip($holidays);
-
-        error_log('InterSoccer: Course holidays: ' . json_encode($holidays));
-
-        $current = new DateTime(current_time('Y-m-d'));
-        $start = new DateTime($start_date);
-
-        error_log('InterSoccer: Current date: ' . $current->format('Y-m-d') . ', Start date: ' . $start->format('Y-m-d'));
-
-        // If course hasn't started yet, all sessions remain
-        if ($current < $start) {
-            error_log('InterSoccer: Course hasn\'t started yet for variation ' . $variation_id . ' - all ' . $total_weeks . ' sessions remaining');
-            return $total_weeks;
-        }
-
-        // Calculate end date to know when course finishes
-        $end_date = self::calculate_end_date($variation_id, $total_weeks);
-        if (!$end_date) {
-            error_log('InterSoccer: Could not calculate end date for variation ' . $variation_id . ' - assuming all sessions remaining');
-            return $total_weeks;
-        }
-
-        $end = new DateTime($end_date);
-        error_log('InterSoccer: Calculated end date: ' . $end->format('Y-m-d'));
-
-        // If course has ended, no sessions remain
-        if ($current > $end) {
-            error_log('InterSoccer: Course has ended for variation ' . $variation_id . ' - 0 sessions remaining');
-            return 0;
-        }
-
-        // Count remaining sessions from current date to end date
-        $remaining = 0;
-        $date = clone $current;
-
-        error_log('InterSoccer: Counting remaining sessions from ' . $current->format('Y-m-d') . ' to ' . $end->format('Y-m-d'));
-
-        while ($date <= $end) {
-            $day = $date->format('Y-m-d');
-            $day_of_week = $date->format('N');
-
-            if ($day_of_week == $course_day) {
-                if (isset($holiday_set[$day])) {
-                    error_log('InterSoccer: Skipping holiday on course day: ' . $day);
-                } else {
-                    $remaining++;
-                    error_log('InterSoccer: Counted remaining session #' . $remaining . ' on ' . $day . ' (day ' . $day_of_week . ')');
-                }
-            }
-            $date->add(new DateInterval('P1D'));
-        }
-
-        $remaining = min($remaining, $total_weeks); // Don't exceed total weeks
-        error_log('InterSoccer: Final remaining sessions for variation ' . $variation_id . ': ' . $remaining . ' (out of ' . $total_weeks . ' total)');
+        intersoccer_debug('Final remaining sessions for variation {variation}: {remaining} (out of {total} total)', [
+            'variation' => $variation_id,
+            'remaining' => $remaining,
+            'total' => $context->get_total_weeks(),
+        ]);
         return $remaining;
     }
 
@@ -399,66 +364,87 @@ class InterSoccer_Course {
      * @return float Calculated price.
      */
     public static function calculate_price($product_id, $variation_id, $remaining_sessions = null) {
-        $product = wc_get_product($variation_id ?: $product_id);
-        if (!$product) {
-            error_log('InterSoccer: Invalid product for course price calculation: ' . ($variation_id ?: $product_id));
-            return 0;
+        $context = self::build_context($product_id, $variation_id);
+        $current_date_for_key = function_exists('current_time') ? current_time('Y-m-d') : date('Y-m-d');
+        $cache_key = $context->build_cache_key($current_date_for_key);
+        $canonical_variation_id = $context->get_canonical_variation_id();
+
+        intersoccer_debug('Course price calculation for variation {variation} - base_price: {base}, total_weeks: {weeks}, session_rate: {rate}', [
+            'variation' => $variation_id ?: $product_id,
+            'base' => $context->get_base_price(),
+            'weeks' => $context->get_total_weeks(),
+            'rate' => $context->get_session_rate(),
+        ]);
+
+        if (isset(self::$price_cache[$cache_key])) {
+            intersoccer_debug('Returning cached course price for canonical variation {canonical} (requested variation {requested}) on {date}: {price}', [
+                'canonical' => $canonical_variation_id,
+                'requested' => $variation_id,
+                'date' => $current_date_for_key,
+                'price' => self::$price_cache[$cache_key],
+            ]);
+            self::record_runtime_stat('cache_hits', $canonical_variation_id);
+            return self::$price_cache[$cache_key];
         }
 
-        $base_price = floatval($product->get_price());
-        $total_weeks = (int) intersoccer_get_course_meta($variation_id ?: $product_id, '_course_total_weeks', 0);
-        $session_rate = floatval(intersoccer_get_course_meta($variation_id ?: $product_id, '_course_weekly_discount', 0));
+        self::record_runtime_stat('price_computations', $canonical_variation_id);
 
-        error_log('InterSoccer: Course price calculation for variation ' . ($variation_id ?: $product_id) . ' - base_price: ' . $base_price . ', total_weeks: ' . $total_weeks . ', session_rate: ' . $session_rate);
-
-        // CRITICAL FIX: Don't apply pro-rated pricing to courses with future start dates
-        // Customers booking early should pay full base price, not a calculated session price
-        $start_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_start_date', '');
-        if ($start_date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)) {
-            $start = new DateTime($start_date);
-            $current = new DateTime(current_time('Y-m-d'));
-            
-            if ($current < $start) {
-                error_log('InterSoccer: Course has not started yet (start: ' . $start_date . ') - returning full base price: ' . $base_price);
-                return $base_price;
-            }
-        }
-
-        if (is_null($remaining_sessions)) {
-            $remaining_sessions = self::calculate_remaining_sessions($variation_id, $total_weeks);
-            error_log('InterSoccer: Calculated remaining_sessions: ' . $remaining_sessions);
+        if (!is_null($remaining_sessions)) {
+            $hinted_sessions = max(0, (int) $remaining_sessions);
+            intersoccer_debug('Received remaining_sessions hint {hint} for variation {variation}', [
+                'hint' => $hinted_sessions,
+                'variation' => $variation_id,
+            ]);
         } else {
-            error_log('InterSoccer: Using provided remaining_sessions: ' . $remaining_sessions);
+            $hinted_sessions = null;
         }
 
-        $price = $base_price; // Default to full price
+        $result = self::pricing_calculator()->calculate_price($context, $hinted_sessions, $current_date_for_key);
+        $authoritative_remaining = $result['remaining_sessions'];
 
-        // Use session rate calculation if available
-        if ($session_rate > 0 && $remaining_sessions > 0) {
-            $price = $session_rate * $remaining_sessions;
-            $price = round($price, 2); // Round to 2 decimal places
-            error_log('InterSoccer: Course price calculated using session rate for variation ' . $variation_id . ': ' . $price . ' (rate: ' . $session_rate . ' × remaining sessions: ' . $remaining_sessions . ')');
-        } else {
-            // Fallback to old prorated calculation for backwards compatibility
-            $total_sessions = self::calculate_total_sessions($variation_id, $total_weeks);
-            error_log('InterSoccer: Fallback calculation - total_sessions: ' . $total_sessions . ', remaining_sessions: ' . $remaining_sessions);
-
-            if ($total_sessions > 0 && $remaining_sessions > 0 && $remaining_sessions <= $total_sessions) {
-                if ($remaining_sessions < $total_sessions) {
-                    // Prorate the price based on remaining sessions
-                    $price = $base_price * ($remaining_sessions / $total_sessions);
-                    $price = round($price, 2); // Round to 2 decimal places
-                    error_log('InterSoccer: Course prorated price (fallback) for variation ' . $variation_id . ': ' . $price . ' (base: ' . $base_price . ' × ' . $remaining_sessions . '/' . $total_sessions . ')');
-                } else {
-                    error_log('InterSoccer: Course full price (fallback) for variation ' . $variation_id . ': ' . $price . ' (all sessions remaining: ' . $remaining_sessions . ')');
-                }
-            } else {
-                error_log('InterSoccer: Invalid sessions for price calculation - remaining: ' . $remaining_sessions . ', total: ' . $total_sessions . ', base_price: ' . $base_price . ', session_rate: ' . $session_rate);
-            }
+        if (!is_null($hinted_sessions) && $hinted_sessions !== $authoritative_remaining) {
+            intersoccer_warning('Remaining sessions hint mismatch for variation {variation} - hinted: {hint}, actual: {actual}', [
+                'variation' => $variation_id,
+                'hint' => $hinted_sessions,
+                'actual' => $authoritative_remaining,
+            ]);
         }
 
-        error_log('InterSoccer: Final calculated price for variation ' . $variation_id . ': ' . $price);
-        return max(0, $price);
+        intersoccer_debug('Authoritative remaining_sessions for variation {variation}: {remaining}', [
+            'variation' => $variation_id,
+            'remaining' => $authoritative_remaining,
+        ]);
+
+        if (!empty($result['guard'])) {
+            $guard_bucket = $result['guard'] === 'future_start' ? 'guard_future_start' : 'guard_base_price';
+            self::record_runtime_stat($guard_bucket, $canonical_variation_id);
+            intersoccer_info('Guard rule triggered ({guard}) for variation {variation} - returning base price {price}', [
+                'guard' => $result['guard'],
+                'variation' => $variation_id,
+                'price' => $context->get_base_price(),
+            ]);
+        } elseif ($context->get_session_rate() > 0 && $authoritative_remaining > 0) {
+            intersoccer_debug('Course price calculated using session rate for variation {variation}: {price} (rate: {rate} × remaining sessions: {remaining})', [
+                'variation' => $variation_id,
+                'price' => $result['price'],
+                'rate' => $context->get_session_rate(),
+                'remaining' => $authoritative_remaining,
+            ]);
+        }
+
+        $final_price = max(0, $result['price']);
+        intersoccer_debug('Final calculated price for variation {variation}: {price}', [
+            'variation' => $variation_id,
+            'price' => $final_price,
+        ]);
+        self::$price_cache[$cache_key] = $final_price;
+        intersoccer_debug('Cached course price for canonical variation {canonical} (requested variation {requested}) on {date}: {price}', [
+            'canonical' => $canonical_variation_id,
+            'requested' => $variation_id,
+            'date' => $current_date_for_key,
+            'price' => $final_price,
+        ]);
+        return $final_price;
     }
 
     /**
@@ -473,11 +459,50 @@ class InterSoccer_Course {
         if ($remaining_sessions > 0) {
             $discount_note = sprintf(__('%d Weeks Remaining', 'intersoccer-product-variations'), $remaining_sessions);
         }
-        error_log('InterSoccer: Calculated discount_note for variation ' . $variation_id . ': ' . $discount_note);
+        intersoccer_debug('Calculated discount_note for variation {variation}: {note}', [
+            'variation' => $variation_id,
+            'note' => $discount_note,
+        ]);
         return $discount_note;
+    }
+
+    /**
+     * Ensure WooCommerce variation price caches roll over daily for course products.
+     *
+     * @param array        $hash Existing hash fragment.
+     * @param WC_Product   $product Parent product instance.
+     * @param bool         $for_display Whether prices are for display.
+     * @return array Modified hash including a daily salt.
+     */
+    public static function filter_variation_prices_hash($hash, $product, $for_display) {
+        if (!is_array($hash)) {
+            $hash = [];
+        }
+
+        if (!$product || !method_exists($product, 'get_id')) {
+            return $hash;
+        }
+
+        $product_id = (int) $product->get_id();
+        $product_type = function_exists('intersoccer_get_product_type') ? intersoccer_get_product_type($product_id) : null;
+
+        if ($product_type !== 'course') {
+            return $hash;
+        }
+
+        $current_day = function_exists('current_time') ? current_time('Y-m-d') : date('Y-m-d');
+
+        $hash['intersoccer_course_pricing_day'] = $current_day;
+        $hash['intersoccer_course_pricing_version'] = '2';
+
+        return $hash;
     }
 }
 } // End class_exists check for InterSoccer_Course
+
+if (function_exists('add_filter')) {
+    add_filter('woocommerce_get_variation_prices_hash', ['InterSoccer_Course', 'filter_variation_prices_hash'], 10, 3);
+}
 
 // Procedural wrappers for backward compatibility
 function calculate_end_date($variation_id, $total_weeks) {
@@ -800,7 +825,7 @@ function intersoccer_get_course_info_display() {
     wp_send_json_success(['html' => $html]);
 }
 
-error_log('InterSoccer: Defined course functions in product-course.php');
+intersoccer_debug('Defined course functions in product-course.php');
 
 /**
  * One-time recalc of course end dates.
@@ -814,7 +839,7 @@ function intersoccer_recalculate_course_end_dates() {
 
     wp_schedule_single_event(time(), 'intersoccer_run_course_end_date_update');
     update_option($flag, true);
-    error_log('InterSoccer: Scheduled one-time course end date recalc');
+    intersoccer_info('Scheduled one-time course end date recalc');
 }
 
 /**
@@ -832,7 +857,7 @@ function intersoccer_run_course_end_date_update_callback() {
             }
         }
     }
-    error_log('InterSoccer: Completed one-time recalc of course end dates');
+    intersoccer_info('Completed one-time recalc of course end dates');
 }
 
 /**
@@ -914,7 +939,11 @@ function intersoccer_filter_course_variation_price_DISABLED($price, $variation) 
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Filtered course variation price for ' . $variation_id . ' from ' . $price . ' to ' . $prorated_price);
+        intersoccer_debug('Filtered course variation price for {variation} from {original} to {prorated}', [
+            'variation' => $variation_id,
+            'original' => $price,
+            'prorated' => $prorated_price,
+        ]);
     }
     
     // Remove filtering flag

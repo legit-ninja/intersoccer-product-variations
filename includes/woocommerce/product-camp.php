@@ -28,7 +28,7 @@ class InterSoccer_Camp {
     public static function calculate_price($product_id, $variation_id, $camp_days = [], $quantity = 1) {
         $product = wc_get_product($variation_id ?: $product_id);
         if (!$product) {
-            error_log('InterSoccer: Invalid product for camp price calculation: ' . ($variation_id ?: $product_id));
+            intersoccer_debug('InterSoccer: Invalid product for camp price calculation: ' . ($variation_id ?: $product_id));
             return 0;
         }
 
@@ -52,11 +52,11 @@ class InterSoccer_Camp {
                 $price = $price_per_day * $quantity;
             }
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (' . $num_days . ' days selected, per_day: ' . $price_per_day . ', booking_type: ' . $booking_type . ')');
+                intersoccer_debug('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (' . $num_days . ' days selected, per_day: ' . $price_per_day . ', booking_type: ' . $booking_type . ')');
             }
         } else {
             // Full-week price (e.g., CHF 500/week)
-            error_log('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (full-week, booking_type: ' . $booking_type . ')');
+            intersoccer_debug('InterSoccer: Camp price for variation ' . $variation_id . ': ' . $price . ' (full-week, booking_type: ' . $booking_type . ')');
         }
 
         return max(0, floatval($price));
@@ -79,13 +79,13 @@ class InterSoccer_Camp {
                 if (empty($camp_days)) {
                     $passed = false;
                     wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
-                    error_log('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ': ' . print_r($_POST, true));
+                    intersoccer_debug('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ': ' . print_r($_POST, true));
                 } elseif (count($camp_days) !== $quantity) {
                     $passed = false;
                     wc_add_notice(__('The number of selected days must match the quantity.', 'intersoccer-product-variations'), 'error');
-                    error_log('InterSoccer: Validation failed - camp_days count (' . count($camp_days) . ') does not match quantity (' . $quantity . ') for product ' . $product_id);
+                    intersoccer_debug('InterSoccer: Validation failed - camp_days count (' . count($camp_days) . ') does not match quantity (' . $quantity . ') for product ' . $product_id);
                 } else {
-                    error_log('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days and quantity ' . $quantity . ' for product ' . $product_id . ': ' . print_r($camp_days, true));
+                    intersoccer_debug('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days and quantity ' . $quantity . ' for product ' . $product_id . ': ' . print_r($camp_days, true));
                 }
             }
         }
@@ -104,7 +104,7 @@ class InterSoccer_Camp {
         if (!empty($camp_days)) {
             $discount_note = sprintf(__('%d Day(s) Selected', 'intersoccer-product-variations'), count($camp_days));
         }
-        error_log('InterSoccer: Calculated discount_note for camp variation ' . $variation_id . ': ' . $discount_note);
+        intersoccer_debug('InterSoccer: Calculated discount_note for camp variation ' . $variation_id . ': ' . $discount_note);
         return $discount_note;
     }
 }
@@ -118,5 +118,5 @@ function intersoccer_validate_single_day_camp($passed, $product_id, $quantity) {
     return InterSoccer_Camp::validate_single_day($passed, $product_id, $quantity);
 }
 
-error_log('InterSoccer: Defined camp functions in product-camps.php');
+intersoccer_debug('InterSoccer: Defined camp functions in product-camps.php');
 ?>

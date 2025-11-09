@@ -18,7 +18,7 @@ add_action('woocommerce_order_status_completed', 'intersoccer_grant_download_per
 function intersoccer_grant_download_permissions($order_id) {
     $order = wc_get_order($order_id);
     if (!$order) {
-        error_log('InterSoccer: Invalid order ID ' . $order_id . ' for granting download permissions');
+        intersoccer_debug('InterSoccer: Invalid order ID ' . $order_id . ' for granting download permissions');
         return;
     }
 
@@ -27,7 +27,7 @@ function intersoccer_grant_download_permissions($order_id) {
         $product = wc_get_product($product_id);
 
         if (!$product) {
-            error_log('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+            intersoccer_debug('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
             continue;
         }
 
@@ -68,7 +68,7 @@ function intersoccer_grant_download_permissions($order_id) {
                 $download_obj = new WC_Customer_Download();
                 $download_obj->set_data($download_data);
                 $download_obj->save();
-                error_log('InterSoccer: Granted download permission for file ' . $download['name'] . ' to order ' . $order_id);
+                intersoccer_debug('InterSoccer: Granted download permission for file ' . $download['name'] . ' to order ' . $order_id);
             }
         }
     }
@@ -111,7 +111,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     
     if (!$parent_product) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Invalid parent product ID: ' . $product_id);
+            intersoccer_debug('InterSoccer: Invalid parent product ID: ' . $product_id);
         }
         return [];
     }
@@ -143,9 +143,9 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Parent attributes for product ' . $product_id . ': ' . print_r($parent_attributes, true));
-        error_log('InterSoccer: Variation attributes for variation ' . ($variation_id ?: 'none') . ': ' . print_r($variation_attributes, true));
-        error_log('InterSoccer: Variation map: ' . print_r($variation_map, true));
+        intersoccer_debug('InterSoccer: Parent attributes for product ' . $product_id . ': ' . print_r($parent_attributes, true));
+        intersoccer_debug('InterSoccer: Variation attributes for variation ' . ($variation_id ?: 'none') . ': ' . print_r($variation_attributes, true));
+        intersoccer_debug('InterSoccer: Variation map: ' . print_r($variation_map, true));
     }
     
     // Define canonical lowercase order for weekdays (used to order day slugs)
@@ -207,7 +207,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             }
 
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Using variation-selected attribute for ' . $attribute_name . ': ' . $value);
+                intersoccer_debug('InterSoccer: Using variation-selected attribute for ' . $attribute_name . ': ' . $value);
             }
         } else {
             // No explicit variation selection: fall back to parent product terms/options
@@ -232,7 +232,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                     } else {
                         // Skip ambiguous parent lists to avoid dumping all venues, etc.
                         if (defined('WP_DEBUG') && WP_DEBUG) {
-                            error_log('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent terms: ' . print_r($terms, true) . ')');
+                            intersoccer_debug('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent terms: ' . print_r($terms, true) . ')');
                         }
                         $value = '';
                     }
@@ -255,13 +255,13 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             $label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', $english_label, $english_label) : $english_label;
             $attributes[$label] = $value;
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value . ' (from: ' . $attribute_name . ')');
+                intersoccer_debug('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value . ' (from: ' . $attribute_name . ')');
             }
         }
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Final attributes returned for product ' . $product_id . ': ' . print_r($attributes, true));
+        intersoccer_debug('InterSoccer: Final attributes returned for product ' . $product_id . ': ' . print_r($attributes, true));
     }
     
     return $attributes;
@@ -294,7 +294,7 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
         if (isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
             $item->add_meta_data('Days Selected', implode(', ', array_map('sanitize_text_field', $values['camp_days'])));
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Added camp_days metadata: ' . implode(', ', $values['camp_days']) . ' for quantity ' . $quantity);
+                intersoccer_debug('InterSoccer: Added camp_days metadata: ' . implode(', ', $values['camp_days']) . ' for quantity ' . $quantity);
             }
         }
 
@@ -315,7 +315,7 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
             $formatted_start = date_i18n('F j, Y', strtotime($start_date));
             $item->add_meta_data('Start Date', $formatted_start);
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Added Start Date: ' . $formatted_start);
+                intersoccer_debug('InterSoccer: Added Start Date: ' . $formatted_start);
             }
         }
 
@@ -375,15 +375,15 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Retrieved ' . count($parent_attributes) . ' parent attributes for product ' . $product_id);
-        error_log('InterSoccer: Parent attributes to add: ' . print_r($parent_attributes, true));
+        intersoccer_debug('InterSoccer: Retrieved ' . count($parent_attributes) . ' parent attributes for product ' . $product_id);
+        intersoccer_debug('InterSoccer: Parent attributes to add: ' . print_r($parent_attributes, true));
     }
     
     foreach ($parent_attributes as $attribute_label => $attribute_value) {
         // Skip attributes that are already added separately to avoid duplication
         if (in_array($attribute_label, ['Activity Type', 'Season'])) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
+                intersoccer_debug('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
             }
             continue;
         }
@@ -391,20 +391,20 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
         $meta_key = $attribute_label;
         $item->add_meta_data($meta_key, sanitize_text_field($attribute_value));
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: ✅ Added parent attribute to order: ' . $meta_key . ' = ' . $attribute_value);
+            intersoccer_debug('InterSoccer: ✅ Added parent attribute to order: ' . $meta_key . ' = ' . $attribute_value);
         }
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
-        error_log('InterSoccer: Order metadata summary:');
-        error_log('  - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none'));
-        error_log('  - Camp Days: ' . (isset($values['camp_days']) && is_array($values['camp_days']) ? implode(', ', $values['camp_days']) : 'none'));
-        error_log('  - Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
-        error_log('  - Late Pickup Days: ' . (isset($values['late_pickup_days']) && is_array($values['late_pickup_days']) ? implode(', ', $values['late_pickup_days']) : 'none'));
-        error_log('  - Late Pickup Cost: ' . ($values['late_pickup_cost'] ?? 'none'));
-        error_log('  - Discount: ' . ($values['discount_note'] ?? 'none'));
-        error_log('  - Parent Attributes: ' . count($parent_attributes));
+        intersoccer_debug('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
+        intersoccer_debug('InterSoccer: Order metadata summary:');
+        intersoccer_debug('  - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none'));
+        intersoccer_debug('  - Camp Days: ' . (isset($values['camp_days']) && is_array($values['camp_days']) ? implode(', ', $values['camp_days']) : 'none'));
+        intersoccer_debug('  - Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
+        intersoccer_debug('  - Late Pickup Days: ' . (isset($values['late_pickup_days']) && is_array($values['late_pickup_days']) ? implode(', ', $values['late_pickup_days']) : 'none'));
+        intersoccer_debug('  - Late Pickup Cost: ' . ($values['late_pickup_cost'] ?? 'none'));
+        intersoccer_debug('  - Discount: ' . ($values['discount_note'] ?? 'none'));
+        intersoccer_debug('  - Parent Attributes: ' . count($parent_attributes));
     }
 }
 
@@ -434,7 +434,7 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Checkout display metadata - Item Key: ' . $cart_item_key . ', Attendee: ' . ($cart_item['assigned_attendee'] ?? 'none') . ', Discount: ' . ($cart_item['discount_note'] ?? 'none'));
+            intersoccer_debug('InterSoccer: Checkout display metadata - Item Key: ' . $cart_item_key . ', Attendee: ' . ($cart_item['assigned_attendee'] ?? 'none') . ', Discount: ' . ($cart_item['discount_note'] ?? 'none'));
         }
     }
 
@@ -449,7 +449,7 @@ function intersoccer_ensure_player_assignment_format($cart_item_data, $product_i
     if (isset($_POST['player_assignment']) && !isset($cart_item_data['assigned_player'])) {
         $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Normalized player_assignment to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
+            intersoccer_debug('InterSoccer: Normalized player_assignment to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
         }
     }
     
@@ -460,9 +460,9 @@ function intersoccer_ensure_player_assignment_format($cart_item_data, $product_i
  * Placeholder for future player management integrations
  */
 function intersoccer_handle_player_assignment($order_id) {
-    error_log('InterSoccer: Placeholder for player assignment in order ' . $order_id);
+    intersoccer_debug('InterSoccer: Placeholder for player assignment in order ' . $order_id);
 }
 // add_action('woocommerce_checkout_order_processed', 'intersoccer_handle_player_assignment', 10, 1);
 
-error_log('InterSoccer: Loaded checkout-calculations.php');
+intersoccer_debug('InterSoccer: Loaded checkout-calculations.php');
 ?>

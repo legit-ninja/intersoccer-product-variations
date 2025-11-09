@@ -22,7 +22,7 @@ if (defined('INTERSOCCER_AJAX_HANDLERS_LOADED')) {
 define('INTERSOCCER_AJAX_HANDLERS_LOADED', true);
 
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('InterSoccer: ajax-handlers.php loaded (fixed version) at ' . current_time('c'));
+    intersoccer_debug('ajax-handlers.php loaded (fixed version) at ' . current_time('c'));
 }
 
 /**
@@ -37,14 +37,14 @@ function intersoccer_ajax_get_product_type() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: get_product_type called with data: ' . json_encode($_POST));
+        intersoccer_debug('InterSoccer: get_product_type called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: get_product_type nonce verification failed');
+            intersoccer_warning('InterSoccer: get_product_type nonce verification failed');
         }
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         wp_die();
@@ -54,7 +54,7 @@ function intersoccer_ajax_get_product_type() {
     $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
     if (!$product_id) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: get_product_type missing product_id');
+            intersoccer_warning('InterSoccer: get_product_type missing product_id');
         }
         wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-product-variations')], 400);
         wp_die();
@@ -64,7 +64,7 @@ function intersoccer_ajax_get_product_type() {
     $product_type = intersoccer_get_product_type($product_id);
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: get_product_type returning: ' . $product_type . ' for product ' . $product_id);
+        intersoccer_debug('InterSoccer: get_product_type returning: ' . $product_type . ' for product ' . $product_id);
     }
     
     wp_send_json_success(['product_type' => $product_type]);
@@ -82,7 +82,7 @@ function intersoccer_ajax_get_course_metadata() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: get_course_metadata called with data: ' . json_encode($_POST));
+        intersoccer_debug('InterSoccer: get_course_metadata called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -126,7 +126,7 @@ function intersoccer_ajax_get_course_metadata() {
     ];
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: get_course_metadata returning: ' . json_encode($metadata));
+        intersoccer_debug('InterSoccer: get_course_metadata returning: ' . json_encode($metadata));
     }
 
     wp_send_json_success($metadata);
@@ -144,7 +144,7 @@ function intersoccer_ajax_calculate_dynamic_price() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: calculate_dynamic_price called with data: ' . json_encode($_POST));
+        intersoccer_debug('InterSoccer: calculate_dynamic_price called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -188,7 +188,7 @@ function intersoccer_ajax_calculate_dynamic_price() {
     ];
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: calculate_dynamic_price returning: ' . json_encode($response));
+        intersoccer_debug('InterSoccer: calculate_dynamic_price returning: ' . json_encode($response));
     }
 
     wp_send_json_success($response);
@@ -206,7 +206,7 @@ function intersoccer_ajax_update_session_data() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: update_session_data called with data: ' . json_encode($_POST));
+        intersoccer_debug('InterSoccer: update_session_data called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -234,7 +234,7 @@ function intersoccer_ajax_update_session_data() {
     set_transient('intersoccer_session_' . $user_id, $session_data, HOUR_IN_SECONDS);
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: update_session_data stored: ' . json_encode($session_data));
+        intersoccer_debug('InterSoccer: update_session_data stored: ' . json_encode($session_data));
     }
 
     wp_send_json_success(['message' => __('Session updated.', 'intersoccer-product-variations'), 'data' => $session_data]);
@@ -253,14 +253,14 @@ function intersoccer_get_user_players() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: intersoccer_get_user_players called at ' . current_time('c'));
+        intersoccer_debug('InterSoccer: intersoccer_get_user_players called at ' . current_time('c'));
     }
 
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Nonce verification failed');
+            intersoccer_warning('InterSoccer: Nonce verification failed');
         }
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         wp_die();
@@ -270,7 +270,7 @@ function intersoccer_get_user_players() {
     $user_id = get_current_user_id();
     if (!$user_id) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: User not logged in');
+            intersoccer_warning('InterSoccer: User not logged in');
         }
         wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-product-variations')], 403);
         wp_die();
@@ -297,7 +297,7 @@ function intersoccer_get_user_players() {
     $response = ['players' => $valid_players, 'count' => count($valid_players)];
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Returned ' . count($valid_players) . ' players for user ' . $user_id);
+        intersoccer_debug('InterSoccer: Returned ' . count($valid_players) . ' players for user ' . $user_id);
     }
     
     wp_send_json_success($response);
@@ -316,23 +316,22 @@ function intersoccer_get_days_of_week() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: intersoccer_get_days_of_week called at ' . current_time('c'));
+        intersoccer_debug('InterSoccer: intersoccer_get_days_of_week called at ' . current_time('c'));
     }
 
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Nonce verification failed for days_of_week');
+            intersoccer_warning('InterSoccer: Nonce verification failed for days_of_week');
         }
-        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         return;
     }
 
     // Validate required parameters
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id'])) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Invalid product_id in get_days_of_week');
+            intersoccer_warning('InterSoccer: Invalid product_id in get_days_of_week');
         }
         wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-product-variations')], 400);
         return;
@@ -358,7 +357,7 @@ function intersoccer_get_days_of_week() {
 
     if (empty($days)) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: No days found for product ' . $parent_id . ', using fallback');
+            intersoccer_debug('InterSoccer: No days found for product ' . $parent_id . ', using fallback');
         }
         $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     } else {
@@ -372,7 +371,7 @@ function intersoccer_get_days_of_week() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Returned days for product ' . $parent_id . ': ' . implode(', ', $days));
+        intersoccer_debug('InterSoccer: Returned days for product ' . $parent_id . ': ' . implode(', ', $days));
     }
     wp_send_json_success(['days' => $days]);
 }
@@ -389,7 +388,7 @@ function intersoccer_get_course_info() {
     }
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: intersoccer_get_course_info called at ' . current_time('c'));
+        intersoccer_debug('InterSoccer: intersoccer_get_course_info called at ' . current_time('c'));
     }
 
     // Verify nonce
@@ -453,12 +452,12 @@ function intersoccer_get_course_info() {
     ];
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('InterSoccer: Course info for ' . $variation_id . ': ' . json_encode($response));
+        intersoccer_debug('InterSoccer: Course info for ' . $variation_id . ': ' . json_encode($response));
     }
     wp_send_json_success($response);
 }
 
 if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log('InterSoccer: Fixed ajax-handlers.php loaded with all required handlers');
+    intersoccer_debug('InterSoccer: Fixed ajax-handlers.php loaded with all required handlers');
 }
 ?>
