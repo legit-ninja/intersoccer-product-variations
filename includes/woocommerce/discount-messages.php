@@ -804,6 +804,7 @@ add_action('plugins_loaded', 'intersoccer_emergency_discount_fallback', 5);
  * 
  * @return string Language code (e.g., 'en', 'de', 'fr')
  */
+if (!function_exists('intersoccer_get_current_language')) {
 function intersoccer_get_current_language() {
     // Log function call for debugging
     intersoccer_debug('InterSoccer: intersoccer_get_current_language() called');
@@ -830,7 +831,7 @@ function intersoccer_get_current_language() {
     
     return $lang;
 }
-
+}
 
 
 /**
@@ -839,9 +840,11 @@ function intersoccer_get_current_language() {
  * @param string $lang_code Language code (e.g., 'en', 'de', 'fr')
  * @return string Language name
  */
+if (!function_exists('intersoccer_get_language_name')) {
 function intersoccer_get_language_name($lang_code) {
     $languages = intersoccer_get_available_languages();
     return $languages[$lang_code] ?? $lang_code;
+}
 }
 
 /**
@@ -849,6 +852,7 @@ function intersoccer_get_language_name($lang_code) {
  * 
  * @return string|false Plugin name if active, false otherwise
  */
+if (!function_exists('intersoccer_get_multilingual_plugin')) {
 function intersoccer_get_multilingual_plugin() {
     if (function_exists('icl_get_current_language')) {
         return 'WPML';
@@ -860,6 +864,7 @@ function intersoccer_get_multilingual_plugin() {
     
     return false;
 }
+}
 
 /**
  * Get string translation using available multilingual plugin
@@ -869,6 +874,7 @@ function intersoccer_get_multilingual_plugin() {
  * @param string $name String name/identifier
  * @return string Translated string
  */
+if (!function_exists('intersoccer_translate_string')) {
 function intersoccer_translate_string($string, $context = 'intersoccer-product-variations', $name = '') {
     // WPML String Translation
     if (function_exists('icl_t')) {
@@ -884,6 +890,7 @@ function intersoccer_translate_string($string, $context = 'intersoccer-product-v
     // WordPress fallback
     return __($string, 'intersoccer-product-variations');
 }
+}
 
 /**
  * Register string for translation
@@ -893,6 +900,7 @@ function intersoccer_translate_string($string, $context = 'intersoccer-product-v
  * @param string $name String name/identifier
  * @return bool Success status
  */
+if (!function_exists('intersoccer_register_string_for_translation')) {
 function intersoccer_register_string_for_translation($string, $context = 'intersoccer-product-variations', $name = '') {
     // WPML String Translation
     if (function_exists('icl_register_string')) {
@@ -913,6 +921,7 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
     intersoccer_debug("InterSoccer: No multilingual plugin available for string registration: {$string}");
     return false;
 }
+}
 
 /**
  * Safe wrapper for getting discount message with language support
@@ -923,6 +932,7 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
  * @param string $fallback Fallback message if translation not found
  * @return string Localized message
  */
+if (!function_exists('intersoccer_get_discount_message_safe')) {
 function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_message', $fallback = '') {
     // Validate inputs
     if (empty($rule_id) || empty($message_type)) {
@@ -987,25 +997,36 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
         return $fallback;
     }
 }
+}
 
 /**
- * Initialize language functions and validate dependencies
- * Call this during plugin activation or admin_init
+ * Initialize language support for discount messages
  */
+if (!function_exists('intersoccer_init_language_support')) {
 function intersoccer_init_language_support() {
-    $multilingual_plugin = intersoccer_get_multilingual_plugin();
-    
-    if ($multilingual_plugin) {
-        intersoccer_debug("InterSoccer: Multilingual support initialized with {$multilingual_plugin}");
-    } else {
-        intersoccer_debug("InterSoccer: No multilingual plugin detected, using WordPress defaults");
+    // Register discount-related strings for translation
+    $strings_to_register = [
+        'Discounts Applied',
+        'Discount Information',
+        '20% Sibling Discount Applied',
+        '25% Multi-Child Discount Applied',
+        '20% Course Sibling Discount',
+        '30% Multi-Child Course Discount',
+        '50% Same Season Course Discount',
+        '20% Tournament Sibling Discount',
+        '30% Multi-Child Tournament Discount'
+    ];
+
+    foreach ($strings_to_register as $string) {
+        intersoccer_register_string_for_translation($string, 'intersoccer-product-variations');
     }
-    
+
     // Test the functions
     $current_lang = intersoccer_get_current_language();
     $available_langs = intersoccer_get_available_languages();
     
     intersoccer_debug("InterSoccer: Language support test - Current: {$current_lang}, Available: " . implode(', ', array_keys($available_langs)));
+}
 }
 
 // Initialize on admin_init to ensure all plugins are loaded
