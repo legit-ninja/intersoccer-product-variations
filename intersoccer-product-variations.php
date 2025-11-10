@@ -415,35 +415,7 @@ add_action('init', function () {
     add_role('organizer', __('Organizer', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
 });
 
-// Register endpoint
-add_action('init', function () {
-    add_rewrite_endpoint('manage-players', EP_ROOT | EP_PAGES);
-});
-
-// Add menu item with high priority (after Dashboard)
-add_filter('woocommerce_account_menu_items', function ($items) {
-    $new_items = [];
-    $inserted = false;
-    foreach ($items as $key => $label) {
-        $new_items[$key] = $label;
-        if ($key === 'dashboard' && !$inserted) {
-            $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
-            $inserted = true;
-        }
-    }
-    if (!$inserted) {
-        $new_items['manage-players'] = __('Manage Players', 'intersoccer-product-variations');
-    }
-    return $new_items;
-}, 10);
-
-// Flush permalinks on activation
-add_action('init', function () {
-    if (get_option('intersoccer_flush_permalinks')) {
-        flush_rewrite_rules();
-        delete_option('intersoccer_flush_permalinks');
-    }
-});
+// Manage Players endpoint and menu handled by Player Management plugin
 
 // Increase AJAX variation threshold
 add_filter('woocommerce_ajax_variation_threshold', function ($qty, $product) {
