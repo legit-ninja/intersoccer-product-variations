@@ -11,14 +11,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-# wpml-name: 794d449fe766d60ac48f318de6bde216
-msgid ""
-"Conservative is safer for slower servers. Fast processes more orders per "
-"batch but may timeout."
-msgstr ""
-"Konservativ ist sicherer für langsamere Server. Schnell verarbeitet mehr "
-"Bestellungen pro Batch, kann aber timeouten."
-
 # wpml-name: 4036eac2b601ce8147e76549fc19e80d
 msgid "Processing Speed"
 msgstr "Verarbeitungsgeschwindigkeit"
@@ -40,12 +32,6 @@ msgstr "Zu verarbeitende Bestellstatus"
 # wpml-name: 5d9108983783acd59d2f54702f5ee69b
 msgid "1. Configure Scan"
 msgstr "1. Scan konfigurieren"
-
-# wpml-name: 6549cf42a1d4beadb1b0d5aff5e45fea
-msgid ""
-"Automatically find and update orders missing metadata. This tool can process "
-"hundreds or thousands of orders efficiently."
-msgstr ""
 
 # wpml-name: 4e95f036c4a50f42482ff4234da8dc1c
 msgid "Automated Order Metadata Update"
@@ -72,25 +58,9 @@ msgstr "Filtern"
 msgid "Show unhealthy variations only"
 msgstr "Nur ungesunde Variationen anzeigen"
 
-# wpml-name: 4e0851cda7b1b7b68fe29772ada21b59
-msgid ""
-"Scan and check health of product variations. Use the filter to show only "
-"unhealthy ones."
-msgstr ""
-"Scannen und überprüfen Sie die Gesundheit der Produktvariationen. Verwenden "
-"Sie den Filter, um nur ungesunde anzuzeigen."
-
 # wpml-name: 056dfec42876969f27464f16daa0e64a
 msgid "Recalculate Course End Dates"
 msgstr "Kurs-Enddaten neu berechnen"
-
-# wpml-name: 9bf8556b6e2595bab483ab41739f4df2
-msgid ""
-"Use this dashboard to check and fix variation issues, such as recalculating "
-"course end dates."
-msgstr ""
-"Verwenden Sie dieses Dashboard, um Variationsprobleme zu überprüfen und zu "
-"beheben, z. B. das Neuberechnen von Kurs-Enddaten."
 
 # wpml-name: 5b5a287500578285455ef5d0f69c0caa
 msgid "InterSoccer Variation Health Dashboard"
@@ -124,14 +94,6 @@ msgstr ""
 msgid "Product ID"
 msgstr ""
 
-# wpml-name: 9beed6a3b96f66cae480142a36054a6d
-msgid ""
-"You have selected high-risk orders. These may have unexpected results. "
-"Continue?"
-msgstr ""
-"Sie haben Hochrisiko-Bestellungen ausgewählt. Diese können unerwartete "
-"Ergebnisse haben. Fortfahren?"
-
 # wpml-name: 8052057babac105e7e98556c65ef7361
 msgid "Export Analysis to CSV"
 msgstr "Analyse als CSV exportieren"
@@ -160,14 +122,6 @@ msgstr "Aktualisierungsfortschritt"
 msgid "Orders Missing Metadata"
 msgstr "Bestellungen mit fehlenden Metadaten"
 
-# wpml-name: 0ade16c7bd5efee5501dd13e5cd0cad1
-msgid ""
-"This will scan your selected orders and show which ones are missing metadata "
-"fields like player details, seasons, activity types, etc."
-msgstr ""
-"Dies scannt Ihre ausgewählten Bestellungen und zeigt, welche Metadatenfelder "
-"wie Spielerdetails, Saisons, Aktivitätstypen usw. fehlen."
-
 # wpml-name: fc9d3df613063ee57906c461320744e2
 msgid "Note:"
 msgstr "Hinweis:"
@@ -175,14 +129,6 @@ msgstr "Hinweis:"
 # wpml-name: 49c6f77c088b172b5412b89dc7a5d79a
 msgid "Find Orders Missing Metadata"
 msgstr "Bestellungen mit fehlenden Metadaten finden"
-
-# wpml-name: 76721e87600c655abb0a7a90028ee5a1
-msgid ""
-"Higher numbers may take longer to process but will find more orders with "
-"missing data."
-msgstr ""
-"Höhere Zahlen können länger dauern, aber finden mehr Bestellungen mit "
-"fehlenden Daten."
 
 # wpml-name: 33e30bd78429f2bca75ec412fd55931f
 msgid "Number of Orders to Scan"
@@ -247,14 +193,6 @@ msgstr "Verarbeitung"
 # wpml-name: 0c95d4e1fefcc3b8a0887e51a42885a2
 msgid "Order Statuses to Check"
 msgstr "Zu prüfende Bestellstatus"
-
-# wpml-name: 5589f170533967b3e5b2898fc158e60b
-msgid ""
-"Find and update orders that are missing metadata fields needed for accurate "
-"rosters and reports."
-msgstr ""
-"Finden und aktualisieren Sie Bestellungen, denen Metadatenfelder fehlen, die "
-"für genaue Listen und Berichte benötigt werden."
 
 # wpml-name: 664d514e463284109c824d4affcdb4f7
 msgid "Order Metadata Update Tool"
@@ -377,13 +315,6 @@ msgstr ""
 # wpml-name: 7badfbc455735b33283d92ea477996de
 msgid "Add New Discount"
 msgstr "Neuen Rabatt hinzufügen"
-
-# wpml-name: Add, edit, or delete discount rules for Camps, Courses, or other products. Rules apply automatically based on cart conditions (e.g., sibling bookings). For manu
-msgid ""
-"Add, edit, or delete discount rules for Camps, Courses, or other products. "
-"Rules apply automatically based on cart conditions (e.g., sibling bookings). "
-"For manual coupons, use <a href=\""
-msgstr ""
 
 # wpml-name: f2a6c498fb90ee345d997f888fce3b18
 msgid "Delete"
@@ -520,14 +451,6 @@ msgstr "%d%% Mehrkind-Rabatt Turnier"
 msgid "%d%% Sibling Tournament Discount"
 msgstr "%d%% Geschwisterrabatt Turnier"
 
-# wpml-name: 926d9548ec2127c2636ab34f6f44bfb7
-msgid ""
-"You saved 50% on this course because your child is enrolled in multiple "
-"courses this season."
-msgstr ""
-"Sie haben 50% bei diesem Kurs gespart, weil Ihr Kind in mehreren Kursen "
-"dieser Saison eingeschrieben ist."
-
 # wpml-name: 98cb3e604330f6b2df6030c245cf554a
 msgid "Same child, multiple courses in same season"
 msgstr "Gleiches Kind, mehrere Kurse in derselben Saison"
@@ -535,14 +458,6 @@ msgstr "Gleiches Kind, mehrere Kurse in derselben Saison"
 # wpml-name: 1a16f21e6041f067495481d41f6160ee
 msgid "50% Same Season Course Discount"
 msgstr "50% Rabatt für Kurs gleiche Saison"
-
-# wpml-name: 0c868546ca56b379ffd6f822f5860499
-msgid ""
-"You saved 30% on this course for your third (or additional) child enrolled "
-"in courses."
-msgstr ""
-"Sie haben 30% bei diesem Kurs für Ihr drittes (oder zusätzliches) Kind "
-"gespart, das in Kursen eingeschrieben ist."
 
 # wpml-name: fd2f2092d275d1300031a6d6c0bc098a
 msgid "Third or additional child course discount"
@@ -552,14 +467,6 @@ msgstr "Drittes oder zusätzliches Kind Kurs-Rabatt"
 msgid "30% Multi-Child Course Discount"
 msgstr "30% Mehrkind-Kurs-Rabatt"
 
-# wpml-name: 5108c4460eab55274354bf3a7be50143
-msgid ""
-"You saved 20% on this course because you have multiple children enrolled in "
-"courses."
-msgstr ""
-"Sie haben 20% bei diesem Kurs gespart, weil Sie mehrere Kinder in Kursen "
-"eingeschrieben haben."
-
 # wpml-name: 04b5e611f90d20ab1c291e4248254d42
 msgid "Second child course discount"
 msgstr "Zweites Kind Kurs-Rabatt"
@@ -568,14 +475,6 @@ msgstr "Zweites Kind Kurs-Rabatt"
 msgid "20% Course Sibling Discount"
 msgstr "20% Kurs-Geschwister-Rabatt"
 
-# wpml-name: 74d308871a329a86c0ede30b01890b12
-msgid ""
-"You saved 25% on this camp for your third (or additional) child enrolled in "
-"camps."
-msgstr ""
-"Sie haben 25% bei diesem Camp für Ihr drittes (oder zusätzliches) Kind "
-"gespart, das in Camps eingeschrieben ist."
-
 # wpml-name: 9fb5155b9ce71a9393f4e4facee5d4c2
 msgid "Third or additional child camp discount"
 msgstr "Drittes oder zusätzliches Kind Camp-Rabatt"
@@ -583,14 +482,6 @@ msgstr "Drittes oder zusätzliches Kind Camp-Rabatt"
 # wpml-name: b42b4793ca0578246755d052e8e60812
 msgid "25% Multi-Child Discount Applied"
 msgstr "25% Mehrkind-Rabatt angewendet"
-
-# wpml-name: b61700880eda7f576bb8057f65ddabdd
-msgid ""
-"You saved 20% on this camp because you have multiple children enrolled in "
-"camps."
-msgstr ""
-"Sie haben 20% bei diesem Camp gespart, weil Sie mehrere Kinder in Camps "
-"eingeschrieben haben."
 
 # wpml-name: b9ec5d7b8e696f6df33609fe478a4fbb
 msgid "Second child camp discount"
@@ -736,22 +627,6 @@ msgstr ""
 msgid "Order ID"
 msgstr ""
 
-# wpml-name: 4933661483878b07bce6ad659c6474d7
-#, fuzzy
-msgid ""
-"Select orders to update with new visible, non-variation parent product "
-"attributes for reporting and analytics. Use \\\"Remove Assigned Player\\\" "
-"to delete the unwanted assigned_player field from orders. Use \\\"Fix "
-"Incorrect Attributes\\\" to correct orders with unwanted attributes (e.g., "
-"all days of the week)."
-msgstr ""
-"Wählen Sie Bestellungen aus, die mit neuen sichtbaren, nicht "
-"variationsbasierten übergeordneten Produktattributen für Berichterstattung "
-"und Analyse aktualisiert werden sollen. Verwenden Sie \"Zugewiesenen Spieler "
-"entfernen\", um das unerwünschte assigned_player-Feld aus Bestellungen zu "
-"löschen. Verwenden Sie \"Falsche Attribute korrigieren\", um Bestellungen "
-"mit unerwünschten Attributen zu korrigieren (z. B. alle Wochentage)."
-
 # wpml-name: 188b6df22ad91edc85495591aef5eccb
 msgid "Update Processing Orders with Parent Attributes"
 msgstr ""
@@ -847,43 +722,57 @@ msgstr ""
 msgid "Invalid product ID."
 msgstr ""
 
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: bc817b1e58c7ef645954e21a3fc1872c
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: Full Week Cost (CHF)
-#~ msgid "Full Week Cost (CHF)"
-#~ msgstr "Kosten für volle Woche (CHF)"
+# wpml-name: Loading players...
+msgid "Loading players..."
+msgstr "Spieler werden geladen..."
 
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: 3bc21967da79e02c83618302e838f61c
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: Per Day Cost (CHF)
-#~ msgid "Per Day Cost (CHF)"
-#~ msgstr "Kosten pro Tag (CHF)"
+# wpml-name: Error: Unable to load players. Please try refreshing the page.
+msgid "Error: Unable to load players. Please try refreshing the page."
+msgstr "Fehler: Spieler konnten nicht geladen werden. Bitte aktualisieren Sie die Seite."
 
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: f5d6040ed78ca86ddc73296a49b18510
-# #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
-# wpml-name: Save Changes
-#~ msgid "Save Changes"
-#~ msgstr "Änderungen speichern"
+#, php-format
+# wpml-name: Error loading players: %s. Please try again.
+msgid "Error loading players: %s. Please try again."
+msgstr "Fehler beim Laden der Spieler: %s. Bitte versuchen Sie es erneut."
 
-# wpml-name: c96e5ac477f66073f9c5861a09294805
-#~ msgid "Select Days"
-#~ msgstr "Tage auswählen"
+#, php-format
+# wpml-name: Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.
+msgid "Please <a href=\"%1$s\">log in</a> or <a href=\"%2$s\">register</a> to select an attendee."
+msgstr "Bitte <a href=\"%1$s\">melden Sie sich an</a> oder <a href=\"%2$s\">registrieren Sie sich</a>, um einen Teilnehmer auszuwählen."
 
-# wpml-name: 0f81226fcb5d2f984946704cde7977b0
-#~ msgid "Select an Attendee"
-#~ msgstr "Teilnehmer auswählen"
+# wpml-name: Please log in or register to select an attendee.
+msgid "Please log in or register to select an attendee."
+msgstr "Bitte melden Sie sich an oder registrieren Sie sich, um einen Teilnehmer auszuwählen."
 
-# wpml-name: b1dea53c7166792e924e11ccd8b98417
-#~ msgid "Please select at least one order to update."
-#~ msgstr "Bitte wählen Sie mindestens eine Bestellung zum Aktualisieren aus."
+#, php-format
+# wpml-name: No players registered. <a href="%s">Add a player</a>.
+msgid "No players registered. <a href=\"%s\">Add a player</a>."
+msgstr "Keine Spieler registriert. <a href=\"%s\">Spieler hinzufügen</a>."
 
-# wpml-name: 272b6d701d99c285d224a44434ade80e
-#~ msgid "Add Discount"
-#~ msgstr "Rabatt hinzufügen"
+# wpml-name: Please add a player to continue.
+msgid "Please add a player to continue."
+msgstr "Bitte fügen Sie einen Spieler hinzu, um fortzufahren."
 
-# wpml-name: 6a881e267266759d1284033f9822fd5b
-#~ msgid "Attributes refreshed."
-#~ msgstr "Attribute aktualisiert."
+# wpml-name: Select an Attendee
+msgid "Select an Attendee"
+msgstr "Teilnehmer auswählen"
+
+# wpml-name: Please select an attendee to add to cart.
+msgid "Please select an attendee to add to cart."
+msgstr "Bitte wählen Sie einen Teilnehmer aus, der zum Warenkorb hinzugefügt werden soll."
+
+# wpml-name: Please select an attendee.
+msgid "Please select an attendee."
+msgstr "Bitte wählen Sie einen Teilnehmer aus."
+
+# wpml-name: Please select at least one day.
+msgid "Please select at least one day."
+msgstr "Bitte wählen Sie mindestens einen Tag aus."
+
+# wpml-name: Please resolve the error to continue.
+msgid "Please resolve the error to continue."
+msgstr "Bitte beheben Sie den Fehler, um fortzufahren."
+
+# wpml-name: Request failed
+msgid "Request failed"
+msgstr "Anfrage fehlgeschlagen"

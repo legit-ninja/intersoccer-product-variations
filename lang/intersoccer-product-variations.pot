@@ -788,3 +788,54 @@ msgstr ""
 # wpml-name: Invalid product ID.
 msgid "Invalid product ID."
 msgstr ""
+
+# wpml-name: Loading players...
+msgid "Loading players..."
+msgstr ""
+
+# wpml-name: Error: Unable to load players. Please try refreshing the page.
+msgid "Error: Unable to load players. Please try refreshing the page."
+msgstr ""
+
+#, php-format
+# wpml-name: Error loading players: %s. Please try again.
+msgid "Error loading players: %s. Please try again."
+msgstr ""
+
+#, php-format
+# wpml-name: Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.
+msgid "Please <a href=\"%1$s\">log in</a> or <a href=\"%2$s\">register</a> to select an attendee."
+msgstr ""
+
+# wpml-name: Please log in or register to select an attendee.
+msgid "Please log in or register to select an attendee."
+msgstr ""
+
+#, php-format
+# wpml-name: No players registered. <a href="%s">Add a player</a>.
+msgid "No players registered. <a href=\"%s\">Add a player</a>."
+msgstr ""
+
+# wpml-name: Please add a player to continue.
+msgid "Please add a player to continue."
+msgstr ""
+
+# wpml-name: Please select an attendee to add to cart.
+msgid "Please select an attendee to add to cart."
+msgstr ""
+
+# wpml-name: Select an Attendee
+msgid "Select an Attendee"
+msgstr ""
+
+# wpml-name: Please select at least one day.
+msgid "Please select at least one day."
+msgstr ""
+
+# wpml-name: Please resolve the error to continue.
+msgid "Please resolve the error to continue."
+msgstr ""
+
+# wpml-name: Request failed
+msgid "Request failed"
+msgstr ""
