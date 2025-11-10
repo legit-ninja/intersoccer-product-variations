@@ -95,18 +95,26 @@ add_action('woocommerce_before_single_product', function () {
     // }
 
     // Player selection HTML
+    $account_dashboard_url = wc_get_account_endpoint_url('dashboard');
+    $manage_players_url = wc_get_account_endpoint_url('manage-players');
+
+    $player_assignment_i18n = intersoccer_get_player_assignment_strings([
+        'dashboard_url' => $account_dashboard_url,
+        'manage_players_url' => $manage_players_url,
+    ]);
+
     ob_start();
 ?>
     <tr class="intersoccer-player-selection intersoccer-injected">
-        <th class="label"><label for="player_assignment_select"><?php esc_html_e('Select an Attendee', 'intersoccer-product-variations'); ?></label></th>
+        <th class="label"><label for="player_assignment_select"><?php echo esc_html($player_assignment_i18n['selectAttendee']); ?></label></th>
         <td class="value">
             <div class="intersoccer-player-content">
                 <?php if (!$user_id) : ?>
-                    <p class="intersoccer-login-prompt">Please <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">log in</a> or <a href="<?php echo esc_url(wc_get_account_endpoint_url('dashboard')); ?>">register</a> to select an attendee.</p>
+                    <p class="intersoccer-login-prompt"><?php echo $player_assignment_i18n['loginPromptHtml']; ?></p>
                 <?php else : ?>
-                    <p class="intersoccer-loading-players">Loading players...</p>
+                    <p class="intersoccer-loading-players"><?php echo esc_html($player_assignment_i18n['loadingPlayers']); ?></p>
                 <?php endif; ?>
-                <span class="intersoccer-attendee-notification" style="color: red; display: none; margin-top: 10px;">Please select an attendee to add to cart.</span>
+                <span class="intersoccer-attendee-notification" style="color: red; display: none; margin-top: 10px;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></span>
             </div>
         </td>
     </tr>
@@ -212,6 +220,8 @@ add_action('woocommerce_before_single_product', function () {
                 console.error('InterSoccer: Product form not found');
                 return;
             }
+            
+            var intersoccerPlayerI18n = <?php echo wp_json_encode($player_assignment_i18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS); ?>;
             
             console.log('InterSoccer Debug: Found form:', $form);
             console.log('InterSoccer Debug: Form classes:', $form.attr('class'));
@@ -357,7 +367,7 @@ add_action('woocommerce_before_single_product', function () {
                 if (intersoccerCheckout.user_id && intersoccerCheckout.user_id !== '0') {
                     var $playerContent = $form.find('.intersoccer-player-content');
                     var loadingTimeout = setTimeout(function() {
-                        $playerContent.find('.intersoccer-loading-players').html('<p>Error: Unable to load players. Please try refreshing the page.</p>');
+                        $playerContent.find('.intersoccer-loading-players').text(intersoccerPlayerI18n.errorLoadingPlayers);
                         console.error('InterSoccer: Player loading timed out after 10s');
                     }, 10000);
 
@@ -395,21 +405,40 @@ add_action('woocommerce_before_single_product', function () {
                                 }
                                 
                                 if (response.data.players.length > 0) {
-                                    var $select = $('<select name="player_assignment" id="player_assignment_select" class="player-select intersoccer-player-select"></select>');
-                                    $select.append('<option value=""><?php esc_html_e('Select an Attendee', 'intersoccer-product-variations'); ?></option>');
+                                    var $select = $('<select>', {
+                                        name: 'player_assignment',
+                                        id: 'player_assignment_select',
+                                        'class': 'player-select intersoccer-player-select'
+                                    });
+                                    $select.append(
+                                        $('<option>', { value: '' }).text(intersoccerPlayerI18n.selectAttendee)
+                                    );
                                     $.each(response.data.players, function(index, player) {
                                         if (player && player.first_name && player.last_name) {
-                                            $select.append('<option value="' + index + '">' + player.first_name + ' ' + player.last_name + '</option>');
+                                            $select.append(
+                                                $('<option>', { value: index }).text(player.first_name + ' ' + player.last_name)
+                                            );
                                         } else {
                                             console.warn('InterSoccer: Invalid player data:', player);
                                         }
                                     });
                                     
                                     // Wrap select in container to match WooCommerce variations styling
-                                    var $container = $('<div class="select_container"></div>').append($select);
-                                    $playerContent.html($container);
-                                    $playerContent.append('<span class="error-message" style="color: red; display: none;"></span>');
-                                    $playerContent.append('<span class="intersoccer-attendee-notification" style="color: red; display: none; margin-top: 10px;">Please select an attendee to add to cart.</span>');
+                                    var $container = $('<div>', { 'class': 'select_container' }).append($select);
+                                    $playerContent.empty();
+                                    $playerContent.append($container);
+                                    $playerContent.append(
+                                        $('<span>', {
+                                            'class': 'error-message',
+                                            style: 'color: red; display: none;'
+                                        })
+                                    );
+                                    $playerContent.append(
+                                        $('<span>', {
+                                            'class': 'intersoccer-attendee-notification',
+                                            style: 'color: red; display: none; margin-top: 10px;'
+                                        }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
+                                    );
                                     
                                     // ENHANCEMENT: Restore player selection after loading
                                     setTimeout(function() {
@@ -442,21 +471,46 @@ add_action('woocommerce_before_single_product', function () {
                                     $form.trigger('check_variations');
                                 } else {
                                     console.log('InterSoccer: No players found in response');
-                                    $playerContent.html('<p>No players registered. <a href="<?php echo esc_url(wc_get_account_endpoint_url('manage-players')); ?>">Add a player</a>.</p>');
-                                    $playerContent.append('<span class="intersoccer-attendee-notification" style="color: red; display: block; margin-top: 10px;">Please add a player to continue.</span>');
+                                    $playerContent
+                                        .empty()
+                                        .append(
+                                            $('<p></p>').html(intersoccerPlayerI18n.noPlayersRegisteredHtml)
+                                        )
+                                        .append(
+                                            $('<span>', {
+                                                'class': 'intersoccer-attendee-notification',
+                                                style: 'color: red; display: block; margin-top: 10px;'
+                                            }).text(intersoccerPlayerI18n.pleaseAddPlayer)
+                                        );
                                     $form.trigger('intersoccer_update_button_state');
                                 }
                             } catch (e) {
                                 console.error('InterSoccer: Player response parsing error:', e.message, 'response:', response);
-                                $playerContent.html('<p>Error loading players: ' + e.message + '. Please try again.</p>');
+                                var errorMessage = intersoccerPlayerI18n.errorLoadingPlayersWithMessage.replace('%s', e && e.message ? e.message : '');
+                                $playerContent
+                                    .empty()
+                                    .append(
+                                        $('<p></p>').text(errorMessage)
+                                    );
                                 $form.trigger('intersoccer_update_button_state');
                             }
                         },
                         error: function(xhr, textStatus, errorThrown) {
                             clearTimeout(loadingTimeout);
                             console.error('InterSoccer: Player AJAX error details:', xhr.status, textStatus, errorThrown, 'response:', xhr.responseText);
-                            $playerContent.html('<p>Error loading players: ' + (xhr.responseJSON?.data?.message || errorThrown || 'Request failed') + '</p>');
-                            $playerContent.append('<span class="intersoccer-attendee-notification" style="color: red; display: block; margin-top: 10px;">Please resolve the error to continue.</span>');
+                            var rawError = (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) ? xhr.responseJSON.data.message : (errorThrown || intersoccerPlayerI18n.genericRequestFailed);
+                            var formattedError = intersoccerPlayerI18n.errorLoadingPlayersWithMessage.replace('%s', rawError);
+                            $playerContent
+                                .empty()
+                                .append(
+                                    $('<p></p>').text(formattedError)
+                                )
+                                .append(
+                                    $('<span>', {
+                                        'class': 'intersoccer-attendee-notification',
+                                        style: 'color: red; display: block; margin-top: 10px;'
+                                    }).text(intersoccerPlayerI18n.resolveError)
+                                );
                             $form.trigger('intersoccer_update_button_state');
                         }
                     });
