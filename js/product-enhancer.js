@@ -5,6 +5,14 @@
 (function($) {
     'use strict';
 
+    const playerMessages = (window.intersoccerCheckout && window.intersoccerCheckout.i18n && window.intersoccerCheckout.i18n.player_assignment) || {};
+    const getPlayerMessage = (key, fallback) => {
+        if (playerMessages && Object.prototype.hasOwnProperty.call(playerMessages, key)) {
+            return playerMessages[key];
+        }
+        return fallback;
+    };
+
     // Main enhancer object
     window.InterSoccerProductEnhancer = {
         // Configuration
@@ -344,7 +352,7 @@
             // Check player selection
             const playerId = $form.find('.intersoccer-player-select').val();
             if (!playerId) {
-                this.showError('player', 'Please select an attendee.');
+                this.showError('player', getPlayerMessage('selectAttendeeShort', 'Please select an attendee.'));
                 return false;
             }
 
@@ -435,16 +443,16 @@
             const $notification = $form.find('.intersoccer-attendee-notification');
 
             if (!isLoggedIn) {
-                $notification.text('Please log in or register to select an attendee.').show();
+                $notification.text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
             } else if (!playerSelected) {
-                $notification.text('Please select an attendee.').show();
+                $notification.text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
             } else {
                 $notification.hide();
             }
 
             const $dayNotification = $form.find('.intersoccer-day-notification');
             if (playerSelected && !daysSelected) {
-                $dayNotification.text('Please select at least one day.').show();
+                $dayNotification.text(getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.')).show();
             } else {
                 $dayNotification.hide();
             }
