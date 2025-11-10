@@ -305,6 +305,7 @@ add_action('init', function () {
 // Include plugin files
 $includes = [
     'includes/logger.php',
+    'includes/language-helpers.php',
     'includes/elementor-widgets.php',
     'includes/woocommerce/admin-ui.php',
     'includes/woocommerce/product-types.php',
@@ -342,6 +343,8 @@ add_action('wp_enqueue_scripts', function () {
     }
 
     if (is_product()) {
+        $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
+
         wp_enqueue_script(
             'intersoccer-variation-details',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/variation-details.js',
@@ -363,6 +366,7 @@ add_action('wp_enqueue_scripts', function () {
                     'start_date' => __('Start Date', 'intersoccer-product-variations'),
                     'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
                     'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+                    'player_assignment' => $player_assignment_strings,
                 ],
             ]
         );
