@@ -136,6 +136,56 @@ function intersoccer_get_multilingual_plugin() {
 }
 
 /**
+ * Get localized strings for the player assignment workflow.
+ *
+ * @param array $args Optional overrides for URLs used in the generated strings.
+ * @return array
+ */
+function intersoccer_get_player_assignment_strings($args = []) {
+    $defaults = [
+        'dashboard_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('dashboard') : '',
+        'manage_players_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('manage-players') : '',
+    ];
+
+    $args = wp_parse_args($args, $defaults);
+
+    $allowed_link_tags = [
+        'a' => [
+            'href' => [],
+        ],
+    ];
+
+    return [
+        'loadingPlayers' => __('Loading players...', 'intersoccer-product-variations'),
+        'errorLoadingPlayers' => __('Error: Unable to load players. Please try refreshing the page.', 'intersoccer-product-variations'),
+        'errorLoadingPlayersWithMessage' => __('Error loading players: %s. Please try again.', 'intersoccer-product-variations'),
+        'loginPromptHtml' => wp_kses(
+            sprintf(
+                __('Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.', 'intersoccer-product-variations'),
+                esc_url($args['dashboard_url']),
+                esc_url($args['dashboard_url'])
+            ),
+            $allowed_link_tags
+        ),
+        'loginPromptText' => __('Please log in or register to select an attendee.', 'intersoccer-product-variations'),
+        'noPlayersRegisteredHtml' => wp_kses(
+            sprintf(
+                __('No players registered. <a href="%s">Add a player</a>.', 'intersoccer-product-variations'),
+                esc_url($args['manage_players_url'])
+            ),
+            $allowed_link_tags
+        ),
+        'pleaseAddPlayer' => __('Please add a player to continue.', 'intersoccer-product-variations'),
+        'selectAttendee' => __('Select an Attendee', 'intersoccer-product-variations'),
+        'selectAttendeeToAdd' => __('Please select an attendee to add to cart.', 'intersoccer-product-variations'),
+        'selectAttendeeShort' => __('Please select an attendee.', 'intersoccer-product-variations'),
+        'selectAtLeastOneDay' => __('Please select at least one day.', 'intersoccer-product-variations'),
+        'resolveError' => __('Please resolve the error to continue.', 'intersoccer-product-variations'),
+        'genericRequestFailed' => __('Request failed', 'intersoccer-product-variations'),
+    ];
+}
+
+/**
  * Get string translation using available multilingual plugin
  * 
  * @param string $string Original string
