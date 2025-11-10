@@ -438,47 +438,49 @@ function intersoccer_sanitize_discount_messages($messages) {
  * 
  * @return array Array of language_code => language_name
  */
-function intersoccer_get_available_languages() {
-    intersoccer_debug('InterSoccer: intersoccer_get_available_languages() called');
-    
-    // Check for WPML
-    if (function_exists('icl_get_languages')) {
-        $languages = icl_get_languages('skip_missing=0');
-        $available = [];
+if (!function_exists('intersoccer_get_available_languages')) {
+    function intersoccer_get_available_languages() {
+        intersoccer_debug('InterSoccer: intersoccer_get_available_languages() called');
         
-        foreach ($languages as $lang_code => $lang_info) {
-            $available[$lang_code] = $lang_info['native_name'];
-        }
-        
-        intersoccer_debug('InterSoccer: WPML languages: ' . print_r($available, true));
-        return $available;
-    }
-    
-    // Check for Polylang
-    if (function_exists('pll_languages_list')) {
-        $lang_codes = pll_languages_list();
-        $available = [];
-        
-        foreach ($lang_codes as $lang_code) {
-            $lang_obj = pll_get_language($lang_code);
-            $available[$lang_code] = $lang_obj ? $lang_obj->name : $lang_code;
-        }
-        
-        if (!empty($available)) {
-            intersoccer_debug('InterSoccer: Polylang languages: ' . print_r($available, true));
+        // Check for WPML
+        if (function_exists('icl_get_languages')) {
+            $languages = icl_get_languages('skip_missing=0');
+            $available = [];
+            
+            foreach ($languages as $lang_code => $lang_info) {
+                $available[$lang_code] = $lang_info['native_name'];
+            }
+            
+            intersoccer_debug('InterSoccer: WPML languages: ' . print_r($available, true));
             return $available;
         }
+        
+        // Check for Polylang
+        if (function_exists('pll_languages_list')) {
+            $lang_codes = pll_languages_list();
+            $available = [];
+            
+            foreach ($lang_codes as $lang_code) {
+                $lang_obj = pll_get_language($lang_code);
+                $available[$lang_code] = $lang_obj ? $lang_obj->name : $lang_code;
+            }
+            
+            if (!empty($available)) {
+                intersoccer_debug('InterSoccer: Polylang languages: ' . print_r($available, true));
+                return $available;
+            }
+        }
+        
+        // Fallback to common languages
+        $fallback = [
+            'en' => 'English',
+            'de' => 'Deutsch',
+            'fr' => 'Français'
+        ];
+        
+        intersoccer_debug('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
+        return $fallback;
     }
-    
-    // Fallback to common languages
-    $fallback = [
-        'en' => 'English',
-        'de' => 'Deutsch',
-        'fr' => 'Français'
-    ];
-    
-    intersoccer_debug('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
-    return $fallback;
 }
 
 /**
