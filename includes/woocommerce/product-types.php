@@ -90,12 +90,14 @@ class InterSoccer_Product_Types {
     private static function detect_type_from_attribute($product) {
         // Try WooCommerce taxonomy approach first
         $product_id = $product->get_id();
-        $activity_types = wc_get_product_terms($product_id, 'pa_activity-type', ['fields' => 'names']);
+        $activity_terms = wc_get_product_terms($product_id, 'pa_activity-type', ['fields' => 'all']);
         
-        if (!empty($activity_types)) {
-            $type = strtolower(trim($activity_types[0]));
-            if (in_array($type, ['camp', 'course', 'birthday', 'tournament'])) {
-                return $type;
+        if (!empty($activity_terms) && !is_wp_error($activity_terms)) {
+            foreach ($activity_terms as $term) {
+                $slug = self::normalize_activity_slug($term, 'pa_activity-type');
+                if ($slug) {
+                    return $slug;
+                }
             }
         }
 
@@ -110,14 +112,53 @@ class InterSoccer_Product_Types {
                 
                 if (is_array($terms)) {
                     foreach ($terms as $term) {
-                        if (in_array($term->slug, ['camp', 'course', 'birthday', 'tournament'], true)) {
-                            return $term->slug;
+                        $slug = self::normalize_activity_slug($term, 'pa_activity-type');
+                        if ($slug) {
+                            return $slug;
                         }
                     }
                 }
             }
         }
         
+        return null;
+    }
+
+    /**
+     * Normalize a translated activity-type term back to its canonical slug.
+     *
+     * @param WP_Term|object $term
+     * @param string $taxonomy
+     * @return string|null
+     */
+    private static function normalize_activity_slug($term, $taxonomy) {
+        if (!$term || !isset($term->slug)) {
+            return null;
+        }
+
+        $canonical = ['camp', 'course', 'birthday', 'tournament'];
+        $slug = strtolower($term->slug);
+
+        if (in_array($slug, $canonical, true)) {
+            return $slug;
+        }
+
+        if (function_exists('apply_filters')) {
+            $default_lang = apply_filters('wpml_default_language', null);
+            if ($default_lang && function_exists('apply_filters')) {
+                $default_term_id = apply_filters('wpml_object_id', $term->term_id, $taxonomy, false, $default_lang);
+                if ($default_term_id) {
+                    $default_term = get_term($default_term_id, $taxonomy);
+                    if ($default_term && !is_wp_error($default_term)) {
+                        $slug = strtolower($default_term->slug);
+                        if (in_array($slug, $canonical, true)) {
+                            return $slug;
+                        }
+                    }
+                }
+            }
+        }
+
         return null;
     }
 
