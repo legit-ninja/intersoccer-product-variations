@@ -285,7 +285,9 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     if (isset($values['assigned_attendee']) && !empty($values['assigned_attendee'])) {
         $item->add_meta_data('Assigned Attendee', sanitize_text_field($values['assigned_attendee']));
         if ($values['assigned_player'] !== null) {
-            $item->add_meta_data('Player Index', absint($values['assigned_player']));
+            $player_index = absint($values['assigned_player']);
+            $item->add_meta_data('Player Index', $player_index);
+            $item->add_meta_data('assigned_player', $player_index);
         }
     }
 

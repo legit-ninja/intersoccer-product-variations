@@ -58,7 +58,9 @@ class OrderMetadataTest extends TestCase {
             $metadata['Assigned Attendee'] = sanitize_text_field($values['assigned_attendee']);
             
             if ($values['assigned_player'] !== null) {
-                $metadata['Player Index'] = absint($values['assigned_player']);
+                $player_index = absint($values['assigned_player']);
+                $metadata['Player Index'] = $player_index;
+                $metadata['assigned_player'] = $player_index;
             }
         }
         
@@ -66,6 +68,8 @@ class OrderMetadataTest extends TestCase {
         $this->assertEquals('John Doe', $metadata['Assigned Attendee']);
         $this->assertArrayHasKey('Player Index', $metadata);
         $this->assertEquals(2, $metadata['Player Index']);
+        $this->assertArrayHasKey('assigned_player', $metadata);
+        $this->assertEquals(2, $metadata['assigned_player']);
     }
     
     /**
