@@ -32,7 +32,7 @@ function intersoccer_grant_download_permissions($order_id) {
         }
 
         $product_type = InterSoccer_Product_Types::get_product_type($product_id);
-        if (!in_array($product_type, ['camp', 'course', 'birthday'])) {
+        if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
             continue;
         }
 
@@ -277,7 +277,7 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     $quantity = $values['quantity'];
     $product_type = intersoccer_get_product_type($product_id);
 
-    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday'])) {
+    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
         return;
     }
 
@@ -418,7 +418,7 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
     $product_id = $cart_item['product_id'];
     $product_type = intersoccer_get_product_type($product_id);
 
-    if ($product_type && in_array($product_type, ['camp', 'course', 'birthday'])) {
+    if ($product_type && in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
         $meta_output = '';
         
         // Assigned Attendee

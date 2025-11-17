@@ -239,13 +239,14 @@ class OrderMetadataTest extends TestCase {
             ['type' => 'camp', 'expected' => true],
             ['type' => 'course', 'expected' => true],
             ['type' => 'birthday', 'expected' => true],
+            ['type' => 'tournament', 'expected' => true],
             ['type' => 'simple', 'expected' => false],
             ['type' => null, 'expected' => false],
         ];
         
         foreach ($test_cases as $case) {
             $product_type = $case['type'];
-            $is_valid = $product_type && in_array($product_type, ['camp', 'course', 'birthday']);
+            $is_valid = $product_type && in_array($product_type, ['camp', 'course', 'birthday', 'tournament']);
             
             $this->assertEquals(
                 $case['expected'],

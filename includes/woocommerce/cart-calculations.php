@@ -187,7 +187,7 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
     $product_id = $cart_item['product_id'];
     $product_type = intersoccer_get_product_type($product_id);
 
-    if ($product_type && in_array($product_type, ['camp', 'course', 'birthday'])) {
+    if ($product_type && in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
         // Assigned Attendee
         if (isset($cart_item['assigned_attendee']) && !empty($cart_item['assigned_attendee'])) {
             $item_data[] = [
