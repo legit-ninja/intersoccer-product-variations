@@ -497,6 +497,58 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         }
     }
 }
+
+/**
+ * Attach same-season discount notes after cart items have been priced.
+ * This runs only in the front-end cart/checkout flow because WooCommerce
+ * triggers woocommerce_before_calculate_totals while building the cart.
+ */
+add_action('woocommerce_before_calculate_totals', 'intersoccer_attach_same_season_discount_note', 25);
+
+function intersoccer_attach_same_season_discount_note($cart) {
+    if (is_admin() && !defined('DOING_AJAX')) {
+        return;
+    }
+
+    if (!$cart instanceof WC_Cart || $cart->is_empty()) {
+        return;
+    }
+
+    $season_groups = [];
+    foreach ($cart->get_cart() as $cart_key => $cart_item) {
+        $product_type = intersoccer_get_product_type($cart_item['product_id']);
+        if ($product_type !== 'course') {
+            continue;
+        }
+
+        $variation_id = $cart_item['variation_id'] ?: $cart_item['product_id'];
+        $season = get_post_meta($variation_id, 'attribute_pa_program-season', true) ?: 'unknown';
+        $season_groups[$season][] = [
+            'cart_key' => $cart_key,
+            'variation_id' => $variation_id,
+        ];
+    }
+
+    foreach ($season_groups as $season => $items) {
+        if (count($items) < 2) {
+            continue;
+        }
+
+        $target = $items[1];
+        $message = intersoccer_get_discount_message(
+            'course_same_season',
+            'cart_message',
+            intersoccer_translate_string('50% Same Season Course Discount', 'intersoccer-product-variations', '50% Same Season Course Discount')
+        );
+
+        if (!empty($target['cart_key']) && isset($cart->cart_contents[$target['cart_key']])) {
+            $cart->cart_contents[$target['cart_key']]['discount_note'] = $message;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                intersoccer_debug('InterSoccer: Attached same-season discount note to cart item ' . $target['variation_id']);
+            }
+        }
+    }
+}
 /**
  * Apply camp combo discounts for multiple children
  * 20% discount on 2nd camp, 25% on 3rd and additional camps

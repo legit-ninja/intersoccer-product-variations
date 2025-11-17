@@ -475,32 +475,9 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
             return date_i18n('F j, Y', strtotime($date));
         }, $holidays);
         $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
-        $data['discount_note'] = calculate_discount_note($variation_id, $data['remaining_sessions']);
         if (defined('WP_DEBUG') && WP_DEBUG) {
             intersoccer_debug('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
         }
     }
     return $data;
 }, 10, 3);
-
-function calculate_discount_note($variation_id, $remaining_sessions) {
-    $discount_note = '';
-    $cart = WC()->cart->get_cart();
-    $season = get_post_meta($variation_id, 'attribute_pa_program-season', true) ?: 'unknown';
-    $grouped_items = [];
-    foreach ($cart as $key => $item) {
-        $item_season = get_post_meta($item['variation_id'] ?: $item['product_id'], 'attribute_pa_program-season', true) ?: 'unknown';
-        if ($item_season === $season && intersoccer_get_product_type($item['product_id']) === 'course') {
-            $grouped_items[$key] = $item;
-        }
-    }
-    $course_index = array_search($variation_id, array_column($grouped_items, 'variation_id') ?: array_column($grouped_items, 'product_id'));
-    if ($course_index !== false && $course_index == 1) {
-        $discount_note = intersoccer_get_discount_message('course_same_season', 'cart_message', intersoccer_translate_string('50% Same Season Course Discount', 'intersoccer-product-variations', '50% Same Season Course Discount'));
-    }
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Calculated discount_note for variation ' . $variation_id . ': ' . $discount_note);
-    }
-    return $discount_note;
-}
-?>
