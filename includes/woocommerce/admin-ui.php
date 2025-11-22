@@ -242,10 +242,53 @@ function intersoccer_render_discounts_page() {
         wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
     }
 
+    // Handle settings save
+    if (isset($_POST['intersoccer_discount_settings_submit']) && check_admin_referer('intersoccer_discount_settings_nonce')) {
+        $disable_with_coupons = isset($_POST['intersoccer_disable_sibling_discount_with_coupons']) ? 1 : 0;
+        update_option('intersoccer_disable_sibling_discount_with_coupons', $disable_with_coupons);
+        echo '<div class="notice notice-success"><p>' . __('Settings saved.', 'intersoccer-product-variations') . '</p></div>';
+    }
+
+    $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
     ?>
     <div class="wrap">
         <h1><?php _e('Manage Discounts', 'intersoccer-product-variations'); ?></h1>
         <p><?php _e('Add, edit, or delete discount rules for Camps, Courses, Tournaments, or other products. These rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href="' . admin_url('edit.php?post_type=shop_coupon') . '">WooCommerce > Coupons</a>.', 'intersoccer-product-variations'); ?></p>
+        
+        <h2><?php _e('Discount Settings', 'intersoccer-product-variations'); ?></h2>
+        <form method="post" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04); margin-bottom: 20px;">
+            <?php wp_nonce_field('intersoccer_discount_settings_nonce'); ?>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="intersoccer_disable_sibling_discount_with_coupons">
+                            <?php _e('Disable Sibling Discounts with Coupons', 'intersoccer-product-variations'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="intersoccer_disable_sibling_discount_with_coupons" 
+                                   id="intersoccer_disable_sibling_discount_with_coupons" 
+                                   value="1" 
+                                   <?php checked($disable_with_coupons, true); ?>>
+                            <?php _e('Disable sibling discounts when WooCommerce discount codes are applied to the cart.', 'intersoccer-product-variations'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('When enabled, sibling discounts (camp, course, and tournament multi-child discounts) and same-season course discounts will not be applied if any WooCommerce coupon codes are active in the cart.', 'intersoccer-product-variations'); ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            <p class="submit">
+                <input type="submit" 
+                       name="intersoccer_discount_settings_submit" 
+                       class="button button-primary" 
+                       value="<?php esc_attr_e('Save Settings', 'intersoccer-product-variations'); ?>">
+            </p>
+        </form>
+
+        <h2><?php _e('Discount Rules', 'intersoccer-product-variations'); ?></h2>
         <div id="intersoccer-discount-app" class="intersoccer-discount-app">
             <p class="intersoccer-discount-loading"><?php esc_html_e('Loading discount rules…', 'intersoccer-product-variations'); ?></p>
         </div>
@@ -371,6 +414,16 @@ function intersoccer_register_enhanced_discount_settings() {
             'type' => 'array',
             'sanitize_callback' => 'intersoccer_sanitize_discount_messages',
             'default' => []
+        ]
+    );
+
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_disable_sibling_discount_with_coupons',
+        [
+            'type' => 'boolean',
+            'default' => false,
+            'sanitize_callback' => 'rest_sanitize_boolean'
         ]
     );
 }
