@@ -6,13 +6,19 @@ vendor/
 # PHPUnit cache
 .phpunit.result.cache
 
-# Debug scripts (keep locally for development)
-debug-course-prices.php
+# Debug and utility scripts (organized in utils/ folder, ignored for deployment)
+utils/debug-*.php
+utils/fix-*.php
+utils/force-*.php
 @todo.list
 
 # Local test files
 run-tests.php
 test_class.php
+
+# Export files
+*.csv
+wc-product-export-*.csv
 
 # Deployment configuration (contains credentials)
 deploy.local.sh

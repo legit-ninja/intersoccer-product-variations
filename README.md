@@ -22,14 +22,21 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 - **Currency Support**: CHF denomination with WooCommerce integration
 
 ### Comprehensive Discount System
-- **Camp Sibling Discounts**:
-  - 20% off 2nd child, 25% off 3rd+ children for different children in same booking
+- **Camp Discounts**:
+  - Sibling: 20% off 2nd child, 25% off 3rd+ children
+  - Progressive: Week 2 gets 10% off, Week 3+ gets 20% off (based on total weeks purchased)
   - Full-week bookings only (single-day excluded)
 - **Course Discounts**:
-  - 20% off 2nd child, 30% off 3rd+ children in same season
-  - 50% off 2nd Course for same child in same season
+  - Sibling: 20% off 2nd child, 30% off 3rd+ children
+  - Same-season: 50% off 2nd course for same child (different days)
+  - Retroactive: Applies even if first course was in previous order
+- **Tournament Discounts**:
+  - Sibling: 20% off 2nd child, 30% off 3rd+ children
+  - Multiple days: Day 1 = 30 CHF, Day 2+ = 20 CHF (2 days for 50 CHF)
+  - Retroactive: Applies even if first day was in previous order
 - **Precise Allocation**: Context-aware discount application with cart validation
 - **Order Metadata**: Discount details stored in order item metadata
+- **Configurable**: All rates and features configurable via Admin UI
 
 ### Late Pickup System
 - **Camp Add-on**: Optional late pickup service (18:00) with configurable pricing
@@ -41,6 +48,8 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 - **Product Type Detection**: Automatic detection via attributes or categories with caching
 - **Course Management**: Start dates, total weeks, holiday exclusions, end-date calculation
 - **Variation Fields**: Custom meta fields for course parameters
+- **Discount Management**: Configure all discount rules, rates, and retroactive settings
+- **Order Lookback**: Configurable period (1-24 months) for checking previous orders
 - **Debug Logging**: Comprehensive error logging for troubleshooting
 
 ### User Experience
