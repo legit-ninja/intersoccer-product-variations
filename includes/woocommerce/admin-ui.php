@@ -246,10 +246,24 @@ function intersoccer_render_discounts_page() {
     if (isset($_POST['intersoccer_discount_settings_submit']) && check_admin_referer('intersoccer_discount_settings_nonce')) {
         $disable_with_coupons = isset($_POST['intersoccer_disable_sibling_discount_with_coupons']) ? 1 : 0;
         update_option('intersoccer_disable_sibling_discount_with_coupons', $disable_with_coupons);
+        
+        $enable_retroactive_courses = isset($_POST['intersoccer_enable_retroactive_course_discounts']) ? 1 : 0;
+        update_option('intersoccer_enable_retroactive_course_discounts', $enable_retroactive_courses);
+        
+        $enable_retroactive_camps = isset($_POST['intersoccer_enable_retroactive_camp_discounts']) ? 1 : 0;
+        update_option('intersoccer_enable_retroactive_camp_discounts', $enable_retroactive_camps);
+        
+        $lookback_months = isset($_POST['intersoccer_retroactive_discount_lookback_months']) ? intval($_POST['intersoccer_retroactive_discount_lookback_months']) : 6;
+        $lookback_months = max(1, min(24, $lookback_months)); // Clamp between 1 and 24 months
+        update_option('intersoccer_retroactive_discount_lookback_months', $lookback_months);
+        
         echo '<div class="notice notice-success"><p>' . __('Settings saved.', 'intersoccer-product-variations') . '</p></div>';
     }
 
     $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
+    $enable_retroactive_courses = get_option('intersoccer_enable_retroactive_course_discounts', true);
+    $enable_retroactive_camps = get_option('intersoccer_enable_retroactive_camp_discounts', true);
+    $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
     ?>
     <div class="wrap">
         <h1><?php _e('Manage Discounts', 'intersoccer-product-variations'); ?></h1>
@@ -276,6 +290,66 @@ function intersoccer_render_discounts_page() {
                         </label>
                         <p class="description">
                             <?php _e('When enabled, sibling discounts (camp, course, and tournament multi-child discounts) and same-season course discounts will not be applied if any WooCommerce coupon codes are active in the cart.', 'intersoccer-product-variations'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="intersoccer_enable_retroactive_course_discounts">
+                            <?php _e('Enable Retroactive Course Discounts', 'intersoccer-product-variations'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="intersoccer_enable_retroactive_course_discounts" 
+                                   id="intersoccer_enable_retroactive_course_discounts" 
+                                   value="1" 
+                                   <?php checked($enable_retroactive_courses, true); ?>>
+                            <?php _e('Apply same-season course discounts based on previous orders.', 'intersoccer-product-variations'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('When enabled, customers who previously purchased a course in the same season (same parent product) will receive the same-season discount on additional courses, even if purchased in separate orders.', 'intersoccer-product-variations'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="intersoccer_enable_retroactive_camp_discounts">
+                            <?php _e('Enable Retroactive Camp Discounts', 'intersoccer-product-variations'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="intersoccer_enable_retroactive_camp_discounts" 
+                                   id="intersoccer_enable_retroactive_camp_discounts" 
+                                   value="1" 
+                                   <?php checked($enable_retroactive_camps, true); ?>>
+                            <?php _e('Apply progressive camp discounts based on previous orders.', 'intersoccer-product-variations'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('When enabled, customers will receive progressive discounts on camp weeks based on total weeks purchased (including previous orders): Week 1 full price, Week 2: 10% off, Week 3+: 20% off.', 'intersoccer-product-variations'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="intersoccer_retroactive_discount_lookback_months">
+                            <?php _e('Order Lookback Period (Months)', 'intersoccer-product-variations'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <input type="number" 
+                               name="intersoccer_retroactive_discount_lookback_months" 
+                               id="intersoccer_retroactive_discount_lookback_months" 
+                               value="<?php echo esc_attr($lookback_months); ?>" 
+                               min="1" 
+                               max="24" 
+                               step="1" 
+                               class="small-text">
+                        <p class="description">
+                            <?php _e('Number of months to look back when checking previous orders for retroactive discounts. Range: 1-24 months. Default: 6 months.', 'intersoccer-product-variations'); ?>
                         </p>
                     </td>
                 </tr>
@@ -424,6 +498,39 @@ function intersoccer_register_enhanced_discount_settings() {
             'type' => 'boolean',
             'default' => false,
             'sanitize_callback' => 'rest_sanitize_boolean'
+        ]
+    );
+    
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_enable_retroactive_course_discounts',
+        [
+            'type' => 'boolean',
+            'default' => true,
+            'sanitize_callback' => 'rest_sanitize_boolean'
+        ]
+    );
+    
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_enable_retroactive_camp_discounts',
+        [
+            'type' => 'boolean',
+            'default' => true,
+            'sanitize_callback' => 'rest_sanitize_boolean'
+        ]
+    );
+    
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_retroactive_discount_lookback_months',
+        [
+            'type' => 'integer',
+            'default' => 6,
+            'sanitize_callback' => function($value) {
+                $value = intval($value);
+                return max(1, min(24, $value)); // Clamp between 1 and 24
+            }
         ]
     );
 }
