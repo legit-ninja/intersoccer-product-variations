@@ -569,6 +569,15 @@ function intersoccer_get_rule_id_from_discount($discount) {
                 
             case 'course_same_season':
                 return 'course_same_season';
+            case 'camp_progressive_week_2':
+            case 'camp_week_2':
+                return 'camp_progressive_week_2';
+            case 'camp_progressive_week_3_plus':
+            case 'camp_week_3_plus':
+                return 'camp_progressive_week_3_plus';
+            case 'tournament_same_child_multiple_days':
+            case 'tournament_multiple_days':
+                return 'tournament_same_child_multiple_days';
                 
             default:
                 return '';
@@ -675,6 +684,21 @@ function intersoccer_initialize_default_messages() {
                 'admin_description' => 'Third or additional child course discount',
                 'customer_note' => 'You saved 30% on this course for your third (or additional) child enrolled in courses.'
             ],
+            'camp_progressive_week_2' => [
+                'cart_message' => __('10% Camp Week 2 Discount', 'intersoccer-product-variations'),
+                'customer_note' => __('You received a 10% discount on your second week of camp!', 'intersoccer-product-variations'),
+                'admin_description' => __('Message shown when customer receives 10% discount on their second week of camp (progressive discount).', 'intersoccer-product-variations')
+            ],
+            'camp_progressive_week_3_plus' => [
+                'cart_message' => __('20% Camp Week 3+ Discount', 'intersoccer-product-variations'),
+                'customer_note' => __('You received a 20% discount on your additional week of camp!', 'intersoccer-product-variations'),
+                'admin_description' => __('Message shown when customer receives 20% discount on their third or additional week of camp (progressive discount).', 'intersoccer-product-variations')
+            ],
+            'tournament_same_child_multiple_days' => [
+                'cart_message' => __('33% Tournament Multiple Days Discount', 'intersoccer-product-variations'),
+                'customer_note' => __('You received a discount on your second tournament day! 2 days for 50 CHF.', 'intersoccer-product-variations'),
+                'admin_description' => __('Message shown when customer receives 33% discount on their second or additional tournament day for the same child.', 'intersoccer-product-variations')
+            ],
             'course_same_season' => [
                 'cart_message' => '50% Same Season Course Discount',
                 'admin_description' => 'Same child, multiple courses in same season',
@@ -689,6 +713,21 @@ function intersoccer_initialize_default_messages() {
                 'cart_message' => '30% Multi-Child Tournament Discount',
                 'admin_description' => 'Third or additional child tournament discount',
                 'customer_note' => 'You saved 30% on this tournament for your third (or additional) child enrolled in tournaments.'
+            ],
+            'camp_progressive_week_2' => [
+                'cart_message' => '10% Camp Week 2 Discount',
+                'admin_description' => 'Progressive discount for second week of camp',
+                'customer_note' => 'You received a 10% discount on your second week of camp!'
+            ],
+            'camp_progressive_week_3_plus' => [
+                'cart_message' => '20% Camp Week 3+ Discount',
+                'admin_description' => 'Progressive discount for third or additional week of camp',
+                'customer_note' => 'You received a 20% discount on your additional week of camp!'
+            ],
+            'tournament_same_child_multiple_days' => [
+                'cart_message' => '33% Tournament Multiple Days Discount',
+                'admin_description' => 'Same child, multiple tournament days discount',
+                'customer_note' => 'You received a discount on your second tournament day! 2 days for 50 CHF.'
             ]
         ];
         
