@@ -121,6 +121,9 @@ function intersoccer_enqueue_discount_admin_assets($hook) {
             ['value' => '2nd_child', 'label' => __('2nd Child', 'intersoccer-product-variations')],
             ['value' => '3rd_plus_child', 'label' => __('3rd or Additional Child', 'intersoccer-product-variations')],
             ['value' => 'same_season_course', 'label' => __('Same Season Course (Same Child)', 'intersoccer-product-variations')],
+            ['value' => 'progressive_week_2', 'label' => __('Progressive Week 2 (Camp)', 'intersoccer-product-variations')],
+            ['value' => 'progressive_week_3_plus', 'label' => __('Progressive Week 3+ (Camp)', 'intersoccer-product-variations')],
+            ['value' => 'same_child_multiple_days', 'label' => __('Same Child Multiple Days (Tournament)', 'intersoccer-product-variations')],
         ],
         'labels' => [
             'name' => __('Name', 'intersoccer-product-variations'),
@@ -409,8 +412,8 @@ function intersoccer_save_discount_callback() {
     $new_rule = [
         'id' => wp_generate_uuid4(),
         'name' => sanitize_text_field($discount['name']),
-        'type' => in_array($discount['type'], ['camp', 'course', 'general']) ? $discount['type'] : 'general',
-        'condition' => in_array($discount['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'none']) ? $discount['condition'] : 'none',
+        'type' => in_array($discount['type'], ['camp', 'course', 'tournament', 'general']) ? $discount['type'] : 'general',
+        'condition' => in_array($discount['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'progressive_week_2', 'progressive_week_3_plus', 'same_child_multiple_days', 'none']) ? $discount['condition'] : 'none',
         'rate' => min(max(floatval($discount['rate']), 0), 100),
         'active' => isset($discount['active']) ? (bool) $discount['active'] : true
     ];
@@ -548,8 +551,8 @@ function intersoccer_sanitize_enhanced_discount_rules($rules) {
         $sanitized_rule = [
             'id' => isset($rule['id']) ? sanitize_key($rule['id']) : wp_generate_uuid4(),
             'name' => isset($rule['name']) ? sanitize_text_field($rule['name']) : '',
-            'type' => in_array($rule['type'], ['camp', 'course', 'general']) ? $rule['type'] : 'general',
-            'condition' => in_array($rule['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'none']) ? $rule['condition'] : 'none',
+            'type' => in_array($rule['type'], ['camp', 'course', 'tournament', 'general']) ? $rule['type'] : 'general',
+            'condition' => in_array($rule['condition'], ['2nd_child', '3rd_plus_child', 'same_season_course', 'progressive_week_2', 'progressive_week_3_plus', 'same_child_multiple_days', 'none']) ? $rule['condition'] : 'none',
             'rate' => min(max(floatval($rule['rate']), 0), 100),
             'active' => isset($rule['active']) ? (bool) $rule['active'] : true,
             'message_key' => isset($rule['message_key']) ? sanitize_key($rule['message_key']) : $rule['id']
@@ -681,15 +684,19 @@ function intersoccer_render_enhanced_discounts_page() {
                                 <select name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][type]">
                                     <option value="camp" <?php selected($rule['type'], 'camp'); ?>><?php _e('Camp', 'intersoccer-product-variations'); ?></option>
                                     <option value="course" <?php selected($rule['type'], 'course'); ?>><?php _e('Course', 'intersoccer-product-variations'); ?></option>
+                                    <option value="tournament" <?php selected($rule['type'], 'tournament'); ?>><?php _e('Tournament', 'intersoccer-product-variations'); ?></option>
                                     <option value="general" <?php selected($rule['type'], 'general'); ?>><?php _e('General', 'intersoccer-product-variations'); ?></option>
                                 </select>
                             </td>
                             <td>
                                 <select name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][condition]">
+                                    <option value="none" <?php selected($rule['condition'], 'none'); ?>><?php _e('None', 'intersoccer-product-variations'); ?></option>
                                     <option value="2nd_child" <?php selected($rule['condition'], '2nd_child'); ?>><?php _e('2nd Child', 'intersoccer-product-variations'); ?></option>
                                     <option value="3rd_plus_child" <?php selected($rule['condition'], '3rd_plus_child'); ?>><?php _e('3rd+ Child', 'intersoccer-product-variations'); ?></option>
-                                    <option value="same_season_course" <?php selected($rule['condition'], 'same_season_course'); ?>><?php _e('Same Season Course', 'intersoccer-product-variations'); ?></option>
-                                    <option value="none" <?php selected($rule['condition'], 'none'); ?>><?php _e('None', 'intersoccer-product-variations'); ?></option>
+                                    <option value="same_season_course" <?php selected($rule['condition'], 'same_season_course'); ?>><?php _e('Same Season Course (Same Child)', 'intersoccer-product-variations'); ?></option>
+                                    <option value="progressive_week_2" <?php selected($rule['condition'], 'progressive_week_2'); ?>><?php _e('Progressive Week 2 (Camp)', 'intersoccer-product-variations'); ?></option>
+                                    <option value="progressive_week_3_plus" <?php selected($rule['condition'], 'progressive_week_3_plus'); ?>><?php _e('Progressive Week 3+ (Camp)', 'intersoccer-product-variations'); ?></option>
+                                    <option value="same_child_multiple_days" <?php selected($rule['condition'], 'same_child_multiple_days'); ?>><?php _e('Same Child Multiple Days (Tournament)', 'intersoccer-product-variations'); ?></option>
                                 </select>
                             </td>
                             <td>
