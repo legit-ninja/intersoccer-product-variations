@@ -18,7 +18,20 @@ add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_d
 function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
     intersoccer_debug('===== InterSoccer Add Cart Item Data START =====');
     intersoccer_debug('InterSoccer Cart Data: Product ID: ' . $product_id . ', Variation ID: ' . $variation_id);
+    intersoccer_debug('InterSoccer Cart Data: $_SERVER[REQUEST_URI]: ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'));
+    intersoccer_debug('InterSoccer Cart Data: $_SERVER[HTTP_REFERER]: ' . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'not set'));
+    intersoccer_debug('InterSoccer Cart Data: wp_get_referer(): ' . wp_get_referer());
     intersoccer_debug('InterSoccer Cart Data: Full POST: ' . print_r($_POST, true));
+    intersoccer_debug('InterSoccer Cart Data: Full GET: ' . print_r($_GET, true));
+    
+    // Verify WooCommerce session is active
+    if (function_exists('WC') && WC()->session) {
+        intersoccer_debug('InterSoccer Cart Data: WooCommerce session is active');
+        $cart_contents = WC()->cart->get_cart_contents();
+        intersoccer_debug('InterSoccer Cart Data: Current cart item count: ' . count($cart_contents));
+    } else {
+        intersoccer_debug('InterSoccer Cart Data: WARNING - WooCommerce session not available');
+    }
 
     // Assigned player
     intersoccer_debug('InterSoccer Cart Data: Checking player_assignment...');
@@ -82,8 +95,37 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
     }
 
     intersoccer_debug('InterSoccer Cart Data: Final cart_item_data: ' . print_r($cart_item_data, true));
+    
+    // Verify cart item will be added
+    if (function_exists('WC') && WC()->cart) {
+        $cart_before = WC()->cart->get_cart_contents_count();
+        intersoccer_debug('InterSoccer Cart Data: Cart item count before adding: ' . $cart_before);
+    }
+    
     intersoccer_debug('===== InterSoccer Add Cart Item Data END =====');
     return $cart_item_data;
+}
+
+/**
+ * Track when items are actually added to cart
+ */
+add_action('woocommerce_add_to_cart', 'intersoccer_track_add_to_cart', 10, 6);
+function intersoccer_track_add_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data) {
+    intersoccer_debug('===== InterSoccer: woocommerce_add_to_cart action fired =====');
+    intersoccer_debug('InterSoccer Add to Cart: Cart item key: ' . $cart_item_key);
+    intersoccer_debug('InterSoccer Add to Cart: Product ID: ' . $product_id);
+    intersoccer_debug('InterSoccer Add to Cart: Variation ID: ' . $variation_id);
+    intersoccer_debug('InterSoccer Add to Cart: Quantity: ' . $quantity);
+    intersoccer_debug('InterSoccer Add to Cart: Cart item data: ' . print_r($cart_item_data, true));
+    
+    if (function_exists('WC') && WC()->cart) {
+        $cart_after = WC()->cart->get_cart_contents_count();
+        intersoccer_debug('InterSoccer Add to Cart: Cart item count after adding: ' . $cart_after);
+    }
+    
+    intersoccer_debug('InterSoccer Add to Cart: $_SERVER[REQUEST_URI]: ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'));
+    intersoccer_debug('InterSoccer Add to Cart: $_SERVER[HTTP_REFERER]: ' . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'not set'));
+    intersoccer_debug('===== InterSoccer: woocommerce_add_to_cart action end =====');
 }
 
 /**
@@ -96,9 +138,44 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
     intersoccer_debug('InterSoccer Cart: Variation ID: ' . $variation_id);
     intersoccer_debug('InterSoccer Cart: Full POST data: ' . print_r($_POST, true));
     
+    $product_type = intersoccer_get_product_type($product_id);
+    
+    // Validate courses - require player assignment
+    if ($product_type === 'course') {
+        intersoccer_debug('InterSoccer Cart: IS a course product');
+        
+        // Check for player assignment in POST data
+        $has_player_assignment = isset($_POST['player_assignment']) && !empty($_POST['player_assignment']);
+        $has_assigned_attendee = isset($_POST['assigned_attendee']) && !empty($_POST['assigned_attendee']);
+        
+        intersoccer_debug('InterSoccer Cart: player_assignment in POST: ' . ($has_player_assignment ? 'YES' : 'NO'));
+        intersoccer_debug('InterSoccer Cart: assigned_attendee in POST: ' . ($has_assigned_attendee ? 'YES' : 'NO'));
+        
+        if (!$has_player_assignment && !$has_assigned_attendee) {
+            wc_add_notice(__('Please select an attendee for this course.', 'intersoccer-product-variations'), 'error');
+            $passed = false;
+            intersoccer_warning('InterSoccer Cart: ❌ VALIDATION FAILED - no player assignment for course');
+            
+            // Store the product URL in session to ensure correct redirect
+            if ($product_id) {
+                $product_url = get_permalink($product_id);
+                if ($product_url && function_exists('WC') && WC()->session) {
+                    WC()->session->set('intersoccer_redirect_url', $product_url);
+                    intersoccer_debug('InterSoccer Cart: Stored redirect URL in session: ' . $product_url);
+                }
+            }
+        } else {
+            intersoccer_debug('InterSoccer Cart: ✅ VALIDATION PASSED - player assignment found for course');
+        }
+        
+        intersoccer_debug('InterSoccer Cart: Final validation result: ' . ($passed ? 'PASSED' : 'FAILED'));
+        intersoccer_debug('===== InterSoccer Cart Validation END =====');
+        return $passed;
+    }
+    
     // Check if this is a camp product
     if (!intersoccer_is_camp($product_id)) {
-        intersoccer_debug('InterSoccer Cart: Not a camp product, skipping validation');
+        intersoccer_debug('InterSoccer Cart: Not a camp or course product, skipping validation');
         return $passed;
     }
 
@@ -142,6 +219,101 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
     intersoccer_debug('InterSoccer Cart: Final validation result: ' . ($passed ? 'PASSED' : 'FAILED'));
     intersoccer_debug('===== InterSoccer Cart Validation END =====');
     return $passed;
+}
+
+/**
+ * Ensure correct redirect URL when validation fails
+ * Only intervenes when there are validation errors - otherwise respects WooCommerce's redirect settings
+ */
+add_filter('woocommerce_add_to_cart_redirect', 'intersoccer_fix_add_to_cart_redirect', 10, 1);
+function intersoccer_fix_add_to_cart_redirect($url) {
+    intersoccer_debug('===== InterSoccer: woocommerce_add_to_cart_redirect filter called =====');
+    intersoccer_debug('InterSoccer Redirect: Incoming URL: ' . $url);
+    intersoccer_debug('InterSoccer Redirect: POST add-to-cart: ' . (isset($_POST['add-to-cart']) ? $_POST['add-to-cart'] : 'not set'));
+    intersoccer_debug('InterSoccer Redirect: Error count: ' . wc_notice_count('error'));
+    intersoccer_debug('InterSoccer Redirect: $_SERVER[HTTP_REFERER]: ' . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'not set'));
+    intersoccer_debug('InterSoccer Redirect: wp_get_referer(): ' . wp_get_referer());
+    intersoccer_debug('InterSoccer Redirect: $_SERVER[REQUEST_URI]: ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'));
+    intersoccer_debug('InterSoccer Redirect: $_POST data: ' . print_r($_POST, true));
+    intersoccer_debug('InterSoccer Redirect: $_GET data: ' . print_r($_GET, true));
+    
+    // Only use stored URL if there are validation errors (validation failed)
+    // This ensures we redirect back to the product page when validation fails
+    if (function_exists('WC') && WC()->session && wc_notice_count('error') > 0) {
+        $stored_url = WC()->session->get('intersoccer_redirect_url');
+        if ($stored_url) {
+            WC()->session->__unset('intersoccer_redirect_url');
+            intersoccer_debug('InterSoccer Redirect: Using stored redirect URL due to validation error: ' . $stored_url);
+            return $stored_url;
+        }
+    }
+    
+    // For successful adds, always respect WooCommerce's redirect setting (don't interfere)
+    intersoccer_debug('InterSoccer Redirect: Returning WooCommerce redirect URL: ' . $url);
+    intersoccer_debug('===== InterSoccer: woocommerce_add_to_cart_redirect filter end =====');
+    return $url;
+}
+
+/**
+ * Fix redirect when validation fails (WooCommerce uses wp_get_referer)
+ * Also fixes malformed referer URLs that might cause redirect issues
+ */
+add_filter('wp_get_referer', 'intersoccer_fix_validation_fail_redirect', 10, 1);
+function intersoccer_fix_validation_fail_redirect($referer) {
+    // Only fix referer if we're in an add-to-cart context
+    if (!isset($_POST['add-to-cart'])) {
+        return $referer;
+    }
+    
+    intersoccer_debug('===== InterSoccer: wp_get_referer filter called (add-to-cart context) =====');
+    intersoccer_debug('InterSoccer Referer: Incoming referer: ' . $referer);
+    intersoccer_debug('InterSoccer Referer: POST add-to-cart: ' . (isset($_POST['add-to-cart']) ? $_POST['add-to-cart'] : 'not set'));
+    intersoccer_debug('InterSoccer Referer: $_SERVER[HTTP_REFERER]: ' . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'not set'));
+    intersoccer_debug('InterSoccer Referer: $_POST[_wp_http_referer]: ' . (isset($_POST['_wp_http_referer']) ? $_POST['_wp_http_referer'] : 'not set'));
+    intersoccer_debug('InterSoccer Referer: $_SERVER[REQUEST_URI]: ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'not set'));
+    intersoccer_debug('InterSoccer Referer: Error count: ' . wc_notice_count('error'));
+    
+    $product_id = absint($_POST['add-to-cart']);
+    if (!$product_id) {
+        intersoccer_debug('InterSoccer Referer: No valid product ID, returning referer as-is');
+        return $referer;
+    }
+    
+    $product_url = get_permalink($product_id);
+    if (!$product_url) {
+        intersoccer_debug('InterSoccer Referer: Could not get product permalink, returning referer as-is');
+        return $referer;
+    }
+    
+    intersoccer_debug('InterSoccer Referer: Product URL: ' . $product_url);
+    
+    // Check if referer is malformed (contains search params, empty params, etc.)
+    $is_malformed = false;
+    if (empty($referer)) {
+        $is_malformed = true;
+        intersoccer_debug('InterSoccer Referer: Referer is empty - marking as malformed');
+    } elseif (strpos($referer, '?post_types=') !== false || 
+              strpos($referer, '?s=') !== false || 
+              strpos($referer, '?zc_gad=') !== false ||
+              preg_match('/\?[^=]*=$/', $referer)) { // Empty query params
+        $is_malformed = true;
+        intersoccer_debug('InterSoccer Referer: Referer contains malformed query parameters - marking as malformed');
+    }
+    
+    // Fix referer if it's malformed or if we have validation errors
+    if ($is_malformed || wc_notice_count('error') > 0) {
+        if ($is_malformed) {
+            intersoccer_debug('InterSoccer Referer: Fixed malformed referer URL: ' . $referer . ' -> ' . $product_url);
+        } else {
+            intersoccer_debug('InterSoccer Referer: Fixed referer URL due to validation error: ' . $referer . ' -> ' . $product_url);
+        }
+        intersoccer_debug('===== InterSoccer: wp_get_referer filter end (fixed) =====');
+        return $product_url;
+    }
+    
+    intersoccer_debug('InterSoccer Referer: Referer is valid, returning as-is');
+    intersoccer_debug('===== InterSoccer: wp_get_referer filter end (unchanged) =====');
+    return $referer;
 }
 
 /**
