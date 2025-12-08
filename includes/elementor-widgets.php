@@ -1811,6 +1811,12 @@ add_action('woocommerce_before_single_product', function () {
         });
     </script>
     <script>
+        // Debug helper functions - defined in global scope so they're available to all functions
+        // These are used by functions defined outside of jQuery(document).ready blocks
+        var debug = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.log.apply(console, arguments); }' : 'function() {}'; ?>;
+        var debugWarn = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.warn.apply(console, arguments); }' : 'function() {}'; ?>;
+        var debugError = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.error.apply(console, arguments); }' : 'function() {}'; ?>;
+        
         // Day translations for WPML compatibility - retrieve from WPML database
         var intersoccerDayTranslations = <?php
         $translations = array();
