@@ -329,13 +329,16 @@ add_action('woocommerce_before_single_product', function () {
                     var targetPlayer = this.getPlayer();
                     if (targetPlayer) {
                         var $select = $form.find('.player-select');
-                        if ($select.length && $select.val() !== targetPlayer) {
-                            $select.val(targetPlayer);
-                            debug('InterSoccer: Player restored to:', targetPlayer);
-                            return true;
+                        if ($select.length) {
+                            if ($select.val() !== targetPlayer) {
+                                $select.val(targetPlayer);
+                                debug('InterSoccer: Player restored to:', targetPlayer);
+                            }
+                            // Return the player value so caller can use it
+                            return targetPlayer;
                         }
                     }
-                    return false;
+                    return '';
                 }
             };
 
@@ -465,7 +468,11 @@ add_action('woocommerce_before_single_product', function () {
                                     
                                     // ENHANCEMENT: Restore player selection after loading
                                     setTimeout(function() {
-                                        playerPersistence.restorePlayer();
+                                        var restoredPlayer = playerPersistence.restorePlayer();
+                                        if (restoredPlayer && restoredPlayer !== '' && restoredPlayer !== '0') {
+                                            $form.find('input[name="assigned_attendee"]').remove();
+                                            $form.append($('<input>', { type: 'hidden', name: 'assigned_attendee', value: restoredPlayer }));
+                                        }
                                         $form.trigger('intersoccer_update_button_state');
                                     }, 100);
                                     
@@ -474,7 +481,7 @@ add_action('woocommerce_before_single_product', function () {
                                         var selectedPlayer = $(this).val();
                                         playerPersistence.setPlayer(selectedPlayer);
                                         
-                                        // Create/update assigned_attendee hidden field
+                                        // Create/update assigned_attendee hidden field immediately
                                         $form.find('input[name="assigned_attendee"]').remove();
                                         if (selectedPlayer && selectedPlayer !== '' && selectedPlayer !== '0') {
                                             $form.append($('<input>', {
@@ -1224,8 +1231,23 @@ add_action('woocommerce_before_single_product', function () {
                 <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
                 // For camp and course products, validate before forcing standard POST submission
                 
+                // Ensure we're using the product form, not the search form
+                var $productForm = $currentForm;
+                if ($productForm.hasClass('search_form') || $productForm.attr('role') === 'search') {
+                    debugError('InterSoccer: ERROR - Attempting to validate search form instead of product form!');
+                    // Try to find the actual product form
+                    $productForm = $('form.variations_form.cart, form.cart:not(.search_form), .woocommerce-product-details form:not(.search_form), .single-product form:not(.search_form)').first();
+                    if (!$productForm.length || !$productForm.find('input[name="variation_id"], input[name="add-to-cart"], button.single_add_to_cart_button').length) {
+                        debugError('InterSoccer: Could not find product form, aborting');
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        return false;
+                    }
+                    debug('InterSoccer: Found correct product form for validation:', $productForm[0]);
+                }
+                
                 // Check if button is disabled (indicates form is not ready)
-                var $submitButton = $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
+                var $submitButton = $productForm.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
                 if ($submitButton.length && ($submitButton.prop('disabled') || $submitButton.hasClass('disabled') || $submitButton.hasClass('wc-variation-selection-needed'))) {
                     debug('InterSoccer: ❌ Validation failed - submit button is disabled');
                     e.preventDefault();
@@ -1234,33 +1256,23 @@ add_action('woocommerce_before_single_product', function () {
                 }
                 
                 // Validate required fields before submission
-                var variationId = $form.find('input[name="variation_id"]').val();
-                var $playerSelect = $form.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
-                var playerAssignment = $playerSelect.val();
-                var $assignedAttendeeInput = $form.find('input[name="assigned_attendee"]');
-                var assignedAttendee = $assignedAttendeeInput.val();
-                var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
-                var campDays = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
+                var variationId = $productForm.find('input[name="variation_id"]').val();
+                var $playerSelect = $productForm.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
+                var playerAssignment = $playerSelect.length > 0 ? $playerSelect.val() : '';
+                var $assignedAttendeeInput = $productForm.find('input[name="assigned_attendee"]');
+                var assignedAttendee = $assignedAttendeeInput.length > 0 ? $assignedAttendeeInput.val() : '';
+                var bookingType = $productForm.find('select[name="attribute_pa_booking-type"]').val();
+                var campDays = $productForm.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
                 
-                debug('InterSoccer: Validation check - Variation ID:', variationId);
-                debug('InterSoccer: Validation check - Player Select element found:', $playerSelect.length > 0);
-                debug('InterSoccer: Validation check - Player Select element:', $playerSelect[0]);
-                debug('InterSoccer: Validation check - Player Assignment value:', playerAssignment);
-                debug('InterSoccer: Validation check - Assigned Attendee input found:', $assignedAttendeeInput.length > 0);
-                debug('InterSoccer: Validation check - Assigned Attendee value:', assignedAttendee);
-                debug('InterSoccer: Validation check - Booking Type:', bookingType);
-                debug('InterSoccer: Validation check - Camp Days:', campDays);
+                debug('InterSoccer: Validation - Variation ID:', variationId, 'Player:', playerAssignment, 'Attendee:', assignedAttendee);
                 
-                // If player is selected but assigned_attendee field doesn't exist, create it
-                if (playerAssignment && playerAssignment !== '' && playerAssignment !== '0' && !assignedAttendee) {
-                    debug('InterSoccer: Player selected but assigned_attendee field missing, creating it now');
-                    $form.append($('<input>', {
-                        type: 'hidden',
-                        name: 'assigned_attendee',
-                        value: playerAssignment
-                    }));
-                    assignedAttendee = playerAssignment;
-                    debug('InterSoccer: Created assigned_attendee field with value:', assignedAttendee);
+                // Ensure assigned_attendee field exists if player is selected
+                if (playerAssignment && playerAssignment !== '' && playerAssignment !== '0') {
+                    if (!assignedAttendee || assignedAttendee === '' || assignedAttendee === '0') {
+                        $productForm.find('input[name="assigned_attendee"]').remove();
+                        $productForm.append($('<input>', { type: 'hidden', name: 'assigned_attendee', value: playerAssignment }));
+                        assignedAttendee = playerAssignment;
+                    }
                 }
                 
                 // Check if variation is selected
@@ -1274,7 +1286,7 @@ add_action('woocommerce_before_single_product', function () {
                 
                 // For courses, require player assignment
                 <?php if ($product_type === 'course'): ?>
-                if ((!playerAssignment || playerAssignment === '' || playerAssignment === '0') && (!assignedAttendee || assignedAttendee === '')) {
+                if ((!playerAssignment || playerAssignment === '' || playerAssignment === '0') && (!assignedAttendee || assignedAttendee === '' || assignedAttendee === '0')) {
                     debug('InterSoccer: ❌ Validation failed - no player assignment for course');
                     e.preventDefault();
                     e.stopImmediatePropagation();
