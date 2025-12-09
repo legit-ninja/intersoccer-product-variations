@@ -78,7 +78,9 @@ function intersoccer_grant_download_permissions($order_id) {
  * Helper function to get player details from user metadata
  */
 function intersoccer_get_player_details($user_id, $player_index) {
-    $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
+    $players = function_exists('intersoccer_get_user_players') 
+        ? intersoccer_get_user_players($user_id) 
+        : (get_user_meta($user_id, 'intersoccer_players', true) ?: []);
     
     if (isset($players[$player_index])) {
         $player = $players[$player_index];

@@ -305,6 +305,7 @@ add_action('init', function () {
 // Include plugin files
 $includes = [
     'includes/logger.php',
+    'includes/helpers.php', // Load early - provides cached player retrieval
     'includes/language-helpers.php',
     'includes/elementor-widgets.php',
     'includes/woocommerce/admin-ui.php',

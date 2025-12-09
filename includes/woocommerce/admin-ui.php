@@ -3572,8 +3572,10 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
         return;
     }
     
-    // Get customer's registered players
-    $players = get_user_meta($customer_id, 'intersoccer_players', true) ?: [];
+    // Get customer's registered players (using cached helper)
+    $players = function_exists('intersoccer_get_user_players') 
+        ? intersoccer_get_user_players($customer_id) 
+        : (get_user_meta($customer_id, 'intersoccer_players', true) ?: []);
     
     if (empty($players)) {
         echo '<div class="player-assignment-notice" style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107;">';
@@ -3673,7 +3675,9 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
     }
     
     // Get customer's players
-    $players = get_user_meta($customer_id, 'intersoccer_players', true) ?: [];
+        $players = function_exists('intersoccer_get_user_players') 
+            ? intersoccer_get_user_players($customer_id) 
+            : (get_user_meta($customer_id, 'intersoccer_players', true) ?: []);
     
     foreach ($_POST['player_assignment'] as $item_id => $selected_index) {
         $item = $order->get_item($item_id);

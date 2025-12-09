@@ -276,8 +276,10 @@ function intersoccer_get_user_players() {
         wp_die();
     }
 
-    // Get players from user meta
-    $players = get_user_meta($user_id, 'intersoccer_players', true) ?: [];
+    // Get players from user meta (using cached helper)
+    $players = function_exists('intersoccer_get_user_players') 
+        ? intersoccer_get_user_players($user_id) 
+        : (get_user_meta($user_id, 'intersoccer_players', true) ?: []);
     
     // Ensure players are valid and sanitized
     $valid_players = [];
