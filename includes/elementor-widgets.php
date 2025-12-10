@@ -1278,15 +1278,11 @@ add_action('woocommerce_before_single_product', function () {
                 var variationId = $productForm.find('input[name="variation_id"]').val();
                 var $playerSelect = $productForm.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
                 var playerAssignment = $playerSelect.length > 0 ? $playerSelect.val() : '';
-                var $assignedAttendeeInput = $productForm.find('input[name="assigned_attendee"]');
-                var assignedAttendee = $assignedAttendeeInput.length > 0 ? $assignedAttendeeInput.val() : '';
                 var bookingType = $productForm.find('select[name="attribute_pa_booking-type"]').val();
                 var campDays = $productForm.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
                 
-                debug('InterSoccer: Validation - Variation ID:', variationId, 'Player:', playerAssignment, 'Attendee:', assignedAttendee);
-                
-                // Ensure assigned_attendee field exists if player is selected
-                // Use native DOM methods for reliable attachment before stopImmediatePropagation
+                // CRITICAL: Ensure assigned_attendee field exists BEFORE reading its value
+                // This must happen before validation to ensure the field is present
                 if (playerAssignment && playerAssignment !== '' && playerAssignment !== '0') {
                     var existingField = $productForm[0].querySelector('input[name="assigned_attendee"]');
                     if (existingField) {
@@ -1304,6 +1300,12 @@ add_action('woocommerce_before_single_product', function () {
                     }
                 }
                 
+                // NOW read the assigned_attendee value after ensuring the field exists
+                var $assignedAttendeeInput = $productForm.find('input[name="assigned_attendee"]');
+                var assignedAttendee = $assignedAttendeeInput.length > 0 ? $assignedAttendeeInput.val() : '';
+                
+                debug('InterSoccer: Validation - Variation ID:', variationId, 'Player:', playerAssignment, 'Attendee:', assignedAttendee);
+                
                 // Check if variation is selected
                 if (!variationId || variationId === '0' || variationId === '') {
                     debug('InterSoccer: ❌ Validation failed - no variation selected');
@@ -1313,16 +1315,8 @@ add_action('woocommerce_before_single_product', function () {
                     return false;
                 }
                 
-                // For courses, require player assignment
-                <?php if ($product_type === 'course'): ?>
-                if ((!playerAssignment || playerAssignment === '' || playerAssignment === '0') && (!assignedAttendee || assignedAttendee === '' || assignedAttendee === '0')) {
-                    debug('InterSoccer: ❌ Validation failed - no player assignment for course');
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    alert('<?php echo esc_js(__('Please select an attendee for this course.', 'intersoccer-product-variations')); ?>');
-                    return false;
-                }
-                <?php endif; ?>
+                // Note: Course attendee validation is handled server-side in cart-calculations.php
+                // This prevents false positives from client-side validation timing issues
                 
                 // For single-day camps, require camp days
                 <?php if ($product_type === 'camp'): ?>
@@ -1431,6 +1425,7 @@ add_action('woocommerce_before_single_product', function () {
                 
                 // Submit the product form natively (bypassing all jQuery handlers)
                 // This matches v1.11.22 behavior which was working correctly
+                // Note: Validation is handled server-side in cart-calculations.php
                 setTimeout(function() {
                     debug('InterSoccer Form: Native form submit executed');
                     debug('InterSoccer Form: Submitting to action:', formElement.action);
