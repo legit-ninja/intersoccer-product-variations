@@ -293,13 +293,47 @@
         }
 
         updateHiddenFields({ playerId, remainingWeeks }) {
-            this.$form.find('input[name="assigned_attendee"]').remove();
-            this.$form.find('input[name="remaining_weeks"]').remove();
+            // Update or create assigned_attendee field (don't remove/recreate)
+            const formElement = this.$form[0];
+            let assignedAttendeeField = formElement.querySelector('input[name="assigned_attendee"]');
             if (playerId) {
-                this.$form.append(`<input type="hidden" name="assigned_attendee" value="${playerId}">`);
+                if (assignedAttendeeField) {
+                    // Field exists - just update the value
+                    assignedAttendeeField.value = playerId;
+                } else {
+                    // Field doesn't exist - create it
+                    assignedAttendeeField = document.createElement('input');
+                    assignedAttendeeField.type = 'hidden';
+                    assignedAttendeeField.name = 'assigned_attendee';
+                    assignedAttendeeField.value = playerId;
+                    formElement.appendChild(assignedAttendeeField);
+                }
+            } else {
+                // No player ID - remove field if it exists
+                if (assignedAttendeeField) {
+                    assignedAttendeeField.remove();
+                }
             }
+            
+            // Update or create remaining_weeks field (don't remove/recreate)
+            let remainingWeeksField = formElement.querySelector('input[name="remaining_weeks"]');
             if (remainingWeeks !== null && remainingWeeks !== undefined) {
-                this.$form.append(`<input type="hidden" name="remaining_weeks" value="${remainingWeeks}">`);
+                if (remainingWeeksField) {
+                    // Field exists - just update the value
+                    remainingWeeksField.value = remainingWeeks;
+                } else {
+                    // Field doesn't exist - create it
+                    remainingWeeksField = document.createElement('input');
+                    remainingWeeksField.type = 'hidden';
+                    remainingWeeksField.name = 'remaining_weeks';
+                    remainingWeeksField.value = remainingWeeks;
+                    formElement.appendChild(remainingWeeksField);
+                }
+            } else {
+                // No remaining weeks - remove field if it exists
+                if (remainingWeeksField) {
+                    remainingWeeksField.remove();
+                }
             }
         }
 

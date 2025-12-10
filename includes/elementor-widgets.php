@@ -470,8 +470,16 @@ add_action('woocommerce_before_single_product', function () {
                                     setTimeout(function() {
                                         var restoredPlayer = playerPersistence.restorePlayer();
                                         if (restoredPlayer && restoredPlayer !== '' && restoredPlayer !== '0') {
-                                            $form.find('input[name="assigned_attendee"]').remove();
-                                            $form.append($('<input>', { type: 'hidden', name: 'assigned_attendee', value: restoredPlayer }));
+                                            var existingField = $form[0].querySelector('input[name="assigned_attendee"]');
+                                            if (existingField) {
+                                                existingField.value = restoredPlayer;
+                                            } else {
+                                                var assignedAttendeeInput = document.createElement('input');
+                                                assignedAttendeeInput.type = 'hidden';
+                                                assignedAttendeeInput.name = 'assigned_attendee';
+                                                assignedAttendeeInput.value = restoredPlayer;
+                                                $form[0].appendChild(assignedAttendeeInput);
+                                            }
                                         }
                                         $form.trigger('intersoccer_update_button_state');
                                     }, 100);
@@ -482,16 +490,27 @@ add_action('woocommerce_before_single_product', function () {
                                         playerPersistence.setPlayer(selectedPlayer);
                                         
                                         // Create/update assigned_attendee hidden field immediately
-                                        $form.find('input[name="assigned_attendee"]').remove();
+                                        var existingField = $form[0].querySelector('input[name="assigned_attendee"]');
                                         if (selectedPlayer && selectedPlayer !== '' && selectedPlayer !== '0') {
-                                            $form.append($('<input>', {
-                                                type: 'hidden',
-                                                name: 'assigned_attendee',
-                                                value: selectedPlayer
-                                            }));
-                                            debug('InterSoccer: Created assigned_attendee hidden field with value:', selectedPlayer);
+                                            if (existingField) {
+                                                // Field exists - just update the value
+                                                existingField.value = selectedPlayer;
+                                                debug('InterSoccer: Updated assigned_attendee field with value:', selectedPlayer);
+                                            } else {
+                                                // Field doesn't exist - create it
+                                                var assignedAttendeeInput = document.createElement('input');
+                                                assignedAttendeeInput.type = 'hidden';
+                                                assignedAttendeeInput.name = 'assigned_attendee';
+                                                assignedAttendeeInput.value = selectedPlayer;
+                                                $form[0].appendChild(assignedAttendeeInput);
+                                                debug('InterSoccer: Created assigned_attendee hidden field with value:', selectedPlayer);
+                                            }
                                         } else {
-                                            debug('InterSoccer: Removed assigned_attendee hidden field (no player selected)');
+                                            // No player selected - remove field if it exists
+                                            if (existingField) {
+                                                existingField.remove();
+                                                debug('InterSoccer: Removed assigned_attendee hidden field (no player selected)');
+                                            }
                                         }
                                         
                                         $form.trigger('intersoccer_update_button_state');
@@ -1269,15 +1288,18 @@ add_action('woocommerce_before_single_product', function () {
                 // Ensure assigned_attendee field exists if player is selected
                 // Use native DOM methods for reliable attachment before stopImmediatePropagation
                 if (playerAssignment && playerAssignment !== '' && playerAssignment !== '0') {
-                    if (!assignedAttendee || assignedAttendee === '' || assignedAttendee === '0') {
-                        $productForm.find('input[name="assigned_attendee"]').remove();
-                        // Use native DOM to ensure field is properly attached
+                    var existingField = $productForm[0].querySelector('input[name="assigned_attendee"]');
+                    if (existingField) {
+                        // Field exists - just update the value
+                        existingField.value = playerAssignment;
+                        debug('InterSoccer: Updated existing assigned_attendee field with value:', playerAssignment);
+                    } else {
+                        // Field doesn't exist - create it
                         var assignedAttendeeInput = document.createElement('input');
                         assignedAttendeeInput.type = 'hidden';
                         assignedAttendeeInput.name = 'assigned_attendee';
                         assignedAttendeeInput.value = playerAssignment;
                         $productForm[0].appendChild(assignedAttendeeInput);
-                        assignedAttendee = playerAssignment;
                         debug('InterSoccer: Created assigned_attendee field with value:', playerAssignment);
                     }
                 }
