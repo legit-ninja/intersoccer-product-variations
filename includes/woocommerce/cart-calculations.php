@@ -140,38 +140,9 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
     
     $product_type = intersoccer_get_product_type($product_id);
     
-    // Validate courses - require player assignment
-    if ($product_type === 'course') {
-        intersoccer_debug('InterSoccer Cart: IS a course product');
-        
-        // Check for player assignment in POST data
-        $has_player_assignment = isset($_POST['player_assignment']) && !empty($_POST['player_assignment']);
-        $has_assigned_attendee = isset($_POST['assigned_attendee']) && !empty($_POST['assigned_attendee']);
-        
-        intersoccer_debug('InterSoccer Cart: player_assignment in POST: ' . ($has_player_assignment ? 'YES' : 'NO'));
-        intersoccer_debug('InterSoccer Cart: assigned_attendee in POST: ' . ($has_assigned_attendee ? 'YES' : 'NO'));
-        
-        if (!$has_player_assignment && !$has_assigned_attendee) {
-            wc_add_notice(__('Please select an attendee for this course.', 'intersoccer-product-variations'), 'error');
-            $passed = false;
-            intersoccer_warning('InterSoccer Cart: ❌ VALIDATION FAILED - no player assignment for course');
-            
-            // Store the product URL in session to ensure correct redirect
-            if ($product_id) {
-                $product_url = get_permalink($product_id);
-                if ($product_url && function_exists('WC') && WC()->session) {
-                    WC()->session->set('intersoccer_redirect_url', $product_url);
-                    intersoccer_debug('InterSoccer Cart: Stored redirect URL in session: ' . $product_url);
-                }
-            }
-        } else {
-            intersoccer_debug('InterSoccer Cart: ✅ VALIDATION PASSED - player assignment found for course');
-        }
-        
-        intersoccer_debug('InterSoccer Cart: Final validation result: ' . ($passed ? 'PASSED' : 'FAILED'));
-        intersoccer_debug('===== InterSoccer Cart Validation END =====');
-        return $passed;
-    }
+    // Note: Course player assignment validation removed - using default player assignment logic
+    // The cart data handler (intersoccer_add_custom_cart_item_data) processes player_assignment for all products
+    // This matches how camps work - no explicit validation, just let the default handler process it
     
     // Check if this is a camp product
     if (!intersoccer_is_camp($product_id)) {
