@@ -244,9 +244,9 @@ function intersoccer_ajax_update_session_data() {
 /**
  * Get user players (enhanced version) - keep existing but improve
  */
-add_action('wp_ajax_intersoccer_get_user_players', 'intersoccer_get_user_players');
-add_action('wp_ajax_nopriv_intersoccer_get_user_players', 'intersoccer_get_user_players');
-function intersoccer_get_user_players() {
+add_action('wp_ajax_intersoccer_get_user_players', 'intersoccer_ajax_get_user_players');
+add_action('wp_ajax_nopriv_intersoccer_get_user_players', 'intersoccer_ajax_get_user_players');
+function intersoccer_ajax_get_user_players() {
     // Clear output buffers
     while (ob_get_level()) {
         ob_end_clean();

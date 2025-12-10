@@ -1267,11 +1267,18 @@ add_action('woocommerce_before_single_product', function () {
                 debug('InterSoccer: Validation - Variation ID:', variationId, 'Player:', playerAssignment, 'Attendee:', assignedAttendee);
                 
                 // Ensure assigned_attendee field exists if player is selected
+                // Use native DOM methods for reliable attachment before stopImmediatePropagation
                 if (playerAssignment && playerAssignment !== '' && playerAssignment !== '0') {
                     if (!assignedAttendee || assignedAttendee === '' || assignedAttendee === '0') {
                         $productForm.find('input[name="assigned_attendee"]').remove();
-                        $productForm.append($('<input>', { type: 'hidden', name: 'assigned_attendee', value: playerAssignment }));
+                        // Use native DOM to ensure field is properly attached
+                        var assignedAttendeeInput = document.createElement('input');
+                        assignedAttendeeInput.type = 'hidden';
+                        assignedAttendeeInput.name = 'assigned_attendee';
+                        assignedAttendeeInput.value = playerAssignment;
+                        $productForm[0].appendChild(assignedAttendeeInput);
                         assignedAttendee = playerAssignment;
+                        debug('InterSoccer: Created assigned_attendee field with value:', playerAssignment);
                     }
                 }
                 
