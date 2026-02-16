@@ -13,7 +13,6 @@ if (!defined('ABSPATH')) exit;
 add_action('woocommerce_before_single_product', function () {
     global $product;
     if (!is_a($product, 'WC_Product')) {
-        intersoccer_warning('Elementor: No valid product found');
         return;
     }
 
@@ -21,20 +20,15 @@ add_action('woocommerce_before_single_product', function () {
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = intersoccer_get_product_type($product_id);
-    intersoccer_debug("Elementor: Initializing wp_footer for product ID: $product_id, type: $product_type");
 
     // Preload days for Camps
     $preloaded_days = [];
     if ($product_type === 'camp') {
         $attributes = $product->get_attributes();
-        intersoccer_debug('Elementor: Checking pa_days-of-week attribute for product ' . $product_id);
-        intersoccer_debug('Elementor: Product attributes: ' . json_encode(array_keys($attributes)));
 
         if (isset($attributes['pa_days-of-week']) && $attributes['pa_days-of-week'] instanceof WC_Product_Attribute) {
-            // Get terms with both names and slugs for multilingual support
             $terms = wc_get_product_terms($product_id, 'pa_days-of-week', ['fields' => 'all']);
-            intersoccer_debug('Elementor: Retrieved terms for pa_days-of-week: ' . json_encode($terms));
-            
+
             if (!empty($terms)) {
                 // Map of day slugs to English names (assuming slugs are in English)
                 $day_map = [
@@ -48,12 +42,8 @@ add_action('woocommerce_before_single_product', function () {
                 $english_days = [];
                 foreach ($terms as $term) {
                     $slug = strtolower($term->slug);
-                    intersoccer_debug('Elementor: Processing term: ' . $term->name . ' (slug: ' . $term->slug . ')');
                     if (isset($day_map[$slug])) {
                         $english_days[] = $day_map[$slug];
-                        intersoccer_debug('Elementor: Mapped to English: ' . $day_map[$slug]);
-                    } else {
-                        intersoccer_warning('Elementor: No mapping found for slug: ' . $slug);
                     }
                 }
 
@@ -65,26 +55,14 @@ add_action('woocommerce_before_single_product', function () {
                         return $pos_a - $pos_b;
                     });
                     $preloaded_days = $english_days;
-                    intersoccer_debug('Elementor: Final preloaded days: ' . json_encode($preloaded_days));
                 } else {
-                    // Fallback to default English days
                     $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                    intersoccer_debug('Elementor: Using fallback days: ' . json_encode($preloaded_days));
                 }
             } else {
-                // Fallback to default English days
                 $preloaded_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                intersoccer_debug('Elementor: No terms found, using fallback days: ' . json_encode($preloaded_days));
             }
-        } else {
-            intersoccer_debug('Elementor: pa_days-of-week attribute not found or not valid');
         }
-    } else {
-        intersoccer_debug('Elementor: Product is not a camp, skipping day preloading');
     }
-    intersoccer_debug('Elementor: Preloaded days for product ' . $product_id . ': ' . json_encode($preloaded_days));
-    intersoccer_debug('Elementor: Product attributes for ' . $product_id . ': ' . json_encode(array_keys($product->get_attributes())));
-    intersoccer_debug('Elementor: Product type: ' . $product_type);
 
     // Course info container removed - course details now only display in variation table
     // if ($product_type === 'course') {

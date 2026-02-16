@@ -102,9 +102,7 @@ class InterSoccer_Product_Types {
             foreach ($activity_terms as $term) {
                 $slug = self::normalize_activity_slug($term, 'pa_activity-type');
                 if ($slug) {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        error_log("InterSoccer: Detected product type '{$slug}' for product {$product_id} from term '{$term->name}' (slug: {$term->slug})");
-                    }
+                    intersoccer_debug("Detected product type '{$slug}' for product {$product_id} from term '{$term->name}'");
                     return $slug;
                 }
             }
@@ -128,20 +126,15 @@ class InterSoccer_Product_Types {
                     foreach ($terms as $term) {
                         $slug = self::normalize_activity_slug($term, 'pa_activity-type');
                         if ($slug) {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                error_log("InterSoccer: Detected product type '{$slug}' for product {$product_id} from attribute term '{$term->name}' (slug: {$term->slug})");
-                            }
+                            intersoccer_debug("Detected product type '{$slug}' for product {$product_id} from attribute");
                             return $slug;
                         }
                     }
                 }
             }
         }
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Could not detect product type for product {$product_id} from attributes");
-        }
-        
+
+        intersoccer_debug("Could not detect product type for product {$product_id} from attributes");
         return null;
     }
 
@@ -273,15 +266,11 @@ class InterSoccer_Product_Types {
         if ($product_type) {
             update_post_meta($product_id, '_intersoccer_product_type', $product_type);
             
-            // Log if type changed
-            if (defined('WP_DEBUG') && WP_DEBUG && $old_type !== $product_type) {
-                error_log("InterSoccer: Product type updated for product {$product_id}: '{$old_type}' -> '{$product_type}'" . ($force_redetect ? ' (forced redetect)' : ''));
+            if ($old_type !== $product_type) {
+                intersoccer_debug("Product type updated for product {$product_id}: '{$old_type}' -> '{$product_type}'");
             }
         } elseif ($old_type) {
-            // If we can't detect a type but one exists, log it
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("InterSoccer: Warning - Could not detect product type for product {$product_id}, but old type was '{$old_type}'");
-            }
+            intersoccer_warning("Could not detect product type for product {$product_id}, old type was '{$old_type}'");
         }
     }
 }
@@ -431,10 +420,6 @@ add_action('woocommerce_after_product_object_save', function($product) {
         $product_id = $product->get_id();
         // Force redetect from attributes when product object is saved
         InterSoccer_Product_Types::update_product_type_on_save($product_id, true);
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Product object saved for product {$product_id}, updating type");
-        }
     }
 }, 20, 1);
 
@@ -444,10 +429,6 @@ add_action('woocommerce_after_product_object_save', function($product) {
 add_action('woocommerce_update_product', function($product_id) {
     // Force redetect from attributes when product is updated
     InterSoccer_Product_Types::update_product_type_on_save($product_id, true);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("InterSoccer: Product updated for product {$product_id}, updating type");
-    }
 }, 20, 1);
 
 /**
@@ -484,10 +465,6 @@ add_action('shutdown', function() {
     if ($has_attributes) {
         $updated = true;
         InterSoccer_Product_Types::update_product_type_on_save($product_id, true);
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Shutdown hook - updating product type for product {$product_id} after attribute save");
-        }
     }
 }, 999);
 
@@ -504,10 +481,6 @@ add_action('woocommerce_save_product_variation', function($variation_id, $loop) 
         add_action('shutdown', function() use ($parent_id) {
             InterSoccer_Product_Types::update_product_type_on_save($parent_id, true);
         }, 999);
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("InterSoccer: Variation {$variation_id} saved, scheduling parent product {$parent_id} type update");
-        }
     }
 }, 99, 2);
 
@@ -516,7 +489,7 @@ add_action('woocommerce_save_product_variation', function($variation_id, $loop) 
  * @param int $product_id
  */
 function intersoccer_debug_product_info($product_id) {
-    if (!WP_DEBUG_LOG) {
+    if (!defined('WP_DEBUG') || !WP_DEBUG) {
         return;
     }
     

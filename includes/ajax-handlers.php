@@ -21,10 +21,6 @@ if (defined('INTERSOCCER_AJAX_HANDLERS_LOADED')) {
 }
 define('INTERSOCCER_AJAX_HANDLERS_LOADED', true);
 
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    intersoccer_debug('ajax-handlers.php loaded (fixed version) at ' . current_time('c'));
-}
-
 /**
  * CRITICAL: Get product type handler - THIS WAS MISSING and causing 400 error
  */
@@ -36,16 +32,9 @@ function intersoccer_ajax_get_product_type() {
         ob_clean();
     }
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: get_product_type called with data: ' . json_encode($_POST));
-    }
-
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: get_product_type nonce verification failed');
-        }
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         wp_die();
     }
@@ -53,20 +42,11 @@ function intersoccer_ajax_get_product_type() {
     // Validate product ID
     $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
     if (!$product_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: get_product_type missing product_id');
-        }
         wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-product-variations')], 400);
         wp_die();
     }
 
-    // Get product type using existing function
     $product_type = intersoccer_get_product_type($product_id);
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: get_product_type returning: ' . $product_type . ' for product ' . $product_id);
-    }
-    
     wp_send_json_success(['product_type' => $product_type]);
     wp_die();
 }
@@ -79,10 +59,6 @@ add_action('wp_ajax_nopriv_intersoccer_get_course_metadata', 'intersoccer_ajax_g
 function intersoccer_ajax_get_course_metadata() {
     if (ob_get_length()) {
         ob_clean();
-    }
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: get_course_metadata called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -125,10 +101,6 @@ function intersoccer_ajax_get_course_metadata() {
         'remaining_weeks' => $remaining_weeks
     ];
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: get_course_metadata returning: ' . json_encode($metadata));
-    }
-
     wp_send_json_success($metadata);
     wp_die();
 }
@@ -141,10 +113,6 @@ add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_aj
 function intersoccer_ajax_calculate_dynamic_price() {
     if (ob_get_length()) {
         ob_clean();
-    }
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: calculate_dynamic_price called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -187,10 +155,6 @@ function intersoccer_ajax_calculate_dynamic_price() {
         'remaining_weeks' => $remaining_weeks
     ];
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: calculate_dynamic_price returning: ' . json_encode($response));
-    }
-
     wp_send_json_success($response);
     wp_die();
 }
@@ -203,10 +167,6 @@ add_action('wp_ajax_nopriv_intersoccer_update_session_data', 'intersoccer_ajax_u
 function intersoccer_ajax_update_session_data() {
     if (ob_get_length()) {
         ob_clean();
-    }
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: update_session_data called with data: ' . json_encode($_POST));
     }
 
     // Verify nonce
@@ -229,13 +189,8 @@ function intersoccer_ajax_update_session_data() {
         'timestamp' => current_time('mysql')
     ];
 
-    // Store in transient (expires in 1 hour)
     $user_id = get_current_user_id() ?: 'guest_' . session_id();
     set_transient('intersoccer_session_' . $user_id, $session_data, HOUR_IN_SECONDS);
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: update_session_data stored: ' . json_encode($session_data));
-    }
 
     wp_send_json_success(['message' => __('Session updated.', 'intersoccer-product-variations'), 'data' => $session_data]);
     wp_die();
@@ -252,16 +207,9 @@ function intersoccer_ajax_get_user_players() {
         ob_end_clean();
     }
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: intersoccer_get_user_players called at ' . current_time('c'));
-    }
-
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: Nonce verification failed');
-        }
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         wp_die();
     }
@@ -269,9 +217,6 @@ function intersoccer_ajax_get_user_players() {
     // Check user authentication
     $user_id = get_current_user_id();
     if (!$user_id) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: User not logged in');
-        }
         wp_send_json_error(['message' => __('You must be logged in.', 'intersoccer-product-variations')], 403);
         wp_die();
     }
@@ -297,11 +242,6 @@ function intersoccer_ajax_get_user_players() {
     }
     
     $response = ['players' => $valid_players, 'count' => count($valid_players)];
-    
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Returned ' . count($valid_players) . ' players for user ' . $user_id);
-    }
-    
     wp_send_json_success($response);
     wp_die();
 }
@@ -317,25 +257,14 @@ function intersoccer_get_days_of_week() {
         ob_clean();
     }
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: intersoccer_get_days_of_week called at ' . current_time('c'));
-    }
-
     // Verify nonce
     $nonce = isset($_POST['nonce']) ? sanitize_text_field($_POST['nonce']) : '';
     if (!wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: Nonce verification failed for days_of_week');
-        }
         wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
         wp_die();
     }
 
-    // Validate required parameters
     if (!isset($_POST['product_id']) || !is_numeric($_POST['product_id'])) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: Invalid product_id in get_days_of_week');
-        }
         wp_send_json_error(['message' => __('Invalid product ID.', 'intersoccer-product-variations')], 400);
         return;
     }
@@ -359,9 +288,6 @@ function intersoccer_get_days_of_week() {
     $days = wc_get_product_terms($parent_id, 'pa_days-of-week', ['fields' => 'names']);
 
     if (empty($days)) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: No days found for product ' . $parent_id . ', using fallback');
-        }
         $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     } else {
         // Sort days in proper order
@@ -373,9 +299,6 @@ function intersoccer_get_days_of_week() {
         });
     }
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Returned days for product ' . $parent_id . ': ' . implode(', ', $days));
-    }
     wp_send_json_success(['days' => $days]);
 }
 
@@ -454,13 +377,5 @@ function intersoccer_get_course_info() {
         }, $holidays)
     ];
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Course info for ' . $variation_id . ': ' . json_encode($response));
-    }
     wp_send_json_success($response);
 }
-
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    intersoccer_debug('InterSoccer: Fixed ajax-handlers.php loaded with all required handlers');
-}
-?>

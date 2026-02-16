@@ -25,9 +25,7 @@ add_action('plugins_loaded', function () {
         false,
         dirname(plugin_basename(__FILE__)) . '/lang'
     );
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log('Text domain loaded: ' . (is_textdomain_loaded('intersoccer-product-variations') ? 'yes' : 'no'));
-    }
+    intersoccer_debug('Text domain loaded: ' . (is_textdomain_loaded('intersoccer-product-variations') ? 'yes' : 'no'));
 });
 
 // Register strings for WPML translation on init to ensure WPML is loaded
@@ -326,22 +324,16 @@ $includes = [
 foreach ($includes as $file) {
     if (file_exists(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file)) {
         require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file;
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Included ' . $file);
-        }
+        intersoccer_debug('InterSoccer: Included ' . $file);
     } else {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_warning('InterSoccer: Failed to include ' . $file . ' - File not found');
-        }
+        intersoccer_warning('InterSoccer: Failed to include ' . $file . ' - File not found');
     }
 }
 
 // Enqueue scripts and styles
 add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('Generated nonce for intersoccer_nonce: ' . $nonce);
-    }
+    intersoccer_debug('Generated nonce for intersoccer_nonce: ' . $nonce);
 
     if (is_product()) {
         $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
@@ -383,20 +375,12 @@ add_action('wp_enqueue_scripts', function () {
 
 // Register activation hook
 register_activation_hook(__FILE__, function () {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_info('InterSoccer: Plugin activated');
-    }
-    // if (!wp_next_scheduled('intersoccer_expire_products')) {
-    //     wp_schedule_event(time(), 'daily', 'intersoccer_expire_products');
-    // }
+    intersoccer_info('InterSoccer: Plugin activated');
 });
 
 // Register deactivation hook
 register_deactivation_hook(__FILE__, function () {
-    // wp_clear_scheduled_hook('intersoccer_expire_products');
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_info('InterSoccer: Plugin deactivated');
-    }
+    intersoccer_info('InterSoccer: Plugin deactivated');
 });
 
 // AJAX handler for nonce refresh
@@ -460,14 +444,10 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                     $days_checked++;
                 }
                 $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
-                }
+                intersoccer_debug('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
             } else {
                 $end_date = '';
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_warning('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
-                }
+                intersoccer_warning('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
             }
         }
         $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
@@ -476,9 +456,7 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
             return date_i18n('F j, Y', strtotime($date));
         }, $holidays);
         $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', holidays=' . json_encode($data['course_holiday_dates']) . ', sessions=' . $data['remaining_sessions'] . ', discount=' . $data['discount_note']);
-        }
+        intersoccer_debug('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', sessions=' . $data['remaining_sessions']);
     }
     return $data;
 }, 10, 3);

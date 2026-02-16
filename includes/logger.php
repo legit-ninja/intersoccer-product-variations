@@ -59,14 +59,23 @@ if (!class_exists('InterSoccer_Logger')) {
         }
 
         public static function info($message, array $context = []) {
+            if (!defined('WP_DEBUG') || !WP_DEBUG) {
+                return;
+            }
             self::log('info', $message, $context);
         }
 
         public static function notice($message, array $context = []) {
+            if (!defined('WP_DEBUG') || !WP_DEBUG) {
+                return;
+            }
             self::log('notice', $message, $context);
         }
 
         public static function warning($message, array $context = []) {
+            if (!defined('WP_DEBUG') || !WP_DEBUG) {
+                return;
+            }
             self::log('warning', $message, $context);
         }
 

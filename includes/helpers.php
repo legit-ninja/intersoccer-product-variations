@@ -105,10 +105,6 @@ function intersoccer_clear_players_cache_on_update($meta_id, $user_id, $meta_key
     // Only clear cache if intersoccer_players meta was updated
     if ($meta_key === 'intersoccer_players') {
         intersoccer_clear_user_players_cache($user_id);
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('InterSoccer: Cleared player cache for user ' . $user_id . ' after meta update');
-        }
     }
 }
 
