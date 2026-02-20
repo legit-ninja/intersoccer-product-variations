@@ -327,7 +327,8 @@ function intersoccer_get_days_of_week() {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             intersoccer_warning('InterSoccer: Nonce verification failed for days_of_week');
         }
-        return;
+        wp_send_json_error(['message' => __('Invalid nonce.', 'intersoccer-product-variations')], 403);
+        wp_die();
     }
 
     // Validate required parameters

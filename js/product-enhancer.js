@@ -180,7 +180,8 @@
             // Add players
             if (this.config.initialPlayers.length > 0) {
                 this.config.initialPlayers.forEach((player, index) => {
-                    $select.append(`<option value="${index}">${player.first_name} ${player.last_name}</option>`);
+                    const $option = $('<option>').val(index).text(player.first_name + ' ' + player.last_name);
+                    $select.append($option);
                 });
             } else {
                 // Show link to add players
