@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wpml-config>
+  <custom-fields>
+    <!-- Course variation metadata -->
+    <custom-field action="copy">_course_start_date</custom-field>
+    <custom-field action="copy">_course_total_weeks</custom-field>
+    <custom-field action="copy">_course_holiday_dates</custom-field>
+    <custom-field action="copy">_course_weekly_discount</custom-field>
+    <custom-field action="copy">_end_date</custom-field>
+
+    <!-- Camp/course display helpers -->
+    <custom-field action="copy">_camp_times</custom-field>
+
+    <!-- Late pickup configuration -->
+    <custom-field action="copy">_intersoccer_enable_late_pickup</custom-field>
+    <custom-field action="copy">_intersoccer_camp_days_available</custom-field>
+    <custom-field action="copy">_intersoccer_late_pickup_days_available</custom-field>
+
+    <!-- Download attachments/data -->
+    <custom-field action="copy">_intersoccer_downloads</custom-field>
+
+    <!-- Internal product typing -->
+    <custom-field action="copy">_intersoccer_product_type</custom-field>
+
+    <!-- Attribute meta (kept in sync across translated products/variations) -->
+    <custom-field action="copy">attribute_pa_booking-type</custom-field>
+    <custom-field action="copy">attribute_pa_program-season</custom-field>
+    <custom-field action="copy">attribute_pa_course-day</custom-field>
+  </custom-fields>
+
+  <admin-texts>
+    <!-- Admin-entered discount messaging + rules (stored as arrays in wp_options) -->
+    <key name="intersoccer_discount_messages" />
+    <key name="intersoccer_discount_rules" />
+  </admin-texts>
+
+  <shortcodes>
+    <shortcode>
+      <tag>intersoccer_course_info</tag>
+    </shortcode>
+  </shortcodes>
+</wpml-config>
+
