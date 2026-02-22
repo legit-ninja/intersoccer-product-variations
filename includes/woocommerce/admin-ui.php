@@ -890,25 +890,25 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 
                 $summary_html = '<div class="missing-summary">';
                 $summary_html .= '<strong>' . count($unique_missing) . ' types of missing fields:</strong><br>';
-                $summary_html .= '<small>' . implode(', ', array_slice($unique_missing, 0, 5));
+                $summary_html .= '<small>' . implode(', ', array_map('esc_html', array_slice($unique_missing, 0, 5)));
                 if (count($unique_missing) > 5) {
                     $summary_html .= ' <em>+' . (count($unique_missing) - 5) . ' more</em>';
                 }
                 $summary_html .= '</small></div>';
                 return $summary_html;
-                
+
             case 'risk_level':
                 $risk_colors = [
                     'low' => 'green',
-                    'medium' => 'orange', 
+                    'medium' => 'orange',
                     'high' => 'red'
                 ];
                 $color = $risk_colors[$item['risk_level']] ?? 'gray';
-                $risk_reasons = implode('<br>', array_slice($item['risk_reasons'], 0, 2)); // Show only first 2 reasons
-                
-                return sprintf('<span style="color: %s; font-weight: bold;">%s</span><br><small>%s</small>', 
-                    $color,
-                    strtoupper($item['risk_level']),
+                $risk_reasons = implode('<br>', array_map('esc_html', array_slice($item['risk_reasons'], 0, 2)));
+
+                return sprintf('<span style="color: %s; font-weight: bold;">%s</span><br><small>%s</small>',
+                    esc_attr($color),
+                    esc_html(strtoupper($item['risk_level'])),
                     $risk_reasons
                 );
                 
@@ -1112,10 +1112,14 @@ function intersoccer_render_update_orders_page() {
     $message = '';
     $show_preview = isset($_POST['preview_updates']) || isset($_POST['detailed_preview']);
     $show_detailed = isset($_POST['detailed_preview']);
-    
+
+    // Verify nonce for any POST action (preview or update)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($show_preview || isset($_POST['update_selected_orders']))) {
+        check_admin_referer('intersoccer_update_orders', 'intersoccer_update_orders_nonce');
+    }
+
     // Handle bulk update
     if (isset($_POST['update_selected_orders'])) {
-        check_admin_referer('intersoccer_update_orders', 'intersoccer_update_orders_nonce');
         
         $order_ids = isset($_POST['selected_order_ids']) ? array_map('intval', explode(',', $_POST['selected_order_ids'])) : [];
         $updated_count = 0;

@@ -1122,42 +1122,6 @@ function intersoccer_store_selected_days_callback() {
     }
 }
 
-/**
- * DEBUG: Test specific order 38734 and variation 35319
- */
-function debug_specific_order_38734() {
-    intersoccer_debug('=== DEBUGGING ORDER 38734 ===');
-
-    $variation_id = 35319;
-    $variation = wc_get_product($variation_id);
-
-    if (!$variation) {
-        intersoccer_warning('Variation 35319 not found');
-        return;
-    }
-
-    $base_price = $variation->get_price();
-    intersoccer_debug('Variation 35319 base price: ' . $base_price);
-
-    $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
-    intersoccer_debug('Variation 35319 booking type: ' . $booking_type);
-
-    // Test different camp_days scenarios
-    $test_scenarios = [
-        [], // Empty array
-        ['monday'], // 1 day
-        ['monday', 'tuesday', 'wednesday', 'thursday'], // 4 days
-    ];
-
-    foreach ($test_scenarios as $camp_days) {
-        $calculated_price = InterSoccer_Camp::calculate_price(0, $variation_id, $camp_days);
-        intersoccer_debug('Camp days ' . json_encode($camp_days) . ' -> Price: ' . $calculated_price);
-    }
-
-    intersoccer_debug('=== END DEBUG ORDER 38734 ===');
-}
-// debug_specific_order_38734(); // Uncomment to run
-
 intersoccer_debug('InterSoccer: Loaded cart-calculations.php');
 // function intersoccer_apply_combo_discounts_to_items($cart) {
 //     intersoccer_debug('InterSoccer: Starting cart calculation for ' . count($cart->get_cart()) . ' items');

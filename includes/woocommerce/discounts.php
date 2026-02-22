@@ -403,8 +403,8 @@ function intersoccer_get_previous_courses_by_parent($customer_id, $parent_produc
     foreach ($orders as $order) {
         $course_items = intersoccer_extract_course_items_from_order($order);
         foreach ($course_items as $course_item) {
-            if ($course_item['parent_product_id'] == $parent_product_id && 
-                $course_item['assigned_player'] == $assigned_player) {
+            if ((int) $course_item['parent_product_id'] === (int) $parent_product_id &&
+                (string) $course_item['assigned_player'] === (string) $assigned_player) {
                 $matching_courses[] = $course_item;
             }
         }
@@ -496,8 +496,8 @@ function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_pr
     foreach ($orders as $order) {
         $tournament_items = intersoccer_extract_tournament_items_from_order($order);
         foreach ($tournament_items as $tournament_item) {
-            if ($tournament_item['parent_product_id'] == $parent_product_id && 
-                $tournament_item['assigned_player'] == $assigned_player) {
+            if ((int) $tournament_item['parent_product_id'] === (int) $parent_product_id &&
+                (string) $tournament_item['assigned_player'] === (string) $assigned_player) {
                 $matching_tournaments[] = $tournament_item;
             }
         }
@@ -538,8 +538,8 @@ function intersoccer_get_previous_camps_by_parent($customer_id, $parent_product_
     foreach ($orders as $order) {
         $camp_items = intersoccer_extract_camp_items_from_order($order);
         foreach ($camp_items as $camp_item) {
-            if ($camp_item['parent_product_id'] == $parent_product_id && 
-                $camp_item['assigned_player'] == $assigned_player) {
+            if ((int) $camp_item['parent_product_id'] === (int) $parent_product_id &&
+                (string) $camp_item['assigned_player'] === (string) $assigned_player) {
                 $matching_camps[] = $camp_item;
             }
         }
