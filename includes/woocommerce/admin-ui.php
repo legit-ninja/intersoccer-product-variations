@@ -924,14 +924,25 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
         $limit = isset($_POST['preview_limit']) ? intval($_POST['preview_limit']) : 25;
         $fix_activity_type_only = isset($_POST['fix_activity_type_only']) && $_POST['fix_activity_type_only'] === '1';
         
-        // Get orders
-        $orders = wc_get_orders([
+        $orders_query_args = [
             'status' => $statuses,
             'type' => 'shop_order',
             'limit' => $limit,
             'orderby' => 'date',
-            'order' => 'DESC'
-        ]);
+            'order' => 'DESC',
+        ];
+        $previous_wpml_lang = null;
+        if (function_exists('apply_filters')) {
+            $previous_wpml_lang = apply_filters('wpml_current_language', null);
+        }
+        if (function_exists('do_action')) {
+            do_action('wpml_switch_language', 'all');
+        }
+        // Get orders (language-agnostic when WPML is active)
+        $orders = wc_get_orders($orders_query_args);
+        if (function_exists('do_action') && $previous_wpml_lang) {
+            do_action('wpml_switch_language', $previous_wpml_lang);
+        }
 
         $this->all_items = $this->analyze_orders($orders, $fix_activity_type_only);
         
@@ -977,15 +988,18 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 'risk_level' => 'low',
                 'risk_reasons' => []
             ];
+            $order_has_relevant_product = false;
 
             foreach ($order->get_items() as $item_id => $item) {
-                $product_id = $item->get_product_id();
-                $variation_id = $item->get_variation_id();
-                $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+                $resolved_context = intersoccer_resolve_order_item_product_context($item);
+                $product_id = (int) $resolved_context['resolved_product_id'];
+                $variation_id = (int) $resolved_context['variation_id'];
+                $product_type = $resolved_context['product_type'];
                 
                 if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
                     continue;
                 }
+                $order_has_relevant_product = true;
                 
                 $order_data['product_types'][] = ucfirst($product_type);
                 
@@ -1066,6 +1080,10 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 if (!empty($proposed)) {
                     $order_data['proposed_updates'][$item_id] = $proposed;
                 }
+            }
+            
+            if (!$order_has_relevant_product) {
+                continue;
             }
             
             // Only include orders that have missing metadata or incorrect Activity Type
@@ -1646,6 +1664,99 @@ function intersoccer_get_activity_type_in_language($product_type_slug, $existing
 }
 
 /**
+ * Resolve a reliable product ID and product type for an order item.
+ *
+ * @param WC_Order_Item_Product $item
+ * @return array<string,mixed>
+ */
+function intersoccer_resolve_order_item_product_context($item) {
+    $source_product_id = (int) $item->get_product_id();
+    $variation_id = (int) $item->get_variation_id();
+
+    // Some historical/broken line items store a variation post ID in product_id while variation_id is empty,
+    // or store variation ID in product_id while variation_id duplicates it. Normalize first.
+    $source_post_type = $source_product_id > 0 ? get_post_type($source_product_id) : '';
+    if ($source_post_type === 'product_variation' && $variation_id <= 0) {
+        $variation_id = $source_product_id;
+    }
+
+    $parent_from_variation = 0;
+    if ($variation_id > 0) {
+        $parent_from_variation = (int) wp_get_post_parent_id($variation_id);
+    }
+
+    $parent_from_source = 0;
+    if ($source_post_type === 'product_variation' && $source_product_id > 0) {
+        $parent_from_source = (int) wp_get_post_parent_id($source_product_id);
+    }
+
+    $parent_id = 0;
+    if ($parent_from_variation > 0) {
+        $parent_id = $parent_from_variation;
+    } elseif ($parent_from_source > 0) {
+        $parent_id = $parent_from_source;
+    } elseif ($source_post_type === 'product' && $source_product_id > 0) {
+        $maybe_parent = wc_get_product($source_product_id);
+        if ($maybe_parent && $maybe_parent->is_type('variable')) {
+            $parent_id = $source_product_id;
+        }
+    }
+
+    // 1) Prefer detecting type on the variable parent when possible.
+    if ($parent_id > 0) {
+        $parent_type = InterSoccer_Product_Types::get_product_type($parent_id);
+        if (is_string($parent_type) && in_array($parent_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+            return [
+                'source_product_id' => $source_product_id,
+                'variation_id' => $variation_id,
+                'resolved_product_id' => $parent_id,
+                'product_type' => $parent_type,
+            ];
+        }
+    }
+
+    // 2) WooCommerce often stores activity-type terms on the variation, not on the variable parent.
+    // If parent detection fails but we have a variation, detect from the variation and still return the parent ID
+    // for attribute/season lookups that expect a variable product.
+    if ($variation_id > 0) {
+        $variation_type = InterSoccer_Product_Types::get_product_type($variation_id);
+        if (is_string($variation_type) && in_array($variation_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+            $resolved_parent_id = $parent_id > 0 ? $parent_id : (int) wp_get_post_parent_id($variation_id);
+            return [
+                'source_product_id' => $source_product_id,
+                'variation_id' => $variation_id,
+                'resolved_product_id' => $resolved_parent_id > 0 ? $resolved_parent_id : $variation_id,
+                'product_type' => $variation_type,
+            ];
+        }
+    }
+
+    // 3) Last resort: try the raw source id (simple products, edge cases).
+    if ($source_product_id > 0 && $source_post_type === 'product') {
+        $source_type = InterSoccer_Product_Types::get_product_type($source_product_id);
+        if (is_string($source_type) && in_array($source_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+            return [
+                'source_product_id' => $source_product_id,
+                'variation_id' => $variation_id,
+                'resolved_product_id' => $source_product_id,
+                'product_type' => $source_type,
+            ];
+        }
+    }
+
+    return [
+        'source_product_id' => $source_product_id,
+        'variation_id' => $variation_id,
+        'resolved_product_id' => $parent_id > 0
+            ? $parent_id
+            : ($source_post_type === 'product_variation' && $parent_from_source > 0
+                ? $parent_from_source
+                : ($source_product_id > 0 ? $source_product_id : $variation_id)),
+        'product_type' => null,
+    ];
+}
+
+/**
  * Detects and updates missing metadata from order item details
  * 
  * @param WC_Order $order The order to update
@@ -1668,12 +1779,13 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
     }
 
     foreach ($order->get_items() as $item_id => $item) {
-        $product_id = $item->get_product_id();
-        $variation_id = $item->get_variation_id();
-        $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+        $resolved_context = intersoccer_resolve_order_item_product_context($item);
+        $product_id = (int) $resolved_context['resolved_product_id'];
+        $variation_id = (int) $resolved_context['variation_id'];
+        $product_type = $resolved_context['product_type'];
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Product ID: ' . $product_id . ', Variation ID: ' . $variation_id . ', Detected Type: ' . ($product_type ?: 'None'));
+            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Source Product ID: ' . $resolved_context['source_product_id'] . ', Resolved Product ID: ' . $product_id . ', Variation ID: ' . $variation_id . ', Detected Type: ' . ($product_type ?: 'None'));
         }
 
         // Skip non-relevant products
@@ -3101,14 +3213,25 @@ function intersoccer_automated_batch_update_callback() {
 // Function to get all orders that need updates (efficient version)
 function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
     intersoccer_debug('InterSoccer: Scanning for orders needing updates, limit: ' . $limit);
-    
-    $orders = wc_get_orders([
+
+    $orders_query_args = [
         'status' => $statuses,
         'type' => 'shop_order',
         'limit' => $limit,
         'orderby' => 'date',
         'order' => 'DESC'
-    ]);
+    ];
+    $previous_wpml_lang = null;
+    if (function_exists('apply_filters')) {
+        $previous_wpml_lang = apply_filters('wpml_current_language', null);
+    }
+    if (function_exists('do_action')) {
+        do_action('wpml_switch_language', 'all');
+    }
+    $orders = wc_get_orders($orders_query_args);
+    if (function_exists('do_action') && $previous_wpml_lang) {
+        do_action('wpml_switch_language', $previous_wpml_lang);
+    }
     
     $orders_needing_updates = [];
     
@@ -3118,8 +3241,8 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
         $needs_update = false;
         
         foreach ($order->get_items() as $item) {
-            $product_id = $item->get_product_id();
-            $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+            $resolved_context = intersoccer_resolve_order_item_product_context($item);
+            $product_type = $resolved_context['product_type'];
             
             if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
                 continue;
@@ -3540,25 +3663,92 @@ function intersoccer_emergency_stop_callback() {
  * Allows admins to assign or change the player/attendee for order items
  * in the WooCommerce order edit screen.
  */
-
 /**
  * Add player assignment dropdown to order items in admin
  */
+function intersoccer_is_admin_player_assignment_item($item, $product = null) {
+    if (!$item || !is_object($item) || !method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $eligible_types = ['camp', 'course', 'birthday', 'tournament'];
+    $candidate_product_ids = [];
+    $item_id = method_exists($item, 'get_id') ? (int) $item->get_id() : 0;
+
+    if (is_object($product) && method_exists($product, 'get_id')) {
+        $candidate_product_ids[] = (int) $product->get_id();
+        if (method_exists($product, 'get_parent_id')) {
+            $candidate_product_ids[] = (int) $product->get_parent_id();
+        }
+    }
+
+    if (method_exists($item, 'get_product_id')) {
+        $candidate_product_ids[] = (int) $item->get_product_id();
+    }
+    if (method_exists($item, 'get_variation_id')) {
+        $candidate_product_ids[] = (int) $item->get_variation_id();
+    }
+
+    $candidate_product_ids = array_values(array_unique(array_filter($candidate_product_ids)));
+
+    foreach ($candidate_product_ids as $candidate_product_id) {
+        $resolved_type = null;
+
+        if (function_exists('intersoccer_get_product_type_safe')) {
+            $resolved_type = intersoccer_get_product_type_safe($candidate_product_id, $candidate_product_id);
+        }
+
+        if (!$resolved_type && function_exists('intersoccer_get_product_type')) {
+            $resolved_type = intersoccer_get_product_type($candidate_product_id);
+        }
+
+        if (is_string($resolved_type) && in_array(strtolower(trim($resolved_type)), $eligible_types, true)) {
+            return true;
+        }
+    }
+
+    $assignment_signature_keys = [
+        'Assigned Attendee',
+        'Player Index',
+        'intersoccer_player_index',
+        'assigned_player',
+    ];
+    foreach ($assignment_signature_keys as $signature_key) {
+        $value = $item->get_meta($signature_key, true);
+        if ($value !== '' && $value !== null) {
+            return true;
+        }
+    }
+
+    $booking_shape_keys = [
+        'pa_course-day',
+        'pa_course-times',
+        'pa_camp-times',
+        'pa_camp-terms',
+        'Age Group',
+        'Camp Terms',
+        'Course Day',
+        'Course Times',
+        'Booking Type',
+    ];
+    foreach ($booking_shape_keys as $shape_key) {
+        $value = $item->get_meta($shape_key, true);
+        if ($value !== '' && $value !== null) {
+            return true;
+        }
+    }
+    return false;
+}
+
 add_action('woocommerce_before_order_itemmeta', 'intersoccer_add_player_assignment_dropdown_admin', 10, 3);
 function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $product) {
     // Only show in admin
     if (!is_admin()) {
         return;
     }
-    
-    // Only show for InterSoccer products (camp, course, birthday, tournament)
-    $product_id = $item->get_product_id();
-    $product_type = function_exists('intersoccer_get_product_type') 
-        ? intersoccer_get_product_type($product_id) 
-        : null;
-    
-    if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
-        return; // Not an InterSoccer product
+
+    if (!intersoccer_is_admin_player_assignment_item($item, $product)) {
+        return;
     }
     
     // Get the order and customer
@@ -3664,7 +3854,7 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
  */
 add_action('woocommerce_saved_order_items', 'intersoccer_save_player_assignment_from_admin', 10, 2);
 function intersoccer_save_player_assignment_from_admin($order_id, $items) {
-    if (!is_admin() || !isset($_POST['player_assignment'])) {
+    if (!is_admin() || !isset($_POST['player_assignment']) || !current_user_can('edit_shop_orders')) {
         return;
     }
     
@@ -3683,7 +3873,12 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             ? intersoccer_get_user_players($customer_id) 
             : (get_user_meta($customer_id, 'intersoccer_players', true) ?: []);
     
-    foreach ($_POST['player_assignment'] as $item_id => $selected_index) {
+    $posted_assignments = wp_unslash($_POST['player_assignment']);
+    if (!is_array($posted_assignments)) {
+        return;
+    }
+
+    foreach ($posted_assignments as $item_id => $selected_index) {
         $item = $order->get_item($item_id);
         if (!$item) {
             continue;
@@ -3694,6 +3889,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             $item->delete_meta_data('Assigned Attendee');
             $item->delete_meta_data('intersoccer_player_index');
             $item->delete_meta_data('Player Index');
+            $item->delete_meta_data('assigned_player');
             $item->delete_meta_data('Attendee DOB');
             $item->delete_meta_data('Attendee Gender');
             $item->delete_meta_data('Medical Conditions');
@@ -3704,7 +3900,8 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             }
             continue;
         }
-        
+        $selected_index = absint($selected_index);
+
         // Validate player exists
         if (!isset($players[$selected_index])) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -3720,6 +3917,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         // Update item metadata
         $item->update_meta_data('Assigned Attendee', $player_name);
         $item->update_meta_data('intersoccer_player_index', $selected_index);
+        $item->update_meta_data('assigned_player', $selected_index);
         
         // Also update Player Index for backwards compatibility
         $item->update_meta_data('Player Index', $selected_index);
