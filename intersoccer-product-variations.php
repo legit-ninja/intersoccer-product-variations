@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: InterSoccer
- * Version: 2.3.10
+ * Version: 2.4.17
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -105,6 +105,13 @@ add_action('init', function () {
             'Select PDF Document',
             'Use this file',
             'Please select at least one day for this single-day camp.',
+            'This booking requires a variation; age could not be verified.',
+            'The age group for this program could not be read. Please contact us or choose another session.',
+            'The program start date could not be determined, so age cannot be verified. Please contact us or try another option.',
+            'The selected attendee needs a valid date of birth. Update it under Manage Players: %s',
+            'The selected attendee needs a valid date of birth. Please update it in your account before booking.',
+            'The attendee date of birth is invalid or is after the program start date.',
+            'This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session.',
             '%d%% Camp Combo Discount (Child %d)',
             '%d%% Course Multi-Child Discount (Child %d)',
             '50%% Same Season Course Discount (Child %d, %s)',
@@ -313,6 +320,7 @@ $includes = [
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
+    'includes/woocommerce/age-group-verification.php',
     'includes/woocommerce/discount-messages.php',
     'includes/admin-product-fields.php',
     'includes/ajax-handlers.php',
