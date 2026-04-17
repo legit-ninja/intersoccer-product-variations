@@ -330,12 +330,9 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     
     // Check if this is a single-day booking type to show "Available Camp Days"
     $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
-    $is_single_day = ($booking_type === 'single-days' || 
-                     $booking_type === 'à la journée' || 
-                     $booking_type === 'a-la-journee' ||
-                     stripos($booking_type, 'single') !== false ||
-                     stripos($booking_type, 'journée') !== false ||
-                     stripos($booking_type, 'journee') !== false);
+    $is_single_day = function_exists('intersoccer_is_single_day_booking_type')
+        ? intersoccer_is_single_day_booking_type($booking_type)
+        : false;
     
     // Get saved day availability (default to all enabled)
     $camp_days_available = get_post_meta($variation_id, '_intersoccer_camp_days_available', true);

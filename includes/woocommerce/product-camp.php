@@ -35,12 +35,9 @@ class InterSoccer_Camp {
         $price = floatval($product->get_price());
         $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
 
-        // Check if this is a single-day booking
-        $is_single_day = stripos($booking_type, 'single') !== false ||
-                        stripos($booking_type, 'jour') !== false ||
-                        stripos($booking_type, 'day') !== false ||
-                        stripos($booking_type, 'einzel') !== false ||
-                        stripos($booking_type, 'tag') !== false;
+        $is_single_day = function_exists('intersoccer_is_single_day_booking_type')
+            ? intersoccer_is_single_day_booking_type($booking_type)
+            : false;
 
         if ($is_single_day) {
             $price_per_day = $price; // CHF 55/day as base price
@@ -74,7 +71,7 @@ class InterSoccer_Camp {
         if (isset($_POST['variation_id'])) {
             $variation_id = intval($_POST['variation_id']);
             $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
-            if ($booking_type === 'single-days') {
+            if (function_exists('intersoccer_is_single_day_booking_type') && intersoccer_is_single_day_booking_type($booking_type)) {
                 $camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
                 if (empty($camp_days)) {
                     $passed = false;

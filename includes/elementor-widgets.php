@@ -10,16 +10,29 @@
  */
 if (!defined('ABSPATH')) exit;
 
-add_action('woocommerce_before_single_product', function () {
+$intersoccer_elementor_product_page_cb = function () {
     global $product;
+    if (!is_a($product, 'WC_Product') && function_exists('get_queried_object_id') && function_exists('wc_get_product')) {
+        $qpid = (int) get_queried_object_id();
+        if ($qpid > 0) {
+            $maybe = wc_get_product($qpid);
+            if (is_a($maybe, 'WC_Product')) {
+                $product = $maybe;
+            }
+        }
+    }
     if (!is_a($product, 'WC_Product')) {
+        return;
+    }
+
+    if (defined('INTERSOCCER_PV_EXTRAS_EMITTED') && INTERSOCCER_PV_EXTRAS_EMITTED) {
         return;
     }
 
     $product_id = $product->get_id();
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
-    $product_type = intersoccer_get_product_type($product_id);
+    $product_type = function_exists('intersoccer_get_product_type') ? intersoccer_get_product_type($product_id) : null;
 
     // Preload days for Camps
     $preloaded_days = [];
@@ -138,6 +151,71 @@ add_action('woocommerce_before_single_product', function () {
         foreach ($variations as $variation) {
             $variation_id = $variation['variation_id'];
             $enable_late_pickup = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+            $variation_booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
+            if (!$variation_booking_type) {
+                $variation_booking_type = get_post_meta($variation_id, 'attribute_pa_booking_type', true);
+            }
+            if (!$variation_booking_type) {
+                $variation_booking_type = get_post_meta($variation_id, 'attribute_booking-type', true);
+            }
+            if (!$variation_booking_type) {
+                $variation_booking_type = get_post_meta($variation_id, 'attribute_booking_type', true);
+            }
+            if (!$variation_booking_type && isset($variation['attributes']) && is_array($variation['attributes'])) {
+                $variation_booking_type = $variation['attributes']['attribute_pa_booking-type']
+                    ?? $variation['attributes']['attribute_booking-type']
+                    ?? $variation['attributes']['attribute_pa_booking_type']
+                    ?? $variation['attributes']['attribute_booking_type']
+                    ?? '';
+                if (!$variation_booking_type) {
+                    foreach ($variation['attributes'] as $attr_key => $attr_value) {
+                        $key_l = strtolower((string) $attr_key);
+                        if (($key_l && (strpos($key_l, 'booking') !== false || strpos($key_l, 'buchung') !== false)) && !empty($attr_value)) {
+                            $variation_booking_type = (string) $attr_value;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!$variation_booking_type && function_exists('wc_get_product')) {
+                $variation_product = wc_get_product($variation_id);
+                if ($variation_product && method_exists($variation_product, 'get_attributes')) {
+                    $variation_attributes = $variation_product->get_attributes();
+                    if (is_array($variation_attributes)) {
+                        foreach ($variation_attributes as $attr_key => $attr_value) {
+                            $attr_key_l = strtolower((string) $attr_key);
+                            if (strpos($attr_key_l, 'booking') !== false || strpos($attr_key_l, 'buchung') !== false) {
+                                if (is_string($attr_value) && $attr_value !== '') {
+                                    $variation_booking_type = $attr_value;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!$variation_booking_type && $variation_product && method_exists($variation_product, 'get_variation_attributes')) {
+                    $variation_attr_map = $variation_product->get_variation_attributes();
+                    if (is_array($variation_attr_map)) {
+                        foreach ($variation_attr_map as $attr_key => $attr_value) {
+                            $attr_key_l = strtolower((string) $attr_key);
+                            if ((strpos($attr_key_l, 'booking') !== false || strpos($attr_key_l, 'buchung') !== false) && !empty($attr_value)) {
+                                $variation_booking_type = (string) $attr_value;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!$variation_booking_type && $variation_product && method_exists($variation_product, 'get_attribute')) {
+                    $attr_value = $variation_product->get_attribute('pa_booking-type');
+                    if (is_string($attr_value) && $attr_value !== '') {
+                        $variation_booking_type = $attr_value;
+                    }
+                }
+            }
+            $variation_booking_type = is_string($variation_booking_type) ? trim($variation_booking_type) : '';
+            $variation_is_single_day = function_exists('intersoccer_is_single_day_booking_type')
+                ? intersoccer_is_single_day_booking_type($variation_booking_type)
+                : false;
             
             // Get available days for this variation (default to all days if not set)
             $camp_days_available = get_post_meta($variation_id, '_intersoccer_camp_days_available', true);
@@ -160,6 +238,8 @@ add_action('woocommerce_before_single_product', function () {
                 'full_week_cost' => $full_week_cost,
                 'available_camp_days' => $available_camp_days,
                 'available_late_pickup_days' => $available_late_pickup_days,
+                'booking_type' => $variation_booking_type,
+                'is_single_day' => $variation_is_single_day,
             ];
         }
         
@@ -264,7 +344,7 @@ add_action('woocommerce_before_single_product', function () {
             });
             
             // Debug: Check for booking type specifically
-            var $bookingTypeSelect = $form.find('select[name="attribute_pa_booking-type"], select[name="attribute_booking-type"]');
+            var $bookingTypeSelect = $form.find('select[name="attribute_pa_booking-type"], select[name="attribute_booking-type"], select[name*="buchung"]');
             debug('InterSoccer Debug: Booking type select found:', $bookingTypeSelect.length > 0);
             if ($bookingTypeSelect.length > 0) {
                 debug('InterSoccer Debug: Booking type select value:', $bookingTypeSelect.val());
@@ -278,6 +358,75 @@ add_action('woocommerce_before_single_product', function () {
             var lastVariation = null;
             var lastVariationId = 0;
             var productType = '<?php echo esc_js($product_type); ?>';
+            window.intersoccerIsSingleDayBookingType = function (bookingType) {
+                if (bookingType == null || bookingType === '') {
+                    return false;
+                }
+                var bt = String(bookingType).toLowerCase();
+                if (bt === 'full-week' || bt.indexOf('full-week') !== -1) {
+                    return false;
+                }
+                if (bt.indexOf('ganze') !== -1 && bt.indexOf('woche') !== -1) {
+                    return false;
+                }
+                if (bt === 'single-days' || bt === 'à la journée' || bt === 'a-la-journee') {
+                    return true;
+                }
+                if (bt === 'tag' || /^(?:1[-_])?ein[-_]?tag$/.test(bt) || /^nur[-_]?tag$/.test(bt)) {
+                    return true;
+                }
+                return bt.indexOf('single') !== -1 || bt.indexOf('journée') !== -1 || bt.indexOf('journee') !== -1
+                    || bt.indexOf('einzel') !== -1 || bt.indexOf('ein-tag') !== -1 || bt.indexOf('eintag') !== -1 || bt.indexOf('1-tag') !== -1
+                    || bt.indexOf('taeglich') !== -1 || bt.indexOf('täglich') !== -1 || bt.indexOf('nur-tag') !== -1
+                    || bt.indexOf('pro-tag') !== -1 || bt.indexOf('pro_tag') !== -1
+                    || bt.indexOf('pro tag') !== -1 || bt.indexOf('tagesbuchung') !== -1 || bt.indexOf('tages-buchung') !== -1;
+            };
+            window.intersoccerGetBookingTypeFromForm = function ($f) {
+                if (!$f || !$f.length) {
+                    return '';
+                }
+                var v = $f.find('select[name="attribute_pa_booking-type"]').val();
+                if (v) {
+                    return String(v);
+                }
+                v = $f.find('select[name="attribute_booking-type"]').val();
+                if (v) {
+                    return String(v);
+                }
+                v = $f.find('select[id*="booking-type"], select[id*="buchung"]').val();
+                if (v) {
+                    return String(v);
+                }
+                v = $f.find('input[name="attribute_pa_booking-type"]').val();
+                if (v) {
+                    return String(v);
+                }
+                v = $f.find('input[name="attribute_booking-type"]').val();
+                if (v) {
+                    return String(v);
+                }
+                $f.find('select[name^="attribute_"]').each(function () {
+                    var n = (($(this).attr('name') || '')).toLowerCase();
+                    if (n.indexOf('booking') !== -1 || n.indexOf('buchung') !== -1) {
+                        var u = $(this).val();
+                        if (u) {
+                            v = u;
+                            return false;
+                        }
+                    }
+                });
+                if (v) {
+                    return String(v);
+                }
+                var $r = $f.find('input[type="radio"][name^="attribute_"]:checked').filter(function () {
+                    var n = (($(this).attr('name') || '')).toLowerCase();
+                    return n.indexOf('booking') !== -1 || n.indexOf('buchung') !== -1;
+                }).first();
+                if ($r.length) {
+                    return String($r.val() || '');
+                }
+                return '';
+            };
             var isSubmitting = false;
             var lastValidAvailableDays = null; // Cache last valid available days to prevent reset on player change
             
@@ -590,15 +739,29 @@ add_action('woocommerce_before_single_product', function () {
                     'Thursday': 'Thursday',
                     'Friday': 'Friday'
                 };
+                if (Object.keys(latePickupVariationSettings).length === 0) {
+                    var $settingsRow = $form.find('.intersoccer-late-pickup-row');
+                    if ($settingsRow.length) {
+                        try {
+                            latePickupVariationSettings = JSON.parse($settingsRow.attr('data-variation-settings') || '{}');
+                        } catch (e) {
+                            debugError('InterSoccer Debug: Failed to pre-load variation settings:', e);
+                        }
+                    }
+                }
 
                 // Show day selection for camp products with single-day bookings only
                 var isCamp = productType === 'camp';
-                var isSingleDayBooking = bookingType === 'single-days' || 
-                                       bookingType === 'à la journée' || 
-                                       bookingType === 'a-la-journee' ||
-                                       bookingType.toLowerCase().includes('single') || 
-                                       bookingType.toLowerCase().includes('journée') ||
-                                       bookingType.toLowerCase().includes('journee');
+                var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
+                if (!isSingleDayBooking) {
+                    var formVariationId = String($form.find('input[name="variation_id"]').val() || '');
+                    if (formVariationId && latePickupVariationSettings[formVariationId] && latePickupVariationSettings[formVariationId].is_single_day) {
+                        isSingleDayBooking = true;
+                        if (!bookingType && latePickupVariationSettings[formVariationId].booking_type) {
+                            bookingType = String(latePickupVariationSettings[formVariationId].booking_type);
+                        }
+                    }
+                }
                 
                 debug('  Condition: productType === "camp" ?', isCamp);
                 debug('  Condition: isSingleDayBooking ?', isSingleDayBooking);
@@ -1129,11 +1292,7 @@ add_action('woocommerce_before_single_product', function () {
             $form.on('intersoccer_update_button_state', function() {
                 var $button = $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
                 var playerId = $form.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select').val();
-                var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || 
-                                $form.find('select[name="attribute_booking-type"]').val() || 
-                                $form.find('select[id*="booking-type"]').val() || 
-                                $form.find('input[name="attribute_pa_booking-type"]').val() || 
-                                $form.find('input[name="attribute_booking-type"]').val() || '';
+                var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
                 // Fix: Check for null/undefined/empty string, but allow 0 (first player index)
                 var hasPlayer = playerId !== null && playerId !== undefined && playerId !== '';
                 
@@ -1152,12 +1311,7 @@ add_action('woocommerce_before_single_product', function () {
                 
                 // For single-day bookings, check if days are selected
                 var daysSelected = true;
-                if (bookingType === 'single-days' || 
-                    bookingType === 'à la journée' || 
-                    bookingType === 'a-la-journee' ||
-                    bookingType.toLowerCase().includes('single') || 
-                    bookingType.toLowerCase().includes('journée') ||
-                    bookingType.toLowerCase().includes('journee')) {
+                if (typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType)) {
                     var selectedDaysCount = $form.find('input[name="camp_days[]"]').length;
                     daysSelected = selectedDaysCount > 0;
                     debug('  Days selected for single-day booking:', daysSelected, 'count:', selectedDaysCount);
@@ -1171,12 +1325,7 @@ add_action('woocommerce_before_single_product', function () {
                 // Manage notifications based on what's missing
                 var $attendeeNotification = $form.find('.intersoccer-attendee-notification');
                 var $dayNotification = $form.find('.intersoccer-day-notification');
-                var isSingleDayBooking = bookingType === 'single-days' || 
-                                       bookingType === 'à la journée' || 
-                                       bookingType === 'a-la-journee' ||
-                                       bookingType.toLowerCase().includes('single') || 
-                                       bookingType.toLowerCase().includes('journée') ||
-                                       bookingType.toLowerCase().includes('journee');
+                var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
                 
                 if (shouldEnable) {
                     $button.prop('disabled', false).removeClass('disabled');
@@ -1256,7 +1405,7 @@ add_action('woocommerce_before_single_product', function () {
                 var variationId = $productForm.find('input[name="variation_id"]').val();
                 var $playerSelect = $productForm.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
                 var playerAssignment = $playerSelect.length > 0 ? $playerSelect.val() : '';
-                var bookingType = $productForm.find('select[name="attribute_pa_booking-type"]').val();
+                var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($productForm) : '';
                 var campDays = $productForm.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
                 
                 // CRITICAL: Ensure assigned_attendee field exists BEFORE reading its value
@@ -1298,12 +1447,7 @@ add_action('woocommerce_before_single_product', function () {
                 
                 // For single-day camps, require camp days
                 <?php if ($product_type === 'camp'): ?>
-                var isSingleDay = bookingType === 'single-days' || 
-                                 bookingType === 'à la journée' || 
-                                 bookingType === 'a-la-journee' ||
-                                 (bookingType && (bookingType.toLowerCase().indexOf('single') !== -1 || 
-                                  bookingType.toLowerCase().indexOf('journée') !== -1 || 
-                                  bookingType.toLowerCase().indexOf('journee') !== -1));
+                var isSingleDay = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
                 
                 if (isSingleDay && (!campDays || campDays.length === 0)) {
                     debug('InterSoccer: ❌ Validation failed - no camp days selected for single-day camp');
@@ -1456,7 +1600,7 @@ add_action('woocommerce_before_single_product', function () {
                 
                 // Debug: Log form data BEFORE any checks
                 var campDaysBeforeSubmit = $form.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
-                var bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
+                var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
                 var variationId = $form.find('input[name="variation_id"]').val();
                 var $playerSelect = $form.find('select[name="player_assignment"], .intersoccer-player-select, select#player_assignment_select');
                 var playerId = $playerSelect.val();
@@ -1540,17 +1684,13 @@ add_action('woocommerce_before_single_product', function () {
             debug('InterSoccer Debug: Day checkboxes element found:', $dayCheckboxes.length);
             
             // Initial render of day checkboxes
-            var initialBookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || 
-                                   $form.find('select[name="attribute_booking-type"]').val() || 
-                                   $form.find('select[id*="booking-type"]').val() || 
-                                   $form.find('input[name="attribute_pa_booking-type"]').val() || 
-                                   $form.find('input[name="attribute_booking-type"]').val() || '';
+            var initialBookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
             debug('InterSoccer Debug: Initial booking type detection:', initialBookingType);
             renderDayCheckboxes(initialBookingType, $daySelection, $dayCheckboxes, $form);
 
             // Handle booking type change
-            $form.find('select[name="attribute_pa_booking-type"], select[name="attribute_booking-type"], select[id*="booking-type"]').on('change', function() {
-                var bookingType = $(this).val();
+            $form.on('change', 'select[name="attribute_pa_booking-type"], select[name="attribute_booking-type"], select[id*="booking-type"], select[id*="buchung"], select[name*="buchung"]', function() {
+                var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : $(this).val();
                 debug('InterSoccer Debug: Booking type changed to:', bookingType);
                 
                 // Trigger WooCommerce variation check when booking type changes
@@ -1559,6 +1699,19 @@ add_action('woocommerce_before_single_product', function () {
                     $form.trigger('intersoccer_update_button_state');
                 }, 100);
                 
+                renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
+            });
+            $form.on('change', 'input[type="radio"][name^="attribute_"]', function() {
+                var n = (($(this).attr('name') || '')).toLowerCase();
+                if (n.indexOf('booking') === -1 && n.indexOf('buchung') === -1) {
+                    return;
+                }
+                var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : $(this).val();
+                debug('InterSoccer Debug: Booking type radio changed to:', bookingType);
+                setTimeout(function() {
+                    $form.trigger('check_variations');
+                    $form.trigger('intersoccer_update_button_state');
+                }, 100);
                 renderDayCheckboxes(bookingType, $daySelection, $dayCheckboxes, $form);
             });
 
@@ -1578,14 +1731,35 @@ add_action('woocommerce_before_single_product', function () {
                                          variation.attributes['attribute_booking-type'] ||
                                          variation.attributes.attribute_pa_booking_type ||
                                          variation.attributes.attribute_booking_type || '';
+                    if (!variationBookingType) {
+                        var svKeys = Object.keys(variation.attributes);
+                        for (var si = 0; si < svKeys.length; si++) {
+                            var sk = svKeys[si];
+                            var skl = sk.toLowerCase();
+                            if ((skl.indexOf('booking') !== -1 || skl.indexOf('buchung') !== -1) && variation.attributes[sk]) {
+                                variationBookingType = variation.attributes[sk];
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!variationBookingType) {
+                    variationBookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
+                }
+                if (!variationBookingType) {
+                    var showVariationId = variation && variation.variation_id ? String(variation.variation_id) : '';
+                    if (showVariationId && latePickupVariationSettings[showVariationId] && latePickupVariationSettings[showVariationId].booking_type) {
+                        variationBookingType = String(latePickupVariationSettings[showVariationId].booking_type);
+                    }
                 }
                 
-                var isSingleDayBooking = variationBookingType === 'single-days' ||
-                                       variationBookingType === 'à la journée' ||
-                                       variationBookingType === 'a-la-journee' ||
-                                       (variationBookingType && (variationBookingType.toLowerCase().includes('single') || 
-                                        variationBookingType.toLowerCase().includes('journée') || 
-                                        variationBookingType.toLowerCase().includes('journee')));
+                var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(variationBookingType);
+                if (!isSingleDayBooking) {
+                    var showVid = variation && variation.variation_id ? String(variation.variation_id) : '';
+                    if (showVid && latePickupVariationSettings[showVid] && latePickupVariationSettings[showVid].is_single_day) {
+                        isSingleDayBooking = true;
+                    }
+                }
                 
                 if (isSingleDayBooking) {
                     // Check if we have selected days
@@ -1692,6 +1866,26 @@ add_action('woocommerce_before_single_product', function () {
                                          variation.attributes['attribute_booking-type'] ||
                                          variation.attributes.attribute_pa_booking_type ||
                                          variation.attributes.attribute_booking_type || '';
+                    if (!variationBookingType) {
+                        var fvKeys = Object.keys(variation.attributes);
+                        for (var fi = 0; fi < fvKeys.length; fi++) {
+                            var fk = fvKeys[fi];
+                            var fkl = fk.toLowerCase();
+                            if ((fkl.indexOf('booking') !== -1 || fkl.indexOf('buchung') !== -1) && variation.attributes[fk]) {
+                                variationBookingType = variation.attributes[fk];
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!variationBookingType) {
+                    variationBookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
+                }
+                if (!variationBookingType) {
+                    var foundVariationId = variation && variation.variation_id ? String(variation.variation_id) : '';
+                    if (foundVariationId && latePickupVariationSettings[foundVariationId] && latePickupVariationSettings[foundVariationId].booking_type) {
+                        variationBookingType = String(latePickupVariationSettings[foundVariationId].booking_type);
+                    }
                 }
 
                 debug('InterSoccer: Booking type from variation:', variationBookingType);
@@ -1707,12 +1901,7 @@ add_action('woocommerce_before_single_product', function () {
                 // Update price for single-day bookings
                 // Note: Only on initial variation load when days are already selected
                 // Checkbox changes are handled by the dedicated checkbox change handler
-                var isSingleDayBooking = variationBookingType === 'single-days' ||
-                                       variationBookingType === 'à la journée' ||
-                                       variationBookingType === 'a-la-journee' ||
-                                       variationBookingType.toLowerCase().includes('single') ||
-                                       variationBookingType.toLowerCase().includes('journée') ||
-                                       variationBookingType.toLowerCase().includes('journee');
+                var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(variationBookingType);
                 if (isSingleDayBooking && selectedDays.length > 0) {
                     // Only update if days were already selected (page load with pre-selected days)
                     // Checkbox change events handle price updates for user interactions
@@ -1753,11 +1942,25 @@ add_action('woocommerce_before_single_product', function () {
                 debug('InterSoccer: Variation found:', variation);
                 
                 // Check if this is a single-day camp booking
-                var bookingType = variation.attributes && variation.attributes['attribute_pa_booking-type'];
+                var attrsFv = variation.attributes || {};
+                var bookingType = attrsFv['attribute_pa_booking-type'] || attrsFv['attribute_booking-type'] || attrsFv.attribute_pa_booking_type || attrsFv.attribute_booking_type || '';
+                if (!bookingType) {
+                    var attrKeys = Object.keys(attrsFv);
+                    for (var ai = 0; ai < attrKeys.length; ai++) {
+                        var ak = attrKeys[ai];
+                        var akl = ak.toLowerCase();
+                        if ((akl.indexOf('booking') !== -1 || akl.indexOf('buchung') !== -1) && attrsFv[ak]) {
+                            bookingType = attrsFv[ak];
+                            break;
+                        }
+                    }
+                }
+                if (!bookingType && typeof window.intersoccerGetBookingTypeFromForm === 'function') {
+                    bookingType = window.intersoccerGetBookingTypeFromForm($form);
+                }
                 debug('InterSoccer: Booking type:', bookingType);
                 
-                if (bookingType === 'single-day' || bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || 
-                    (bookingType && (bookingType.includes('single') || bookingType.includes('journée') || bookingType.includes('journee')))) {
+                if (typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType)) {
                     debug('InterSoccer: Single-day camp detected, setting up price update');
                     
                     // Store the original per-day price (only if not already stored)
@@ -1814,9 +2017,7 @@ add_action('woocommerce_before_single_product', function () {
                 $form.trigger('check_variations');
                 
                 // Also try to get current booking type and render
-                var currentBookingType = $form.find('select[name="attribute_pa_booking-type"]').val() || 
-                                       $form.find('select[name="attribute_booking-type"]').val() || 
-                                       $form.find('select[id*="booking-type"]').val() || '';
+                var currentBookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : '';
                 debug('InterSoccer: Initial booking type check:', currentBookingType);
                 if (currentBookingType) {
                     renderDayCheckboxes(currentBookingType, $daySelection, $dayCheckboxes, $form);
@@ -1931,9 +2132,8 @@ add_action('woocommerce_before_single_product', function () {
             }
 
             // Only make AJAX call if we have days selected or if this is a single-day booking
-            var bookingType = $form.find('select[name*="booking-type"]').val() || $form.find('input[name="variation_id"]').closest('.variation').find('select[name*="booking-type"]').val();
-            var isSingleDayBooking = bookingType === 'single-day' || bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || 
-                                   (bookingType && (bookingType.includes('single') || bookingType.includes('journée') || bookingType.includes('journee')));
+            var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($form) : ($form.find('select[name*="booking-type"]').val() || '');
+            var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
             
             if (isSingleDayBooking && selectedDays.length === 0) {
                 debug('InterSoccer: Single-day booking but no days selected, skipping AJAX');
@@ -2136,4 +2336,42 @@ add_action('woocommerce_before_single_product', function () {
         });
     </script>
 <?php
-});
+    if (!defined('INTERSOCCER_PV_EXTRAS_EMITTED')) {
+        define('INTERSOCCER_PV_EXTRAS_EMITTED', true);
+    }
+};
+
+add_action('woocommerce_before_single_product', $intersoccer_elementor_product_page_cb, 5);
+add_action('woocommerce_single_product_summary', $intersoccer_elementor_product_page_cb, 0);
+add_action('woocommerce_before_add_to_cart_form', $intersoccer_elementor_product_page_cb, 0);
+add_action('woocommerce_after_add_to_cart_form', $intersoccer_elementor_product_page_cb, 0);
+add_action('woocommerce_before_add_to_cart_button', $intersoccer_elementor_product_page_cb, 0);
+
+add_action(
+    'wp_footer',
+    static function () use ($intersoccer_elementor_product_page_cb) {
+        $on_product_context = (function_exists('is_product') && is_product())
+            || (function_exists('is_singular') && is_singular('product'));
+        if (!$on_product_context) {
+            return;
+        }
+        if (defined('INTERSOCCER_PV_EXTRAS_EMITTED') && INTERSOCCER_PV_EXTRAS_EMITTED) {
+            return;
+        }
+        global $product;
+        if (!is_a($product, 'WC_Product') && function_exists('get_queried_object_id') && function_exists('wc_get_product')) {
+            $qpid = (int) get_queried_object_id();
+            if ($qpid > 0) {
+                $maybe = wc_get_product($qpid);
+                if (is_a($maybe, 'WC_Product')) {
+                    $product = $maybe;
+                }
+            }
+        }
+        if (!is_a($product, 'WC_Product') || !$product->is_type('variable')) {
+            return;
+        }
+        call_user_func($intersoccer_elementor_product_page_cb);
+    },
+    999
+);

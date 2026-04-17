@@ -13,6 +13,20 @@
         return fallback;
     };
 
+    function intersoccerIsSingleDayBookingType(bt) {
+        if (bt == null || bt === '') return false;
+        const s = String(bt).toLowerCase();
+        if (s === 'full-week' || s.indexOf('full-week') !== -1) return false;
+        if (s.indexOf('ganze') !== -1 && s.indexOf('woche') !== -1) return false;
+        if (s === 'single-days' || s === 'à la journée' || s === 'a-la-journee') return true;
+        if (s === 'tag' || /^(?:1[-_])?ein[-_]?tag$/.test(s) || /^nur[-_]?tag$/.test(s)) return true;
+        return s.indexOf('single') !== -1 || s.indexOf('journée') !== -1 || s.indexOf('journee') !== -1
+            || s.indexOf('einzel') !== -1 || s.indexOf('ein-tag') !== -1 || s.indexOf('eintag') !== -1 || s.indexOf('1-tag') !== -1
+            || s.indexOf('taeglich') !== -1 || s.indexOf('täglich') !== -1 || s.indexOf('nur-tag') !== -1
+            || s.indexOf('pro-tag') !== -1 || s.indexOf('pro_tag') !== -1
+            || s.indexOf('pro tag') !== -1 || s.indexOf('tagesbuchung') !== -1 || s.indexOf('tages-buchung') !== -1;
+    }
+
     // Main enhancer object
     window.InterSoccerProductEnhancer = {
         // Configuration
@@ -226,7 +240,7 @@
         // Handle booking type change
         handleBookingTypeChange: function(bookingType) {
             if (!bookingType) return;
-            if (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) {
+            if (intersoccerIsSingleDayBookingType(bookingType)) {
                 this.showDaySelection();
                 this.renderDayCheckboxes();
             } else {
@@ -411,7 +425,7 @@
             
             // Check actual hidden inputs instead of this.state.selectedDays (which is managed by elementor-widgets.php)
             const actualSelectedDays = $form.find('input[name="camp_days[]"]').length;
-            const daysSelected = (!bookingType) ? true : (bookingType === 'single-days' || bookingType === 'à la journée' || bookingType === 'a-la-journee' || bookingType.toLowerCase().includes('single') || bookingType.toLowerCase().includes('journée') || bookingType.toLowerCase().includes('journee')) ? actualSelectedDays > 0 : true;
+            const daysSelected = (!bookingType) ? true : (intersoccerIsSingleDayBookingType(bookingType) ? actualSelectedDays > 0 : true);
             const isLoggedIn = this.config.userId > 0;
 
             console.log('InterSoccer Product Enhancer: Button state check - playerValue:', playerValue, 'player:', playerSelected, 'days:', daysSelected, 'actualDays:', actualSelectedDays, 'logged in:', isLoggedIn);

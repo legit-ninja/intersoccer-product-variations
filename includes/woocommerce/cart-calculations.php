@@ -85,13 +85,9 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
     // Get the booking type from the variation
     $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
 
-    // Check if this is a single-day booking (including French variants)
-    $is_single_day = $booking_type === 'single-days' || 
-                    $booking_type === 'à la journée' || 
-                    $booking_type === 'a-la-journee' ||
-                    stripos($booking_type, 'single') !== false || 
-                    stripos($booking_type, 'journée') !== false ||
-                    stripos($booking_type, 'journee') !== false;
+    $is_single_day = function_exists('intersoccer_is_single_day_booking_type')
+        ? intersoccer_is_single_day_booking_type($booking_type)
+        : false;
 
     // For single-day camps, require at least one day to be selected
     if ($is_single_day) {
@@ -689,14 +685,23 @@ function intersoccer_add_price_update_script() {
                     console.log('InterSoccer: Variation found (debounced), id: ' + currentVariationId + ', booking_type: ' + (variation.attributes.attribute_pa_booking_type || 'none'));
                 }
 
-                // Show/hide day selection based on booking type
-                var bookingType = variation.attributes.attribute_pa_booking_type || '';
-                var isSingleDayBooking = bookingType === 'single-days' ||
-                                       bookingType === 'à la journée' ||
-                                       bookingType === 'a-la-journee' ||
-                                       bookingType.toLowerCase().includes('single') ||
-                                       bookingType.toLowerCase().includes('journée') ||
-                                       bookingType.toLowerCase().includes('journee');
+                // Show/hide day selection based on booking type (hyphen + underscore keys; DE/WPML slugs)
+                var attrs = variation.attributes || {};
+                var bookingType = attrs.attribute_pa_booking_type || attrs['attribute_pa_booking-type'] || attrs.attribute_booking_type || attrs['attribute_booking-type'] || '';
+                function intersoccerIsSingleDayBookingTypeCart(bt) {
+                    if (bt == null || bt === '') return false;
+                    var b = String(bt).toLowerCase();
+                    if (b === 'full-week' || b.indexOf('full-week') !== -1) return false;
+                    if (b.indexOf('ganze') !== -1 && b.indexOf('woche') !== -1) return false;
+                    if (b === 'single-days' || b === 'à la journée' || b === 'a-la-journee') return true;
+                    if (b === 'tag' || /^(?:1[-_])?ein[-_]?tag$/.test(b) || /^nur[-_]?tag$/.test(b)) return true;
+                    return b.indexOf('single') !== -1 || b.indexOf('journée') !== -1 || b.indexOf('journee') !== -1
+                        || b.indexOf('einzel') !== -1 || b.indexOf('ein-tag') !== -1 || b.indexOf('eintag') !== -1 || b.indexOf('1-tag') !== -1
+                        || b.indexOf('taeglich') !== -1 || b.indexOf('täglich') !== -1 || b.indexOf('nur-tag') !== -1
+                        || b.indexOf('pro-tag') !== -1 || b.indexOf('pro_tag') !== -1
+                        || b.indexOf('pro tag') !== -1 || b.indexOf('tagesbuchung') !== -1 || b.indexOf('tages-buchung') !== -1;
+                }
+                var isSingleDayBooking = intersoccerIsSingleDayBookingTypeCart(bookingType);
 
                 console.log('InterSoccer: isSingleDayBooking check:', isSingleDayBooking, 'for booking type:', bookingType);
 
@@ -867,12 +872,9 @@ function intersoccer_calculate_camp_price_callback() {
 
     // Check if this is a single-day camp booking
     $booking_type = get_post_meta($variation_id, 'attribute_pa_booking-type', true);
-    $is_single_day = $booking_type === 'single-days' || 
-                    $booking_type === 'à la journée' || 
-                    $booking_type === 'a-la-journee' ||
-                    stripos($booking_type, 'single') !== false || 
-                    stripos($booking_type, 'journée') !== false ||
-                    stripos($booking_type, 'journee') !== false;
+    $is_single_day = function_exists('intersoccer_is_single_day_booking_type')
+        ? intersoccer_is_single_day_booking_type($booking_type)
+        : false;
     
     if ($is_single_day && empty($camp_days)) {
         wp_send_json_error(['message' => 'No camp days selected']);
