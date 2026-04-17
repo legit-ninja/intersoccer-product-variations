@@ -41,16 +41,20 @@ class InterSoccer_Product_Types {
             return null;
         }
 
-        // Check transient cache first
+        // Check transient cache first (never treat empty string as a permanent "miss" — allows WPML / late meta)
         $transient_key = 'intersoccer_type_' . $product_id;
         $cached_type = get_transient($transient_key);
         if (false !== $cached_type) {
-            return $cached_type ?: null;
+            if ($cached_type === '' || $cached_type === null) {
+                delete_transient($transient_key);
+            } else {
+                return $cached_type;
+            }
         }
 
         $product = wc_get_product($product_id);
         if (!$product) {
-            set_transient($transient_key, '', HOUR_IN_SECONDS);
+            delete_transient($transient_key);
             return null;
         }
 
@@ -77,7 +81,38 @@ class InterSoccer_Product_Types {
             return $product_type;
         }
 
-        set_transient($transient_key, '', HOUR_IN_SECONDS);
+        // WPML: translations often lack copied meta/terms; inherit from default-language product.
+        if (function_exists('apply_filters')) {
+            $default_lang = apply_filters('wpml_default_language', null);
+            if ($default_lang) {
+                $original_id = (int) apply_filters('wpml_object_id', $product_id, 'product', true, $default_lang);
+                if ($original_id > 0 && $original_id !== (int) $product_id) {
+                    $from_original_meta = get_post_meta($original_id, '_intersoccer_product_type', true);
+                    if ($from_original_meta && in_array($from_original_meta, ['camp', 'course', 'birthday', 'tournament'], true)) {
+                        update_post_meta($product_id, '_intersoccer_product_type', $from_original_meta);
+                        set_transient($transient_key, $from_original_meta, HOUR_IN_SECONDS);
+                        return $from_original_meta;
+                    }
+                    $orig_product = wc_get_product($original_id);
+                    if ($orig_product) {
+                        $from_orig = self::detect_type_from_attribute($orig_product);
+                        if (!$from_orig) {
+                            $from_orig = self::detect_type_from_category($original_id);
+                        }
+                        if ($from_orig) {
+                            update_post_meta($product_id, '_intersoccer_product_type', $from_orig);
+                            if (!get_post_meta($original_id, '_intersoccer_product_type', true)) {
+                                update_post_meta($original_id, '_intersoccer_product_type', $from_orig);
+                            }
+                            set_transient($transient_key, $from_orig, HOUR_IN_SECONDS);
+                            return $from_orig;
+                        }
+                    }
+                }
+            }
+        }
+
+        delete_transient($transient_key);
         return null;
     }
 
@@ -161,7 +196,28 @@ class InterSoccer_Product_Types {
 
         // Translation map: canonical -> language variants (slugs and names)
         $translation_map = [
-            'camp' => ['camp', 'camps', 'camp de vacances', 'lager', 'campeggio'],
+            // NOTE: Some catalogs use non-core activity slugs on `pa_activity-type` (e.g. "event")
+            // plus audience/modifier terms (e.g. "girls-only"). These still represent camp-style products
+            // for InterSoccer's purposes, but must be recognized or product type detection returns null.
+            'camp' => [
+                'camp',
+                'camps',
+                'camp de vacances',
+                'lager',
+                'campeggio',
+                'event',
+                'events',
+                'evenement',
+                'événement',
+                'eveil',
+                'eveil football',
+                'girls-only',
+                'girls_only',
+                'girlsonly',
+                'filles',
+                'madchen',
+                'mädchen',
+            ],
             'course' => ['course', 'cours', 'kurs', 'corso', 'stage'],
             'birthday' => ['birthday', 'anniversaire', 'geburtstag', 'compleanno'],
             'tournament' => ['tournament', 'tournoi', 'turnier', 'torneo'],
