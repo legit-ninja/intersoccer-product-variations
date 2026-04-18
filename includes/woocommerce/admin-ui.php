@@ -1774,9 +1774,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
     $overall_updated = false;
     $order_id = $order->get_id();
     
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Processing metadata update for order ' . $order_id . ' (customer ID: ' . $order->get_customer_id() . ')');
-    }
 
     foreach ($order->get_items() as $item_id => $item) {
         $resolved_context = intersoccer_resolve_order_item_product_context($item);
@@ -1784,15 +1781,9 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         $variation_id = (int) $resolved_context['variation_id'];
         $product_type = $resolved_context['product_type'];
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Source Product ID: ' . $resolved_context['source_product_id'] . ', Resolved Product ID: ' . $product_id . ', Variation ID: ' . $variation_id . ', Detected Type: ' . ($product_type ?: 'None'));
-        }
 
         // Skip non-relevant products
         if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping: Not a relevant product type.');
-            }
             continue;
         }
 
@@ -1800,9 +1791,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         $existing_meta = $item->get_meta_data();
         $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Existing meta keys: ' . implode(', ', $existing_keys));
-        }
 
         $item_updated = false;
 
@@ -1811,9 +1799,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         $assigned_player = in_array('assigned_player', $existing_keys) ? $item->get_meta('assigned_player', true) : 0;
         $player_details = intersoccer_get_player_details($user_id, $assigned_player);
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Player details from helper: ' . (empty($player_details['name']) ? 'Empty' : $player_details['name']));
-        }
 
         // Build potential updates array (SAME LOGIC AS WORKING DEEP DEBUG)
         $potential_updates = [
@@ -1868,9 +1853,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
             $potential_updates['Base Price'] = wc_price($base_price);
         }
 
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Potential updates count: ' . count($potential_updates));
-        }
 
         // Apply updates (SAME LOGIC AS WORKING DEEP DEBUG)
         foreach ($potential_updates as $key => $value) {
@@ -1881,23 +1863,13 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
             
             // Skip null or empty values (except for Medical Conditions which can be 'None')
             if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping ' . $key . ' - value is null/empty');
-                }
                 continue;
             }
             
             if (!in_array($key, $existing_keys)) {
                 // If fix_activity_type_only is enabled, don't add missing fields, only fix incorrect ones
                 if ($fix_activity_type_only) {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Skipping missing ' . $key . ' (fix_activity_type_only mode)');
-                    }
                     continue;
-                }
-                
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - SHOULD UPDATE: ' . $key . ' = ' . $value . ' (missing from existing keys)');
                 }
                 
                 try {
@@ -1939,16 +1911,8 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
                                 intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED TO UPDATE ' . $key . ': ' . $e->getMessage());
                             }
                         }
-                    } else {
-                        // Normalized values match - same product type, just different language (correct!)
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Activity Type is correct (normalized match: ' . $normalized_existing . '), preserving language: "' . $existing_value . '"');
-                        }
                     }
                 } else {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Already exists: ' . $key);
-                    }
                 }
             }
         }
@@ -1958,17 +1922,10 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
             try {
                 $item->save();
                 $overall_updated = true;
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - Item saved successfully');
-                }
             } catch (Exception $e) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED to save item: ' . $e->getMessage());
                 }
-            }
-        } else {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - No updates needed');
             }
         }
     }
@@ -1977,9 +1934,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
     if ($overall_updated) {
         try {
             $order->save();
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Order ' . $order_id . ' - Order saved successfully');
-            }
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Order ' . $order_id . ' - FAILED to save order: ' . $e->getMessage());

@@ -917,20 +917,12 @@ add_action('woocommerce_before_calculate_totals', function($cart) {
 add_action('woocommerce_before_calculate_totals', 'intersoccer_apply_combo_discounts_to_items', 20);
 
 function intersoccer_apply_combo_discounts_to_items($cart) {
-    intersoccer_debug('InterSoccer: ===== DISCOUNT FUNCTION CALLED =====');
-    intersoccer_debug('InterSoccer: is_admin=' . (is_admin() ? 'yes' : 'no') . ', DOING_AJAX=' . (defined('DOING_AJAX') && DOING_AJAX ? 'yes' : 'no'));
-    intersoccer_debug('InterSoccer: did_action count=' . did_action('woocommerce_before_calculate_totals'));
-    
     if (is_admin() && !defined('DOING_AJAX')) {
-        intersoccer_debug('InterSoccer: EXITING - is_admin and not AJAX');
         return;
     }
     if (did_action('woocommerce_before_calculate_totals') >= 2) {
-        intersoccer_debug('InterSoccer: EXITING - prevent loops (did_action >= 2)');
         return;  // Prevent loops
     }
-    
-    intersoccer_debug('InterSoccer: Starting discount calculations, cart has ' . count($cart->get_cart()) . ' items');
 
     // Reset all items to base price
     foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
@@ -1315,21 +1307,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         // Apply Tournament Same-Child Multiple Days Discount
         $tournament_same_child_rate = $discount_rates['tournament']['same_child_multiple_days'] ?? null;
         
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer Tournament: Checking same-child multiple days discount');
-            intersoccer_debug('InterSoccer Tournament: Rate from settings: ' . ($tournament_same_child_rate !== null ? ($tournament_same_child_rate * 100) . '%' : 'NULL/DISABLED'));
-            intersoccer_debug('InterSoccer Tournament: Available rates: ' . print_r($discount_rates['tournament'] ?? [], true));
-        }
-        
         if ($tournament_same_child_rate !== null) {
             $customer_id = get_current_user_id();
             $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer Tournament: Customer ID: ' . $customer_id);
-                intersoccer_debug('InterSoccer Tournament: Lookback months: ' . $lookback_months);
-                intersoccer_debug('InterSoccer Tournament: Tournaments in context: ' . count($context['tournaments_by_child']));
-            }
             
             // Group tournaments by assigned player and parent product
             $tournaments_by_player_parent = array();
@@ -1352,19 +1332,11 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 }
             }
             
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer Tournament: Grouped into ' . count($tournaments_by_player_parent) . ' groups by player/parent');
-            }
-            
             // Process each group
             foreach ($tournaments_by_player_parent as $key => $group) {
                 $parent_product_id = $group['parent_product_id'];
                 $assigned_player = $group['assigned_player'];
                 $cart_items = $group['cart_items'];
-                
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer Tournament: Processing group - Parent: ' . $parent_product_id . ', Player: ' . $assigned_player . ', Cart items: ' . count($cart_items));
-                }
                 
                 // Get previous tournaments for this combination
                 $previous_tournaments = intersoccer_get_previous_tournaments_by_parent(
@@ -1374,23 +1346,11 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     $lookback_months
                 );
                 
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer Tournament: Found ' . count($previous_tournaments) . ' previous tournaments');
-                }
-                
                 // Count total tournament days (previous + current cart)
                 $total_days = count($previous_tournaments) + count($cart_items);
-                
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    intersoccer_debug('InterSoccer Tournament: Total days (previous + cart): ' . $total_days);
-                }
-                
+
                 // Apply discount to 2nd+ days in current cart
                 if ($total_days >= 2) {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer Tournament: Total days >= 2, applying discount logic');
-                    }
-                    
                     // Sort cart items by price (ascending) to discount cheaper items
                     usort($cart_items, function($a, $b) { return $a['price'] <=> $b['price']; });
                     
@@ -1400,21 +1360,13 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     foreach ($cart_items as $index => $item) {
                         $day_position = $previous_count + $index + 1; // 1-based position
                         
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer Tournament: Item ' . $index . ' - Position: ' . $day_position . ', Price: ' . $item['price']);
-                        }
-                        
                         // Apply discount to 2nd+ days
                         if ($day_position >= 2) {
                             $percent = $tournament_same_child_rate;
                             $cart_key = $item['cart_key'];
                             $base_price = $cart->cart_contents[$cart_key]['base_price'];
                             $discounted_price = $base_price * (1 - $percent);
-                            
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                intersoccer_debug('InterSoccer Tournament: Applying ' . ($percent * 100) . '% discount - Base: ' . $base_price . ', Discounted: ' . $discounted_price);
-                            }
-                            
+
                             $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
                             $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
                             
@@ -1423,15 +1375,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                             $cart->cart_contents[$cart_key]['discount_note'] = $message;
                             
                             intersoccer_debug('InterSoccer: Applied tournament same-child discount ' . ($percent * 100) . '% to day ' . $day_position . ' for item ' . $item['product_id'] . ' for attendee ' . $assigned_player);
-                        } else {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                intersoccer_debug('InterSoccer Tournament: Day position ' . $day_position . ' < 2, no discount applied');
-                            }
                         }
-                    }
-                } else {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer Tournament: Total days < 2 (' . $total_days . '), no discount applied');
                     }
                 }
             }
@@ -1921,42 +1865,4 @@ function intersoccer_clear_discount_session() {
     }
 }
 
-/**
- * Debug function to log cart state for discount troubleshooting
- */
-function intersoccer_debug_discount_cart() {
-    if (!defined('WP_DEBUG') || !WP_DEBUG) {
-        return;
-    }
-    
-    intersoccer_debug('=== InterSoccer Discount Debug ===');
-    
-    if (WC()->cart && !WC()->cart->is_empty()) {
-        $cart_items = WC()->cart->get_cart();
-        foreach ($cart_items as $cart_item_key => $cart_item) {
-            $product_id = $cart_item['product_id'];
-            $product_type = intersoccer_get_product_type($product_id);
-            $assigned_player = $cart_item['assigned_player'] ?? $cart_item['assigned_attendee'] ?? 'not set';
-            $price = $cart_item['data']->get_price();
-            
-            intersoccer_debug("Cart Item: {$cart_item_key}");
-            intersoccer_debug("  Product ID: {$product_id}");
-            intersoccer_debug("  Product Type: {$product_type}");
-            intersoccer_debug("  Assigned Player: {$assigned_player}");
-            intersoccer_debug("  Price: {$price}");
-        }
-        
-        $fees = WC()->cart->get_fees();
-        intersoccer_debug('Current fees: ' . print_r($fees, true));
-    }
-    
-    intersoccer_debug('=== End Discount Debug ===');
-}
-
-// Add debug hook when WP_DEBUG is enabled
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    add_action('woocommerce_cart_calculate_fees', 'intersoccer_debug_discount_cart', 999);
-}
-
-intersoccer_debug('InterSoccer: Loaded ENHANCED discounts.php with precise allocation and reporting integration');
 ?>

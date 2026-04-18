@@ -779,7 +779,6 @@ function intersoccer_validate_discount_message_functions() {
         return false;
     }
     
-    intersoccer_debug("InterSoccer: All required functions for discount messages are available");
     return true;
 }
 
@@ -845,28 +844,21 @@ add_action('plugins_loaded', 'intersoccer_emergency_discount_fallback', 5);
  */
 if (!function_exists('intersoccer_get_current_language')) {
 function intersoccer_get_current_language() {
-    // Log function call for debugging
-    intersoccer_debug('InterSoccer: intersoccer_get_current_language() called');
-    
     // Check for WPML
     if (function_exists('icl_get_current_language')) {
         $lang = icl_get_current_language();
-        intersoccer_debug('InterSoccer: WPML detected, current language: ' . $lang);
         return $lang;
     }
     
     // Check for Polylang
     if (function_exists('pll_current_language')) {
         $lang = pll_current_language();
-        intersoccer_debug('InterSoccer: Polylang detected, current language: ' . $lang);
         return $lang ? $lang : 'en';
     }
     
     // Fallback to WordPress locale
     $locale = get_locale();
     $lang = substr($locale, 0, 2); // Extract language code from locale (e.g., 'en' from 'en_US')
-    
-    intersoccer_debug('InterSoccer: No multilingual plugin detected, using WordPress locale: ' . $locale . ' -> ' . $lang);
     
     return $lang;
 }
@@ -945,7 +937,6 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
     if (function_exists('icl_register_string')) {
         $name = $name ?: md5($string);
         icl_register_string($context, $name, $string);
-        intersoccer_debug("InterSoccer: Registered WPML string - Context: {$context}, Name: {$name}, String: {$string}");
         return true;
     }
     
@@ -953,11 +944,9 @@ function intersoccer_register_string_for_translation($string, $context = 'inters
     if (function_exists('pll_register_string')) {
         $name = $name ?: $string;
         pll_register_string($name, $string, $context);
-        intersoccer_debug("InterSoccer: Registered Polylang string - Context: {$context}, Name: {$name}, String: {$string}");
         return true;
     }
-    
-    intersoccer_debug("InterSoccer: No multilingual plugin available for string registration: {$string}");
+
     return false;
 }
 }
@@ -1074,9 +1063,5 @@ add_action('admin_init', 'intersoccer_init_language_support', 15);
 // Initialize on init for frontend
 add_action('init', 'intersoccer_init_language_support', 15);
 
-intersoccer_debug('InterSoccer: Language helper functions loaded');
-
 add_action('admin_init', 'intersoccer_initialize_default_messages');
-
-intersoccer_debug('InterSoccer: Loaded discount messages integration with WPML support');
 ?>
