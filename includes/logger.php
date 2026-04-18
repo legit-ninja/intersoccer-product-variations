@@ -47,7 +47,14 @@ if (!class_exists('InterSoccer_Logger')) {
                 return;
             }
 
-            error_log('InterSoccer [' . strtoupper($level) . ']: ' . self::interpolate($message, $context));
+            // Prevent repeated fallback spam when Woo logger is unavailable.
+            static $fallback_seen = [];
+            $line = 'InterSoccer [' . strtoupper($level) . ']: ' . self::interpolate($message, $context);
+            if (isset($fallback_seen[$line])) {
+                return;
+            }
+            $fallback_seen[$line] = true;
+            error_log($line);
         }
 
         public static function debug($message, array $context = []) {
