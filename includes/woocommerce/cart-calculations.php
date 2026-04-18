@@ -12,6 +12,50 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Day values posted from camp_days[] fields (becomes $_POST['camp_days'] in PHP).
+ *
+ * @return string[]
+ */
+function intersoccer_get_posted_camp_days() {
+    if (!isset($_POST['camp_days']) || !is_array($_POST['camp_days'])) {
+        return [];
+    }
+    $out = [];
+    foreach ($_POST['camp_days'] as $d) {
+        $d = sanitize_text_field(wp_unslash((string) $d));
+        if ($d !== '') {
+            $out[] = $d;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Variable camp/course products must POST the full variation form (player, days, etc.).
+ */
+add_filter(
+    'woocommerce_product_supports',
+    static function ($supports, $feature, $product) {
+        if ($feature !== 'ajax_add_to_cart') {
+            return $supports;
+        }
+        if (!$product instanceof WC_Product || !$product->is_type('variable')) {
+            return $supports;
+        }
+        if (!function_exists('intersoccer_get_product_type')) {
+            return $supports;
+        }
+        $ptype = intersoccer_get_product_type($product->get_id());
+        if (in_array($ptype, ['camp', 'course'], true)) {
+            return false;
+        }
+        return $supports;
+    },
+    10,
+    3
+);
+
+/**
  * Add custom data from product form to cart item.
  */
 add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_data', 10, 3);
@@ -27,8 +71,9 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
     }
 
     // Camp days
-    if (isset($_POST['camp_days']) && is_array($_POST['camp_days'])) {
-        $cart_item_data['camp_days'] = array_map('sanitize_text_field', $_POST['camp_days']);
+    $posted_camp_days = intersoccer_get_posted_camp_days();
+    if (!empty($posted_camp_days)) {
+        $cart_item_data['camp_days'] = $posted_camp_days;
     }
 
     // Late pickup data
@@ -82,8 +127,23 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
         return $passed;
     }
 
-    // Get the booking type from the variation
-    $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
+    $booking_type = '';
+    $vid = (int) $variation_id;
+    if ($vid > 0) {
+        foreach (['attribute_pa_booking-type', 'attribute_pa_booking_type', 'attribute_booking-type', 'attribute_booking_type'] as $meta_key) {
+            $booking_type = (string) get_post_meta($vid, $meta_key, true);
+            if ($booking_type !== '') {
+                break;
+            }
+        }
+    }
+    if ($booking_type === '' && is_array($variations)) {
+        $booking_type = (string) ($variations['attribute_pa_booking-type']
+            ?? $variations['attribute_pa_booking_type']
+            ?? $variations['attribute_booking-type']
+            ?? $variations['attribute_booking_type']
+            ?? '');
+    }
 
     $is_single_day = function_exists('intersoccer_is_single_day_booking_type')
         ? intersoccer_is_single_day_booking_type($booking_type)
@@ -91,7 +151,7 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
 
     // For single-day camps, require at least one day to be selected
     if ($is_single_day) {
-        $camp_days = isset($_POST['camp_days']) ? (array) $_POST['camp_days'] : [];
+        $camp_days = intersoccer_get_posted_camp_days();
 
         if (empty($camp_days)) {
             wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');

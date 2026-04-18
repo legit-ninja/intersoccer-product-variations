@@ -96,10 +96,12 @@
 
             // Player selection change
             $form.on('change', '.intersoccer-player-select', function() {
-                // For camps, delegate button state to elementor-widgets.php via custom event
+                // For camps, delegate button state to elementor-widgets.php (body namespaced — may differ from enhancer's $form node)
                 if (self.config.productType === 'camp') {
                     console.log('InterSoccer Product Enhancer: Player changed, triggering intersoccer_update_button_state event');
-                    $form.trigger('intersoccer_update_button_state');
+                    if (self.config.productId) {
+                        jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_' + self.config.productId);
+                    }
                 } else {
                     self.updateButtonState();
                 }
@@ -133,7 +135,9 @@
             this.populatePlayerSelect($form);
             // For camps, delegate to elementor-widgets.php
             if (this.config.productType === 'camp') {
-                $form.trigger('intersoccer_update_button_state');
+                if (this.config.productId) {
+                    jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_' + this.config.productId);
+                }
             } else {
                 this.updateButtonState();
             }
@@ -216,7 +220,9 @@
 
             // For camps, delegate to elementor-widgets.php
             if (this.config.productType === 'camp') {
-                $(this.state.formSelector).trigger('intersoccer_update_button_state');
+                if (this.config.productId) {
+                    jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_' + this.config.productId);
+                }
             } else {
                 this.updateButtonState();
             }
@@ -248,7 +254,9 @@
             }
             // For camps, delegate to elementor-widgets.php
             if (this.config.productType === 'camp') {
-                $(this.state.formSelector).trigger('intersoccer_update_button_state');
+                if (this.config.productId) {
+                    jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_' + this.config.productId);
+                }
             } else {
                 this.updateButtonState();
             }
@@ -312,7 +320,9 @@
 
             // For camps, delegate to elementor-widgets.php
             if (this.config.productType === 'camp') {
-                $form.trigger('intersoccer_update_button_state');
+                if (this.config.productId) {
+                    jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_' + this.config.productId);
+                }
             } else {
                 this.updateButtonState();
             }
@@ -365,8 +375,8 @@
             const $form = $(this.state.formSelector);
             
             // Check player selection
-            const playerId = $form.find('.intersoccer-player-select').val();
-            if (!playerId) {
+            const playerId = $form.find('.intersoccer-player-selection select[name="player_assignment"], select[name="player_assignment"], .intersoccer-player-select').first().val();
+            if (playerId === null || playerId === undefined || playerId === '') {
                 this.showError('player', getPlayerMessage('selectAttendeeShort', 'Please select an attendee.'));
                 return false;
             }
