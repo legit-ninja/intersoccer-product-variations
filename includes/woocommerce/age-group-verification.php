@@ -150,16 +150,60 @@ function intersoccer_parse_age_group_bounds($label_or_slug) {
 }
 
 /**
- * Normalize month token from camp-terms slug for date parsing.
+ * Normalize month token from camp-terms slug to an English month name strtotime() understands.
  *
- * @param string $token e.g. "october".
- * @return string
+ * @param string $token e.g. "october", "juni", "juillet".
+ * @return string English month name or best-effort ucfirst fallback.
  */
 function intersoccer_pv_normalize_camp_month_token($token) {
-    $t = strtolower(trim($token));
+    $t = strtolower(trim((string) $token));
     if ($t === '') {
-        return $t;
+        return '';
     }
+    if (function_exists('remove_accents')) {
+        $t = remove_accents($t);
+    }
+
+    static $map = null;
+    if ($map === null) {
+        $map = [
+            'january' => 'January', 'jan' => 'January',
+            'february' => 'February', 'feb' => 'February',
+            'march' => 'March', 'mar' => 'March',
+            'april' => 'April', 'apr' => 'April',
+            'may' => 'May',
+            'june' => 'June', 'jun' => 'June',
+            'july' => 'July', 'jul' => 'July',
+            'august' => 'August', 'aug' => 'August',
+            'september' => 'September', 'sep' => 'September', 'sept' => 'September',
+            'october' => 'October', 'oct' => 'October',
+            'november' => 'November', 'nov' => 'November',
+            'december' => 'December', 'dec' => 'December',
+            'januar' => 'January',
+            'februar' => 'February',
+            'marz' => 'March', 'mrz' => 'March', 'maerz' => 'March',
+            'mai' => 'May',
+            'juni' => 'June',
+            'juli' => 'July',
+            'oktober' => 'October',
+            'dezember' => 'December',
+            'janvier' => 'January',
+            'fevrier' => 'February',
+            'mars' => 'March',
+            'avril' => 'April',
+            'juin' => 'June',
+            'juillet' => 'July',
+            'aout' => 'August',
+            'septembre' => 'September',
+            'octobre' => 'October',
+            'decembre' => 'December',
+        ];
+    }
+
+    if (isset($map[$t])) {
+        return $map[$t];
+    }
+
     return ucfirst($t);
 }
 
@@ -241,6 +285,24 @@ function intersoccer_parse_camp_start_date_from_terms($camp_terms_slug, $season)
     }
 
     if (preg_match('/(\w+)-week-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-days/', $camp_terms, $matches)) {
+        return $make_ymd($matches[2], $matches[3], $year);
+    }
+
+    // German storefront slugs (WPML): e.g. sommer-woche-2-juni-29-juli-3-5-tage
+    if (preg_match('/(\w+)-woche-\d+-(\w+)-(\d{1,2})-(\w+)-(\d{1,2})-\d+-tage/u', $camp_terms, $matches)) {
+        return $make_ymd($matches[2], $matches[3], $year);
+    }
+
+    if (preg_match('/(\w+)-woche-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-tage/u', $camp_terms, $matches)) {
+        return $make_ymd($matches[2], $matches[3], $year);
+    }
+
+    // French storefront slugs: e.g. été-semaine-2-juin-29-juillet-3-5-jours
+    if (preg_match('/(\w+)-semaine-\d+-(\w+)-(\d{1,2})-(\w+)-(\d{1,2})-\d+-jours/ui', $camp_terms, $matches)) {
+        return $make_ymd($matches[2], $matches[3], $year);
+    }
+
+    if (preg_match('/(\w+)-semaine-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-jours/ui', $camp_terms, $matches)) {
         return $make_ymd($matches[2], $matches[3], $year);
     }
 
@@ -590,11 +652,15 @@ function intersoccer_validate_player_age_on_add_to_cart($passed, $product_id, $q
         return $passed;
     }
 
-    if (!isset($_POST['player_assignment']) || $_POST['player_assignment'] === '') {
+    if (!isset($_POST['player_assignment'])) {
+        return $passed;
+    }
+    $posted_player = wp_unslash($_POST['player_assignment']);
+    if ($posted_player === '' || $posted_player === null) {
         return $passed;
     }
 
-    $player_index = absint($_POST['player_assignment']);
+    $player_index = absint($posted_player);
     $result = intersoccer_validate_line_player_age($user_id, $player_index, $product_id, (int) $variation_id);
     if (is_wp_error($result)) {
         wc_add_notice($result->get_error_message(), 'error');

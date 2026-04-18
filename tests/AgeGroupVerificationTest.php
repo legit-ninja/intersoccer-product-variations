@@ -95,6 +95,12 @@ class AgeGroupVerificationTest extends TestCase {
         $this->assertSame('2025-06-24', $start);
     }
 
+    public function test_parse_camp_start_date_german_wpml_slug() {
+        $slug = 'sommer-woche-2-juni-29-juli-3-5-tage';
+        $start = intersoccer_parse_camp_start_date_from_terms($slug, '2026');
+        $this->assertSame('2026-06-29', $start);
+    }
+
     public function test_age_on_date() {
         $this->assertSame(10, intersoccer_age_on_date('2015-06-01', '2025-06-01'));
         $this->assertSame(9, intersoccer_age_on_date('2015-06-02', '2025-06-01'));
