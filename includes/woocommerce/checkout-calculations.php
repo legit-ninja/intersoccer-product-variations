@@ -81,15 +81,26 @@ function intersoccer_get_player_details($user_id, $player_index) {
     $players = function_exists('intersoccer_get_user_players') 
         ? intersoccer_get_user_players($user_id) 
         : (get_user_meta($user_id, 'intersoccer_players', true) ?: []);
-    
-    if (isset($players[$player_index])) {
-        $player = $players[$player_index];
+
+    if (!is_array($players)) {
+        $players = [];
+    }
+    $slot = function_exists('intersoccer_resolve_intersoccer_players_meta_key')
+        ? intersoccer_resolve_intersoccer_players_meta_key($players, $player_index)
+        : (array_key_exists($player_index, $players) ? $player_index : null);
+
+    if ($slot !== null && isset($players[$slot])) {
+        $player = $players[$slot];
+        $gender_val = isset($player['gender']) ? trim((string) ($player['gender'])) : '';
+        if ($gender_val === '' && isset($player['player_gender'])) {
+            $gender_val = trim((string) $player['player_gender']);
+        }
         return [
             'first_name' => $player['first_name'] ?? '',
             'last_name' => $player['last_name'] ?? '',
             'name' => trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? '')),
             'dob' => $player['dob'] ?? '',
-            'gender' => $player['gender'] ?? '',
+            'gender' => $gender_val,
             'medical_conditions' => $player['medical_conditions'] ?? ''
         ];
     }
@@ -450,13 +461,16 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
  */
 add_filter('woocommerce_add_cart_item_data', 'intersoccer_ensure_player_assignment_format', 5, 4);
 function intersoccer_ensure_player_assignment_format($cart_item_data, $product_id, $variation_id, $quantity) {
-    if (isset($_POST['player_assignment']) && !isset($cart_item_data['assigned_player'])) {
-        $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Normalized player_assignment to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
+    if (!isset($cart_item_data['assigned_player']) && function_exists('intersoccer_get_posted_player_assignment_index')) {
+        $idx = intersoccer_get_posted_player_assignment_index();
+        if ($idx !== null) {
+            $cart_item_data['assigned_player'] = $idx;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                intersoccer_debug('InterSoccer: Normalized posted attendee to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
+            }
         }
     }
-    
+
     return $cart_item_data;
 }
 

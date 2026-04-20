@@ -31,6 +31,79 @@ function intersoccer_get_posted_camp_days() {
 }
 
 /**
+ * Resolve posted attendee value to intersoccer_players index (numeric or full-name match).
+ *
+ * @param int    $user_id Logged-in customer (0 when guest).
+ * @param string $raw     Raw POST value.
+ * @return int|string|null Canonical intersoccer_players key when resolvable (int for numeric keys).
+ */
+function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, $raw) {
+    $v = trim((string) $raw);
+    if ($v === '') {
+        return null;
+    }
+    if (preg_match('/^\d+$/', $v)) {
+        $n = absint($v);
+        $uid = (int) $user_id;
+        if ($uid > 0 && function_exists('intersoccer_get_user_players') && function_exists('intersoccer_resolve_intersoccer_players_meta_key')) {
+            $players = intersoccer_get_user_players($uid);
+            if (is_array($players) && $players !== []) {
+                $slot = intersoccer_resolve_intersoccer_players_meta_key($players, $n);
+                if ($slot !== null) {
+                    return is_int($slot) ? $slot : (is_string($slot) && ctype_digit((string) $slot) ? (int) $slot : $slot);
+                }
+            }
+        }
+        return $n;
+    }
+    $user_id = (int) $user_id;
+    if ($user_id <= 0 || !function_exists('intersoccer_get_user_players')) {
+        return null;
+    }
+    $players = intersoccer_get_user_players($user_id);
+    if (!is_array($players)) {
+        return null;
+    }
+    $needle = strtolower(preg_replace('/\s+/u', ' ', $v));
+    foreach ($players as $idx => $p) {
+        if (!is_array($p)) {
+            continue;
+        }
+        $full = trim(preg_replace('/\s+/u', ' ', ($p['first_name'] ?? '') . ' ' . ($p['last_name'] ?? '')));
+        if ($full === '') {
+            continue;
+        }
+        if (strtolower($full) === $needle) {
+            return (int) $idx;
+        }
+    }
+    return null;
+}
+
+/**
+ * Player index from the add-to-cart request (intersoccer_players array key).
+ * Elementor uses player_assignment; variation-details.js syncs assigned_attendee (index or display name).
+ *
+ * @return int|string|null Canonical meta key when resolvable; null when not posted or not resolvable.
+ */
+function intersoccer_get_posted_player_assignment_index() {
+    $uid = (int) get_current_user_id();
+    if (isset($_POST['player_assignment']) && $_POST['player_assignment'] !== '' && $_POST['player_assignment'] !== null) {
+        $resolved = intersoccer_resolve_player_index_from_posted_attendee_string($uid, (string) wp_unslash($_POST['player_assignment']));
+        if ($resolved !== null) {
+            return $resolved;
+        }
+    }
+    if (isset($_POST['assigned_attendee']) && $_POST['assigned_attendee'] !== '' && $_POST['assigned_attendee'] !== null) {
+        $resolved = intersoccer_resolve_player_index_from_posted_attendee_string($uid, (string) wp_unslash($_POST['assigned_attendee']));
+        if ($resolved !== null) {
+            return $resolved;
+        }
+    }
+    return null;
+}
+
+/**
  * Variable camp/course products must POST the full variation form (player, days, etc.).
  */
 add_filter(
@@ -62,9 +135,10 @@ add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_d
 function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
     intersoccer_debug('Add cart item: product=' . $product_id . ', variation=' . $variation_id);
 
-    // Assigned player
-    if (isset($_POST['player_assignment'])) {
-        $cart_item_data['assigned_player'] = absint($_POST['player_assignment']);
+    // Assigned player (player_assignment or hidden assigned_attendee from variation-details.js)
+    $posted_player_index = intersoccer_get_posted_player_assignment_index();
+    if ($posted_player_index !== null) {
+        $cart_item_data['assigned_player'] = $posted_player_index;
         $user_id = get_current_user_id();
         $player_details = intersoccer_get_player_details($user_id, $cart_item_data['assigned_player']);
         $cart_item_data['assigned_attendee'] = $player_details['name'];

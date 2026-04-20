@@ -273,10 +273,9 @@ $intersoccer_elementor_product_page_cb = function () {
 ?>
     <script>
         jQuery(document).ready(function($) {
-            // Debug helper function - only logs when WP_DEBUG is enabled
-            var debug = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.log.apply(console, arguments); }' : 'function() {}'; ?>;
-            var debugWarn = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.warn.apply(console, arguments); }' : 'function() {}'; ?>;
-            var debugError = <?php echo (defined('WP_DEBUG') && WP_DEBUG) ? 'function() { console.error.apply(console, arguments); }' : 'function() {}'; ?>;
+            var debug = function() {};
+            var debugWarn = function() {};
+            var debugError = function() {};
 
             // Elementor / alternate templates: intersoccer-variation-details may not load, so wp_localize_script never ran — merge PHP-safe defaults.
             window.intersoccerCheckout = $.extend(true, {}, window.intersoccerCheckout || {}, {
@@ -1016,10 +1015,15 @@ $intersoccer_elementor_product_page_cb = function () {
                                     $select.append(
                                         $('<option>', { value: '' }).text(intersoccerPlayerI18n.selectAttendee)
                                     );
-                                    $.each(response.data.players, function(index, player) {
+                                    $.each(response.data.players, function(loopPos, player) {
                                         if (player && player.first_name && player.last_name) {
+                                            // Must use server meta index (player.index), not jQuery each position — sparse
+                                            // intersoccer_players keys (e.g. after deletes) otherwise mismatch and ATC reads wrong row.
+                                            var metaIndex = (player.index !== undefined && player.index !== null && player.index !== '')
+                                                ? String(player.index)
+                                                : String(loopPos);
                                             $select.append(
-                                                $('<option>', { value: index }).text(player.first_name + ' ' + player.last_name)
+                                                $('<option>', { value: metaIndex }).text(player.first_name + ' ' + player.last_name)
                                             );
                                         } else {
                                             debugWarn('InterSoccer: Invalid player data:', player);

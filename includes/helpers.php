@@ -88,11 +88,54 @@ function intersoccer_clear_user_players_cache($user_id = null) {
  */
 function intersoccer_get_player_by_index($user_id, $player_index) {
     $players = intersoccer_get_user_players($user_id);
-    
-    if (isset($players[$player_index]) && is_array($players[$player_index])) {
-        return $players[$player_index];
+
+    if (!is_array($players)) {
+        return null;
     }
-    
+    $key = intersoccer_resolve_intersoccer_players_meta_key($players, $player_index);
+    if ($key !== null && isset($players[$key]) && is_array($players[$key])) {
+        return $players[$key];
+    }
+
+    return null;
+}
+
+/**
+ * Map a posted player slot to the real intersoccer_players array key.
+ *
+ * Front-ends sometimes send 0..n-1 (list position) while user meta uses sparse keys (e.g. after a child
+ * row was removed). Prefer exact key match, then int-string match, then Nth key in array order.
+ *
+ * @param array<int|string, mixed> $players   intersoccer_players meta value (array of player rows).
+ * @param mixed                    $requested Posted index or key from forms / AJAX.
+ * @return int|string|null Real array key, or null if not resolvable.
+ */
+function intersoccer_resolve_intersoccer_players_meta_key(array $players, $requested) {
+    if ($players === []) {
+        return null;
+    }
+    if ($requested === null || $requested === '') {
+        return null;
+    }
+    if (array_key_exists($requested, $players)) {
+        return $requested;
+    }
+    $as_int = null;
+    if (is_int($requested)) {
+        $as_int = $requested;
+    } elseif (is_string($requested) && $requested !== '' && ctype_digit($requested)) {
+        $as_int = (int) $requested;
+    }
+    if ($as_int !== null && array_key_exists($as_int, $players)) {
+        return $as_int;
+    }
+    if ($as_int === null) {
+        return null;
+    }
+    $keys = array_keys($players);
+    if ($as_int >= 0 && $as_int < count($keys)) {
+        return $keys[$as_int];
+    }
     return null;
 }
 
