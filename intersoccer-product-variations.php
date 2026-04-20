@@ -321,6 +321,7 @@ $includes = [
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
     'includes/woocommerce/age-group-verification.php',
+    'includes/woocommerce/girls-only-verification.php',
     'includes/woocommerce/discount-messages.php',
     'includes/admin-product-fields.php',
     'includes/ajax-handlers.php',
