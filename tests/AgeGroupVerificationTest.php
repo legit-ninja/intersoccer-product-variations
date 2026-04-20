@@ -111,4 +111,42 @@ class AgeGroupVerificationTest extends TestCase {
         $this->assertSame('2025-01-15', intersoccer_parse_loose_date_to_ymd('2025-01-15'));
         $this->assertNotNull(intersoccer_parse_loose_date_to_ymd('January 15, 2025'));
     }
+
+    public function test_program_reference_date_from_discovery_inputs_prefers_course() {
+        $slug = 'autumn-week-4-october-20-october-24-5-days';
+        $ref = intersoccer_program_reference_date_from_discovery_inputs(
+            '2025-03-01',
+            $slug,
+            'Autumn 2025',
+            'January 1, 2025'
+        );
+        $this->assertSame('2025-03-01', $ref);
+    }
+
+    public function test_program_reference_date_from_discovery_inputs_camp_before_event() {
+        $slug = 'autumn-week-4-october-20-october-24-5-days';
+        $ref = intersoccer_program_reference_date_from_discovery_inputs(
+            'not-a-date',
+            $slug,
+            'Autumn 2025',
+            'January 1, 2025'
+        );
+        $this->assertSame('2025-10-20', $ref);
+    }
+
+    public function test_program_reference_date_from_discovery_inputs_event_when_no_camp() {
+        $ref = intersoccer_program_reference_date_from_discovery_inputs(
+            '',
+            '',
+            '',
+            '2025-07-04'
+        );
+        $this->assertSame('2025-07-04', $ref);
+    }
+
+    public function test_program_reference_date_from_discovery_inputs_returns_null_when_empty() {
+        $this->assertNull(
+            intersoccer_program_reference_date_from_discovery_inputs('', '', '', '')
+        );
+    }
 }

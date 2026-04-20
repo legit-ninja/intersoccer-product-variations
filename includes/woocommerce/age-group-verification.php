@@ -80,6 +80,26 @@ function intersoccer_get_variation_age_group_slug($variation_id) {
 }
 
 /**
+ * Whether the line has pa_age-group (variation first, else unambiguous parent).
+ *
+ * @param int $product_id   Parent product ID.
+ * @param int $variation_id Variation ID (0 for simple or parent-only resolution).
+ * @return bool
+ */
+function intersoccer_line_has_age_group_attribute($product_id, $variation_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return false;
+    }
+    $variation_id = (int) $variation_id;
+    if ($variation_id > 0 && intersoccer_get_variation_age_group_slug($variation_id) !== '') {
+        return true;
+    }
+    $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
+    return is_string($label) && $label !== '';
+}
+
+/**
  * Parse inclusive min/max ages from an age-group label or slug.
  *
  * @param string $label_or_slug Term name, slug fragment, or storefront string.
@@ -340,13 +360,13 @@ function intersoccer_parse_loose_date_to_ymd($value) {
 }
 
 /**
- * Resolve tournament/birthday reference date from attributes.
+ * First non-empty pa_date / date attribute string (variation then parent).
  *
  * @param int $product_id   Parent product ID.
  * @param int $variation_id Variation ID.
- * @return string|null Y-m-d
+ * @return string Raw value or empty string.
  */
-function intersoccer_get_event_date_from_product_attributes($product_id, $variation_id) {
+function intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id) {
     $candidates = [];
     $variation = $variation_id ? wc_get_product($variation_id) : null;
     $parent = wc_get_product($product_id);
@@ -361,15 +381,50 @@ function intersoccer_get_event_date_from_product_attributes($product_id, $variat
     }
 
     foreach ($candidates as $raw) {
-        if (!is_string($raw) || $raw === '') {
-            continue;
-        }
-        $ymd = intersoccer_parse_loose_date_to_ymd($raw);
-        if ($ymd) {
-            return $ymd;
+        if (is_string($raw) && $raw !== '') {
+            return $raw;
         }
     }
 
+    return '';
+}
+
+/**
+ * Resolve tournament/birthday reference date from attributes.
+ *
+ * @param int $product_id   Parent product ID.
+ * @param int $variation_id Variation ID.
+ * @return string|null Y-m-d
+ */
+function intersoccer_get_event_date_from_product_attributes($product_id, $variation_id) {
+    $raw = intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id);
+    if ($raw === '') {
+        return null;
+    }
+    return intersoccer_parse_loose_date_to_ymd($raw);
+}
+
+/**
+ * Reference date when type-specific resolution failed or product type is unknown (course → camp → event).
+ *
+ * @param string      $course_start_ymd  _course_start_date value (Y-m-d).
+ * @param string      $camp_terms_slug   pa_camp-terms slug.
+ * @param string      $season_str        Season label for year extraction.
+ * @param string      $event_date_raw    pa_date / date attribute string.
+ * @return string|null Y-m-d
+ */
+function intersoccer_program_reference_date_from_discovery_inputs($course_start_ymd, $camp_terms_slug, $season_str, $event_date_raw) {
+    $course_start_ymd = is_string($course_start_ymd) ? trim($course_start_ymd) : '';
+    if ($course_start_ymd !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $course_start_ymd)) {
+        return $course_start_ymd;
+    }
+    $from_camp = intersoccer_parse_camp_start_date_from_terms((string) $camp_terms_slug, (string) $season_str);
+    if ($from_camp) {
+        return $from_camp;
+    }
+    if (is_string($event_date_raw) && trim($event_date_raw) !== '') {
+        return intersoccer_parse_loose_date_to_ymd($event_date_raw);
+    }
     return null;
 }
 
@@ -407,37 +462,51 @@ function intersoccer_get_camp_terms_slug($product_id, $variation_id) {
 /**
  * Program reference date (first day) for age calculation.
  *
- * @param int    $product_id   Parent product ID.
- * @param int    $variation_id Variation ID.
- * @param string $product_type camp|course|birthday|tournament
+ * @param int         $product_id   Parent product ID.
+ * @param int         $variation_id Variation ID.
+ * @param string|null $product_type camp|course|birthday|tournament or null when unclassified.
  * @return string|null Y-m-d or null if unknown.
  */
 function intersoccer_get_program_reference_date($product_id, $variation_id, $product_type) {
     $computed = null;
 
-    switch ($product_type) {
-        case 'course':
-            if ($variation_id && function_exists('intersoccer_get_course_meta')) {
-                $start = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-                if (is_string($start) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $start)) {
-                    $computed = $start;
+    $classified = is_string($product_type) && in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true);
+    if ($classified) {
+        switch ($product_type) {
+            case 'course':
+                if ($variation_id && function_exists('intersoccer_get_course_meta')) {
+                    $start = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
+                    if (is_string($start) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $start)) {
+                        $computed = $start;
+                    }
                 }
-            }
-            break;
+                break;
 
-        case 'camp':
-            $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
-            $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
-            $computed = intersoccer_parse_camp_start_date_from_terms($camp_terms, $season);
-            break;
+            case 'camp':
+                $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
+                $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
+                $computed = intersoccer_parse_camp_start_date_from_terms($camp_terms, $season);
+                break;
 
-        case 'tournament':
-        case 'birthday':
-            $computed = intersoccer_get_event_date_from_product_attributes($product_id, $variation_id);
-            break;
+            case 'tournament':
+            case 'birthday':
+                $computed = intersoccer_get_event_date_from_product_attributes($product_id, $variation_id);
+                break;
 
-        default:
-            $computed = null;
+            default:
+                $computed = null;
+        }
+    }
+
+    if ($computed === null) {
+        $course_start = '';
+        if ($variation_id && function_exists('intersoccer_get_course_meta')) {
+            $course_start = (string) intersoccer_get_course_meta((int) $variation_id, '_course_start_date', '');
+        }
+        $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
+        $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
+        $event_raw = intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id);
+        $computed = intersoccer_program_reference_date_from_discovery_inputs($course_start, $camp_terms, $season, $event_raw);
     }
 
     /**
@@ -446,7 +515,7 @@ function intersoccer_get_program_reference_date($product_id, $variation_id, $pro
      * @param string|null $date         Computed date or null.
      * @param int         $product_id   Parent product ID.
      * @param int         $variation_id Variation ID.
-     * @param string      $product_type Product type slug.
+     * @param string|null $product_type Product type slug or null.
      */
     return apply_filters('intersoccer_program_reference_date', $computed, $product_id, $variation_id, $product_type);
 }
@@ -497,23 +566,16 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
         return true;
     }
 
+    if (!intersoccer_line_has_age_group_attribute($product_id, $variation_id)) {
+        return true;
+    }
+
     $product_type = function_exists('intersoccer_get_product_type')
         ? intersoccer_get_product_type($product_id)
         : null;
 
-    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
-        return true;
-    }
-
-    if (!$variation_id) {
-        return new WP_Error(
-            'intersoccer_age_no_variation',
-            __('This booking requires a variation; age could not be verified.', 'intersoccer-product-variations')
-        );
-    }
-
     $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
-    $slug = intersoccer_get_variation_age_group_slug($variation_id);
+    $slug = $variation_id ? intersoccer_get_variation_age_group_slug((int) $variation_id) : '';
     $bounds = null;
     if ($label) {
         $bounds = intersoccer_parse_age_group_bounds($label);
@@ -532,7 +594,8 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
 
     $ref = intersoccer_get_program_reference_date($product_id, $variation_id, $product_type);
     if (!$ref) {
-        intersoccer_warning('InterSoccer age check: no reference date for product ' . $product_id . ' variation ' . $variation_id . ' type ' . $product_type);
+        $type_log = $product_type !== null && $product_type !== '' ? (string) $product_type : '(none)';
+        intersoccer_warning('InterSoccer age check: no reference date for product ' . $product_id . ' variation ' . $variation_id . ' type ' . $type_log);
         return new WP_Error(
             'intersoccer_age_no_reference_date',
             __('The program start date could not be determined, so age cannot be verified. Please contact us or try another option.', 'intersoccer-product-variations')
@@ -643,25 +706,19 @@ function intersoccer_validate_player_age_on_add_to_cart($passed, $product_id, $q
         return $passed;
     }
 
-    if (empty($variation_id)) {
+    if (!intersoccer_line_has_age_group_attribute($product_id, (int) $variation_id)) {
         return $passed;
     }
 
-    $product_type = intersoccer_get_product_type($product_id);
-    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+    if (!function_exists('intersoccer_get_posted_player_assignment_index')) {
+        return $passed;
+    }
+    $player_index = intersoccer_get_posted_player_assignment_index();
+    if ($player_index === null) {
         return $passed;
     }
 
-    if (!isset($_POST['player_assignment'])) {
-        return $passed;
-    }
-    $posted_player = wp_unslash($_POST['player_assignment']);
-    if ($posted_player === '' || $posted_player === null) {
-        return $passed;
-    }
-
-    $player_index = absint($posted_player);
-    $result = intersoccer_validate_line_player_age($user_id, $player_index, $product_id, (int) $variation_id);
+    $result = intersoccer_validate_line_player_age($user_id, $player_index, $product_id, absint($variation_id));
     if (is_wp_error($result)) {
         wc_add_notice($result->get_error_message(), 'error');
         return false;
@@ -686,12 +743,11 @@ function intersoccer_validate_cart_player_ages_at_checkout() {
     foreach (WC()->cart->get_cart() as $cart_item) {
         $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
         $variation_id = isset($cart_item['variation_id']) ? (int) $cart_item['variation_id'] : 0;
-        if (!$product_id || !$variation_id) {
+        if (!$product_id) {
             continue;
         }
 
-        $product_type = intersoccer_get_product_type($product_id);
-        if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+        if (!intersoccer_line_has_age_group_attribute($product_id, $variation_id)) {
             continue;
         }
 
