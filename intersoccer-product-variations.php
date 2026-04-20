@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: InterSoccer
- * Version: 2.4.17
+ * Version: 2.4.19
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -25,7 +25,6 @@ add_action('plugins_loaded', function () {
         false,
         dirname(plugin_basename(__FILE__)) . '/lang'
     );
-    intersoccer_debug('Text domain loaded: ' . (is_textdomain_loaded('intersoccer-product-variations') ? 'yes' : 'no'));
 });
 
 // Register strings for WPML translation on init to ensure WPML is loaded
@@ -333,7 +332,6 @@ $includes = [
 foreach ($includes as $file) {
     if (file_exists(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file)) {
         require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . $file;
-        intersoccer_debug('InterSoccer: Included ' . $file);
     } else {
         intersoccer_warning('InterSoccer: Failed to include ' . $file . ' - File not found');
     }
@@ -342,7 +340,6 @@ foreach ($includes as $file) {
 // Enqueue scripts and styles
 add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
-    intersoccer_debug('Generated nonce for intersoccer_nonce: ' . $nonce);
 
     if (is_product()) {
         $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];

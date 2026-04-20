@@ -920,9 +920,11 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
     public function prepare_items() {
         $this->_column_headers = [$this->get_columns(), [], []];
         
-        $statuses = isset($_POST['order_statuses']) ? array_map('sanitize_text_field', $_POST['order_statuses']) : ['processing', 'completed'];
-        $limit = isset($_POST['preview_limit']) ? intval($_POST['preview_limit']) : 25;
-        $fix_activity_type_only = isset($_POST['fix_activity_type_only']) && $_POST['fix_activity_type_only'] === '1';
+        $statuses = isset($_REQUEST['order_statuses']) && is_array($_REQUEST['order_statuses'])
+            ? array_map('sanitize_text_field', $_REQUEST['order_statuses'])
+            : ['processing', 'completed'];
+        $limit = isset($_REQUEST['preview_limit']) ? intval($_REQUEST['preview_limit']) : 25;
+        $fix_activity_type_only = isset($_REQUEST['fix_activity_type_only']) && (string) $_REQUEST['fix_activity_type_only'] === '1';
         
         $orders_query_args = [
             'status' => $statuses,
@@ -964,8 +966,8 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
     }
 
     /**
-     * Fixed analyze_orders method using the working deep debug logic
-     * 
+     * Analyze orders and identify missing metadata.
+     *
      * @param array $orders Array of WC_Order objects
      * @param bool $fix_activity_type_only If true, only show orders with incorrect Activity Type
      */
@@ -1003,7 +1005,6 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 
                 $order_data['product_types'][] = ucfirst($product_type);
                 
-                // Use EXACT SAME LOGIC as working deep debug
                 $user_id = $order->get_customer_id();
                 $existing_meta = $item->get_meta_data();
                 $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
@@ -1128,12 +1129,35 @@ function intersoccer_render_update_orders_page() {
     }
 
     $message = '';
-    $show_preview = isset($_POST['preview_updates']) || isset($_POST['detailed_preview']);
-    $show_detailed = isset($_POST['detailed_preview']);
+    $selected_statuses = isset($_REQUEST['order_statuses']) && is_array($_REQUEST['order_statuses'])
+        ? array_values(array_map('sanitize_text_field', $_REQUEST['order_statuses']))
+        : ['processing', 'completed'];
+    $preview_limit_value = isset($_REQUEST['preview_limit']) ? sanitize_text_field((string) $_REQUEST['preview_limit']) : '25';
+    $fix_activity_type_only_checked = isset($_REQUEST['fix_activity_type_only']) && (string) $_REQUEST['fix_activity_type_only'] === '1';
+    $show_preview = isset($_REQUEST['preview_updates']) || isset($_REQUEST['detailed_preview']);
+    $show_detailed = isset($_REQUEST['detailed_preview']);
 
     // Verify nonce for any POST action (preview or update)
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($show_preview || isset($_POST['update_selected_orders']))) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ((isset($_POST['preview_updates']) || isset($_POST['detailed_preview'])) || isset($_POST['update_selected_orders']))) {
         check_admin_referer('intersoccer_update_orders', 'intersoccer_update_orders_nonce');
+    }
+
+    // Preserve preview state/filters across pagination links by redirecting preview POST to GET.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['preview_updates']) || isset($_POST['detailed_preview']))) {
+        $query_args = [
+            'page' => 'intersoccer-update-orders',
+            'preview_updates' => isset($_POST['preview_updates']) ? '1' : null,
+            'detailed_preview' => isset($_POST['detailed_preview']) ? '1' : null,
+            'preview_limit' => $preview_limit_value,
+            'fix_activity_type_only' => $fix_activity_type_only_checked ? '1' : '0',
+            'order_statuses' => $selected_statuses,
+        ];
+        $query_args = array_filter($query_args, static function ($value) {
+            return $value !== null;
+        });
+        $url = admin_url('admin.php?' . http_build_query($query_args));
+        wp_safe_redirect($url);
+        exit;
     }
 
     // Handle bulk update
@@ -1175,22 +1199,22 @@ function intersoccer_render_update_orders_page() {
                 <tr>
                     <th scope="row"><?php _e('Order Statuses to Check', 'intersoccer-product-variations'); ?></th>
                     <td>
-                        <label><input type="checkbox" name="order_statuses[]" value="processing" checked> <?php _e('Processing', 'intersoccer-product-variations'); ?></label><br>
-                        <label><input type="checkbox" name="order_statuses[]" value="completed" checked> <?php _e('Completed', 'intersoccer-product-variations'); ?></label><br>
-                        <label><input type="checkbox" name="order_statuses[]" value="on-hold"> <?php _e('On Hold', 'intersoccer-product-variations'); ?></label>
+                        <label><input type="checkbox" name="order_statuses[]" value="processing" <?php checked(in_array('processing', $selected_statuses, true)); ?>> <?php _e('Processing', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" name="order_statuses[]" value="completed" <?php checked(in_array('completed', $selected_statuses, true)); ?>> <?php _e('Completed', 'intersoccer-product-variations'); ?></label><br>
+                        <label><input type="checkbox" name="order_statuses[]" value="on-hold" <?php checked(in_array('on-hold', $selected_statuses, true)); ?>> <?php _e('On Hold', 'intersoccer-product-variations'); ?></label>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row"><?php _e('Number of Orders to Scan', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <select name="preview_limit">
-                            <option value="25" <?php selected($_POST['preview_limit'] ?? '', '25'); ?>>25 recent orders</option>
-                            <option value="50" <?php selected($_POST['preview_limit'] ?? '', '50'); ?>>50 recent orders</option>
-                            <option value="100" <?php selected($_POST['preview_limit'] ?? '', '100'); ?>>100 recent orders</option>
-                            <option value="500" <?php selected($_POST['preview_limit'] ?? '', '500'); ?>>500 recent orders</option>
-                            <option value="1000" <?php selected($_POST['preview_limit'] ?? '', '1000'); ?>>1000 recent orders</option>
-                            <option value="2000" <?php selected($_POST['preview_limit'] ?? '', '2000'); ?>>2000 recent orders</option>
-                            <option value="-1" <?php selected($_POST['preview_limit'] ?? '', '-1'); ?>>All orders (may be slow)</option>
+                            <option value="25" <?php selected($preview_limit_value, '25'); ?>>25 recent orders</option>
+                            <option value="50" <?php selected($preview_limit_value, '50'); ?>>50 recent orders</option>
+                            <option value="100" <?php selected($preview_limit_value, '100'); ?>>100 recent orders</option>
+                            <option value="500" <?php selected($preview_limit_value, '500'); ?>>500 recent orders</option>
+                            <option value="1000" <?php selected($preview_limit_value, '1000'); ?>>1000 recent orders</option>
+                            <option value="2000" <?php selected($preview_limit_value, '2000'); ?>>2000 recent orders</option>
+                            <option value="-1" <?php selected($preview_limit_value, '-1'); ?>>All orders (may be slow)</option>
                         </select>
                         <p class="description"><?php _e('Higher numbers may take longer to process but will find more orders with missing data.', 'intersoccer-product-variations'); ?></p>
                     </td>
@@ -1199,7 +1223,7 @@ function intersoccer_render_update_orders_page() {
                     <th scope="row"><?php _e('Update Options', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <label>
-                            <input type="checkbox" name="fix_activity_type_only" value="1" <?php checked(isset($_POST['fix_activity_type_only'])); ?>>
+                            <input type="checkbox" name="fix_activity_type_only" value="1" <?php checked($fix_activity_type_only_checked); ?>>
                             <?php _e('Fix Activity Type Only', 'intersoccer-product-variations'); ?>
                         </label>
                         <p class="description">
@@ -1219,7 +1243,9 @@ function intersoccer_render_update_orders_page() {
             </p>
         </form>
 
-        <?php if ($show_preview) : ?>
+        <?php if ($show_preview) { ?>
+            <?php
+            ?>
             <hr>
             <h2><?php _e('Orders Missing Metadata', 'intersoccer-product-variations'); ?></h2>
             
@@ -1235,10 +1261,12 @@ function intersoccer_render_update_orders_page() {
             <?php
             $table = new InterSoccer_Order_Preview_Table();
             $table->prepare_items();
+            ?>
             
-            if (empty($table->items)) {
-                echo '<div class="notice notice-success"><p>' . __('Great! No orders found that need metadata updates.', 'intersoccer-product-variations') . '</p></div>';
-            } else {
+            <?php if (empty($table->items)) : ?>
+                <div class="notice notice-success"><p><?php _e('Great! No orders found that need metadata updates.', 'intersoccer-product-variations'); ?></p></div>
+            <?php else : ?>
+                <?php
                 // Get actual statistics
                 $total_orders_scanned = count($table->all_items);  // We'll need to track this
                 $orders_with_missing = count($table->all_items);   // Orders that have missing metadata
@@ -1280,15 +1308,13 @@ function intersoccer_render_update_orders_page() {
                     <?php $table->display(); ?>
                     
                     <input type="hidden" id="selected-order-ids" name="selected_order_ids" value="">
-                    <?php if (isset($_POST['fix_activity_type_only']) && $_POST['fix_activity_type_only'] === '1') : ?>
+                    <?php if ($fix_activity_type_only_checked) : ?>
                         <input type="hidden" name="fix_activity_type_only" value="1">
                     <?php endif; ?>
                     <?php wp_nonce_field('intersoccer_update_orders', 'intersoccer_update_orders_nonce'); ?>
                 </form>
-                <?php
-            }
-            ?>
-        <?php endif; ?>
+            <?php endif; ?>
+        <?php } ?>
     </div>
 
     <style>
@@ -1327,8 +1353,6 @@ function intersoccer_render_update_orders_page() {
 
     <script>
         jQuery(document).ready(function($) {
-            console.log('InterSoccer: Enhanced Order Update UI loaded');
-            
             let selectedOrders = [];
             
             // Handle checkbox changes
@@ -1397,7 +1421,6 @@ function intersoccer_render_update_orders_page() {
                 // ... rest of your batch processing code
             });
             
-            console.log('InterSoccer: Enhanced UI event handlers attached');
         });
     </script>
     <?php
@@ -1800,7 +1823,7 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         $player_details = intersoccer_get_player_details($user_id, $assigned_player);
 
 
-        // Build potential updates array (SAME LOGIC AS WORKING DEEP DEBUG)
+        // Build potential updates array.
         $potential_updates = [
             'Assigned Attendee' => isset($player_details['name']) ? $player_details['name'] : null,
             'Attendee DOB' => isset($player_details['dob']) ? $player_details['dob'] : null,
@@ -1854,7 +1877,7 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         }
 
 
-        // Apply updates (SAME LOGIC AS WORKING DEEP DEBUG)
+        // Apply updates.
         foreach ($potential_updates as $key => $value) {
             // If fix_activity_type_only is enabled, skip all fields except Activity Type
             if ($fix_activity_type_only && $key !== 'Activity Type') {
@@ -2792,172 +2815,6 @@ function intersoccer_batch_update_orders_callback() {
     ]);
 }
 
-function intersoccer_ajax_scripts() {
-    $current_screen = get_current_screen();
-    $page_hooks = [
-        'woocommerce_page_intersoccer-update-orders',
-        'woocommerce_page_intersoccer-enhanced-update-orders'
-    ];
-    
-    if (!$current_screen || !in_array($current_screen->id, $page_hooks)) {
-        return;
-    }
-    ?>
-    <script>
-    jQuery(document).ready(function($) {
-        console.log('InterSoccer: Fixed AJAX scripts loaded');
-        
-        // Add test button to verify AJAX works
-        if ($('#test-ajax-btn').length === 0) {
-            $('h1').after('<button type="button" id="test-ajax-btn" class="button button-secondary" style="margin-left: 10px;">Test AJAX</button>');
-        }
-        
-        $('#test-ajax-btn').on('click', function() {
-            console.log('Testing AJAX...');
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intersoccer_test_ajax'
-                },
-                success: function(response) {
-                    console.log('AJAX test successful:', response);
-                    alert('AJAX connection working!');
-                },
-                error: function(xhr, status, error) {
-                    console.error('AJAX test failed:', xhr, status, error);
-                    alert('AJAX test failed: ' + error);
-                }
-            });
-        });
-
-        // Enhanced batch processing function
-        function processBatchUpdate(orderIds, startIndex = 0, batchSize = 3) {
-            console.log('InterSoccer: Starting batch update', {
-                orderIds: orderIds.slice(startIndex, startIndex + batchSize),
-                startIndex: startIndex,
-                total: orderIds.length
-            });
-            
-            return $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'intersoccer_batch_update_orders',
-                    nonce: $('input[name="intersoccer_update_orders_nonce"]').val(),
-                    order_ids: orderIds,
-                    start_index: startIndex,
-                    batch_size: batchSize
-                },
-                timeout: 60000, // 60 second timeout
-                beforeSend: function() {
-                    console.log('InterSoccer: Sending batch request...');
-                }
-            });
-        }
-
-        // Override existing form submission or add new handler
-        function handleBulkUpdate() {
-            console.log('InterSoccer: Bulk update initiated');
-            
-            let selectedOrders = [];
-            
-            // Try multiple selector patterns for checkboxes
-            const checkboxSelectors = [
-                'input[name="order_ids[]"]:checked',
-                'input[name="selected_order_ids"]:checked',
-                '.order-checkbox:checked'
-            ];
-            
-            for (let selector of checkboxSelectors) {
-                selectedOrders = $(selector).map(function() {
-                    return parseInt($(this).val());
-                }).get();
-                
-                if (selectedOrders.length > 0) {
-                    console.log('Found selected orders with selector:', selector, selectedOrders);
-                    break;
-                }
-            }
-            
-            if (selectedOrders.length === 0) {
-                alert('Please select at least one order to update.');
-                return false;
-            }
-
-            // Show progress
-            if ($('#update-progress').length === 0) {
-                $('h1').after(`
-                    <div id="update-progress" style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccd0d4;">
-                        <h3>Update Progress</h3>
-                        <div style="background: #f1f1f1; border-radius: 10px; padding: 3px;">
-                            <div id="progress-bar" style="background: #4CAF50; height: 20px; border-radius: 8px; width: 0%; transition: width 0.3s;"></div>
-                        </div>
-                        <p id="progress-text">Starting...</p>
-                    </div>
-                `);
-            }
-            
-            $('#update-progress').show();
-
-            let processedOrders = 0;
-            let successCount = 0;
-            let errorCount = 0;
-            let totalOrders = selectedOrders.length;
-
-            function processBatch(startIndex) {
-                processBatchUpdate(selectedOrders, startIndex, 3)
-                    .done(function(response) {
-                        console.log('Batch response:', response);
-                        
-                        if (response.success) {
-                            processedOrders += response.data.processed_in_batch;
-                            successCount += response.data.updated_count;
-                            errorCount += response.data.errors.length;
-
-                            let progress = response.data.progress;
-                            $('#progress-bar').css('width', progress + '%');
-                            $('#progress-text').text(`Processed ${processedOrders} of ${totalOrders} orders (${successCount} updated, ${errorCount} errors)`);
-
-                            if (response.data.is_complete) {
-                                $('#progress-text').html(`
-                                    <strong>Complete!</strong> Updated ${successCount} orders, ${errorCount} errors.
-                                    <button type="button" onclick="window.location.reload()" class="button button-primary">Reload Page</button>
-                                `);
-                            } else {
-                                setTimeout(() => processBatch(response.data.next_index), 1000);
-                            }
-                        } else {
-                            $('#progress-text').html(`<span style="color: red;">Error: ${response.data?.message || 'Unknown error'}</span>`);
-                        }
-                    })
-                    .fail(function(xhr, status, error) {
-                        console.error('Batch failed:', xhr, status, error);
-                        $('#progress-text').html(`<span style="color: red;">Network error: ${error} (${xhr.status})</span>`);
-                    });
-            }
-
-            processBatch(0);
-        }
-
-        // Attach to existing buttons or forms
-        $('body').on('click', 'input[name="update_selected_orders"], #update-selected-btn, button[name="update_orders"]', function(e) {
-            e.preventDefault();
-            handleBulkUpdate();
-        });
-
-        // Also handle form submissions
-        $('body').on('submit', '#bulk-update-form, #update-orders-form', function(e) {
-            e.preventDefault();
-            handleBulkUpdate();
-        });
-
-        console.log('InterSoccer: Enhanced event handlers attached');
-    });
-    </script>
-    <?php
-}
-
 // Remove
 // add_action('wp_ajax_test_preview_analysis', 'test_preview_analysis_callback');
 // function test_preview_analysis_callback() {
@@ -2989,7 +2846,7 @@ function intersoccer_ajax_scripts() {
 //             continue;
 //         }
         
-//         // Use the same analysis as the working deep debug
+//         // Use the same analysis method
 //         $user_id = $order->get_customer_id();
 //         $variation_id = $item->get_variation_id();
         

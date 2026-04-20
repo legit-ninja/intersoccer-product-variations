@@ -58,11 +58,7 @@ if (!class_exists('InterSoccer_Logger')) {
         }
 
         public static function debug($message, array $context = []) {
-            // Only log debug messages when WP_DEBUG is enabled
-            if (!defined('WP_DEBUG') || !WP_DEBUG) {
-                return;
-            }
-            self::log('debug', $message, $context);
+            return;
         }
 
         public static function info($message, array $context = []) {
