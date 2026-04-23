@@ -596,10 +596,26 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
     if (!$ref) {
         $type_log = $product_type !== null && $product_type !== '' ? (string) $product_type : '(none)';
         intersoccer_warning('InterSoccer age check: no reference date for product ' . $product_id . ' variation ' . $variation_id . ' type ' . $type_log);
-        return new WP_Error(
-            'intersoccer_age_no_reference_date',
-            __('The program start date could not be determined, so age cannot be verified. Please contact us or try another option.', 'intersoccer-product-variations')
+        /**
+         * Strict mode for missing reference dates.
+         * Default false: do not block checkout when product metadata is incomplete.
+         */
+        $strict_missing_reference_date = (bool) apply_filters(
+            'intersoccer_age_group_strict_missing_reference_date',
+            false,
+            $user_id,
+            $player_index,
+            $product_id,
+            $variation_id,
+            $product_type
         );
+        if ($strict_missing_reference_date) {
+            return new WP_Error(
+                'intersoccer_age_no_reference_date',
+                __('The program start date could not be determined, so age cannot be verified. Please contact us or try another option.', 'intersoccer-product-variations')
+            );
+        }
+        return true;
     }
 
     if (!function_exists('intersoccer_get_player_details')) {

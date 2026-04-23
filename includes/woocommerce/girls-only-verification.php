@@ -279,8 +279,7 @@ function intersoccer_line_is_girls_only_program($product_id, $variation_id) {
         }
     }
 
-    $filtered = (bool) apply_filters('intersoccer_line_is_girls_only_program', $is_girls_only, $product_id, $variation_id);
-    return $filtered;
+    return (bool) apply_filters('intersoccer_line_is_girls_only_program', $is_girls_only, $product_id, $variation_id);
 }
 
 /**
