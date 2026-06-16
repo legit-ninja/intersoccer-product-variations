@@ -544,6 +544,163 @@ function intersoccer_age_on_date($dob_ymd, $ref_ymd) {
 }
 
 /**
+ * Default age restriction settings (grace periods and strict mode).
+ *
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ */
+function intersoccer_get_age_restriction_settings_defaults() {
+    return [
+        'grace_enabled' => true,
+        'below_min_months' => 2,
+        'above_max_months' => 1,
+        'strict_missing_reference_date' => false,
+    ];
+}
+
+/**
+ * Sanitize age restriction settings from admin form.
+ *
+ * @param mixed $input Raw POST/settings input.
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ */
+function intersoccer_sanitize_age_restriction_settings($input) {
+    $defaults = intersoccer_get_age_restriction_settings_defaults();
+    if (!is_array($input)) {
+        return $defaults;
+    }
+
+    return [
+        'grace_enabled' => !empty($input['grace_enabled']),
+        'below_min_months' => max(0, min(12, (int) ($input['below_min_months'] ?? $defaults['below_min_months']))),
+        'above_max_months' => max(0, min(12, (int) ($input['above_max_months'] ?? $defaults['above_max_months']))),
+        'strict_missing_reference_date' => !empty($input['strict_missing_reference_date']),
+    ];
+}
+
+/**
+ * Age restriction settings from wp_options (with filter).
+ *
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ */
+function intersoccer_get_age_restriction_settings() {
+    $stored = get_option('intersoccer_age_restriction_settings', []);
+    $merged = array_merge(
+        intersoccer_get_age_restriction_settings_defaults(),
+        is_array($stored) ? $stored : []
+    );
+
+    /**
+     * @param array $merged Settings array.
+     */
+    return apply_filters('intersoccer_age_restriction_settings', $merged);
+}
+
+/**
+ * Full months between date of birth and reference date (day-aware).
+ *
+ * @param string $dob_ymd Date of birth Y-m-d.
+ * @param string $ref_ymd Reference date Y-m-d.
+ * @return int|null Null if invalid or DOB after reference.
+ */
+function intersoccer_age_in_months_on_date($dob_ymd, $ref_ymd) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob_ymd) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ref_ymd)) {
+        return null;
+    }
+    try {
+        $dob = new DateTimeImmutable($dob_ymd, new DateTimeZone('UTC'));
+        $ref = new DateTimeImmutable($ref_ymd, new DateTimeZone('UTC'));
+    } catch (Exception $e) {
+        return null;
+    }
+    if ($dob > $ref) {
+        return null;
+    }
+
+    $months = ((int) $ref->format('Y') - (int) $dob->format('Y')) * 12
+        + ((int) $ref->format('m') - (int) $dob->format('m'));
+    if ((int) $ref->format('d') < (int) $dob->format('d')) {
+        $months--;
+    }
+
+    return $months;
+}
+
+/**
+ * Check whether a DOB falls within age bounds on a reference date (with optional grace).
+ *
+ * @param string $dob_ymd   Date of birth Y-m-d.
+ * @param string $ref_ymd   Reference date Y-m-d.
+ * @param array{min: int|null, max: int|null} $bounds Parsed age group bounds.
+ * @param array|null $settings Age restriction settings; uses stored settings when null.
+ * @return array{matches: bool, age_years: int|null, age_months: int|null}
+ */
+function intersoccer_player_age_within_bounds($dob_ymd, $ref_ymd, array $bounds, $settings = null) {
+    if ($settings === null) {
+        $settings = intersoccer_get_age_restriction_settings();
+    }
+
+    $age_years = intersoccer_age_on_date($dob_ymd, $ref_ymd);
+    if ($age_years === null) {
+        return [
+            'matches' => false,
+            'age_years' => null,
+            'age_months' => null,
+        ];
+    }
+
+    $min = $bounds['min'] ?? null;
+    $max = $bounds['max'] ?? null;
+    $grace_enabled = !empty($settings['grace_enabled']);
+    $below = (int) ($settings['below_min_months'] ?? 0);
+    $above = (int) ($settings['above_max_months'] ?? 0);
+
+    if (!$grace_enabled || ($below === 0 && $above === 0)) {
+        $matches = true;
+        if ($min !== null && $age_years < $min) {
+            $matches = false;
+        }
+        if ($max !== null && $age_years > $max) {
+            $matches = false;
+        }
+
+        return [
+            'matches' => $matches,
+            'age_years' => $age_years,
+            'age_months' => intersoccer_age_in_months_on_date($dob_ymd, $ref_ymd),
+        ];
+    }
+
+    $age_months = intersoccer_age_in_months_on_date($dob_ymd, $ref_ymd);
+    if ($age_months === null) {
+        return [
+            'matches' => false,
+            'age_years' => $age_years,
+            'age_months' => null,
+        ];
+    }
+
+    $matches = true;
+    if ($min !== null) {
+        $min_months = ($min * 12) - $below;
+        if ($age_months < $min_months) {
+            $matches = false;
+        }
+    }
+    if ($max !== null) {
+        $max_months = ($max * 12) + $above;
+        if ($age_months > $max_months) {
+            $matches = false;
+        }
+    }
+
+    return [
+        'matches' => $matches,
+        'age_years' => $age_years,
+        'age_months' => $age_months,
+    ];
+}
+
+/**
  * Validate assigned player age for a product line.
  *
  * @param int $user_id      Customer user ID.
@@ -644,35 +801,32 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
         return new WP_Error('intersoccer_age_no_dob', $msg);
     }
 
-    $age = intersoccer_age_on_date($dob_ymd, $ref);
-    if ($age === null) {
+    $settings = intersoccer_get_age_restriction_settings();
+    $age_result = intersoccer_player_age_within_bounds($dob_ymd, $ref, $bounds, $settings);
+    if ($age_result['age_years'] === null) {
         return new WP_Error(
             'intersoccer_age_invalid_dob',
             __('The attendee date of birth is invalid or is after the program start date.', 'intersoccer-product-variations')
         );
     }
 
-    $min = $bounds['min'];
-    $max = $bounds['max'];
-    $matches = true;
-    if ($min !== null && $age < $min) {
-        $matches = false;
-    }
-    if ($max !== null && $age > $max) {
-        $matches = false;
-    }
+    $age = $age_result['age_years'];
+    $age_months = $age_result['age_months'];
+    $matches = $age_result['matches'];
 
     /**
      * Filter: final say on whether age matches (after bounds check).
      *
-     * @param bool $matches      Whether age is within bounds.
-     * @param int  $age          Age on reference date.
-     * @param int  $user_id
-     * @param int  $player_index
-     * @param int  $product_id
-     * @param int  $variation_id
-     * @param array{min: int|null, max: int|null} $bounds
-     * @param string $ref       Reference date Y-m-d.
+     * @param bool   $matches      Whether age is within bounds.
+     * @param int    $age          Completed years on reference date.
+     * @param int    $user_id
+     * @param int    $player_index
+     * @param int    $product_id
+     * @param int    $variation_id
+     * @param array  $bounds       Parsed min/max bounds.
+     * @param string $ref          Reference date Y-m-d.
+     * @param int|null $age_months Full months on reference date (null when unavailable).
+     * @param array  $settings     Age restriction settings.
      */
     $matches = (bool) apply_filters(
         'intersoccer_player_age_matches_program',
@@ -683,7 +837,9 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
         $product_id,
         $variation_id,
         $bounds,
-        $ref
+        $ref,
+        $age_months,
+        $settings
     );
 
     if (!$matches) {

@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.4.23
+ * Version: 2.6.16
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -111,6 +111,12 @@ add_action('init', function () {
             'The selected attendee needs a valid date of birth. Please update it in your account before booking.',
             'The attendee date of birth is invalid or is after the program start date.',
             'This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session.',
+            'Age Restriction Settings',
+            'Age Restrictions',
+            'Enable age grace',
+            'Months below minimum',
+            'Months above maximum',
+            'Strict missing start date',
             '%d%% Camp Combo Discount (Child %d)',
             '%d%% Course Multi-Child Discount (Child %d)',
             '50%% Same Season Course Discount (Child %d, %s)',
@@ -320,6 +326,7 @@ $includes = [
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
     'includes/woocommerce/age-group-verification.php',
+    'includes/woocommerce/age-restriction-settings.php',
     'includes/woocommerce/girls-only-verification.php',
     'includes/woocommerce/discount-messages.php',
     'includes/admin-product-fields.php',

@@ -39,9 +39,40 @@ if (!function_exists('intersoccer_debug')) {
     }
 }
 
+if (!function_exists('get_option')) {
+    function get_option($option, $default = false) {
+        global $intersoccer_test_options;
+        if (!is_array($intersoccer_test_options)) {
+            return $default;
+        }
+        return array_key_exists($option, $intersoccer_test_options) ? $intersoccer_test_options[$option] : $default;
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    function apply_filters($hook, $value) {
+        return $value;
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/woocommerce/age-group-verification.php';
 
 class AgeGroupVerificationTest extends TestCase {
+
+    protected function tearDown(): void {
+        global $intersoccer_test_options;
+        $intersoccer_test_options = [];
+        parent::tearDown();
+    }
+
+    private function graceSettings($below = 2, $above = 1, $enabled = true) {
+        return [
+            'grace_enabled' => $enabled,
+            'below_min_months' => $below,
+            'above_max_months' => $above,
+            'strict_missing_reference_date' => false,
+        ];
+    }
 
     public function test_parse_age_group_bounds_hyphen_years() {
         $b = intersoccer_parse_age_group_bounds('6-8 years');
@@ -148,5 +179,130 @@ class AgeGroupVerificationTest extends TestCase {
         $this->assertNull(
             intersoccer_program_reference_date_from_discovery_inputs('', '', '', '')
         );
+    }
+
+    public function test_age_in_months_on_date() {
+        $this->assertSame(35, intersoccer_age_in_months_on_date('2022-04-01', '2025-03-01'));
+        $this->assertSame(145, intersoccer_age_in_months_on_date('2013-02-01', '2025-03-01'));
+        $this->assertNull(intersoccer_age_in_months_on_date('2026-01-01', '2025-03-01'));
+    }
+
+    public function test_grace_allows_two_years_eleven_months_when_min_is_three() {
+        $settings = $this->graceSettings(2, 1);
+        $result = intersoccer_player_age_within_bounds(
+            '2022-04-01',
+            '2025-03-01',
+            ['min' => 3, 'max' => null],
+            $settings
+        );
+        $this->assertTrue($result['matches']);
+        $this->assertSame(2, $result['age_years']);
+        $this->assertSame(35, $result['age_months']);
+    }
+
+    public function test_grace_rejects_two_years_nine_months_when_min_is_three() {
+        $settings = $this->graceSettings(2, 1);
+        $result = intersoccer_player_age_within_bounds(
+            '2022-06-01',
+            '2025-03-01',
+            ['min' => 3, 'max' => null],
+            $settings
+        );
+        $this->assertFalse($result['matches']);
+    }
+
+    public function test_grace_allows_twelve_years_one_month_when_max_is_twelve() {
+        $settings = $this->graceSettings(2, 1);
+        $result = intersoccer_player_age_within_bounds(
+            '2013-02-01',
+            '2025-03-01',
+            ['min' => null, 'max' => 12],
+            $settings
+        );
+        $this->assertTrue($result['matches']);
+        $this->assertSame(12, $result['age_years']);
+    }
+
+    public function test_grace_rejects_twelve_years_two_months_when_max_is_twelve() {
+        $settings = $this->graceSettings(2, 1);
+        $result = intersoccer_player_age_within_bounds(
+            '2013-01-01',
+            '2025-03-01',
+            ['min' => null, 'max' => 12],
+            $settings
+        );
+        $this->assertFalse($result['matches']);
+    }
+
+    public function test_strict_mode_when_grace_disabled() {
+        $settings = $this->graceSettings(2, 1, false);
+        $result = intersoccer_player_age_within_bounds(
+            '2022-04-01',
+            '2025-03-01',
+            ['min' => 3, 'max' => null],
+            $settings
+        );
+        $this->assertFalse($result['matches']);
+    }
+
+    public function test_grace_zero_months_uses_integer_years() {
+        $settings = $this->graceSettings(0, 0);
+        $result = intersoccer_player_age_within_bounds(
+            '2022-04-01',
+            '2025-03-01',
+            ['min' => 3, 'max' => null],
+            $settings
+        );
+        $this->assertFalse($result['matches']);
+    }
+
+    public function test_grace_applies_only_on_configured_bound_for_minimum_plus() {
+        $settings = $this->graceSettings(2, 0);
+        $pass = intersoccer_player_age_within_bounds(
+            '2013-02-01',
+            '2025-03-01',
+            ['min' => 12, 'max' => null],
+            $settings
+        );
+        $this->assertTrue($pass['matches']);
+
+        $fail = intersoccer_player_age_within_bounds(
+            '2014-04-01',
+            '2025-03-01',
+            ['min' => 12, 'max' => null],
+            $settings
+        );
+        $this->assertFalse($fail['matches']);
+    }
+
+    public function test_grace_applies_only_on_configured_bound_for_u_format_max() {
+        $settings = $this->graceSettings(0, 1);
+        $bounds = intersoccer_parse_age_group_bounds('U10');
+        $this->assertNotNull($bounds);
+
+        $pass = intersoccer_player_age_within_bounds(
+            '2016-02-01',
+            '2025-03-01',
+            $bounds,
+            $settings
+        );
+        $this->assertTrue($pass['matches']);
+
+        $fail = intersoccer_player_age_within_bounds(
+            '2016-01-01',
+            '2025-03-01',
+            $bounds,
+            $settings
+        );
+        $this->assertFalse($fail['matches']);
+    }
+
+    public function test_get_age_restriction_settings_defaults() {
+        global $intersoccer_test_options;
+        $intersoccer_test_options = [];
+        $settings = intersoccer_get_age_restriction_settings();
+        $this->assertTrue($settings['grace_enabled']);
+        $this->assertSame(2, $settings['below_min_months']);
+        $this->assertSame(1, $settings['above_max_months']);
     }
 }
