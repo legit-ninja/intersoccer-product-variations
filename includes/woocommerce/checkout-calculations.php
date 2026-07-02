@@ -133,19 +133,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     $parent_attributes = $parent_product->get_attributes();
     $variation_attributes = $variation_product ? $variation_product->get_variation_attributes() : [];
 
-    // Map of attribute names to their registered English labels for translation
-    $label_map = [
-        'pa_intersoccer-venues' => 'Sites InterSoccer',
-        'pa_course-day' => 'Course Day',
-        'pa_age-group' => 'Age Group',
-        'pa_course-times' => 'Course Times',
-        'pa_activity-type' => 'Activity Type',
-        'pa_program-season' => 'Season',
-        'pa_booking-type' => 'Booking Type',
-        'pa_canton-region' => 'Canton / Region',
-        'pa_city' => 'City',
-        'pa_note' => 'Note',
-    ];
+    $label_map = intersoccer_attr_order_meta_label_map();
 
     // Build a map of variation attributes keyed by the taxonomy/attribute name
     // e.g. 'pa_city' => 'geneva'
@@ -161,8 +149,8 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
         intersoccer_debug('InterSoccer: Variation map: ' . print_r($variation_map, true));
     }
     
-    // Define canonical lowercase order for weekdays (used to order day slugs)
-    $canonical_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    $canonical_days = intersoccer_attr_canonical_weekday_slugs();
+    $day_order_taxonomies = intersoccer_attr_day_order_taxonomies();
 
     foreach ($parent_attributes as $attribute_name => $attribute) {
         $value = '';
@@ -174,7 +162,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             if ($attribute->is_taxonomy()) {
                 $slugs = array_map('trim', explode(',', $selected));
                 // For days-of-week, respect canonical ordering
-                if (in_array($attribute_name, ['pa_days-of-week', 'pa_course-day'])) {
+                if (in_array($attribute_name, $day_order_taxonomies, true)) {
                     $ordered = array_values(array_intersect($canonical_days, array_map('strtolower', $slugs)));
                     $names = [];
                     foreach ($ordered as $slug) {
@@ -226,7 +214,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             // No explicit variation selection: fall back to parent product terms/options
             if ($attribute->is_taxonomy()) {
                 // Days-of-week get canonical ordered list
-                if (in_array($attribute_name, ['pa_days-of-week', 'pa_course-day'])) {
+                if (in_array($attribute_name, $day_order_taxonomies, true)) {
                     $term_slugs = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'slugs']);
                     $ordered_slugs = array_values(array_intersect($canonical_days, $term_slugs));
                     $names = [];
@@ -396,17 +384,37 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     
     foreach ($parent_attributes as $attribute_label => $attribute_value) {
         // Skip attributes that are already added separately to avoid duplication
-        if (in_array($attribute_label, ['Activity Type', 'Season'])) {
+        if (in_array($attribute_label, ['Activity Type', 'Season'], true)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
             }
             continue;
         }
-        // Convert attribute label to metadata key format (e.g., "City" -> "City")
         $meta_key = $attribute_label;
         $item->add_meta_data($meta_key, sanitize_text_field($attribute_value));
         if (defined('WP_DEBUG') && WP_DEBUG) {
             intersoccer_debug('InterSoccer: ✅ Added parent attribute to order: ' . $meta_key . ' = ' . $attribute_value);
+        }
+    }
+
+    // Write machine taxonomy keys (pa_*) for variation-selected attributes.
+    if ($variation_id && function_exists('wc_get_product')) {
+        $variation_product = wc_get_product($variation_id);
+        if ($variation_product && method_exists($variation_product, 'get_variation_attributes')) {
+            foreach ($variation_product->get_variation_attributes() as $vkey => $vval) {
+                $taxonomy = str_replace('attribute_', '', (string) $vkey);
+                if (strpos($taxonomy, 'pa_') !== 0 || $vval === '') {
+                    continue;
+                }
+                $item->add_meta_data($taxonomy, sanitize_text_field($vval));
+                $attr_slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
+                if ($attr_slug) {
+                    $item->add_meta_data(
+                        intersoccer_attr_resolve_meta_key($attr_slug),
+                        sanitize_text_field($vval)
+                    );
+                }
+            }
         }
     }
 

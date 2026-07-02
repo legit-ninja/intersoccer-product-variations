@@ -2205,10 +2205,10 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         $products = wc_get_products(['limit' => -1, 'type' => ['variable', 'variation'], 'status' => ['publish', 'draft']]);
         $data = [];
         $required_attrs = [
-            'camp' => ['pa_booking-type', 'pa_age-group'], // pa_days-of-week checked on parent
-            'course' => ['pa_course-day', '_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
-            'birthday' => [], // Add if needed
-            'tournament' => [] // Tournaments are simple fixed-date events with no special requirements
+            'camp' => intersoccer_attr_health_required_keys('camp'),
+            'course' => intersoccer_attr_health_required_keys('course'),
+            'birthday' => intersoccer_attr_health_required_keys('birthday'),
+            'tournament' => intersoccer_attr_health_required_keys('tournament'),
         ];
 
         foreach ($products as $product) {
@@ -2235,13 +2235,16 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                     }
                 }
 
-                // Check pa_days-of-week on parent for camps
                 if ($type === 'camp' && $parent_product) {
                     $parent_attributes = $parent_product->get_attributes();
-                    if (empty($parent_attributes['pa_days-of-week'])) {
-                        $missing[] = 'pa_days-of-week (parent)';
-                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $variation_id);
-                    } else {
+                    $parent_required = intersoccer_attr_required('camp', 'parent');
+                    foreach ($parent_required as $parent_attr) {
+                        if ($parent_attr === 'pa_days-of-week' && empty($parent_attributes['pa_days-of-week'])) {
+                            $missing[] = 'pa_days-of-week (parent)';
+                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $variation_id);
+                        }
+                    }
+                    if (!in_array('pa_days-of-week (parent)', $missing, true) && !empty($parent_attributes['pa_days-of-week'])) {
                         intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $variation_id);
                     }
                 }
@@ -2289,7 +2292,6 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                         }
                     }
 
-                    // Check pa_days-of-week on parent for camps
                     if ($type === 'camp') {
                         $parent_attributes = $product->get_attributes();
                         if (empty($parent_attributes['pa_days-of-week'])) {
@@ -2585,20 +2587,17 @@ function intersoccer_refresh_variation_attributes_callback() {
         $type = InterSoccer_Product_Types::get_product_type($parent_id);
         $parent_product = wc_get_product($parent_id);
 
-        $required_attrs = [
-            'camp' => ['pa_booking-type' => 'full-week', 'pa_age-group' => '5-13y (Full Day)'],
-            'course' => ['pa_course-day' => 'Monday', '_course_start_date' => date('Y-m-d'), '_course_total_weeks' => '16', '_course_holiday_dates' => '']
-        ];
+        $required_attrs = intersoccer_attr_refresh_defaults($type);
 
-        if (isset($required_attrs[$type])) {
+        if (!empty($required_attrs)) {
             $attributes = $product->get_attributes();
-            foreach ($required_attrs[$type] as $key => $default) {
+            foreach ($required_attrs as $key => $default) {
                 if (empty($attributes[$key])) {
                     if (strpos($key, 'pa_') === 0) {
                         $taxonomy = $key;
                         $term = get_term_by('slug', $default, $taxonomy);
                         if ($term) {
-                            wp_set_object_terms($variation_id, $term->term_id, $taxonomy);
+                            wp_set_object_terms($variation_id, (int) $term->term_id, $taxonomy);
                             intersoccer_debug('InterSoccer: Set default attribute ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
                         }
                     } else {
@@ -2608,15 +2607,25 @@ function intersoccer_refresh_variation_attributes_callback() {
                 }
             }
 
-            // Ensure pa_days-of-week on parent for camps
-            if ($type === 'camp' && $parent_product) {
+            $parent_defaults = intersoccer_attr_refresh_parent_defaults();
+            if ($type === 'camp' && $parent_product && isset($parent_defaults['camp'])) {
                 $parent_attributes = $parent_product->get_attributes();
-                if (empty($parent_attributes['pa_days-of-week'])) {
-                    $default_days = 'Monday,Tuesday,Wednesday,Thursday,Friday';
-                    $term = get_term_by('slug', $default_days, 'pa_days-of-week');
-                    if ($term) {
-                        wp_set_object_terms($parent_id, $term->term_id, 'pa_days-of-week');
-                        intersoccer_debug('InterSoccer: Set default pa_days-of-week to ' . $default_days . ' for parent product ' . $parent_id);
+                foreach ($parent_defaults['camp'] as $parent_tax => $term_slugs) {
+                    if (!empty($parent_attributes[$parent_tax])) {
+                        continue;
+                    }
+                    $term_ids = [];
+                    foreach ((array) $term_slugs as $term_slug) {
+                        $term = get_term_by('slug', $term_slug, $parent_tax);
+                        if ($term && !is_wp_error($term)) {
+                            $term_ids[] = (int) $term->term_id;
+                        }
+                    }
+                    if (!empty($term_ids)) {
+                        wp_set_object_terms($parent_id, $term_ids, $parent_tax);
+                        intersoccer_debug(
+                            'InterSoccer: Set default ' . $parent_tax . ' terms for parent product ' . $parent_id
+                        );
                     }
                 }
             }
@@ -3531,17 +3540,16 @@ function intersoccer_is_admin_player_assignment_item($item, $product = null) {
         }
     }
 
-    $booking_shape_keys = [
-        'pa_course-day',
-        'pa_course-times',
-        'pa_camp-times',
-        'pa_camp-terms',
-        'Age Group',
-        'Camp Terms',
-        'Course Day',
-        'Course Times',
-        'Booking Type',
-    ];
+    $booking_shape_keys = array_merge(
+        intersoccer_attr_order_shape_keys(),
+        [
+            'Age Group',
+            'Camp Terms',
+            'Course Day',
+            'Course Times',
+            'Booking Type',
+        ]
+    );
     foreach ($booking_shape_keys as $shape_key) {
         $value = $item->get_meta($shape_key, true);
         if ($value !== '' && $value !== null) {

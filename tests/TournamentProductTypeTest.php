@@ -196,17 +196,23 @@ class TournamentProductTypeTest extends TestCase {
      * Test tournament is handled in admin UI
      */
     public function testTournamentInAdminRequiredAttributes() {
-        // This tests that tournament has an entry in the required_attrs array
-        $required_attrs = [
-            'camp' => ['pa_booking-type', 'pa_age-group'],
-            'course' => ['pa_course-day', '_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
-            'birthday' => [],
-            'tournament' => []
-        ];
-        
-        $this->assertArrayHasKey('tournament', $required_attrs, 'Tournament should be in required_attrs array');
-        $this->assertIsArray($required_attrs['tournament'], 'Tournament required attrs should be an array');
-        $this->assertEmpty($required_attrs['tournament'], 'Tournament should have no special required attributes');
+        require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
+
+        foreach (['camp', 'course', 'birthday', 'tournament'] as $type) {
+            $this->assertIsArray(
+                intersoccer_attr_health_required_keys($type),
+                $type . ' should have health required keys array'
+            );
+        }
+
+        $this->assertEmpty(
+            intersoccer_attr_health_required_keys('tournament'),
+            'Tournament should have no special required attributes'
+        );
+        $this->assertNotEmpty(
+            intersoccer_attr_health_required_keys('camp'),
+            'Camp should have required variation attributes'
+        );
     }
 }
 

@@ -377,9 +377,19 @@ function intersoccer_is_tournament($product_id) {
  * @param int $product_id
  * @return string|null
  */
+function intersoccer_get_product_term_name($product_id, $slug) {
+    $taxonomy = intersoccer_attr_taxonomy($slug);
+    $terms = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'names']);
+    return !empty($terms) ? $terms[0] : null;
+}
+
+/**
+ * Get product venue
+ * @param int $product_id
+ * @return string|null
+ */
 function intersoccer_get_product_venue($product_id) {
-    $venues = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'names']);
-    return !empty($venues) ? $venues[0] : null;
+    return intersoccer_get_product_term_name($product_id, 'intersoccer-venues');
 }
 
 /**
@@ -388,8 +398,7 @@ function intersoccer_get_product_venue($product_id) {
  * @return string|null
  */
 function intersoccer_get_product_season($product_id) {
-    $seasons = wc_get_product_terms($product_id, 'pa_program-season', ['fields' => 'names']);
-    return !empty($seasons) ? $seasons[0] : null;
+    return intersoccer_get_product_term_name($product_id, 'program-season');
 }
 
 /**
@@ -398,8 +407,7 @@ function intersoccer_get_product_season($product_id) {
  * @return string|null
  */
 function intersoccer_get_product_age_group($product_id) {
-    $age_groups = wc_get_product_terms($product_id, 'pa_age-group', ['fields' => 'names']);
-    return !empty($age_groups) ? $age_groups[0] : null;
+    return intersoccer_get_product_term_name($product_id, 'age-group');
 }
 
 /**
@@ -408,8 +416,7 @@ function intersoccer_get_product_age_group($product_id) {
  * @return string|null
  */
 function intersoccer_get_product_canton($product_id) {
-    $cantons = wc_get_product_terms($product_id, 'pa_canton-region', ['fields' => 'names']);
-    return !empty($cantons) ? $cantons[0] : null;
+    return intersoccer_get_product_term_name($product_id, 'canton-region');
 }
 
 /**
@@ -418,42 +425,8 @@ function intersoccer_get_product_canton($product_id) {
  * @return string|null
  */
 function intersoccer_get_product_city($product_id) {
-    $cities = wc_get_product_terms($product_id, 'pa_city', ['fields' => 'names']);
-    return !empty($cities) ? $cities[0] : null;
+    return intersoccer_get_product_term_name($product_id, 'city');
 }
-
-/**
- * Initialize product type hooks and taxonomies
- */
-add_action('init', function() {
-    // Register custom product attributes if they don't exist
-    $attributes = [
-        'pa_activity-type' => 'Activity Type',
-        'pa_intersoccer-venues' => 'InterSoccer Venues',
-        'pa_program-season' => 'Program Season',
-        'pa_age-group' => 'Age Group',
-        'pa_canton-region' => 'Canton / Region',
-        'pa_city' => 'City',
-        'pa_booking-type' => 'Booking Type',
-        'pa_course-day' => 'Course Day',
-        'pa_camp-terms' => 'Camp Terms',
-        'pa_days-of-week' => 'Days of Week'
-    ];
-    
-    foreach ($attributes as $slug => $name) {
-        if (!taxonomy_exists($slug)) {
-            register_taxonomy($slug, 'product', [
-                'label' => $name,
-                'public' => true,
-                'hierarchical' => true,
-                'show_ui' => true,
-                'show_admin_column' => true,
-                'query_var' => true,
-                'rewrite' => ['slug' => $slug],
-            ]);
-        }
-    }
-});
 
 /**
  * Hook to update product type on save.

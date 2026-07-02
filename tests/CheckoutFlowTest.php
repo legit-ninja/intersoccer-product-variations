@@ -293,5 +293,61 @@ class CheckoutFlowTest extends TestCase {
         
         $this->assertTrue($should_execute, 'Hook should execute for completed order');
     }
+
+    /**
+     * Test: Checkout order-meta labels match attribute registry contract.
+     */
+    public function testCheckoutOrderMetaLabelsMatchRegistry() {
+        require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
+
+        $map = intersoccer_attr_order_meta_label_map();
+        $this->assertSame('Sites InterSoccer', $map['pa_intersoccer-venues']);
+        $this->assertSame('Booking Type', $map['pa_booking-type']);
+        $this->assertSame('Season', $map['pa_program-season']);
+        $this->assertSame('Course Day', $map['pa_course-day']);
+    }
+
+    // Regression: ECO-006 — Player data helper and cache split across PM object cache and PV request cache
+    public function test_checkout_sees_fresh_player_after_pm_edit()
+    {
+        if (!function_exists('get_user_meta')) {
+            $GLOBALS['pv_test_user_meta'] = [];
+            function get_user_meta($user_id, $key = '', $single = false) {
+                $value = $GLOBALS['pv_test_user_meta'][$user_id][$key] ?? '';
+                return $single ? $value : [$value];
+            }
+            function update_user_meta($user_id, $key, $value) {
+                $GLOBALS['pv_test_user_meta'][$user_id][$key] = $value;
+                return true;
+            }
+        }
+
+        require_once dirname(__DIR__) . '/includes/helpers.php';
+
+        $user_id = 42;
+        update_user_meta($user_id, 'intersoccer_players', [
+            [
+                'first_name' => 'Original',
+                'last_name' => 'Player',
+                'dob' => '2015-01-01',
+                'gender' => 'female',
+            ],
+        ]);
+
+        intersoccer_get_user_players($user_id);
+
+        update_user_meta($user_id, 'intersoccer_players', [
+            [
+                'first_name' => 'Renamed',
+                'last_name' => 'Player',
+                'dob' => '2015-01-01',
+                'gender' => 'female',
+            ],
+        ]);
+
+        $players = intersoccer_get_user_players($user_id);
+
+        $this->assertSame('Renamed', $players[0]['first_name'] ?? null, 'PV should reflect player renamed in PM without force_refresh');
+    }
 }
 

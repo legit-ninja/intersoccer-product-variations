@@ -23,9 +23,29 @@
     <custom-field action="copy">_intersoccer_product_type</custom-field>
 
     <!-- Attribute meta (kept in sync across translated products/variations) -->
-    <custom-field action="copy">attribute_pa_booking-type</custom-field>
+    <custom-field action="copy">attribute_pa_activity-type</custom-field>
+    <custom-field action="copy">attribute_pa_intersoccer-venues</custom-field>
     <custom-field action="copy">attribute_pa_program-season</custom-field>
+    <custom-field action="copy">attribute_pa_age-group</custom-field>
+    <custom-field action="copy">attribute_pa_canton-region</custom-field>
+    <custom-field action="copy">attribute_pa_city</custom-field>
+    <custom-field action="copy">attribute_pa_booking-type</custom-field>
+    <custom-field action="copy">attribute_pa_days-of-week</custom-field>
+    <custom-field action="copy">attribute_pa_camp-terms</custom-field>
     <custom-field action="copy">attribute_pa_course-day</custom-field>
+    <custom-field action="copy">attribute_pa_course-times</custom-field>
+    <custom-field action="copy">attribute_pa_camp-times</custom-field>
+    <custom-field action="copy">attribute_pa_girls-only</custom-field>
+    <custom-field action="copy">attribute_pa_date</custom-field>
+    <custom-field action="copy">attribute_pa_tournament-day</custom-field>
+    <custom-field action="copy">attribute_pa_tournament-time</custom-field>
+    <custom-field action="copy">attribute_pa_note</custom-field>
+    <!-- Legacy variation meta aliases -->
+    <custom-field action="copy">attribute_pa_booking_type</custom-field>
+    <custom-field action="copy">attribute_pa_intersoccer_venues</custom-field>
+    <custom-field action="copy">attribute_pa_course_day</custom-field>
+    <custom-field action="copy">attribute_pa_canton_region</custom-field>
+    <custom-field action="copy">attribute_pa_girls_only</custom-field>
   </custom-fields>
 
   <admin-texts>
@@ -40,4 +60,3 @@
     </shortcode>
   </shortcodes>
 </wpml-config>
-
