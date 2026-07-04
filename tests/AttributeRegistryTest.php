@@ -12,7 +12,7 @@ class AttributeRegistryTest extends TestCase {
     }
 
     public function test_contract_version_is_defined() {
-        $this->assertSame(1, INTERSOCCER_ATTRIBUTE_CONTRACT_VERSION);
+        $this->assertSame(2, INTERSOCCER_ATTRIBUTE_CONTRACT_VERSION);
     }
 
     public function test_every_registry_entry_has_required_fields() {
@@ -101,5 +101,11 @@ class AttributeRegistryTest extends TestCase {
         $camp_keys = intersoccer_attr_health_required_keys('camp');
         $this->assertContains('pa_booking-type', $camp_keys);
         $this->assertNotContains('pa_course-day', $camp_keys);
+    }
+
+    public function test_camp_and_course_templates_include_girls_only() {
+        $templates = intersoccer_attr_product_type_templates();
+        $this->assertContains('girls-only', $templates['camp']['parent']);
+        $this->assertContains('girls-only', $templates['course']['parent']);
     }
 }

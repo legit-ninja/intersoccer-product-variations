@@ -166,6 +166,18 @@ function intersoccer_attr_ajax_sync() {
             count($result['existing'])
         );
     }
+    if (!empty($result['existing_via_alias'])) {
+        $parts[] = sprintf(
+            __('Resolved via legacy slug: %s', 'intersoccer-product-variations'),
+            implode(', ', $result['existing_via_alias'])
+        );
+    }
+    if (!empty($result['reconciled'])) {
+        $parts[] = sprintf(
+            __('Reconciled orphaned taxonomies: %s', 'intersoccer-product-variations'),
+            implode(', ', $result['reconciled'])
+        );
+    }
     if (!empty($result['terms_created'])) {
         $parts[] = sprintf(
             __('Terms seeded: %s', 'intersoccer-product-variations'),
@@ -205,6 +217,24 @@ function intersoccer_attr_ajax_audit() {
         (int) $audit['summary']['missing'],
         (int) $audit['summary']['legacy_hits']
     );
+
+    if (!empty($audit['alias_resolved'])) {
+        $aliases = [];
+        foreach ($audit['alias_resolved'] as $registry_slug => $wc_slug) {
+            $aliases[] = $registry_slug . '→' . $wc_slug;
+        }
+        $lines[] = esc_html__('Registry aliases in WooCommerce:', 'intersoccer-product-variations') . ' '
+            . esc_html(implode(', ', $aliases));
+    }
+
+    if (!empty($audit['orphaned_taxonomies'])) {
+        $orphans = [];
+        foreach ($audit['orphaned_taxonomies'] as $registry_slug => $taxonomy) {
+            $orphans[] = $registry_slug . '→' . $taxonomy;
+        }
+        $lines[] = esc_html__('Orphaned taxonomies (run Sync to reconcile):', 'intersoccer-product-variations') . ' '
+            . esc_html(implode(', ', $orphans));
+    }
 
     if (!empty($audit['missing_wc_attributes'])) {
         $lines[] = esc_html__('Missing WC attributes:', 'intersoccer-product-variations') . ' '

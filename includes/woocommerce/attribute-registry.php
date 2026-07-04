@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('INTERSOCCER_ATTRIBUTE_CONTRACT_VERSION')) {
-    define('INTERSOCCER_ATTRIBUTE_CONTRACT_VERSION', 1);
+    define('INTERSOCCER_ATTRIBUTE_CONTRACT_VERSION', 2);
 }
 
 /**
@@ -171,7 +171,11 @@ function intersoccer_attr_registry() {
                 'attribute_pa_girl-only',
                 'attribute_pa_girl_only',
             ],
-            'default_terms' => [],
+            'default_terms' => [
+                ['name' => 'Yes', 'slug' => 'yes'],
+                ['name' => 'No', 'slug' => 'no'],
+                ['name' => "Girl's Only", 'slug' => 'girls-only'],
+            ],
             'day_attribute' => false,
         ],
         'date' => [
@@ -237,12 +241,12 @@ function intersoccer_attr_product_type_templates() {
 
     $templates = [
         'camp' => [
-            'parent' => array_merge($core_parent, ['days-of-week', 'camp-terms', 'camp-times']),
+            'parent' => array_merge($core_parent, ['girls-only', 'days-of-week', 'camp-terms', 'camp-times']),
             'variation' => ['booking-type', 'age-group'],
             'meta' => [],
         ],
         'course' => [
-            'parent' => $core_parent,
+            'parent' => array_merge($core_parent, ['girls-only']),
             'variation' => ['course-day', 'course-times', 'age-group'],
             'meta' => ['_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
         ],

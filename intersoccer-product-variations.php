@@ -321,6 +321,8 @@ $includes = [
     'includes/woocommerce/attribute-registry.php',
     'includes/woocommerce/attribute-sync.php',
     'includes/woocommerce/attribute-admin.php',
+    'includes/woocommerce/order-meta-contract.php',
+    'includes/woocommerce/attribute-enforcement.php',
     'includes/woocommerce/admin-ui.php',
     'includes/woocommerce/product-types.php',
     'includes/woocommerce/product-course.php',

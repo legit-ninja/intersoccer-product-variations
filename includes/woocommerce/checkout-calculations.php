@@ -155,6 +155,33 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     foreach ($parent_attributes as $attribute_name => $attribute) {
         $value = '';
 
+        // Girls-only switch attributes are handled separately (not as Activity Type duplicate).
+        if (function_exists('intersoccer_is_girls_only_taxonomy') && intersoccer_is_girls_only_taxonomy($attribute_name)) {
+            $pairs = function_exists('intersoccer_collect_taxonomy_term_pairs_for_line')
+                ? intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variation_id ?: 0, $attribute_name)
+                : [];
+            $girls_values = [];
+            foreach ($pairs as $pair) {
+                $formatted = function_exists('intersoccer_format_girls_only_meta_value')
+                    ? intersoccer_format_girls_only_meta_value($pair['slug'] ?? '', $pair['name'] ?? '')
+                    : '';
+                if ($formatted !== '') {
+                    $girls_values[] = $formatted;
+                }
+            }
+            if (!empty($girls_values)) {
+                $label = intersoccer_attr_order_meta_label('girls-only');
+                $label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', $label, $label) : $label;
+                $attributes[$label] = implode(', ', array_unique($girls_values));
+            }
+            continue;
+        }
+
+        // Activity Type taxonomy: program terms only (girls-only modifier excluded; composite Activity Type meta handles that).
+        if (function_exists('intersoccer_is_activity_type_taxonomy') && intersoccer_is_activity_type_taxonomy($attribute_name)) {
+            continue;
+        }
+
         // If variation explicitly sets this attribute, prefer the variation value(s)
         if (isset($variation_map[$attribute_name]) && !empty($variation_map[$attribute_name])) {
             $selected = $variation_map[$attribute_name];
@@ -286,9 +313,7 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     if (isset($values['assigned_attendee']) && !empty($values['assigned_attendee'])) {
         $item->add_meta_data('Assigned Attendee', sanitize_text_field($values['assigned_attendee']));
         if ($values['assigned_player'] !== null) {
-            $player_index = absint($values['assigned_player']);
-            $item->add_meta_data('Player Index', $player_index);
-            $item->add_meta_data('assigned_player', $player_index);
+            $item->add_meta_data('assigned_player', absint($values['assigned_player']));
         }
     }
 
@@ -336,58 +361,49 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
             $item->add_meta_data('Holidays', implode(', ', $formatted_holidays));
         }
         
-        if (isset($values['remaining_sessions']) && is_numeric($values['remaining_sessions'])) {
-            $item->add_meta_data('Remaining Sessions', absint($values['remaining_sessions']));
-        }
-        
         if (isset($values['discount_note']) && !empty($values['discount_note'])) {
             $item->add_meta_data('Discount', sanitize_text_field($values['discount_note']));
         }
     }
 
-    // 4. Add Base Price and Discount Amount
-    if (isset($values['base_price'])) {
-        $item->add_meta_data('Base Price', wc_price($values['base_price']));
-    }
     if (isset($values['discount_amount']) && $values['discount_amount'] > 0) {
         $item->add_meta_data('Discount Amount', wc_price($values['discount_amount']));
     }
 
-    // 5. Add Variation ID for reference (if not already added)
-    if ($variation_id) {
-        $existing_variation_id = $item->get_meta('Variation ID');
-        if (empty($existing_variation_id)) {
-            $item->add_meta_data('Variation ID', $variation_id);
+    // Season, Activity Type, and registry attributes via contract builder.
+    $built = intersoccer_build_order_line_meta([
+        'item' => $item,
+        'product_id' => $product_id,
+        'variation_id' => $variation_id,
+        'product_type' => $product_type,
+        'cart_values' => $values,
+    ]);
+
+    foreach ($built['updates'] as $meta_key => $meta_value) {
+        if (in_array($meta_key, ['Assigned Attendee', 'assigned_player', 'Days Selected', 'Late Pickup Type', 'Late Pickup Days', 'Late Pickup Cost', 'Start Date', 'End Date', 'Holidays', 'Discount', 'Discount Amount'], true)) {
+            continue;
         }
+        $item->add_meta_data($meta_key, is_string($meta_value) ? sanitize_text_field($meta_value) : $meta_value);
     }
 
-    // 6. Add Season information (important for reporting)
-    $season = intersoccer_get_product_season($product_id);
-    if ($season) {
-        $season_key = function_exists('icl_t') ? icl_t('intersoccer-product-variations', 'Season', 'Season') : 'Season';
-        $item->add_meta_data($season_key, $season);
+    $parent_attributes = [];
+    if (function_exists('intersoccer_get_parent_product_attributes')) {
+        $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
     }
-
-    // 7. Add Activity Type for clarity
-    $activity_type = ucfirst($product_type ?: 'Unknown');
-    $activity_type = function_exists('icl_t') ? icl_t('intersoccer-product-variations', $activity_type, $activity_type) : $activity_type;
-    $activity_type_key = function_exists('icl_t') ? icl_t('intersoccer-product-variations', 'Activity Type', 'Activity Type') : 'Activity Type';
-    $item->add_meta_data($activity_type_key, $activity_type);
-
-    // 8. Add parent product attributes (excluding variation attributes)
-    $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-    
     if (defined('WP_DEBUG') && WP_DEBUG) {
         intersoccer_debug('InterSoccer: Retrieved ' . count($parent_attributes) . ' parent attributes for product ' . $product_id);
         intersoccer_debug('InterSoccer: Parent attributes to add: ' . print_r($parent_attributes, true));
     }
     
     foreach ($parent_attributes as $attribute_label => $attribute_value) {
-        // Skip attributes that are already added separately to avoid duplication
-        if (in_array($attribute_label, ['Activity Type', 'Season'], true)) {
+        // Skip attributes already added via contract builder or checkout-specific blocks.
+        if (in_array($attribute_label, ['Activity Type', 'Season', 'Girls Only'], true)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
             }
+            continue;
+        }
+        if (isset($built['updates'][$attribute_label])) {
             continue;
         }
         $meta_key = $attribute_label;

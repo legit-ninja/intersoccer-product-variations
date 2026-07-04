@@ -1005,35 +1005,22 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 
                 $order_data['product_types'][] = ucfirst($product_type);
                 
-                $user_id = $order->get_customer_id();
                 $existing_meta = $item->get_meta_data();
                 $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
                 
-                $assigned_player = in_array('assigned_player', $existing_keys) ? $item->get_meta('assigned_player', true) : 0;
-                $player_details = intersoccer_get_player_details($user_id, $assigned_player);
-                
-                // Get existing Activity Type to preserve language
                 $existing_activity_type = in_array('Activity Type', $existing_keys) ? $item->get_meta('Activity Type', true) : '';
-                
-                // Get Activity Type in the same language as existing, or default to English
-                $activity_type_value = $product_type 
-                    ? intersoccer_get_activity_type_in_language($product_type, $existing_activity_type)
-                    : 'Unknown';
-                
-                $potential_updates = [
-                    'Assigned Attendee' => isset($player_details['name']) ? $player_details['name'] : null,
-                    'Attendee DOB' => isset($player_details['dob']) ? $player_details['dob'] : null,
-                    'Attendee Gender' => isset($player_details['gender']) ? $player_details['gender'] : null,
-                    'Medical Conditions' => isset($player_details['medical_conditions']) ? 
-                        (!empty($player_details['medical_conditions']) ? $player_details['medical_conditions'] : 'None') : null,
-                    'Activity Type' => $activity_type_value,
-                    'Season' => intersoccer_get_product_season($product_id),
-                    'Variation ID' => $variation_id
-                ];
-                
-                $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-                $potential_updates = array_merge($potential_updates, $attributes);
-                
+
+                $built = intersoccer_build_order_line_meta([
+                    'order' => $order,
+                    'item' => $item,
+                    'product_id' => $product_id,
+                    'variation_id' => $variation_id,
+                    'product_type' => $product_type,
+                    'existing_activity_type' => $existing_activity_type,
+                    'fix_activity_type_only' => $fix_activity_type_only,
+                ]);
+                $potential_updates = $built['updates'];
+
                 // Check what's missing or incorrect
                 $missing = [];
                 $proposed = [];
@@ -1050,8 +1037,10 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                     }
                     
                     if (!in_array($key, $existing_keys)) {
-                        // If fix_activity_type_only mode, skip missing fields (only fix incorrect ones)
-                        if (!$fix_activity_type_only) {
+                        if ($fix_activity_type_only && $key === 'Activity Type') {
+                            $missing[] = $key . ' (missing)';
+                            $proposed[$key] = $value;
+                        } elseif (!$fix_activity_type_only) {
                             $missing[] = $key;
                             $proposed[$key] = $value;
                         }
@@ -1066,7 +1055,9 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                             // Only flag as incorrect if normalized values don't match
                             if ($normalized_existing !== $normalized_expected) {
                                 $has_incorrect_activity_type = true;
-                                $corrected_value = intersoccer_get_activity_type_in_language($normalized_expected, $existing_value);
+                                $corrected_value = (strpos((string) $normalized_expected, 'girls') !== false)
+                                    ? $value
+                                    : intersoccer_get_activity_type_in_language($normalized_expected, $existing_value);
                                 $missing[] = $key . ' (incorrect: "' . $existing_value . '" should be "' . $corrected_value . '")';
                                 $proposed[$key] = $corrected_value;
                             }
@@ -1076,6 +1067,21 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 
                 if (!empty($missing)) {
                     $order_data['missing_keys'][$item_id] = $missing;
+                }
+
+                $deprecated_present = [];
+                foreach (intersoccer_order_meta_deprecated_keys() as $deprecated_key) {
+                    if (in_array($deprecated_key, $existing_keys, true) && $item->get_meta($deprecated_key, true) !== '') {
+                        $deprecated_present[] = $deprecated_key;
+                    }
+                }
+                if (!empty($deprecated_present)) {
+                    $order_data['missing_keys'][$item_id] = array_merge(
+                        $order_data['missing_keys'][$item_id] ?? [],
+                        array_map(static function ($key) {
+                            return $key . ' (deprecated)';
+                        }, $deprecated_present)
+                    );
                 }
                 
                 if (!empty($proposed)) {
@@ -1134,6 +1140,7 @@ function intersoccer_render_update_orders_page() {
         : ['processing', 'completed'];
     $preview_limit_value = isset($_REQUEST['preview_limit']) ? sanitize_text_field((string) $_REQUEST['preview_limit']) : '25';
     $fix_activity_type_only_checked = isset($_REQUEST['fix_activity_type_only']) && (string) $_REQUEST['fix_activity_type_only'] === '1';
+    $strip_deprecated_checked = isset($_REQUEST['strip_deprecated_meta']) && (string) $_REQUEST['strip_deprecated_meta'] === '1';
     $show_preview = isset($_REQUEST['preview_updates']) || isset($_REQUEST['detailed_preview']);
     $show_detailed = isset($_REQUEST['detailed_preview']);
 
@@ -1150,6 +1157,7 @@ function intersoccer_render_update_orders_page() {
             'detailed_preview' => isset($_POST['detailed_preview']) ? '1' : null,
             'preview_limit' => $preview_limit_value,
             'fix_activity_type_only' => $fix_activity_type_only_checked ? '1' : '0',
+            'strip_deprecated_meta' => $strip_deprecated_checked ? '1' : '0',
             'order_statuses' => $selected_statuses,
         ];
         $query_args = array_filter($query_args, static function ($value) {
@@ -1168,10 +1176,11 @@ function intersoccer_render_update_orders_page() {
         $errors = [];
         
         $fix_activity_type_only = isset($_POST['fix_activity_type_only']) && $_POST['fix_activity_type_only'] === '1';
-        
+        $strip_deprecated = isset($_POST['strip_deprecated_meta']) && $_POST['strip_deprecated_meta'] === '1';
+
         foreach ($order_ids as $order_id) {
             $order = wc_get_order($order_id);
-            if ($order && intersoccer_update_order_metadata($order, $fix_activity_type_only)) {
+            if ($order && intersoccer_update_order_metadata($order, $fix_activity_type_only, $strip_deprecated)) {
                 $updated_count++;
             } else {
                 $errors[] = $order_id;
@@ -1181,6 +1190,9 @@ function intersoccer_render_update_orders_page() {
         $message = sprintf(__('Updated metadata for %d orders.', 'intersoccer-product-variations'), $updated_count);
         if (!empty($errors)) {
             $message .= ' ' . sprintf(__('Failed to update: %s', 'intersoccer-product-variations'), implode(', ', $errors));
+        }
+        if ($updated_count > 0) {
+            $message .= ' ' . __('Run Reports → Reconcile Rosters to refresh roster rows for repaired orders.', 'intersoccer-product-variations');
         }
     }
 
@@ -1227,7 +1239,14 @@ function intersoccer_render_update_orders_page() {
                             <?php _e('Fix Activity Type Only', 'intersoccer-product-variations'); ?>
                         </label>
                         <p class="description">
-                            <?php _e('When checked, only corrects incorrect Activity Type values (e.g., fixes Tournament products saved as "Course"). Does not add missing metadata fields.', 'intersoccer-product-variations'); ?>
+                            <?php _e('When checked, only updates Activity Type (incorrect or missing). Useful for girls-only camps saved as plain "Camp".', 'intersoccer-product-variations'); ?>
+                        </p>
+                        <label>
+                            <input type="checkbox" name="strip_deprecated_meta" value="1" <?php checked($strip_deprecated_checked); ?>>
+                            <?php _e('Strip Deprecated Metadata', 'intersoccer-product-variations'); ?>
+                        </label>
+                        <p class="description">
+                            <?php _e('Removes Variation ID, Base Price, Remaining Sessions, and Player Index keys when assigned_player is present.', 'intersoccer-product-variations'); ?>
                         </p>
                     </td>
                 </tr>
@@ -1310,6 +1329,9 @@ function intersoccer_render_update_orders_page() {
                     <input type="hidden" id="selected-order-ids" name="selected_order_ids" value="">
                     <?php if ($fix_activity_type_only_checked) : ?>
                         <input type="hidden" name="fix_activity_type_only" value="1">
+                    <?php endif; ?>
+                    <?php if ($strip_deprecated_checked) : ?>
+                        <input type="hidden" name="strip_deprecated_meta" value="1">
                     <?php endif; ?>
                     <?php wp_nonce_field('intersoccer_update_orders', 'intersoccer_update_orders_nonce'); ?>
                 </form>
@@ -1618,6 +1640,17 @@ function intersoccer_normalize_activity_type($activity_type) {
     
     $normalized = strtolower(trim($activity_type));
     
+    // Composite girls-only values: camp,course + girls modifier.
+    if (strpos($normalized, 'girls') !== false || strpos($normalized, 'filles') !== false || strpos($normalized, 'madchen') !== false || strpos($normalized, 'mädchen') !== false) {
+        if (strpos($normalized, 'camp') !== false || strpos($normalized, 'lager') !== false) {
+            return 'camp,girls only';
+        }
+        if (strpos($normalized, 'course') !== false || strpos($normalized, 'cours') !== false || strpos($normalized, 'kurs') !== false) {
+            return 'course,girls only';
+        }
+        return 'girls only';
+    }
+    
     // Translation map: normalized English -> language variants
     $translation_map = [
         'camp' => ['camp', 'camps', 'camp de vacances', 'lager', 'campeggio'],
@@ -1682,6 +1715,18 @@ function intersoccer_get_activity_type_in_language($product_type_slug, $existing
         ],
     ];
     
+    $type = strtolower(trim($product_type_slug));
+    if ($type === 'camp,girls only' || $type === 'course,girls only' || $type === 'girls only') {
+        $base_type = strpos($type, 'course') !== false ? 'course' : (strpos($type, 'camp') !== false ? 'camp' : '');
+        $suffix = function_exists('intersoccer_order_activity_type_girls_only_suffix')
+            ? intersoccer_order_activity_type_girls_only_suffix($language)
+            : 'Girls Only';
+        if ($base_type !== '' && isset($translations[$base_type][$language])) {
+            return $translations[$base_type][$language] . ', ' . $suffix;
+        }
+        return $suffix;
+    }
+
     // Return translated value or fallback to English
     return $translations[$product_type_slug][$language] ?? $translations[$product_type_slug]['en'] ?? ucfirst($product_type_slug);
 }
@@ -1784,9 +1829,10 @@ function intersoccer_resolve_order_item_product_context($item) {
  * 
  * @param WC_Order $order The order to update
  * @param bool $fix_activity_type_only If true, only fixes incorrect Activity Type values
+ * @param bool $strip_deprecated If true, remove deprecated meta keys from line items
  * @return bool True if any updates were made, false otherwise
  */
-function intersoccer_update_order_metadata($order, $fix_activity_type_only = false) {
+function intersoccer_update_order_metadata($order, $fix_activity_type_only = false, $strip_deprecated = false) {
     if (!($order instanceof WC_Order)) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             intersoccer_debug('InterSoccer: Skipped order ' . $order->get_id() . ' - Not a WC_Order (type: ' . get_class($order) . ')');
@@ -1796,155 +1842,46 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
 
     $overall_updated = false;
     $order_id = $order->get_id();
-    
 
     foreach ($order->get_items() as $item_id => $item) {
+        if (!($item instanceof WC_Order_Item_Product)) {
+            continue;
+        }
+
         $resolved_context = intersoccer_resolve_order_item_product_context($item);
         $product_id = (int) $resolved_context['resolved_product_id'];
         $variation_id = (int) $resolved_context['variation_id'];
         $product_type = $resolved_context['product_type'];
 
-
-        // Skip non-relevant products
-        if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
+        if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
             continue;
         }
 
-        // Get existing metadata
-        $existing_meta = $item->get_meta_data();
-        $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
+        $existing_activity_type = (string) $item->get_meta('Activity Type', true);
+        $built = intersoccer_build_order_line_meta([
+            'order' => $order,
+            'item' => $item,
+            'product_id' => $product_id,
+            'variation_id' => $variation_id,
+            'product_type' => $product_type,
+            'existing_activity_type' => $existing_activity_type,
+            'fix_activity_type_only' => $fix_activity_type_only,
+        ]);
 
+        $item_updated = intersoccer_apply_order_line_meta_updates($item, $built['updates'], $fix_activity_type_only);
 
-        $item_updated = false;
-
-        // Get player details
-        $user_id = $order->get_customer_id();
-        $assigned_player = in_array('assigned_player', $existing_keys) ? $item->get_meta('assigned_player', true) : 0;
-        $player_details = intersoccer_get_player_details($user_id, $assigned_player);
-
-
-        // Build potential updates array.
-        $potential_updates = [
-            'Assigned Attendee' => isset($player_details['name']) ? $player_details['name'] : null,
-            'Attendee DOB' => isset($player_details['dob']) ? $player_details['dob'] : null,
-            'Attendee Gender' => isset($player_details['gender']) ? $player_details['gender'] : null,
-            'Medical Conditions' => isset($player_details['medical_conditions']) ? 
-                (!empty($player_details['medical_conditions']) ? $player_details['medical_conditions'] : 'None') : null,
-            'Activity Type' => $product_type ? intersoccer_get_activity_type_in_language($product_type, '') : 'Unknown',
-            'Season' => intersoccer_get_product_season($product_id),
-            'Variation ID' => $variation_id
-        ];
-
-        // Add product attributes
-        $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-        $potential_updates = array_merge($potential_updates, $attributes);
-
-        // Type-specific metadata
-        if ($product_type === 'camp') {
-            $camp_times = get_post_meta($variation_id ?: $product_id, '_camp_times', true);
-            if ($camp_times) {
-                $potential_updates['Camp Times'] = $camp_times;
-            }
-        } elseif ($product_type === 'course') {
-            $start_date = get_post_meta($variation_id ?: $product_id, '_course_start_date', true);
-            if ($start_date) {
-                $potential_updates['Start Date'] = date_i18n('d/m/y', strtotime($start_date));
-            }
-            
-            $end_date = get_post_meta($variation_id ?: $product_id, '_end_date', true);
-            if ($end_date) {
-                $potential_updates['End Date'] = date_i18n('d/m/Y', strtotime($end_date));
-            }
-            
-            $holidays = get_post_meta($variation_id ?: $product_id, '_course_holiday_dates', true) ?: [];
-            if (!empty($holidays)) {
-                $formatted_holidays = implode(', ', array_map(function($date) { return date_i18n('F j, Y', strtotime($date)); }, $holidays));
-                $potential_updates['Holidays'] = $formatted_holidays;
-            }
-            
-            $total_weeks = (int) get_post_meta($variation_id ?: $product_id, '_course_total_weeks', true);
-            if ($total_weeks > 0) {
-                $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id ?: $product_id, $total_weeks);
-                $potential_updates['Remaining Sessions'] = $remaining_sessions;
+        if ($strip_deprecated) {
+            $removed = intersoccer_strip_deprecated_order_line_meta($item);
+            if (!empty($removed)) {
+                $item_updated = true;
             }
         }
 
-        // Add Base Price
-        $product = wc_get_product($variation_id ?: $product_id);
-        if ($product) {
-            $base_price = floatval($product->get_regular_price());
-            $potential_updates['Base Price'] = wc_price($base_price);
-        }
-
-
-        // Apply updates.
-        foreach ($potential_updates as $key => $value) {
-            // If fix_activity_type_only is enabled, skip all fields except Activity Type
-            if ($fix_activity_type_only && $key !== 'Activity Type') {
-                continue;
-            }
-            
-            // Skip null or empty values (except for Medical Conditions which can be 'None')
-            if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
-                continue;
-            }
-            
-            if (!in_array($key, $existing_keys)) {
-                // If fix_activity_type_only is enabled, don't add missing fields, only fix incorrect ones
-                if ($fix_activity_type_only) {
-                    continue;
-                }
-                
-                try {
-                    $item->add_meta_data($key, $value);
-                    $item_updated = true;
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - ADDED: ' . $key . ' = ' . $value);
-                    }
-                } catch (Exception $e) {
-                    if (defined('WP_DEBUG') && WP_DEBUG) {
-                        intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED TO ADD ' . $key . ': ' . $e->getMessage());
-                    }
-                }
-            } else {
-                // Check if existing value is incorrect (especially for Activity Type)
-                $existing_value = $item->get_meta($key, true);
-                if ($key === 'Activity Type') {
-                    // Normalize both values for comparison
-                    $normalized_existing = intersoccer_normalize_activity_type($existing_value);
-                    $normalized_expected = intersoccer_normalize_activity_type($value);
-                    
-                    // Only update if normalized values don't match (different product type)
-                    if ($normalized_existing !== $normalized_expected) {
-                        // Activity Type mismatch - update it, preserving language if possible
-                        // Get the correct value in the same language as existing
-                        $corrected_value = intersoccer_get_activity_type_in_language($normalized_expected, $existing_value);
-                        
-                        if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - CORRECTING ' . $key . ' from "' . $existing_value . '" (normalized: ' . $normalized_existing . ') to "' . $corrected_value . '" (normalized: ' . $normalized_expected . ')');
-                        }
-                        try {
-                            $item->update_meta_data($key, $corrected_value);
-                            $item_updated = true;
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - UPDATED: ' . $key . ' = ' . $corrected_value);
-                            }
-                        } catch (Exception $e) {
-                            if (defined('WP_DEBUG') && WP_DEBUG) {
-                                intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED TO UPDATE ' . $key . ': ' . $e->getMessage());
-                            }
-                        }
-                    }
-                } else {
-                }
-            }
-        }
-
-        // Save the item if updated
         if ($item_updated) {
             try {
                 $item->save();
                 $overall_updated = true;
+                do_action('intersoccer_order_line_meta_repaired', $order_id, $item_id);
             } catch (Exception $e) {
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     intersoccer_debug('InterSoccer: Order ' . $order_id . ', Item ' . $item_id . ' - FAILED to save item: ' . $e->getMessage());
@@ -1953,7 +1890,6 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
         }
     }
 
-    // Save the order if any items were updated
     if ($overall_updated) {
         try {
             $order->save();
@@ -1975,53 +1911,53 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
  * Fixed version of the analysis function for the enhanced preview table
  */
 function intersoccer_analyze_item_metadata($order, $item, $product_type) {
-    $product_id = $item->get_product_id();
-    $variation_id = $item->get_variation_id();
-    $user_id = $order->get_customer_id();
-    
-    // Get existing meta keys
+    $resolved = intersoccer_resolve_order_item_product_context($item);
+    $product_id = (int) $resolved['resolved_product_id'];
+    $variation_id = (int) $resolved['variation_id'];
+    $product_type = $resolved['product_type'] ?: $product_type;
+
     $existing_meta = $item->get_meta_data();
-    $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
-    
+    $existing_keys = array_map(static function ($meta) {
+        return $meta->key;
+    }, $existing_meta);
+
     $missing = [];
     $proposed = [];
-    
-    // Get player details
-    $assigned_player = in_array('assigned_player', $existing_keys) ? $item->get_meta('assigned_player', true) : 0;
-    $player_details = intersoccer_get_player_details($user_id, $assigned_player);
-    
-    // Build potential updates (SAME LOGIC AS CORRECTED UPDATE FUNCTION)
-    $potential_updates = [
-        'Assigned Attendee' => isset($player_details['name']) ? $player_details['name'] : null,
-        'Attendee DOB' => isset($player_details['dob']) ? $player_details['dob'] : null,
-        'Attendee Gender' => isset($player_details['gender']) ? $player_details['gender'] : null,
-        'Medical Conditions' => isset($player_details['medical_conditions']) ? 
-            (!empty($player_details['medical_conditions']) ? $player_details['medical_conditions'] : 'None') : null,
-        'Activity Type' => ucfirst($product_type ?: 'Unknown'),
-        'Season' => intersoccer_get_product_season($product_id),
-        'Variation ID' => $variation_id
-    ];
-    
-    // Add product attributes
-    $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-    $potential_updates = array_merge($potential_updates, $attributes);
-    
-    // Check each potential update
+
+    $existing_activity_type = in_array('Activity Type', $existing_keys, true)
+        ? $item->get_meta('Activity Type', true)
+        : '';
+
+    $built = intersoccer_build_order_line_meta([
+        'order' => $order,
+        'item' => $item,
+        'product_id' => $product_id,
+        'variation_id' => $variation_id,
+        'product_type' => $product_type,
+        'existing_activity_type' => $existing_activity_type,
+    ]);
+    $potential_updates = $built['updates'];
+
     foreach ($potential_updates as $key => $value) {
-        // Skip null or empty values (except for Medical Conditions which can be 'None')
         if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
             continue;
         }
-        
-        if (!in_array($key, $existing_keys)) {
+
+        if (!in_array($key, $existing_keys, true)) {
             $missing[] = $key;
             $proposed[$key] = $value;
+        } elseif ($key === 'Activity Type' && function_exists('intersoccer_normalize_activity_type')) {
+            $existing_value = $item->get_meta($key, true);
+            if (intersoccer_normalize_activity_type($existing_value) !== intersoccer_normalize_activity_type($value)) {
+                $missing[] = $key . ' (incorrect)';
+                $proposed[$key] = $value;
+            }
         }
     }
-    
+
     return [
         'missing' => $missing,
-        'proposed' => $proposed
+        'proposed' => $proposed,
     ];
 }
 
@@ -2048,22 +1984,26 @@ function intersoccer_update_processing_orders_callback() {
 
     foreach ($order_ids as $order_id) {
         $order = wc_get_order($order_id);
-        if (!$order || $order->get_status() !== 'processing') {
-            intersoccer_debug('InterSoccer: Invalid or non-Processing order ID ' . $order_id);
+        if (!$order) {
+            intersoccer_debug('InterSoccer: Invalid order ID ' . $order_id);
             continue;
         }
 
-        foreach ($order->get_items() as $item_id => $item) {
-            $product_id = $item->get_product_id();
-            $variation_id = $item->get_variation_id();
-            $product = wc_get_product($variation_id ?: $product_id);
+        $allowed_statuses = apply_filters('intersoccer_order_repair_allowed_statuses', ['processing', 'completed', 'on-hold']);
+        if (!in_array($order->get_status(), $allowed_statuses, true)) {
+            intersoccer_debug('InterSoccer: Skipping order ' . $order_id . ' with status ' . $order->get_status());
+            continue;
+        }
 
-            if (!$product) {
-                intersoccer_debug('InterSoccer: Invalid product for order item ' . $item_id . ' in order ' . $order_id);
+        intersoccer_update_order_metadata($order, false, true);
+
+        foreach ($order->get_items() as $item_id => $item) {
+            if (!($item instanceof WC_Order_Item_Product)) {
                 continue;
             }
 
-            $product_type = InterSoccer_Product_Types::get_product_type($product_id);
+            $resolved = intersoccer_resolve_order_item_product_context($item);
+            $product_type = $resolved['product_type'];
 
             if ($remove_assigned_player) {
                 $item->delete_meta_data('assigned_player');
@@ -2075,11 +2015,12 @@ function intersoccer_update_processing_orders_callback() {
                 intersoccer_debug('InterSoccer: Removed Days-of-week attribute from order item ' . $item_id . ' in order ' . $order_id);
             }
 
-            $item->save();
+            if ($remove_assigned_player || ($fix_incorrect && $product_type === 'camp')) {
+                $item->save();
+            }
         }
 
         $order->save();
-        intersoccer_debug('InterSoccer: Updated order ' . $order_id . ' with new parent attributes' . ($remove_assigned_player ? ' and removed assigned_player' : '') . ($fix_incorrect ? ' and fixed incorrect attributes' : ''));
     }
 
     wp_send_json_success(['message' => __('Orders updated successfully.', 'intersoccer-product-variations')]);
@@ -3603,9 +3544,12 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
     
     // Get current assignment
     $current_attendee = $item->get_meta('Assigned Attendee');
-    $current_player_index = $item->get_meta('intersoccer_player_index');
-    if ($current_player_index === '') {
-        $current_player_index = $item->get_meta('Player Index'); // Fallback to old key
+    $current_player_index = $item->get_meta('assigned_player');
+    if ($current_player_index === '' || $current_player_index === null) {
+        $current_player_index = $item->get_meta('intersoccer_player_index');
+    }
+    if ($current_player_index === '' || $current_player_index === null) {
+        $current_player_index = $item->get_meta('Player Index');
     }
     
     ?>
@@ -3735,11 +3679,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         
         // Update item metadata
         $item->update_meta_data('Assigned Attendee', $player_name);
-        $item->update_meta_data('intersoccer_player_index', $selected_index);
         $item->update_meta_data('assigned_player', $selected_index);
-        
-        // Also update Player Index for backwards compatibility
-        $item->update_meta_data('Player Index', $selected_index);
         
         // Update additional player details
         if (!empty($player['dob'])) {
