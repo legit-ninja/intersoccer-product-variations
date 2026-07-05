@@ -302,148 +302,28 @@ add_action('woocommerce_checkout_create_order_line_item', 'intersoccer_add_order
 function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $order) {
     $product_id = $values['product_id'];
     $variation_id = $values['variation_id'];
-    $quantity = $values['quantity'];
     $product_type = intersoccer_get_product_type($product_id);
 
-    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
+    if (!$product_type || !in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
         return;
     }
 
-    // 1. Add Assigned Attendee
-    if (isset($values['assigned_attendee']) && !empty($values['assigned_attendee'])) {
-        $item->add_meta_data('Assigned Attendee', sanitize_text_field($values['assigned_attendee']));
-        if ($values['assigned_player'] !== null) {
-            $item->add_meta_data('assigned_player', absint($values['assigned_player']));
-        }
-    }
-
-    // 2. Add Camp-specific metadata
-    if ($product_type === 'camp') {
-        if (isset($values['camp_days']) && is_array($values['camp_days']) && !empty($values['camp_days'])) {
-            $item->add_meta_data('Days Selected', implode(', ', array_map('sanitize_text_field', $values['camp_days'])));
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Added camp_days metadata: ' . implode(', ', $values['camp_days']) . ' for quantity ' . $quantity);
-            }
-        }
-
-        // Add late pickup metadata
-        if (isset($values['late_pickup_type']) && $values['late_pickup_type'] !== 'none') {
-            $item->add_meta_data('Late Pickup Type', $values['late_pickup_type'] === 'full-week' ? 'Full Week' : 'Single Day(s)');
-            if ($values['late_pickup_type'] === 'single-days' && isset($values['late_pickup_days']) && is_array($values['late_pickup_days'])) {
-                $item->add_meta_data('Late Pickup Days', implode(', ', array_map('sanitize_text_field', $values['late_pickup_days'])));
-            }
-            if (isset($values['late_pickup_cost']) && $values['late_pickup_cost'] > 0) {
-                $item->add_meta_data('Late Pickup Cost', wc_price($values['late_pickup_cost']));
-            }
-        }
-    } elseif ($product_type === 'course') {
-        // Course-specific metadata
-        $start_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_start_date', '');
-        if ($start_date) {
-            $formatted_start = date_i18n('F j, Y', strtotime($start_date));
-            $item->add_meta_data('Start Date', $formatted_start);
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Added Start Date: ' . $formatted_start);
-            }
-        }
-
-        $end_date = intersoccer_get_course_meta($variation_id ?: $product_id, '_end_date', '');
-        if ($end_date) {
-            $formatted_end = date_i18n('F j, Y', strtotime($end_date));
-            $item->add_meta_data('End Date', $formatted_end);
-        }
-
-        $holidays = intersoccer_get_course_meta($variation_id ?: $product_id, '_course_holiday_dates', []);
-        if (!empty($holidays) && is_array($holidays)) {
-            $formatted_holidays = array_map(function($date) {
-                return date_i18n('F j, Y', strtotime($date));
-            }, $holidays);
-            $item->add_meta_data('Holidays', implode(', ', $formatted_holidays));
-        }
-        
-        if (isset($values['discount_note']) && !empty($values['discount_note'])) {
-            $item->add_meta_data('Discount', sanitize_text_field($values['discount_note']));
-        }
-    }
-
-    if (isset($values['discount_amount']) && $values['discount_amount'] > 0) {
-        $item->add_meta_data('Discount Amount', wc_price($values['discount_amount']));
-    }
-
-    // Season, Activity Type, and registry attributes via contract builder.
-    $built = intersoccer_build_order_line_meta([
-        'item' => $item,
+    intersoccer_write_order_line_meta($item, [
+        'order' => $order,
         'product_id' => $product_id,
         'variation_id' => $variation_id,
         'product_type' => $product_type,
         'cart_values' => $values,
+        'mode' => 'checkout',
     ]);
 
-    foreach ($built['updates'] as $meta_key => $meta_value) {
-        if (in_array($meta_key, ['Assigned Attendee', 'assigned_player', 'Days Selected', 'Late Pickup Type', 'Late Pickup Days', 'Late Pickup Cost', 'Start Date', 'End Date', 'Holidays', 'Discount', 'Discount Amount'], true)) {
-            continue;
-        }
-        $item->add_meta_data($meta_key, is_string($meta_value) ? sanitize_text_field($meta_value) : $meta_value);
-    }
-
-    $parent_attributes = [];
-    if (function_exists('intersoccer_get_parent_product_attributes')) {
-        $parent_attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
-    }
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Retrieved ' . count($parent_attributes) . ' parent attributes for product ' . $product_id);
-        intersoccer_debug('InterSoccer: Parent attributes to add: ' . print_r($parent_attributes, true));
-    }
-    
-    foreach ($parent_attributes as $attribute_label => $attribute_value) {
-        // Skip attributes already added via contract builder or checkout-specific blocks.
-        if (in_array($attribute_label, ['Activity Type', 'Season', 'Girls Only'], true)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Skipping duplicate attribute: ' . $attribute_label);
-            }
-            continue;
-        }
-        if (isset($built['updates'][$attribute_label])) {
-            continue;
-        }
-        $meta_key = $attribute_label;
-        $item->add_meta_data($meta_key, sanitize_text_field($attribute_value));
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: ✅ Added parent attribute to order: ' . $meta_key . ' = ' . $attribute_value);
-        }
-    }
-
-    // Write machine taxonomy keys (pa_*) for variation-selected attributes.
-    if ($variation_id && function_exists('wc_get_product')) {
-        $variation_product = wc_get_product($variation_id);
-        if ($variation_product && method_exists($variation_product, 'get_variation_attributes')) {
-            foreach ($variation_product->get_variation_attributes() as $vkey => $vval) {
-                $taxonomy = str_replace('attribute_', '', (string) $vkey);
-                if (strpos($taxonomy, 'pa_') !== 0 || $vval === '') {
-                    continue;
-                }
-                $item->add_meta_data($taxonomy, sanitize_text_field($vval));
-                $attr_slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
-                if ($attr_slug) {
-                    $item->add_meta_data(
-                        intersoccer_attr_resolve_meta_key($attr_slug),
-                        sanitize_text_field($vval)
-                    );
-                }
-            }
-        }
-    }
-
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $quantity);
+        intersoccer_debug('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $values['quantity']);
         intersoccer_debug('InterSoccer: Order metadata summary:');
         intersoccer_debug('  - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none'));
         intersoccer_debug('  - Camp Days: ' . (isset($values['camp_days']) && is_array($values['camp_days']) ? implode(', ', $values['camp_days']) : 'none'));
         intersoccer_debug('  - Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
-        intersoccer_debug('  - Late Pickup Days: ' . (isset($values['late_pickup_days']) && is_array($values['late_pickup_days']) ? implode(', ', $values['late_pickup_days']) : 'none'));
-        intersoccer_debug('  - Late Pickup Cost: ' . ($values['late_pickup_cost'] ?? 'none'));
         intersoccer_debug('  - Discount: ' . ($values['discount_note'] ?? 'none'));
-        intersoccer_debug('  - Parent Attributes: ' . count($parent_attributes));
     }
 }
 

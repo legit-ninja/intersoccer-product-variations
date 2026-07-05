@@ -63,11 +63,64 @@ require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.p
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
 class OrderMetaContractTest extends TestCase {
+    /** @var array<string,mixed> */
+    public static $mock_player_details = [];
+
     protected function setUp(): void {
         parent::setUp();
         if (class_exists('MockFilters')) {
             MockFilters::reset();
         }
+        self::$mock_player_details = [];
+    }
+
+    public function test_correctable_keys_include_attendee_fields() {
+        $keys = intersoccer_order_meta_correctable_keys();
+        $this->assertContains('Activity Type', $keys);
+        $this->assertContains('Attendee DOB', $keys);
+        $this->assertContains('Attendee Gender', $keys);
+        $this->assertContains('Medical Conditions', $keys);
+    }
+
+    public function test_build_order_line_meta_enriches_attendee_when_cart_has_name_and_player_index() {
+        if (!function_exists('intersoccer_get_player_details')) {
+            function intersoccer_get_player_details($user_id, $player_index) {
+                return OrderMetaContractTest::$mock_player_details;
+            }
+        }
+
+        self::$mock_player_details = [
+            'name' => 'Fallback Name',
+            'dob' => '2015-03-10',
+            'gender' => 'Male',
+            'medical_conditions' => 'Asthma',
+        ];
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'assigned_attendee' => 'Cart Name',
+                'assigned_player' => 1,
+            ],
+            'order' => new class {
+                public function get_customer_id() {
+                    return 42;
+                }
+            },
+        ]);
+
+        $updates = $built['updates'];
+        $this->assertSame('Cart Name', $updates['Assigned Attendee']);
+        $this->assertSame(1, $updates['assigned_player']);
+        $this->assertSame('2015-03-10', $updates['Attendee DOB']);
+        $this->assertSame('Male', $updates['Attendee Gender']);
+        $this->assertSame('Asthma', $updates['Medical Conditions']);
+    }
+
+    public function test_collect_variation_taxonomy_meta_returns_empty_without_variation() {
+        $this->assertSame([], intersoccer_collect_variation_taxonomy_meta(0));
     }
 
     public function test_deprecated_keys_include_player_index_and_variation_id() {

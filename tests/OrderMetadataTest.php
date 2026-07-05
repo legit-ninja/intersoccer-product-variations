@@ -8,7 +8,101 @@
 
 use PHPUnit\Framework\TestCase;
 
+if (!defined('ABSPATH')) {
+    define('ABSPATH', __DIR__ . '/../');
+}
+
+if (!function_exists('__')) {
+    function __($text, $domain = null) {
+        return $text;
+    }
+}
+
+if (!function_exists('add_filter')) {
+    function add_filter($hook, $callback, $priority = 10, $accepted_args = 1) {
+        return true;
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    function apply_filters($hook, $value) {
+        return $value;
+    }
+}
+
+if (!function_exists('taxonomy_exists')) {
+    function taxonomy_exists($taxonomy) {
+        return false;
+    }
+}
+
+if (!function_exists('wc_get_product_terms')) {
+    function wc_get_product_terms($product_id, $taxonomy, $args = []) {
+        return [];
+    }
+}
+
+if (!function_exists('intersoccer_get_player_details')) {
+    function intersoccer_get_player_details($user_id, $player_index) {
+        return OrderMetadataTest::$mock_player_details;
+    }
+}
+
+require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
+require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
+require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
+
 class OrderMetadataTest extends TestCase {
+    /** @var array<string,mixed> */
+    public static $mock_player_details = [];
+
+    protected function setUp(): void {
+        parent::setUp();
+        self::$mock_player_details = [];
+    }
+
+    public function test_build_order_line_meta_includes_days_selected_for_camp() {
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'camp_days' => ['Monday', 'Wednesday', 'Friday'],
+            ],
+        ]);
+
+        $this->assertSame('Monday, Wednesday, Friday', $built['updates']['Days Selected'] ?? '');
+    }
+
+    public function test_build_order_line_meta_includes_attendee_fields_with_player_details() {
+        self::$mock_player_details = [
+            'name' => 'John Doe',
+            'dob' => '2014-01-02',
+            'gender' => 'Female',
+            'medical_conditions' => '',
+        ];
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'course',
+            'cart_values' => [
+                'assigned_attendee' => 'John Doe',
+                'assigned_player' => 0,
+            ],
+            'order' => new class {
+                public function get_customer_id() {
+                    return 7;
+                }
+            },
+        ]);
+
+        $updates = $built['updates'];
+        $this->assertSame('John Doe', $updates['Assigned Attendee']);
+        $this->assertSame('2014-01-02', $updates['Attendee DOB']);
+        $this->assertSame('Female', $updates['Attendee Gender']);
+        $this->assertSame('None', $updates['Medical Conditions']);
+    }
     
     /**
      * Test: Days Selected metadata is added to order items for camps

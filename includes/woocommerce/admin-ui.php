@@ -1857,18 +1857,14 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
             continue;
         }
 
-        $existing_activity_type = (string) $item->get_meta('Activity Type', true);
-        $built = intersoccer_build_order_line_meta([
+        $item_updated = intersoccer_write_order_line_meta($item, [
             'order' => $order,
-            'item' => $item,
             'product_id' => $product_id,
             'variation_id' => $variation_id,
             'product_type' => $product_type,
-            'existing_activity_type' => $existing_activity_type,
             'fix_activity_type_only' => $fix_activity_type_only,
+            'mode' => 'repair',
         ]);
-
-        $item_updated = intersoccer_apply_order_line_meta_updates($item, $built['updates'], $fix_activity_type_only);
 
         if ($strip_deprecated) {
             $removed = intersoccer_strip_deprecated_order_line_meta($item);
@@ -2064,9 +2060,16 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
     public function column_default($item, $column_name) {
         switch ($column_name) {
             case 'product_id':
-                return sprintf('<a href="%s">%s</a>', get_edit_post_link($item['product_id']), esc_html($item['product_id']));
+                $product_link = get_edit_post_link($item['product_id']);
+                return $product_link
+                    ? sprintf('<a href="%s">%s</a>', esc_url($product_link), esc_html($item['product_id']))
+                    : esc_html($item['product_id']);
             case 'variation_id':
-                return $item['variation_id'] ? sprintf('<a href="%s">%s</a>', get_edit_post_link($item['variation_id']), esc_html($item['variation_id'])) : '-';
+                if (!$item['variation_id']) {
+                    return '-';
+                }
+                $variation_link = $this->get_variation_admin_edit_link($item['product_id'], $item['variation_id']);
+                return sprintf('<a href="%s">%s</a>', esc_url($variation_link), esc_html($item['variation_id']));
             case 'type':
                 return esc_html(ucfirst($item['type']));
             case 'attributes':
@@ -2137,13 +2140,55 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
     }
 
     /**
+     * Admin edit URL for a variation (opens parent product editor on the variation panel).
+     *
+     * @param int $parent_id    Variable product ID.
+     * @param int $variation_id Variation ID.
+     * @return string Edit URL.
+     */
+    private function get_variation_admin_edit_link($parent_id, $variation_id) {
+        $parent_id = (int) $parent_id;
+        $variation_id = (int) $variation_id;
+
+        if ($parent_id > 0) {
+            $parent_link = get_edit_post_link($parent_id);
+            if ($parent_link) {
+                return $parent_link . '#variation_' . $variation_id;
+            }
+        }
+
+        $variation_link = get_edit_post_link($variation_id);
+        return $variation_link ?: '#';
+    }
+
+    /**
+     * Whether a course variation has finished (no remaining sessions).
+     *
+     * @param int $variation_id Variation ID.
+     * @return bool
+     */
+    private function is_expired_course_variation($variation_id) {
+        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+        if ($total_weeks <= 0) {
+            return false;
+        }
+
+        if (class_exists('InterSoccer_Course')) {
+            return InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks) <= 0;
+        }
+
+        $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
+        return !empty($start_date) && strtotime($start_date) < strtotime(current_time('Y-m-d'));
+    }
+
+    /**
      * Get variation data with health check.
      *
      * @param bool $unhealthy_only Show only unhealthy variations.
      * @return array Variation data.
      */
     private function get_variation_data($unhealthy_only = false) {
-        $products = wc_get_products(['limit' => -1, 'type' => ['variable', 'variation'], 'status' => ['publish', 'draft']]);
+        $products = wc_get_products(['limit' => -1, 'type' => 'variable', 'status' => ['publish', 'draft']]);
         $data = [];
         $required_attrs = [
             'camp' => intersoccer_attr_health_required_keys('camp'),
@@ -2153,49 +2198,53 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         ];
 
         foreach ($products as $product) {
-            $product_id = $product->get_id();
-            $type = InterSoccer_Product_Types::get_product_type($product_id);
-            intersoccer_debug('InterSoccer: Processing product ' . $product_id . ' with type: ' . ($type ?: 'null'));
-            $attributes = [];
+            if ($product->get_type() !== 'variable') {
+                continue;
+            }
 
-            if ($product instanceof WC_Product_Variation) {
-                $variation_id = $product_id;
-                $parent_id = $product->get_parent_id();
-                $parent_product = wc_get_product($parent_id);
-                $attributes = $product->get_attributes();
-                $attributes['_course_start_date'] = get_post_meta($variation_id, '_course_start_date', true);
-                $attributes['_course_total_weeks'] = get_post_meta($variation_id, '_course_total_weeks', true);
-                $attributes['_course_holiday_dates'] = get_post_meta($variation_id, '_course_holiday_dates', true);
+            $parent_id = $product->get_id();
+            $type = InterSoccer_Product_Types::get_product_type($parent_id);
+            intersoccer_debug('InterSoccer: Processing product ' . $parent_id . ' with type: ' . ($type ?: 'null'));
+
+            foreach ($product->get_children() as $var_id) {
+                $var_product = wc_get_product($var_id);
+                if (!$var_product || $var_product->get_parent_id() <= 0) {
+                    continue;
+                }
+
+                if ($type === 'course' && $this->is_expired_course_variation($var_id)) {
+                    continue;
+                }
+
+                $var_attributes = $var_product->get_attributes();
+                $var_attributes['_course_start_date'] = get_post_meta($var_id, '_course_start_date', true);
+                $var_attributes['_course_total_weeks'] = get_post_meta($var_id, '_course_total_weeks', true);
+                $var_attributes['_course_holiday_dates'] = get_post_meta($var_id, '_course_holiday_dates', true);
 
                 $missing = [];
                 if (isset($required_attrs[$type])) {
                     foreach ($required_attrs[$type] as $req_attr) {
-                        if (empty($attributes[$req_attr]) && !($req_attr === '_course_holiday_dates' && empty($attributes[$req_attr]))) {
+                        if (empty($var_attributes[$req_attr]) && !($req_attr === '_course_holiday_dates' && empty($var_attributes[$req_attr]))) {
                             $missing[] = $req_attr;
                         }
                     }
                 }
 
-                if ($type === 'camp' && $parent_product) {
-                    $parent_attributes = $parent_product->get_attributes();
-                    $parent_required = intersoccer_attr_required('camp', 'parent');
-                    foreach ($parent_required as $parent_attr) {
-                        if ($parent_attr === 'pa_days-of-week' && empty($parent_attributes['pa_days-of-week'])) {
-                            $missing[] = 'pa_days-of-week (parent)';
-                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $variation_id);
-                        }
-                    }
-                    if (!in_array('pa_days-of-week (parent)', $missing, true) && !empty($parent_attributes['pa_days-of-week'])) {
-                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $variation_id);
+                if ($type === 'camp') {
+                    $parent_attributes = $product->get_attributes();
+                    if (empty($parent_attributes['pa_days-of-week'])) {
+                        $missing[] = 'pa_days-of-week (parent)';
+                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $var_id);
+                    } else {
+                        intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $var_id);
                     }
                 }
 
-                // Course-specific health checks
                 if ($type === 'course') {
-                    intersoccer_debug('InterSoccer: Processing course variation ' . $variation_id . ' with type: ' . $type);
-                    $issues = $this->check_course_health($variation_id, $product);
+                    intersoccer_debug('InterSoccer: Processing course variation ' . $var_id . ' with type: ' . $type);
+                    $issues = $this->check_course_health($var_id, $var_product);
                     $missing = array_merge($missing, $issues);
-                    intersoccer_debug('InterSoccer: Course health issues for ' . $variation_id . ': ' . json_encode($issues));
+                    intersoccer_debug('InterSoccer: Course health issues for ' . $var_id . ': ' . json_encode($issues));
                 }
 
                 $is_healthy = empty($missing);
@@ -2205,66 +2254,12 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
 
                 $data[] = [
                     'product_id' => $parent_id,
-                    'variation_id' => $variation_id,
+                    'variation_id' => $var_id,
                     'type' => $type ?: 'Unknown',
-                    'attributes' => $attributes,
+                    'attributes' => $var_attributes,
                     'missing' => $missing,
-                    'is_healthy' => $is_healthy
+                    'is_healthy' => $is_healthy,
                 ];
-            } else {
-                $parent_id = $product_id;
-                $variations = $product->get_type() === 'variable' ? $product->get_children() : [];
-                foreach ($variations as $var_id) {
-                    $var_product = wc_get_product($var_id);
-                    if (!$var_product) {
-                        continue;
-                    }
-                    $var_attributes = $var_product->get_attributes();
-                    $var_attributes['_course_start_date'] = get_post_meta($var_id, '_course_start_date', true);
-                    $var_attributes['_course_total_weeks'] = get_post_meta($var_id, '_course_total_weeks', true);
-                    $var_attributes['_course_holiday_dates'] = get_post_meta($var_id, '_course_holiday_dates', true);
-
-                    $missing = [];
-                    if (isset($required_attrs[$type])) {
-                        foreach ($required_attrs[$type] as $req_attr) {
-                            if (empty($var_attributes[$req_attr]) && !($req_attr === '_course_holiday_dates' && empty($var_attributes[$req_attr]))) {
-                                $missing[] = $req_attr;
-                            }
-                        }
-                    }
-
-                    if ($type === 'camp') {
-                        $parent_attributes = $product->get_attributes();
-                        if (empty($parent_attributes['pa_days-of-week'])) {
-                            $missing[] = 'pa_days-of-week (parent)';
-                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' missing pa_days-of-week for camp variation ' . $var_id);
-                        } else {
-                            intersoccer_debug('InterSoccer: Parent product ' . $parent_id . ' has pa_days-of-week for camp variation ' . $var_id);
-                        }
-                    }
-
-                    // Course-specific health checks
-                    if ($type === 'course') {
-                        intersoccer_debug('InterSoccer: Processing course variation ' . $var_id . ' with type: ' . $type);
-                        $issues = $this->check_course_health($var_id, $var_product);
-                        $missing = array_merge($missing, $issues);
-                        intersoccer_debug('InterSoccer: Course health issues for ' . $var_id . ': ' . json_encode($issues));
-                    }
-
-                    $is_healthy = empty($missing);
-                    if ($unhealthy_only && $is_healthy) {
-                        continue;
-                    }
-
-                    $data[] = [
-                        'product_id' => $parent_id,
-                        'variation_id' => $var_id,
-                        'type' => $type ?: 'Unknown',
-                        'attributes' => $var_attributes,
-                        'missing' => $missing,
-                        'is_healthy' => $is_healthy
-                    ];
-                }
             }
         }
 
@@ -2287,6 +2282,11 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
         // Get course metadata
         $start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+
+        if ($this->is_expired_course_variation($variation_id)) {
+            return [];
+        }
+
         $session_rate = floatval(intersoccer_get_course_meta($variation_id, '_course_weekly_discount', 0));
         $base_price = floatval($product->get_price());
 
@@ -2399,6 +2399,7 @@ function intersoccer_render_variation_health_page() {
             <?php endif; ?>
         </div>
         <h1><?php _e('Variation Health Checker', 'intersoccer-product-variations'); ?></h1>
+        <p class="description"><?php _e('Catalog tool only: checks and fixes product variation attributes. Does not update existing order metadata. After catalog fixes, use Find Order Issues and Reconcile Rosters for order and roster data.', 'intersoccer-product-variations'); ?></p>
         <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-product-variations'); ?></p>
 
         <form method="get" action="<?php echo menu_page_url('intersoccer-variation-health', false); ?>">
@@ -2426,6 +2427,10 @@ function intersoccer_render_variation_health_page() {
 
                 if (!action || variationIds.length === 0) {
                     alert('<?php _e('Please select an action and at least one variation.', 'intersoccer-product-variations'); ?>');
+                    return;
+                }
+
+                if (action === 'refresh' && !confirm('<?php echo esc_js(__('Refresh Attributes may apply default course dates only to variations missing values. Active courses with remaining sessions will not receive new start dates. Continue?', 'intersoccer-product-variations')); ?>')) {
                     return;
                 }
 
@@ -2533,18 +2538,34 @@ function intersoccer_refresh_variation_attributes_callback() {
         if (!empty($required_attrs)) {
             $attributes = $product->get_attributes();
             foreach ($required_attrs as $key => $default) {
-                if (empty($attributes[$key])) {
-                    if (strpos($key, 'pa_') === 0) {
-                        $taxonomy = $key;
-                        $term = get_term_by('slug', $default, $taxonomy);
-                        if ($term) {
-                            wp_set_object_terms($variation_id, (int) $term->term_id, $taxonomy);
-                            intersoccer_debug('InterSoccer: Set default attribute ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
+                if ($type === 'course' && strpos($key, '_course_') === 0) {
+                    $total_weeks = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+                    if ($total_weeks > 0 && class_exists('InterSoccer_Course')) {
+                        $remaining = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+                        if ($remaining > 0) {
+                            continue;
                         }
-                    } else {
-                        update_post_meta($variation_id, $key, $default);
-                        intersoccer_debug('InterSoccer: Set default meta ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
                     }
+                }
+
+                $current_value = strpos($key, 'pa_') === 0
+                    ? ($attributes[$key] ?? '')
+                    : get_post_meta($variation_id, $key, true);
+
+                if ($current_value !== '' && $current_value !== null && $current_value !== []) {
+                    continue;
+                }
+
+                if (strpos($key, 'pa_') === 0) {
+                    $taxonomy = $key;
+                    $term = get_term_by('slug', $default, $taxonomy);
+                    if ($term) {
+                        wp_set_object_terms($variation_id, (int) $term->term_id, $taxonomy);
+                        intersoccer_debug('InterSoccer: Set default attribute ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
+                    }
+                } else {
+                    update_post_meta($variation_id, $key, $default);
+                    intersoccer_debug('InterSoccer: Set default meta ' . $key . ' to ' . $default . ' for variation ' . $variation_id);
                 }
             }
 

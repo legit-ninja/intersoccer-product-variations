@@ -300,21 +300,25 @@ function intersoccer_build_order_line_meta($args) {
         }
     }
 
-    if (isset($cart_values['assigned_attendee']) && $cart_values['assigned_attendee'] !== '') {
-        $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
-        if ($assigned_player !== null) {
-            $updates['assigned_player'] = $assigned_player;
-        }
-    } elseif ($user_id > 0 && $assigned_player !== null && function_exists('intersoccer_get_player_details')) {
+    if ($user_id > 0 && $assigned_player !== null && function_exists('intersoccer_get_player_details')) {
         $player_details = intersoccer_get_player_details($user_id, $assigned_player);
         if (!empty($player_details['name'])) {
-            $updates['Assigned Attendee'] = $player_details['name'];
+            if (isset($cart_values['assigned_attendee']) && $cart_values['assigned_attendee'] !== '') {
+                $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
+            } else {
+                $updates['Assigned Attendee'] = $player_details['name'];
+            }
             $updates['assigned_player'] = $assigned_player;
             $updates['Attendee DOB'] = $player_details['dob'] !== '' ? $player_details['dob'] : null;
             $updates['Attendee Gender'] = $player_details['gender'] !== '' ? $player_details['gender'] : null;
             $updates['Medical Conditions'] = !empty($player_details['medical_conditions'])
                 ? $player_details['medical_conditions']
                 : 'None';
+        }
+    } elseif (isset($cart_values['assigned_attendee']) && $cart_values['assigned_attendee'] !== '') {
+        $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
+        if ($assigned_player !== null) {
+            $updates['assigned_player'] = $assigned_player;
         }
     }
 
@@ -381,6 +385,135 @@ function intersoccer_build_order_line_meta($args) {
     }
 
     return ['updates' => $updates, 'strip' => $strip];
+}
+
+/**
+ * Meta keys that repair may update when missing or empty (not add-only).
+ *
+ * @return array<int,string>
+ */
+function intersoccer_order_meta_correctable_keys() {
+    return [
+        'Activity Type',
+        'Attendee DOB',
+        'Attendee Gender',
+        'Medical Conditions',
+    ];
+}
+
+/**
+ * Collect pa_* and attribute_pa_* keys from a variation for order line meta.
+ *
+ * @param int $variation_id
+ * @return array<string,string>
+ */
+function intersoccer_collect_variation_taxonomy_meta($variation_id) {
+    $meta = [];
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0 || !function_exists('wc_get_product')) {
+        return $meta;
+    }
+
+    $variation_product = wc_get_product($variation_id);
+    if (!$variation_product || !method_exists($variation_product, 'get_variation_attributes')) {
+        return $meta;
+    }
+
+    foreach ($variation_product->get_variation_attributes() as $vkey => $vval) {
+        $taxonomy = str_replace('attribute_', '', (string) $vkey);
+        if (strpos($taxonomy, 'pa_') !== 0 || $vval === '') {
+            continue;
+        }
+        $meta[$taxonomy] = sanitize_text_field($vval);
+        if (function_exists('intersoccer_attr_slug_from_taxonomy')) {
+            $attr_slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
+            if ($attr_slug && function_exists('intersoccer_attr_resolve_meta_key')) {
+                $meta[intersoccer_attr_resolve_meta_key($attr_slug)] = sanitize_text_field($vval);
+            }
+        }
+    }
+
+    return $meta;
+}
+
+/**
+ * Sanitize a contract meta value for persistence on an order line item.
+ *
+ * @param mixed $value
+ * @return mixed
+ */
+function intersoccer_sanitize_order_line_meta_value($value) {
+    if (is_string($value)) {
+        return sanitize_text_field($value);
+    }
+    return $value;
+}
+
+/**
+ * Write registry-driven order line meta (checkout and repair).
+ *
+ * @param WC_Order_Item_Product $item
+ * @param array<string,mixed>   $context {
+ *   @type WC_Order|null $order
+ *   @type int           $product_id
+ *   @type int           $variation_id
+ *   @type string        $product_type
+ *   @type array         $cart_values
+ *   @type bool          $fix_activity_type_only
+ *   @type string        $mode checkout|repair
+ * }
+ * @return bool Whether any change was made (repair) or meta was written (checkout).
+ */
+function intersoccer_write_order_line_meta($item, array $context) {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+
+    $mode = isset($context['mode']) ? (string) $context['mode'] : 'checkout';
+    $product_id = (int) ($context['product_id'] ?? 0);
+    $variation_id = (int) ($context['variation_id'] ?? 0);
+    $product_type = (string) ($context['product_type'] ?? '');
+    $cart_values = is_array($context['cart_values'] ?? null) ? $context['cart_values'] : [];
+    $fix_activity_type_only = !empty($context['fix_activity_type_only']);
+    $order = $context['order'] ?? null;
+
+    if ($product_id <= 0) {
+        $product_id = (int) $item->get_product_id();
+    }
+    if ($variation_id <= 0) {
+        $variation_id = (int) $item->get_variation_id();
+    }
+    if ($product_type === '' && $product_id > 0 && function_exists('intersoccer_get_product_type')) {
+        $product_type = strtolower((string) intersoccer_get_product_type($product_id));
+    }
+    if (!($order instanceof WC_Order)) {
+        $order = $item->get_order();
+    }
+
+    $built = intersoccer_build_order_line_meta([
+        'order' => $order instanceof WC_Order ? $order : null,
+        'item' => $item,
+        'product_id' => $product_id,
+        'variation_id' => $variation_id,
+        'product_type' => $product_type,
+        'cart_values' => $cart_values,
+        'existing_activity_type' => (string) $item->get_meta('Activity Type', true),
+        'fix_activity_type_only' => $fix_activity_type_only,
+    ]);
+
+    $updates = array_merge($built['updates'], intersoccer_collect_variation_taxonomy_meta($variation_id));
+
+    if ($mode === 'checkout') {
+        foreach ($updates as $key => $value) {
+            if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
+                continue;
+            }
+            $item->add_meta_data($key, intersoccer_sanitize_order_line_meta_value($value));
+        }
+        return true;
+    }
+
+    return intersoccer_apply_order_line_meta_updates($item, $updates, $fix_activity_type_only);
 }
 
 /**
@@ -458,6 +591,15 @@ function intersoccer_apply_order_line_meta_updates($item, array $updates, $fix_a
                         ? intersoccer_get_activity_type_in_language($normalized_expected, $existing_value)
                         : $value);
                 $item->update_meta_data($key, $corrected);
+                $changed = true;
+            }
+            continue;
+        }
+
+        if (in_array($key, intersoccer_order_meta_correctable_keys(), true)) {
+            $existing_value = $item->get_meta($key, true);
+            if ($existing_value === '' || $existing_value === null) {
+                $item->update_meta_data($key, intersoccer_sanitize_order_line_meta_value($value));
                 $changed = true;
             }
         }
