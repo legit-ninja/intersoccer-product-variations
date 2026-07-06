@@ -42,6 +42,16 @@ function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, 
     if ($v === '') {
         return null;
     }
+
+    $uid = (int) $user_id;
+    if ($uid > 0 && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $v)
+        && function_exists('intersoccer_get_player_by_id')) {
+        $by_id = intersoccer_get_player_by_id($uid, $v);
+        if ($by_id !== null) {
+            return $by_id['key'];
+        }
+    }
+
     if (preg_match('/^\d+$/', $v)) {
         $n = absint($v);
         $uid = (int) $user_id;
@@ -104,6 +114,39 @@ function intersoccer_get_posted_player_assignment_index() {
 }
 
 /**
+ * Stable player UUID from add-to-cart POST when provided.
+ *
+ * @return string Empty when not posted.
+ */
+function intersoccer_get_posted_assigned_player_id() {
+    if (isset($_POST['assigned_player_id']) && $_POST['assigned_player_id'] !== '') {
+        return sanitize_text_field(wp_unslash((string) $_POST['assigned_player_id']));
+    }
+
+    $uid = (int) get_current_user_id();
+    foreach (['player_assignment', 'assigned_attendee'] as $field) {
+        if (!isset($_POST[$field]) || $_POST[$field] === '') {
+            continue;
+        }
+        $raw = trim((string) wp_unslash($_POST[$field]));
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $raw)) {
+            return sanitize_text_field($raw);
+        }
+        if ($uid > 0 && function_exists('intersoccer_get_player_by_id') && preg_match('/^\d+$/', $raw)) {
+            $index = intersoccer_get_posted_player_assignment_index();
+            if ($index !== null && function_exists('intersoccer_get_player_by_index')) {
+                $row = intersoccer_get_player_by_index($uid, $index);
+                if (is_array($row) && !empty($row['player_id'])) {
+                    return (string) $row['player_id'];
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
  * Variable camp/course products must POST the full variation form (player, days, etc.).
  */
 add_filter(
@@ -142,6 +185,14 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         $user_id = get_current_user_id();
         $player_details = intersoccer_get_player_details($user_id, $cart_item_data['assigned_player']);
         $cart_item_data['assigned_attendee'] = $player_details['name'];
+        if (!empty($player_details['player_id'])) {
+            $cart_item_data['assigned_player_id'] = $player_details['player_id'];
+        }
+    }
+
+    $posted_player_id = intersoccer_get_posted_assigned_player_id();
+    if ($posted_player_id !== '') {
+        $cart_item_data['assigned_player_id'] = $posted_player_id;
     }
 
     // Camp days

@@ -13,6 +13,11 @@ if (!defined('ABSPATH')) {
 
 require_once dirname(__DIR__) . '/includes/helpers.php';
 
+$pm_player_data = dirname(__DIR__, 2) . '/player-management/includes/player-data.php';
+if (file_exists($pm_player_data)) {
+    require_once $pm_player_data;
+}
+
 class PlayersMetaKeyResolutionTest extends TestCase {
 
     public function test_exact_meta_key_wins() {

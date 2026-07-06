@@ -8,7 +8,7 @@ Canonical order item metadata for InterSoccer bookings. **Writer:** `intersoccer
 |--------|---------------------|-----------------|
 | Camp weekdays offered | `pa_days-of-week` → label **Days of Week** | — |
 | Customer camp day pick | — | **Days Selected** |
-| Player reference | — | `assigned_player` (canonical) |
+| Player reference | — | **`assigned_player_id`** (UUID, canonical) + `assigned_player` (legacy index) |
 | Player display | — | **Assigned Attendee** |
 | Player PII | — | **Attendee DOB**, **Attendee Gender**, **Medical Conditions** |
 
@@ -20,7 +20,15 @@ Deprecated keys (strip on repair): `Variation ID`, `Base Price`, `Remaining Sess
 2. Repair: Find Order Issues → `intersoccer_write_order_line_meta()` with `mode => repair`
 3. Admin player assignment: direct meta updates on order items
 
-Repair is **add-only** for most keys. **Correctable** when empty: Activity Type, Attendee DOB, Attendee Gender, Medical Conditions.
+Repair is **add-only** for most keys. **Correctable** when empty: Activity Type, Attendee DOB, Attendee Gender, Medical Conditions, **`assigned_player_id`**.
+
+## Historical migration playbook
+
+1. **Player Management → Advanced → Backfill Player IDs** — assign `player_id` UUID to existing `intersoccer_players` rows.
+2. **Product Variations → Find Order Issues** — repair order lines; resolves `assigned_player_id` from live PM data when only legacy `assigned_player` index exists.
+3. **Reports & Rosters → Reconcile Rosters** — refresh roster DB for affected date range.
+
+Dual-write during transition: new checkouts write both `assigned_player_id` and legacy `assigned_player`. Readers (RR `PlayerMatcher`) prefer UUID, then index fallback.
 
 ## Tool responsibilities
 
@@ -37,7 +45,7 @@ After meta repair, `intersoccer_order_line_meta_repaired` triggers a targeted ro
 | Field | Primary meta_key | Legacy fallback |
 |-------|------------------|-----------------|
 | Selected days | `Days Selected` | `Days of Week` |
-| Gender | `Attendee Gender` | `gender` |
+| Gender | `Attendee Gender` | `gender`, `Player Gender` |
 | Discount | `Discount` | `_applied_discounts` |
 | Discount amount | `Discount Amount` | — |
 

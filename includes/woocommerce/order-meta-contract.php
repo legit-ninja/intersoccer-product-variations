@@ -55,6 +55,7 @@ function intersoccer_order_meta_checkout_extras() {
         'Discount Amount',
         'Girls Only',
         'assigned_player',
+        'assigned_player_id',
     ];
 }
 
@@ -220,6 +221,135 @@ function intersoccer_format_girls_only_meta_value($slug, $name) {
 }
 
 /**
+ * Normalize a player row into order-meta detail fields.
+ *
+ * @param array<string,mixed> $player Player row from intersoccer_players.
+ * @return array{first_name:string,last_name:string,name:string,dob:string,gender:string,medical_conditions:string,player_id:string}
+ */
+function intersoccer_format_player_details_row(array $player) {
+    $gender_val = isset($player['gender']) ? trim((string) $player['gender']) : '';
+    if ($gender_val === '' && isset($player['player_gender'])) {
+        $gender_val = trim((string) $player['player_gender']);
+    }
+
+    return [
+        'first_name' => (string) ($player['first_name'] ?? ''),
+        'last_name' => (string) ($player['last_name'] ?? ''),
+        'name' => trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? '')),
+        'dob' => (string) ($player['dob'] ?? ''),
+        'gender' => $gender_val,
+        'medical_conditions' => (string) ($player['medical_conditions'] ?? ''),
+        'player_id' => (string) ($player['player_id'] ?? ''),
+    ];
+}
+
+/**
+ * Resolve assigned player index, UUID, and display fields for order meta.
+ *
+ * @param int                      $user_id     Customer user ID.
+ * @param array<string,mixed>      $cart_values Cart/checkout context.
+ * @param WC_Order_Item_Product|null $item      Existing order line when repairing.
+ * @return array{index:int|string|null,player_id:string,details:array<string,string>|null}
+ */
+function intersoccer_resolve_order_assigned_player($user_id, array $cart_values, $item = null) {
+    $result = [
+        'index' => null,
+        'player_id' => '',
+        'details' => null,
+    ];
+
+    if (!empty($cart_values['assigned_player_id'])) {
+        $result['player_id'] = sanitize_text_field((string) $cart_values['assigned_player_id']);
+    } elseif ($item instanceof WC_Order_Item_Product) {
+        $result['player_id'] = sanitize_text_field((string) $item->get_meta('assigned_player_id', true));
+    }
+
+    if (isset($cart_values['assigned_player']) && $cart_values['assigned_player'] !== null && $cart_values['assigned_player'] !== '') {
+        $result['index'] = absint($cart_values['assigned_player']);
+    } elseif ($item instanceof WC_Order_Item_Product) {
+        $index_meta = $item->get_meta('assigned_player', true);
+        if ($index_meta !== '' && $index_meta !== null) {
+            $result['index'] = absint($index_meta);
+        }
+    }
+
+    if ($user_id <= 0) {
+        return $result;
+    }
+
+    if ($result['player_id'] !== '' && function_exists('intersoccer_get_player_by_id')) {
+        $by_id = intersoccer_get_player_by_id($user_id, $result['player_id']);
+        if ($by_id !== null && is_array($by_id['player'])) {
+            $result['index'] = $by_id['key'];
+            $result['details'] = intersoccer_format_player_details_row($by_id['player']);
+            if ($result['player_id'] === '' && !empty($by_id['player']['player_id'])) {
+                $result['player_id'] = (string) $by_id['player']['player_id'];
+            }
+            return $result;
+        }
+    }
+
+    if ($result['index'] !== null && function_exists('intersoccer_get_player_details')) {
+        $details = intersoccer_get_player_details($user_id, $result['index']);
+        if (!empty($details['name']) && $details['name'] !== 'Unknown Player') {
+            $result['details'] = $details;
+            if ($result['player_id'] === '' && !empty($details['player_id'])) {
+                $result['player_id'] = (string) $details['player_id'];
+            } elseif ($result['player_id'] === '' && function_exists('intersoccer_get_player_by_index')) {
+                $row = intersoccer_get_player_by_index($user_id, $result['index']);
+                if (is_array($row) && !empty($row['player_id'])) {
+                    $result['player_id'] = (string) $row['player_id'];
+                }
+            }
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Apply attendee snapshot fields to order meta updates.
+ *
+ * @param array<string,mixed> $updates     Meta updates (by reference).
+ * @param array<string,mixed> $cart_values Cart values.
+ * @param array<string,mixed> $resolved    From intersoccer_resolve_order_assigned_player().
+ */
+function intersoccer_apply_assigned_player_order_meta(array &$updates, array $cart_values, array $resolved) {
+    $details = $resolved['details'] ?? null;
+    if (!is_array($details) || empty($details['name'])) {
+        if (!empty($cart_values['assigned_attendee'])) {
+            $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
+        }
+        if ($resolved['index'] !== null) {
+            $updates['assigned_player'] = $resolved['index'];
+        }
+        if ($resolved['player_id'] !== '') {
+            $updates['assigned_player_id'] = $resolved['player_id'];
+        }
+        return;
+    }
+
+    if (!empty($cart_values['assigned_attendee'])) {
+        $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
+    } else {
+        $updates['Assigned Attendee'] = $details['name'];
+    }
+
+    if ($resolved['index'] !== null) {
+        $updates['assigned_player'] = $resolved['index'];
+    }
+    if ($resolved['player_id'] !== '') {
+        $updates['assigned_player_id'] = $resolved['player_id'];
+    }
+
+    $updates['Attendee DOB'] = $details['dob'] !== '' ? $details['dob'] : null;
+    $updates['Attendee Gender'] = $details['gender'] !== '' ? $details['gender'] : null;
+    $updates['Medical Conditions'] = !empty($details['medical_conditions'])
+        ? $details['medical_conditions']
+        : 'None';
+}
+
+/**
  * Build order line meta for checkout or repair.
  *
  * @param array<string,mixed> $args {
@@ -288,38 +418,12 @@ function intersoccer_build_order_line_meta($args) {
         }
     }
 
-    $assigned_player = null;
-    if (isset($cart_values['assigned_player']) && $cart_values['assigned_player'] !== null) {
-        $assigned_player = absint($cart_values['assigned_player']);
-    } elseif ($item instanceof WC_Order_Item_Product) {
-        $assigned_player = $item->get_meta('assigned_player', true);
-        if ($assigned_player === '' || $assigned_player === null) {
-            $assigned_player = null;
-        } else {
-            $assigned_player = absint($assigned_player);
-        }
-    }
-
-    if ($user_id > 0 && $assigned_player !== null && function_exists('intersoccer_get_player_details')) {
-        $player_details = intersoccer_get_player_details($user_id, $assigned_player);
-        if (!empty($player_details['name'])) {
-            if (isset($cart_values['assigned_attendee']) && $cart_values['assigned_attendee'] !== '') {
-                $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
-            } else {
-                $updates['Assigned Attendee'] = $player_details['name'];
-            }
-            $updates['assigned_player'] = $assigned_player;
-            $updates['Attendee DOB'] = $player_details['dob'] !== '' ? $player_details['dob'] : null;
-            $updates['Attendee Gender'] = $player_details['gender'] !== '' ? $player_details['gender'] : null;
-            $updates['Medical Conditions'] = !empty($player_details['medical_conditions'])
-                ? $player_details['medical_conditions']
-                : 'None';
-        }
+    $item_for_player = ($item instanceof WC_Order_Item_Product) ? $item : null;
+    $resolved_player = intersoccer_resolve_order_assigned_player($user_id, $cart_values, $item_for_player);
+    if ($resolved_player['details'] !== null || $resolved_player['index'] !== null || $resolved_player['player_id'] !== '') {
+        intersoccer_apply_assigned_player_order_meta($updates, $cart_values, $resolved_player);
     } elseif (isset($cart_values['assigned_attendee']) && $cart_values['assigned_attendee'] !== '') {
         $updates['Assigned Attendee'] = sanitize_text_field($cart_values['assigned_attendee']);
-        if ($assigned_player !== null) {
-            $updates['assigned_player'] = $assigned_player;
-        }
     }
 
     if ($product_type === 'camp') {
@@ -398,6 +502,7 @@ function intersoccer_order_meta_correctable_keys() {
         'Attendee DOB',
         'Attendee Gender',
         'Medical Conditions',
+        'assigned_player_id',
     ];
 }
 

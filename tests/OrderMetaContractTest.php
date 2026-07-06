@@ -80,6 +80,7 @@ class OrderMetaContractTest extends TestCase {
         $this->assertContains('Attendee DOB', $keys);
         $this->assertContains('Attendee Gender', $keys);
         $this->assertContains('Medical Conditions', $keys);
+        $this->assertContains('assigned_player_id', $keys);
     }
 
     public function test_build_order_line_meta_enriches_attendee_when_cart_has_name_and_player_index() {
@@ -117,6 +118,46 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('2015-03-10', $updates['Attendee DOB']);
         $this->assertSame('Male', $updates['Attendee Gender']);
         $this->assertSame('Asthma', $updates['Medical Conditions']);
+    }
+
+    public function test_build_order_line_meta_writes_assigned_player_id_from_uuid() {
+        if (!function_exists('intersoccer_get_player_by_id')) {
+            function intersoccer_get_player_by_id($user_id, $player_id) {
+                if ($player_id === 'uuid-test-1234-5678-90ab-cdef12345678') {
+                    return [
+                        'key' => 2,
+                        'player' => [
+                            'player_id' => $player_id,
+                            'first_name' => 'Uuid',
+                            'last_name' => 'Child',
+                            'dob' => '2014-06-01',
+                            'gender' => 'Female',
+                            'medical_conditions' => '',
+                        ],
+                    ];
+                }
+                return null;
+            }
+        }
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'assigned_player_id' => 'uuid-test-1234-5678-90ab-cdef12345678',
+            ],
+            'order' => new class {
+                public function get_customer_id() {
+                    return 42;
+                }
+            },
+        ]);
+
+        $updates = $built['updates'];
+        $this->assertSame('uuid-test-1234-5678-90ab-cdef12345678', $updates['assigned_player_id']);
+        $this->assertSame(2, $updates['assigned_player']);
+        $this->assertSame('Uuid Child', $updates['Assigned Attendee']);
     }
 
     public function test_collect_variation_taxonomy_meta_returns_empty_without_variation() {

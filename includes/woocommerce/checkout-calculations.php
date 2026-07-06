@@ -101,7 +101,8 @@ function intersoccer_get_player_details($user_id, $player_index) {
             'name' => trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? '')),
             'dob' => $player['dob'] ?? '',
             'gender' => $gender_val,
-            'medical_conditions' => $player['medical_conditions'] ?? ''
+            'medical_conditions' => $player['medical_conditions'] ?? '',
+            'player_id' => (string) ($player['player_id'] ?? ''),
         ];
     }
     
@@ -111,7 +112,8 @@ function intersoccer_get_player_details($user_id, $player_index) {
         'name' => 'Unknown Player',
         'dob' => '',
         'gender' => '',
-        'medical_conditions' => ''
+        'medical_conditions' => '',
+        'player_id' => '',
     ];
 }
 

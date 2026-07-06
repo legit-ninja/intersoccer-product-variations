@@ -232,6 +232,7 @@ function intersoccer_ajax_get_user_players() {
         if (is_array($player) && isset($player['first_name']) && isset($player['last_name'])) {
             $valid_players[] = [
                 'index' => $index,
+                'player_id' => sanitize_text_field($player['player_id'] ?? ''),
                 'first_name' => sanitize_text_field($player['first_name']),
                 'last_name' => sanitize_text_field($player['last_name']),
                 'dob' => sanitize_text_field($player['dob'] ?? ''),

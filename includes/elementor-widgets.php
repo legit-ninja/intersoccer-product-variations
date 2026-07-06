@@ -1022,8 +1022,15 @@ $intersoccer_elementor_product_page_cb = function () {
                                             var metaIndex = (player.index !== undefined && player.index !== null && player.index !== '')
                                                 ? String(player.index)
                                                 : String(loopPos);
+                                            var optValue = (player.player_id && String(player.player_id) !== '')
+                                                ? String(player.player_id)
+                                                : metaIndex;
                                             $select.append(
-                                                $('<option>', { value: metaIndex }).text(player.first_name + ' ' + player.last_name)
+                                                $('<option>', {
+                                                    value: optValue,
+                                                    'data-player-index': metaIndex,
+                                                    'data-player-id': player.player_id || ''
+                                                }).text(player.first_name + ' ' + player.last_name)
                                             );
                                         } else {
                                             debugWarn('InterSoccer: Invalid player data:', player);

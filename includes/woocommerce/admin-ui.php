@@ -3042,6 +3042,13 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
                     break 2; // Break both loops
                 }
             }
+
+            $has_player_ref = in_array('assigned_player', $existing_keys, true)
+                || in_array('Assigned Attendee', $existing_keys, true);
+            if ($has_player_ref && !in_array('assigned_player_id', $existing_keys, true)) {
+                $needs_update = true;
+                break;
+            }
         }
         
         if ($needs_update) {
@@ -3566,6 +3573,7 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
     // Get current assignment
     $current_attendee = $item->get_meta('Assigned Attendee');
     $current_player_index = $item->get_meta('assigned_player');
+    $current_player_id = $item->get_meta('assigned_player_id');
     if ($current_player_index === '' || $current_player_index === null) {
         $current_player_index = $item->get_meta('intersoccer_player_index');
     }
@@ -3593,7 +3601,8 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
                 $selected = '';
                 
                 // Check if this player is currently assigned (by name or index)
-                if ($current_attendee === $player_name || $current_player_index == $index) {
+                if ($current_attendee === $player_name || $current_player_index == $index
+                    || ($current_player_id !== '' && !empty($player['player_id']) && $current_player_id === $player['player_id'])) {
                     $selected = 'selected';
                 }
                 
@@ -3613,8 +3622,9 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
                     }
                     $display_info .= ')';
                 }
+                $option_value = !empty($player['player_id']) ? $player['player_id'] : $index;
                 ?>
-                <option value="<?php echo esc_attr($index); ?>" <?php echo $selected; ?>>
+                <option value="<?php echo esc_attr($option_value); ?>" data-player-index="<?php echo esc_attr($index); ?>" <?php echo $selected; ?>>
                     <?php echo esc_html($display_info); ?>
                 </option>
             <?php endforeach; ?>
@@ -3674,6 +3684,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             $item->delete_meta_data('intersoccer_player_index');
             $item->delete_meta_data('Player Index');
             $item->delete_meta_data('assigned_player');
+            $item->delete_meta_data('assigned_player_id');
             $item->delete_meta_data('Attendee DOB');
             $item->delete_meta_data('Attendee Gender');
             $item->delete_meta_data('Medical Conditions');
@@ -3684,23 +3695,38 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             }
             continue;
         }
-        $selected_index = absint($selected_index);
+        $selected_raw = (string) $selected_index;
+        $player = null;
+        $resolved_index = null;
 
-        // Validate player exists
-        if (!isset($players[$selected_index])) {
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $selected_raw)
+            && function_exists('intersoccer_get_player_by_id')) {
+            $by_id = intersoccer_get_player_by_id($customer_id, $selected_raw);
+            if ($by_id !== null) {
+                $player = $by_id['player'];
+                $resolved_index = $by_id['key'];
+            }
+        } else {
+            $resolved_index = absint($selected_index);
+            if (isset($players[$resolved_index])) {
+                $player = $players[$resolved_index];
+            }
+        }
+
+        if (!is_array($player)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Invalid player index ' . $selected_index . ' for customer ' . $customer_id);
+                intersoccer_debug('InterSoccer: Invalid player selection ' . $selected_raw . ' for customer ' . $customer_id);
             }
             continue;
         }
         
-        // Get player info
-        $player = $players[$selected_index];
         $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
         
-        // Update item metadata
         $item->update_meta_data('Assigned Attendee', $player_name);
-        $item->update_meta_data('assigned_player', $selected_index);
+        $item->update_meta_data('assigned_player', $resolved_index);
+        if (!empty($player['player_id'])) {
+            $item->update_meta_data('assigned_player_id', $player['player_id']);
+        }
         
         // Update additional player details
         if (!empty($player['dob'])) {
