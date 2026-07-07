@@ -43,3 +43,38 @@ function intersoccer_is_single_day_booking_type($booking_type) {
     }
     return false;
 }
+
+/**
+ * Whether late pickup admin fields were submitted for this variation save.
+ *
+ * @param int $variation_id
+ * @param int $loop
+ * @return bool
+ */
+function intersoccer_late_pickup_admin_fields_submitted($variation_id, $loop) {
+    if (
+        $loop >= 0
+        && isset($_POST['_intersoccer_late_pickup_fields_present'])
+        && is_array($_POST['_intersoccer_late_pickup_fields_present'])
+        && isset($_POST['_intersoccer_late_pickup_fields_present'][$loop])
+    ) {
+        return true;
+    }
+
+    if (isset($_POST['_intersoccer_late_pickup_fields_present_' . $variation_id])) {
+        return true;
+    }
+
+    if ($loop < 0) {
+        foreach (array_keys($_POST) as $key) {
+            if (
+                strpos($key, '_intersoccer_late_pickup_fields_present') !== false
+                || strpos($key, '_intersoccer_enable_late_pickup') !== false
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}

@@ -315,6 +315,9 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
         intersoccer_debug('Admin: Late pickup field for variation ' . $variation_id . ': DB value="' . ($db_value ?: 'NULL') . '", get_post_meta="' . $saved_value . '", checked="' . $checked . '", loop=' . $loop);
     }
     
+    // Sentinel: WooCommerce only POSTs loaded variation rows; without this, bulk saves wipe meta on unloaded rows.
+    echo '<input type="hidden" name="_intersoccer_late_pickup_fields_present[' . esc_attr((string) $loop) . ']" value="1" />';
+
     echo '<p class="form-field _intersoccer_enable_late_pickup_field" style="margin: 5px 0;">';
     echo '<label for="_intersoccer_enable_late_pickup_' . $loop . '" style="display: inline-block; margin-right: 10px;">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>';
     echo '<input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />';
@@ -403,6 +406,35 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
 }
 
 /**
+ * Re-enable late pickup on every variation of a camp product (data repair).
+ *
+ * @param int $parent_product_id
+ * @return int Number of variations updated.
+ */
+function intersoccer_enable_late_pickup_for_all_camp_variations($parent_product_id) {
+    $parent_product_id = (int) $parent_product_id;
+    if ($parent_product_id <= 0 || !intersoccer_is_camp($parent_product_id)) {
+        return 0;
+    }
+
+    $product = wc_get_product($parent_product_id);
+    if (!$product || !$product->is_type('variable')) {
+        return 0;
+    }
+
+    $updated = 0;
+    foreach ($product->get_children() as $variation_id) {
+        update_post_meta((int) $variation_id, '_intersoccer_enable_late_pickup', 'yes');
+        wc_delete_product_transients((int) $variation_id);
+        $updated++;
+    }
+
+    wc_delete_product_transients($parent_product_id);
+
+    return $updated;
+}
+
+/**
  * Save Late Pick Up option for variations
  */
 add_action('woocommerce_save_product_variation', 'intersoccer_save_camp_variation_fields', 10, 2);
@@ -469,11 +501,11 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
         }
     }
 
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('Save: Final enable_late_pickup = ' . $enable_late_pickup . ' for variation ' . $variation_id);
-    }
+    $fields_submitted = intersoccer_late_pickup_admin_fields_submitted($variation_id, $loop);
 
-    update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+    if ($fields_submitted) {
+        update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);
+    }
     
     // Save Available Camp Days (for single-day booking types)
     $weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -653,3 +685,136 @@ function intersoccer_sync_course_metadata_on_translation_complete($post_id, $dat
     // Clear transients
     wc_delete_product_transients($post_id);
 }
+
+/**
+ * Admin-post repair handler (use wp_nonce_url-generated links only).
+ */
+function intersoccer_handle_repair_late_pickup_admin_post() {
+    if (!is_user_logged_in() || !current_user_can('manage_woocommerce')) {
+        wp_safe_redirect(wp_login_url(admin_url('edit.php?post_type=product')));
+        exit;
+    }
+
+    $product_id = isset($_REQUEST['product_id']) ? (int) $_REQUEST['product_id'] : 0;
+    $redirect = $product_id > 0
+        ? get_edit_post_link($product_id, 'raw')
+        : admin_url('edit.php?post_type=product');
+
+    if (!$redirect) {
+        $redirect = admin_url('edit.php?post_type=product');
+    }
+
+    $nonce = isset($_REQUEST['_wpnonce']) ? sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])) : '';
+    if ($product_id <= 0 || !wp_verify_nonce($nonce, 'intersoccer_repair_late_pickup_' . $product_id)) {
+        wp_safe_redirect(add_query_arg('intersoccer_late_pickup_repair_error', '1', $redirect));
+        exit;
+    }
+
+    $updated = intersoccer_enable_late_pickup_for_all_camp_variations($product_id);
+
+    wp_safe_redirect(add_query_arg('intersoccer_late_pickup_repaired', $updated, $redirect));
+    exit;
+}
+add_action('admin_post_intersoccer_repair_late_pickup', 'intersoccer_handle_repair_late_pickup_admin_post');
+
+/**
+ * Repair link for a camp product edit screen.
+ *
+ * @param int $product_id
+ * @return string
+ */
+function intersoccer_get_late_pickup_repair_url($product_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return '';
+    }
+
+    return wp_nonce_url(
+        admin_url('admin-post.php?action=intersoccer_repair_late_pickup&product_id=' . $product_id),
+        'intersoccer_repair_late_pickup_' . $product_id
+    );
+}
+
+/**
+ * Late pickup status + one-click repair on camp product edit screen.
+ */
+function intersoccer_render_late_pickup_repair_panel() {
+    global $post;
+
+    if (!$post || $post->post_type !== 'product' || !function_exists('intersoccer_is_camp') || !intersoccer_is_camp($post->ID)) {
+        return;
+    }
+
+    $product = wc_get_product($post->ID);
+    if (!$product || !$product->is_type('variable')) {
+        return;
+    }
+
+    $enabled = 0;
+    $total = 0;
+    foreach ($product->get_children() as $variation_id) {
+        $total++;
+        if (get_post_meta((int) $variation_id, '_intersoccer_enable_late_pickup', true) === 'yes') {
+            $enabled++;
+        }
+    }
+
+    $repair_url = intersoccer_get_late_pickup_repair_url($post->ID);
+
+    echo '<div class="options_group intersoccer-late-pickup-repair-panel">';
+    echo '<p class="form-field" style="padding: 0 12px;">';
+    echo '<strong>' . esc_html__('Late Pick Up', 'intersoccer-product-variations') . '</strong><br />';
+    echo esc_html(
+        sprintf(
+            /* translators: 1: enabled count, 2: total variation count */
+            __('Enabled on %1$d of %2$d variations.', 'intersoccer-product-variations'),
+            $enabled,
+            $total
+        )
+    );
+    if ($enabled < $total && $repair_url !== '') {
+        echo '<br /><a class="button button-secondary" href="' . esc_url($repair_url) . '" style="margin-top: 8px;">';
+        echo esc_html__('Re-enable late pick up on all variations', 'intersoccer-product-variations');
+        echo '</a>';
+    }
+    echo '</p></div>';
+}
+add_action('woocommerce_product_options_general_product_data', 'intersoccer_render_late_pickup_repair_panel', 25);
+
+add_action('admin_notices', function () {
+    if (!current_user_can('manage_woocommerce')) {
+        return;
+    }
+
+    if (isset($_GET['intersoccer_late_pickup_repair_error'])) {
+        echo '<div class="notice notice-error is-dismissible"><p>';
+        echo esc_html__(
+            'Late pick up repair could not run (invalid or expired link). Open the camp product in admin and use the "Re-enable late pick up on all variations" button on the General tab.',
+            'intersoccer-product-variations'
+        );
+        echo '</p></div>';
+        return;
+    }
+
+    if (!isset($_GET['intersoccer_late_pickup_repaired'])) {
+        return;
+    }
+
+    $updated = (int) $_GET['intersoccer_late_pickup_repaired'];
+    if ($updated <= 0) {
+        echo '<div class="notice notice-warning is-dismissible"><p>';
+        echo esc_html__('No camp variations were updated. Confirm this is a variable camp product.', 'intersoccer-product-variations');
+        echo '</p></div>';
+        return;
+    }
+
+    echo '<div class="notice notice-success is-dismissible"><p>';
+    echo esc_html(
+        sprintf(
+            /* translators: %d: number of camp variations updated */
+            __('Late pick up re-enabled on %d camp variations.', 'intersoccer-product-variations'),
+            $updated
+        )
+    );
+    echo '</p></div>';
+});

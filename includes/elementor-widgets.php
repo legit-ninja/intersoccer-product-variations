@@ -243,8 +243,15 @@ $intersoccer_elementor_product_page_cb = function () {
             ];
         }
         
+        $enabled_late_pickup_count = 0;
+        foreach ($variation_settings as $settings_row) {
+            if (!empty($settings_row['enabled'])) {
+                $enabled_late_pickup_count++;
+            }
+        }
+
         intersoccer_debug('Late Pickup (Elementor): Total variations: ' . count($variations));
-        intersoccer_debug('Late Pickup (Elementor): Variations with late pickup enabled: ' . count($variation_settings));
+        intersoccer_debug('Late Pickup (Elementor): Variations with late pickup enabled: ' . $enabled_late_pickup_count);
         intersoccer_debug('Late Pickup (Elementor): Variation settings: ' . json_encode($variation_settings));
         
         // ALWAYS generate the HTML for camp products, even if no variations have it enabled yet
