@@ -527,17 +527,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (!$targetForm || !$targetForm.length) {
                     return;
                 }
-                var $localSelects = $targetForm.find('select[name="player_assignment"]');
-                var hasChosenLocal = false;
-                $localSelects.each(function () {
-                    if (intersoccerPlayerIndexChosen($(this).val())) {
-                        hasChosenLocal = true;
-                        return false;
-                    }
-                });
-                if (hasChosenLocal) {
-                    return;
-                }
+                // Always prefer the scoped/visible selection (may be on another Elementor clone),
+                // then fall back to a chosen value already on the submitting form.
                 var idx = '';
                 var $srcSel = intersoccerGetPlayerSelectForThisProduct();
                 if ($srcSel.length) {
@@ -545,9 +536,6 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 if (!intersoccerPlayerIndexChosen(idx)) {
                     idx = intersoccerPvAnyScopedPlayerValue();
-                }
-                if (!intersoccerPlayerIndexChosen(idx) && typeof playerPersistence.getPlayer === 'function') {
-                    idx = playerPersistence.getPlayer();
                 }
                 if (!intersoccerPlayerIndexChosen(idx)) {
                     $srcSel = intersoccerGetPlayerAssignmentSelect(intersoccerResolveProductForm());
@@ -561,23 +549,36 @@ $intersoccer_elementor_product_page_cb = function () {
                         idx = $srcSel.val();
                     }
                 }
+                var $localSelects = $targetForm.find('select[name="player_assignment"]');
+                if (!intersoccerPlayerIndexChosen(idx)) {
+                    $localSelects.each(function () {
+                        if (intersoccerPlayerIndexChosen($(this).val())) {
+                            idx = $(this).val();
+                            return false;
+                        }
+                    });
+                }
+                // Prefer the submitting form's select over persisted player from a prior booking.
+                if (!intersoccerPlayerIndexChosen(idx) && typeof playerPersistence.getPlayer === 'function') {
+                    idx = playerPersistence.getPlayer();
+                }
                 if (!intersoccerPlayerIndexChosen(idx)) {
                     return;
                 }
                 if ($localSelects.length) {
                     $localSelects.each(function () {
-                        if (!intersoccerPlayerIndexChosen($(this).val())) {
-                            $(this).val(idx);
-                        }
+                        $(this).val(String(idx));
                     });
-                    return;
+                } else {
+                    $targetForm.find('input[type="hidden"][name="player_assignment"]').remove();
+                    var h = document.createElement('input');
+                    h.type = 'hidden';
+                    h.name = 'player_assignment';
+                    h.value = String(idx);
+                    $targetForm[0].appendChild(h);
                 }
-                $targetForm.find('input[type="hidden"][name="player_assignment"]').remove();
-                var h = document.createElement('input');
-                h.type = 'hidden';
-                h.name = 'player_assignment';
-                h.value = String(idx);
-                $targetForm[0].appendChild(h);
+                // Mirror player onto layout form + assigned_attendee hidden field for POST.
+                intersoccerApplyPlayerChoice(idx);
             }
 
             /**
@@ -1014,6 +1015,16 @@ $intersoccer_elementor_product_page_cb = function () {
                                 }
                                 
                                 if (response.data.players.length > 0) {
+                                    // Preserve shopper's choice if they picked a player before this AJAX completed
+                                    // (rebuilding the <select> would otherwise reset to "Select attendee").
+                                    var preservedPlayer = intersoccerPvAnyScopedPlayerValue();
+                                    if (!intersoccerPlayerIndexChosen(preservedPlayer)) {
+                                        preservedPlayer = intersoccerGetPlayerSelectForThisProduct().val() || '';
+                                    }
+                                    if (!intersoccerPlayerIndexChosen(preservedPlayer) && typeof playerPersistence.getPlayer === 'function') {
+                                        preservedPlayer = playerPersistence.getPlayer();
+                                    }
+
                                     var $select = $('<select>', {
                                         name: 'player_assignment',
                                         id: 'player_assignment_select_<?php echo (int) $product_id; ?>',
@@ -1060,9 +1071,17 @@ $intersoccer_elementor_product_page_cb = function () {
                                             style: 'color: red; display: none; margin-top: 10px;'
                                         }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
                                     );
+
+                                    if (intersoccerPlayerIndexChosen(preservedPlayer)) {
+                                        $select.val(String(preservedPlayer));
+                                    }
                                     
                                     // ENHANCEMENT: Restore player selection after loading
                                     setTimeout(function() {
+                                        if (intersoccerPlayerIndexChosen(preservedPlayer)) {
+                                            intersoccerApplyPlayerChoice(preservedPlayer);
+                                            return;
+                                        }
                                         var restoredPlayer = playerPersistence.restorePlayer();
                                         if (intersoccerPlayerIndexChosen(restoredPlayer)) {
                                             var existingField = $form[0].querySelector('input[name="assigned_attendee"]');
@@ -1486,6 +1505,11 @@ $intersoccer_elementor_product_page_cb = function () {
                     // Show/hide day checkboxes based on selection
                     if (selectedLatePickupOption === 'single-days') {
                         $dayCheckboxesContainer.show();
+                        // Checkboxes may stay checked in the DOM after toggling away from single-days;
+                        // re-sync so cost/price update without requiring an extra change event.
+                        selectedLatePickupDays = $dayCheckboxesContainer.find('.intersoccer-late-pickup-day-checkbox:checked').map(function() {
+                            return $(this).val();
+                        }).get();
                     } else {
                         $dayCheckboxesContainer.hide();
                         selectedLatePickupDays = []; // Clear selected days when not in single-days mode
@@ -1580,7 +1604,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 updateMainPriceWithLatePickup(cost);
             }
             
-            function updateMainPriceWithLatePickup(latePickupCost) {
+            function updateMainPriceWithLatePickup(latePickupCost, retryCount) {
+                retryCount = retryCount || 0;
                 var $priceContainer = jQuery('.woocommerce-variation-price');
                 if (!$priceContainer.length) {
                     debug('InterSoccer Late Pickup: Price container not found, skipping main price update');
@@ -1588,16 +1613,37 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 
                 // Check if there's a pending AJAX price update
-                // If so, skip updating display - AJAX completion handler will trigger recalculation with correct base
+                // If so, retry shortly — optimistic day-checkbox updates can block this briefly.
                 var pendingUpdate = $priceContainer.data('intersoccer-updating');
                 if (pendingUpdate) {
-                    debug('InterSoccer Late Pickup: AJAX price update in progress, skipping display update (will recalculate after AJAX)');
-                    return;
+                    if (retryCount < 30) {
+                        setTimeout(function () {
+                            updateMainPriceWithLatePickup(latePickupCost, retryCount + 1);
+                        }, 100);
+                        return;
+                    }
+                    debug('InterSoccer Late Pickup: AJAX price update still in progress after retries, applying anyway');
                 }
                 
                 // Get the base price (must be already stored from variation data)
                 var basePrice = parseFloat($priceContainer.data('intersoccer-base-price'));
                 if (!basePrice || isNaN(basePrice)) {
+                    var $amount = $priceContainer.find('.woocommerce-Price-amount').first();
+                    if ($amount.length) {
+                        var parsedDisplay = parseFloat(String($amount.text()).replace(/[^\d.,-]/g, '').replace(',', '.'));
+                        if (parsedDisplay > 0) {
+                            basePrice = parsedDisplay;
+                            $priceContainer.data('intersoccer-base-price', basePrice);
+                        }
+                    }
+                }
+                if (!basePrice || isNaN(basePrice)) {
+                    if (retryCount < 30) {
+                        setTimeout(function () {
+                            updateMainPriceWithLatePickup(latePickupCost, retryCount + 1);
+                        }, 100);
+                        return;
+                    }
                     debug('InterSoccer Late Pickup: Base price not available yet, skipping update');
                     return;
                 }
@@ -2284,24 +2330,30 @@ $intersoccer_elementor_product_page_cb = function () {
                             // Build price HTML matching WooCommerce structure
                             var priceHtml = '<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">CHF</span>' + totalPrice.toFixed(2) + '</bdi></span></span>';
                             
-                            // Set flag to prevent interference
+                            // Set flag to prevent interference, then apply calculated price on next tick.
+                            // Always clear the flag here — this show_variation path may run without a
+                            // following updateCampPrice AJAX (e.g. late-pickup-only changes), and a stuck
+                            // flag permanently blocks updateMainPriceWithLatePickup().
                             $priceContainer.data('intersoccer-updating', true);
                             
-                            // Update price immediately after WooCommerce renders (next tick)
-                            // This prevents the flicker from base price to calculated price
                             setTimeout(function() {
-                                // Double-check we still have selected days
                                 var stillSelected = [];
                                 $form.find('.intersoccer-day-checkbox:checked').each(function() {
                                     stillSelected.push(jQuery(this).val());
                                 });
                                 
-                                if (stillSelected.length > 0 && $priceContainer.data('intersoccer-updating')) {
-                                    $priceContainer.html(priceHtml);
-                                    debug('InterSoccer: Prevented WooCommerce price reset, set calculated price to CHF', totalPrice.toFixed(2), '(camp:', calculatedPrice, '+ late pickup:', latePickupCost + ')');
+                                if (stillSelected.length > 0) {
+                                    $priceContainer.data('intersoccer-base-price', calculatedPrice);
+                                    var settings = latePickupVariationSettings[variation.variation_id];
+                                    if (settings && selectedLatePickupOption && selectedLatePickupOption !== 'none') {
+                                        updateLatePickupCost(settings);
+                                        debug('InterSoccer: Reapplied late pickup after show_variation price guard');
+                                    } else {
+                                        $priceContainer.html(priceHtml);
+                                        debug('InterSoccer: Prevented WooCommerce price reset, set calculated price to CHF', totalPrice.toFixed(2), '(camp:', calculatedPrice, '+ late pickup:', latePickupCost + ')');
+                                    }
                                 }
-                                
-                                // Flag will be cleared when AJAX completes in updateCampPrice success handler
+                                $priceContainer.data('intersoccer-updating', false);
                             }, 0);
                         }
                     }
@@ -2782,14 +2834,23 @@ $intersoccer_elementor_product_page_cb = function () {
                     // Update DOM directly (do NOT modify variation object to prevent WooCommerce interference)
                     var $variationPriceContainer = jQuery('.woocommerce-variation-price');
                     if ($variationPriceContainer.length) {
-                        $variationPriceContainer.html(optimisticPriceHtml);
-                        debug('InterSoccer: Optimistic price update to CHF', estimatedPrice.toFixed(2), 'for', selectedDays.length, 'days');
-                        
-                        // Add temporary flag to prevent WooCommerce from overwriting during AJAX
-                        $variationPriceContainer.data('intersoccer-updating', true);
-                        setTimeout(function() {
+                        $variationPriceContainer.data('intersoccer-base-price', estimatedPrice);
+                        var $latePickupOption = $form.find('input[name="late_pickup_option"]:checked');
+                        var latePickupActive = $latePickupOption.length > 0 && $latePickupOption.val() !== 'none';
+                        if (latePickupActive) {
+                            debug('InterSoccer: Optimistic camp base CHF', estimatedPrice.toFixed(2), '— deferring display to late pickup recalc');
                             $variationPriceContainer.data('intersoccer-updating', false);
-                        }, 1000);
+                            $form.trigger('intersoccer_price_updated', {rawPrice: estimatedPrice});
+                        } else {
+                            $variationPriceContainer.html(optimisticPriceHtml);
+                            debug('InterSoccer: Optimistic price update to CHF', estimatedPrice.toFixed(2), 'for', selectedDays.length, 'days');
+                            
+                            // Add temporary flag to prevent WooCommerce from overwriting during AJAX
+                            $variationPriceContainer.data('intersoccer-updating', true);
+                            setTimeout(function() {
+                                $variationPriceContainer.data('intersoccer-updating', false);
+                            }, 1000);
+                        }
                     }
                     
                     // DO NOT trigger woocommerce_variation_has_changed - it causes WooCommerce to re-render and flicker

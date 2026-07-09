@@ -178,6 +178,13 @@ add_filter('woocommerce_add_cart_item_data', 'intersoccer_add_custom_cart_item_d
 function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $variation_id) {
     intersoccer_debug('Add cart item: product=' . $product_id . ', variation=' . $variation_id);
 
+    $posted_player_id = intersoccer_get_posted_assigned_player_id();
+    if ($posted_player_id !== '') {
+        $cart_item_data['assigned_player_id'] = $posted_player_id;
+        // Hash cart lines by posted UUID first so siblings never merge when resolution is delayed.
+        $cart_item_data['unique_key'] = 'player_' . $posted_player_id;
+    }
+
     // Assigned player (player_assignment or hidden assigned_attendee from variation-details.js)
     $posted_player_index = intersoccer_get_posted_player_assignment_index();
     if ($posted_player_index !== null) {
@@ -187,12 +194,10 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         $cart_item_data['assigned_attendee'] = $player_details['name'];
         if (!empty($player_details['player_id'])) {
             $cart_item_data['assigned_player_id'] = $player_details['player_id'];
+            if (empty($cart_item_data['unique_key'])) {
+                $cart_item_data['unique_key'] = 'player_' . $player_details['player_id'];
+            }
         }
-    }
-
-    $posted_player_id = intersoccer_get_posted_assigned_player_id();
-    if ($posted_player_id !== '') {
-        $cart_item_data['assigned_player_id'] = $posted_player_id;
     }
 
     // Camp days
@@ -223,6 +228,17 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         $cart_item_data['base_price'] = InterSoccer_Course::calculate_price($product_id, $variation_id);
     } else {
         $cart_item_data['base_price'] = floatval(wc_get_product($variation_id ?: $product_id)->get_price());
+    }
+
+    // Distinct attendees (and late-pickup / day configs) must not merge into one WC line.
+    // WooCommerce hashes cart_item_data into the cart item key; a stable unique_key guarantees
+    // siblings booking the same variation remain separate rows.
+    if (empty($cart_item_data['unique_key'])) {
+        if (!empty($cart_item_data['assigned_player_id'])) {
+            $cart_item_data['unique_key'] = 'player_' . $cart_item_data['assigned_player_id'];
+        } elseif (isset($cart_item_data['assigned_player']) && $cart_item_data['assigned_player'] !== '' && $cart_item_data['assigned_player'] !== null) {
+            $cart_item_data['unique_key'] = 'player_idx_' . $cart_item_data['assigned_player'];
+        }
     }
 
     return $cart_item_data;
