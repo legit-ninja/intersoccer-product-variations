@@ -70,7 +70,8 @@ The following options must be exported/imported between environments:
 3. **`intersoccer_disable_sibling_discount_with_coupons`** - Coupon interaction setting
 4. **`intersoccer_enable_retroactive_course_discounts`** - Enable retroactive courses (default: true)
 5. **`intersoccer_enable_retroactive_camp_discounts`** - Enable retroactive camps (default: true)
-6. **`intersoccer_retroactive_discount_lookback_months`** - Lookback period (default: 6)
+6. **`intersoccer_enable_retroactive_sibling_discounts`** - Enable sibling rates across prior orders (default: true)
+7. **`intersoccer_retroactive_discount_lookback_months`** - Lookback period (default: 6)
 
 ### Export SQL Query
 ```sql
@@ -81,6 +82,7 @@ WHERE option_name IN (
     'intersoccer_disable_sibling_discount_with_coupons',
     'intersoccer_enable_retroactive_course_discounts',
     'intersoccer_enable_retroactive_camp_discounts',
+    'intersoccer_enable_retroactive_sibling_discounts',
     'intersoccer_retroactive_discount_lookback_months'
 );
 ```
@@ -107,7 +109,11 @@ Visit **WooCommerce > Marketing > InterSoccer Discounts** to auto-initialize all
    - Apply progressive camp discounts based on previous orders
    - Default: Enabled
 
-4. **Order Lookback Period** (number input)
+4. **Enable Retroactive Sibling Discounts** (checkbox)
+   - Count children from previous orders for camp and course sibling rates (tournament/birthday: same-cart only)
+   - Default: Enabled
+
+5. **Order Lookback Period** (number input)
    - Months to look back when checking previous orders
    - Range: 1-24 months
    - Default: 6 months

@@ -206,8 +206,14 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         $cart_item_data['camp_days'] = $posted_camp_days;
     }
 
-    // Late pickup data
-    if (intersoccer_is_camp($product_id) && isset($_POST['late_pickup_type'])) {
+    // Late pickup data (full-day camps only; half-day variations ignore posted late pickup)
+    if (
+        intersoccer_is_camp($product_id)
+        && isset($_POST['late_pickup_type'])
+        && (int) $variation_id > 0
+        && function_exists('intersoccer_variation_allows_late_pickup')
+        && intersoccer_variation_allows_late_pickup((int) $variation_id)
+    ) {
         $cart_item_data['late_pickup_type'] = sanitize_text_field($_POST['late_pickup_type']);
         if ($cart_item_data['late_pickup_type'] === 'single-days' && isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days'])) {
             $cart_item_data['late_pickup_days'] = array_map('sanitize_text_field', $_POST['late_pickup_days']);

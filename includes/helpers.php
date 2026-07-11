@@ -45,6 +45,64 @@ function intersoccer_is_single_day_booking_type($booking_type) {
 }
 
 /**
+ * Whether pa_age-group label or slug indicates a half-day camp session.
+ *
+ * @param string $label Term name or display label.
+ * @param string $slug  Term slug (optional).
+ * @return bool
+ */
+function intersoccer_is_half_day_age_group($label, $slug = '') {
+    foreach ([$label, $slug] as $hay) {
+        $h = function_exists('mb_strtolower') ? mb_strtolower(trim((string) $hay), 'UTF-8') : strtolower(trim((string) $hay));
+        if ($h !== '' && (strpos($h, 'half-day') !== false || strpos($h, 'half day') !== false)) {
+            return true;
+        }
+    }
+
+    /**
+     * Filter half-day detection for custom age-group catalogs.
+     *
+     * @param bool   $is_half_day
+     * @param string $label
+     * @param string $slug
+     */
+    return (bool) apply_filters('intersoccer_is_half_day_age_group', false, $label, $slug);
+}
+
+/**
+ * Whether late pickup is allowed for a variation (enabled meta + full-day age group).
+ *
+ * @param int $variation_id Variation post ID.
+ * @return bool
+ */
+function intersoccer_variation_allows_late_pickup($variation_id) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0) {
+        return false;
+    }
+    if (get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true) !== 'yes') {
+        return false;
+    }
+
+    $parent_id = 0;
+    if (function_exists('wc_get_product')) {
+        $product = wc_get_product($variation_id);
+        if ($product && method_exists($product, 'get_parent_id')) {
+            $parent_id = (int) $product->get_parent_id();
+        }
+    }
+
+    $label = function_exists('intersoccer_get_variation_age_group_label')
+        ? (string) intersoccer_get_variation_age_group_label($parent_id, $variation_id)
+        : '';
+    $slug = function_exists('intersoccer_get_variation_age_group_slug')
+        ? (string) intersoccer_get_variation_age_group_slug($variation_id)
+        : '';
+
+    return !intersoccer_is_half_day_age_group($label, $slug);
+}
+
+/**
  * Whether late pickup admin fields were submitted for this variation save.
  *
  * @param int $variation_id

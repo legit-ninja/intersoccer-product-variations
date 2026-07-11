@@ -546,13 +546,14 @@ function intersoccer_age_on_date($dob_ymd, $ref_ymd) {
 /**
  * Default age restriction settings (grace periods and strict mode).
  *
- * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, half_day_above_max_months: int, strict_missing_reference_date: bool}
  */
 function intersoccer_get_age_restriction_settings_defaults() {
     return [
         'grace_enabled' => true,
         'below_min_months' => 2,
         'above_max_months' => 1,
+        'half_day_above_max_months' => 24,
         'strict_missing_reference_date' => false,
     ];
 }
@@ -561,7 +562,7 @@ function intersoccer_get_age_restriction_settings_defaults() {
  * Sanitize age restriction settings from admin form.
  *
  * @param mixed $input Raw POST/settings input.
- * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, half_day_above_max_months: int, strict_missing_reference_date: bool}
  */
 function intersoccer_sanitize_age_restriction_settings($input) {
     $defaults = intersoccer_get_age_restriction_settings_defaults();
@@ -573,6 +574,7 @@ function intersoccer_sanitize_age_restriction_settings($input) {
         'grace_enabled' => !empty($input['grace_enabled']),
         'below_min_months' => max(0, min(12, (int) ($input['below_min_months'] ?? $defaults['below_min_months']))),
         'above_max_months' => max(0, min(12, (int) ($input['above_max_months'] ?? $defaults['above_max_months']))),
+        'half_day_above_max_months' => max(0, min(36, (int) ($input['half_day_above_max_months'] ?? $defaults['half_day_above_max_months']))),
         'strict_missing_reference_date' => !empty($input['strict_missing_reference_date']),
     ];
 }
@@ -580,7 +582,7 @@ function intersoccer_sanitize_age_restriction_settings($input) {
 /**
  * Age restriction settings from wp_options (with filter).
  *
- * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, strict_missing_reference_date: bool}
+ * @return array{grace_enabled: bool, below_min_months: int, above_max_months: int, half_day_above_max_months: int, strict_missing_reference_date: bool}
  */
 function intersoccer_get_age_restriction_settings() {
     $stored = get_option('intersoccer_age_restriction_settings', []);
@@ -802,6 +804,13 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
     }
 
     $settings = intersoccer_get_age_restriction_settings();
+    if (
+        function_exists('intersoccer_is_half_day_age_group')
+        && intersoccer_is_half_day_age_group($label, $slug)
+        && ($bounds['max'] ?? null) !== null
+    ) {
+        $settings['above_max_months'] = (int) ($settings['half_day_above_max_months'] ?? 24);
+    }
     $age_result = intersoccer_player_age_within_bounds($dob_ymd, $ref, $bounds, $settings);
     if ($age_result['age_years'] === null) {
         return new WP_Error(

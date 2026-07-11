@@ -63,6 +63,7 @@ function intersoccer_age_restriction_settings_page() {
             'grace_enabled' => isset($_POST['grace_enabled']) ? 1 : 0,
             'below_min_months' => isset($_POST['below_min_months']) ? (int) $_POST['below_min_months'] : 0,
             'above_max_months' => isset($_POST['above_max_months']) ? (int) $_POST['above_max_months'] : 0,
+            'half_day_above_max_months' => isset($_POST['half_day_above_max_months']) ? (int) $_POST['half_day_above_max_months'] : 0,
             'strict_missing_reference_date' => isset($_POST['strict_missing_reference_date']) ? 1 : 0,
         ];
         update_option(
@@ -112,6 +113,15 @@ function intersoccer_age_restriction_settings_page() {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row">
+                        <label for="half_day_above_max_months"><?php esc_html_e('Half-day months above maximum', 'intersoccer-product-variations'); ?></label>
+                    </th>
+                    <td>
+                        <input type="number" name="half_day_above_max_months" id="half_day_above_max_months" value="<?php echo esc_attr((int) ($settings['half_day_above_max_months'] ?? 24)); ?>" min="0" max="36" step="1" class="small-text">
+                        <p class="description"><?php esc_html_e('Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 24 months allows a child up to 7 years on the program start date.', 'intersoccer-product-variations'); ?></p>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e('Strict missing start date', 'intersoccer-product-variations'); ?></th>
                     <td>
                         <label>
@@ -147,6 +157,8 @@ function intersoccer_register_age_restriction_settings_strings() {
         'When disabled, validation uses completed whole years only (strict).',
         'Months below minimum',
         'Months above maximum',
+        'Half-day months above maximum',
+        'Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 24 months allows a child up to 7 years on the program start date.',
         'Strict missing start date',
         'Block checkout when the program start date cannot be determined',
         'By default, bookings proceed when start date metadata is missing. Enable this to reject those bookings.',

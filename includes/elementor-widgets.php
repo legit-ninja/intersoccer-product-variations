@@ -233,7 +233,9 @@ $intersoccer_elementor_product_page_cb = function () {
             $available_late_pickup_days = array_keys(array_filter($late_pickup_days_available));
             
             $variation_settings[$variation_id] = [
-                'enabled' => ($enable_late_pickup === 'yes'),
+                'enabled' => function_exists('intersoccer_variation_allows_late_pickup')
+                    ? intersoccer_variation_allows_late_pickup($variation_id)
+                    : ($enable_late_pickup === 'yes'),
                 'per_day_cost' => $per_day_cost,
                 'full_week_cost' => $full_week_cost,
                 'available_camp_days' => $available_camp_days,

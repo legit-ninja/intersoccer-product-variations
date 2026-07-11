@@ -23,6 +23,9 @@ class DiscountFunctionsTest extends TestCase {
             'intersoccer_get_previous_courses_by_parent',
             'intersoccer_get_previous_camps_by_parent',
             'intersoccer_get_previous_tournaments_by_parent',
+            'intersoccer_discount_player_key',
+            'intersoccer_get_previous_sibling_child_totals',
+            'intersoccer_merge_sibling_child_totals',
         ];
         
         $discounts_file = dirname(__DIR__) . '/includes/woocommerce/discounts.php';

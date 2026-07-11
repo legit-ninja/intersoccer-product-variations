@@ -301,10 +301,23 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     ));
     
     $saved_value = get_post_meta($variation_id, '_intersoccer_enable_late_pickup', true);
+
+    $parent_id = (int) $parent_product->get_id();
+    $age_label = function_exists('intersoccer_get_variation_age_group_label')
+        ? (string) intersoccer_get_variation_age_group_label($parent_id, $variation_id)
+        : '';
+    $age_slug = function_exists('intersoccer_get_variation_age_group_slug')
+        ? (string) intersoccer_get_variation_age_group_slug($variation_id)
+        : '';
+    $is_half_day = function_exists('intersoccer_is_half_day_age_group')
+        ? intersoccer_is_half_day_age_group($age_label, $age_slug)
+        : false;
     
     // Disabled by default for new variations (empty meta), respect saved setting
-    // Only check if explicitly set to 'yes'
-    if ($saved_value === 'yes') {
+    // Only check if explicitly set to 'yes' (half-day variations cannot enable late pickup)
+    if ($is_half_day) {
+        $checked = '';
+    } elseif ($saved_value === 'yes') {
         $checked = 'checked';
     } else {
         // Default to unchecked (disabled) for new variations or when set to 'no'
@@ -319,9 +332,14 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
     echo '<input type="hidden" name="_intersoccer_late_pickup_fields_present[' . esc_attr((string) $loop) . ']" value="1" />';
 
     echo '<p class="form-field _intersoccer_enable_late_pickup_field" style="margin: 5px 0;">';
-    echo '<label for="_intersoccer_enable_late_pickup_' . $loop . '" style="display: inline-block; margin-right: 10px;">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>';
-    echo '<input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />';
-    echo '<span class="description" style="display: block; margin-top: 5px; color: #666;">' . __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations') . '</span>';
+    if ($is_half_day) {
+        echo '<span class="description" style="display: block; margin-bottom: 5px; color: #666;">' . esc_html__('Late pick up is available for full-day camps only.', 'intersoccer-product-variations') . '</span>';
+        echo '<input type="hidden" name="_intersoccer_enable_late_pickup[' . esc_attr((string) $loop) . ']" value="no" />';
+    } else {
+        echo '<label for="_intersoccer_enable_late_pickup_' . $loop . '" style="display: inline-block; margin-right: 10px;">' . __('Enable Late Pick Up', 'intersoccer-product-variations') . '</label>';
+        echo '<input type="checkbox" class="checkbox" name="_intersoccer_enable_late_pickup[' . $loop . ']" id="_intersoccer_enable_late_pickup_' . $loop . '" value="yes" ' . $checked . ' />';
+        echo '<span class="description" style="display: block; margin-top: 5px; color: #666;">' . __('Allow customers to add late pick up options for this camp variation.', 'intersoccer-product-variations') . '</span>';
+    }
     
     // Debug info (visible in admin)
     if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -383,8 +401,8 @@ function intersoccer_add_camp_late_pickup_field($variation_id, $loop) {
         echo '</div>';
     }
     
-    // Show "Available Late Pickup Days" if late pickup is enabled
-    if ($saved_value === 'yes') {
+    // Show "Available Late Pickup Days" if late pickup is enabled (full-day only)
+    if ($saved_value === 'yes' && !$is_half_day) {
         echo '<div style="margin: 15px 0; padding: 10px; background: #fff8e1; border: 1px solid #ffd54f; border-radius: 4px;">';
         echo '<p style="margin: 0 0 8px 0; font-weight: bold; color: #ff8f00;">' . __('Available Late Pickup Days', 'intersoccer-product-variations') . '</p>';
         echo '<p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">' . __('Select which days late pickup is available. Unchecked days will not be displayed as late pickup options.', 'intersoccer-product-variations') . '</p>';
@@ -424,8 +442,58 @@ function intersoccer_enable_late_pickup_for_all_camp_variations($parent_product_
 
     $updated = 0;
     foreach ($product->get_children() as $variation_id) {
-        update_post_meta((int) $variation_id, '_intersoccer_enable_late_pickup', 'yes');
-        wc_delete_product_transients((int) $variation_id);
+        $variation_id = (int) $variation_id;
+        $parent_id = (int) $parent_product_id;
+        $age_label = function_exists('intersoccer_get_variation_age_group_label')
+            ? (string) intersoccer_get_variation_age_group_label($parent_id, $variation_id)
+            : '';
+        $age_slug = function_exists('intersoccer_get_variation_age_group_slug')
+            ? (string) intersoccer_get_variation_age_group_slug($variation_id)
+            : '';
+        if (function_exists('intersoccer_is_half_day_age_group') && intersoccer_is_half_day_age_group($age_label, $age_slug)) {
+            continue;
+        }
+        update_post_meta($variation_id, '_intersoccer_enable_late_pickup', 'yes');
+        wc_delete_product_transients($variation_id);
+        $updated++;
+    }
+
+    wc_delete_product_transients($parent_product_id);
+
+    return $updated;
+}
+
+/**
+ * Disable late pickup on half-day camp variations (data repair).
+ *
+ * @param int $parent_product_id
+ * @return int Number of variations updated.
+ */
+function intersoccer_disable_late_pickup_for_half_day_variations($parent_product_id) {
+    $parent_product_id = (int) $parent_product_id;
+    if ($parent_product_id <= 0 || !intersoccer_is_camp($parent_product_id)) {
+        return 0;
+    }
+
+    $product = wc_get_product($parent_product_id);
+    if (!$product || !$product->is_type('variable')) {
+        return 0;
+    }
+
+    $updated = 0;
+    foreach ($product->get_children() as $variation_id) {
+        $variation_id = (int) $variation_id;
+        $age_label = function_exists('intersoccer_get_variation_age_group_label')
+            ? (string) intersoccer_get_variation_age_group_label($parent_product_id, $variation_id)
+            : '';
+        $age_slug = function_exists('intersoccer_get_variation_age_group_slug')
+            ? (string) intersoccer_get_variation_age_group_slug($variation_id)
+            : '';
+        if (!function_exists('intersoccer_is_half_day_age_group') || !intersoccer_is_half_day_age_group($age_label, $age_slug)) {
+            continue;
+        }
+        update_post_meta($variation_id, '_intersoccer_enable_late_pickup', 'no');
+        wc_delete_product_transients($variation_id);
         $updated++;
     }
 
@@ -502,6 +570,16 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
     }
 
     $fields_submitted = intersoccer_late_pickup_admin_fields_submitted($variation_id, $loop);
+
+    $age_label = function_exists('intersoccer_get_variation_age_group_label')
+        ? (string) intersoccer_get_variation_age_group_label((int) $parent_product->get_id(), (int) $variation_id)
+        : '';
+    $age_slug = function_exists('intersoccer_get_variation_age_group_slug')
+        ? (string) intersoccer_get_variation_age_group_slug((int) $variation_id)
+        : '';
+    if (function_exists('intersoccer_is_half_day_age_group') && intersoccer_is_half_day_age_group($age_label, $age_slug)) {
+        $enable_late_pickup = 'no';
+    }
 
     if ($fields_submitted) {
         update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enable_late_pickup);

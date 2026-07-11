@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.7.8
+ * Version: 2.7.9
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -116,6 +116,8 @@ add_action('init', function () {
             'Enable age grace',
             'Months below minimum',
             'Months above maximum',
+            'Half-day months above maximum',
+            'Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 24 months allows a child up to 7 years on the program start date.',
             'Strict missing start date',
             '%d%% Camp Combo Discount (Child %d)',
             '%d%% Course Multi-Child Discount (Child %d)',

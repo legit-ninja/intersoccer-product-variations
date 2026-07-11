@@ -4,7 +4,7 @@
 This plugin enhances the WooCommerce booking system for InterSoccer Switzerland by managing complex product variations, dynamic pricing calculations, and sophisticated sibling discount systems. It supports three main product types: Camps (full-week and single-day), Courses (seasonal with prorated pricing), and Birthdays, with comprehensive admin interfaces and multilingual support.
 
 ## Version
-- **Version: 2.7.8**
+- **Version: 2.7.9**
 - Release Date: July 8, 2026
 
 ## Features
@@ -23,15 +23,16 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 
 ### Comprehensive Discount System
 - **Camp Discounts**:
-  - Sibling: 20% off 2nd child, 25% off 3rd+ children
+  - Sibling: 20% off 2nd child, 25% off 3rd+ children (counts children from previous orders within lookback)
   - Progressive: Week 2 gets 10% off, Week 3+ gets 20% off (based on total weeks purchased)
+  - When sibling and progressive both apply to a line, the higher percent wins
   - Full-week bookings only (single-day excluded)
 - **Course Discounts**:
-  - Sibling: 20% off 2nd child, 30% off 3rd+ children
+  - Sibling: 20% off 2nd child, 30% off 3rd+ children (same season; prior orders included)
   - Same-season: 50% off 2nd course for same child (different days)
   - Retroactive: Applies even if first course was in previous order
 - **Tournament Discounts**:
-  - Sibling: 20% off 2nd child, 30% off 3rd+ children
+  - Sibling: 20% off 2nd child, 30% off 3rd+ children (prior orders included)
   - Multiple days: Day 1 = 30 CHF, Day 2+ = 20 CHF (2 days for 50 CHF)
   - Retroactive: Applies even if first day was in previous order
 - **Precise Allocation**: Context-aware discount application with cart validation

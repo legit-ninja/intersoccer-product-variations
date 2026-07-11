@@ -55,6 +55,7 @@ if (!function_exists('apply_filters')) {
     }
 }
 
+require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/age-group-verification.php';
 
 class AgeGroupVerificationTest extends TestCase {
@@ -65,11 +66,12 @@ class AgeGroupVerificationTest extends TestCase {
         parent::tearDown();
     }
 
-    private function graceSettings($below = 2, $above = 1, $enabled = true) {
+    private function graceSettings($below = 2, $above = 1, $enabled = true, $halfDayAbove = 24) {
         return [
             'grace_enabled' => $enabled,
             'below_min_months' => $below,
             'above_max_months' => $above,
+            'half_day_above_max_months' => $halfDayAbove,
             'strict_missing_reference_date' => false,
         ];
     }
@@ -304,5 +306,23 @@ class AgeGroupVerificationTest extends TestCase {
         $this->assertTrue($settings['grace_enabled']);
         $this->assertSame(2, $settings['below_min_months']);
         $this->assertSame(1, $settings['above_max_months']);
+        $this->assertSame(24, $settings['half_day_above_max_months']);
+    }
+
+    public function test_parse_age_group_bounds_half_day_label() {
+        $bounds = intersoccer_parse_age_group_bounds('3-5y (Half-Day)');
+        $this->assertNotNull($bounds);
+        $this->assertSame(3, $bounds['min']);
+        $this->assertSame(5, $bounds['max']);
+    }
+
+    public function test_half_day_uses_extended_above_max_months() {
+        $settings = $this->graceSettings(2, 1, true, 24);
+        $bounds = ['min' => 3, 'max' => 5];
+        $pass = intersoccer_player_age_within_bounds('2018-04-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 24]));
+        $this->assertTrue($pass['matches']);
+
+        $fail = intersoccer_player_age_within_bounds('2017-01-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 24]));
+        $this->assertFalse($fail['matches']);
     }
 }
