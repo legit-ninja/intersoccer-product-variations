@@ -606,14 +606,44 @@ function intersoccer_write_order_line_meta($item, array $context) {
         'fix_activity_type_only' => $fix_activity_type_only,
     ]);
 
-    $updates = array_merge($built['updates'], intersoccer_collect_variation_taxonomy_meta($variation_id));
+    $variation_tax_meta = intersoccer_collect_variation_taxonomy_meta($variation_id);
+    $updates = array_merge($built['updates'], $variation_tax_meta);
 
     if ($mode === 'checkout') {
+        $existing_keys = [];
+        foreach ($item->get_meta_data() as $meta_row) {
+            $existing_keys[(string) $meta_row->key] = true;
+        }
+
+        $canonical_to_legacy = [];
+        if (function_exists('intersoccer_attr_legacy_order_meta_label_reverse_map')) {
+            foreach (intersoccer_attr_legacy_order_meta_label_reverse_map() as $legacy => $canonical) {
+                $canonical_to_legacy[$canonical][] = $legacy;
+            }
+        }
+
         foreach ($updates as $key => $value) {
             if ($value === null || ($value === '' && $key !== 'Medical Conditions')) {
                 continue;
             }
-            $item->add_meta_data($key, intersoccer_sanitize_order_line_meta_value($value));
+
+            if (!empty($canonical_to_legacy[$key])) {
+                foreach ($canonical_to_legacy[$key] as $legacy) {
+                    if (isset($existing_keys[$legacy])) {
+                        $item->delete_meta_data($legacy);
+                        unset($existing_keys[$legacy]);
+                    }
+                }
+            }
+
+            $sanitized = intersoccer_sanitize_order_line_meta_value($value);
+            if (isset($existing_keys[$key])) {
+                $item->update_meta_data($key, $sanitized);
+                continue;
+            }
+
+            $item->add_meta_data($key, $sanitized, true);
+            $existing_keys[$key] = true;
         }
         return true;
     }
@@ -662,11 +692,15 @@ function intersoccer_apply_order_line_meta_updates($item, array $updates, $fix_a
         return false;
     }
 
+    $changed = false;
+
+    if (!$fix_activity_type_only && function_exists('intersoccer_attr_legacy_order_meta_label_reverse_map')) {
+        $changed = intersoccer_normalize_legacy_order_meta_keys($item) || $changed;
+    }
+
     $existing_keys = array_map(static function ($meta) {
         return $meta->key;
     }, $item->get_meta_data());
-
-    $changed = false;
 
     foreach ($updates as $key => $value) {
         if ($fix_activity_type_only && $key !== 'Activity Type') {
@@ -708,6 +742,54 @@ function intersoccer_apply_order_line_meta_updates($item, array $updates, $fix_a
                 $changed = true;
             }
         }
+    }
+
+    return $changed;
+}
+
+/**
+ * Rename non-English (FR/DE) order meta keys to their canonical English equivalents.
+ *
+ * Uses the attribute registry's legacy_order_meta_labels reverse map.
+ * Skips keys where the canonical already exists with a non-empty value.
+ *
+ * @param WC_Order_Item_Product $item
+ * @return bool Whether any key was renamed.
+ */
+function intersoccer_normalize_legacy_order_meta_keys($item) {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+
+    $reverse = intersoccer_attr_legacy_order_meta_label_reverse_map();
+    if (empty($reverse)) {
+        return false;
+    }
+
+    $existing = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $existing[$meta->key] = $meta->value;
+    }
+
+    $changed = false;
+    foreach ($existing as $raw_key => $value) {
+        if (!isset($reverse[$raw_key])) {
+            continue;
+        }
+
+        $canonical = $reverse[$raw_key];
+        if ($canonical === $raw_key) {
+            continue;
+        }
+
+        $canonical_value = $existing[$canonical] ?? null;
+        if ($canonical_value !== null && $canonical_value !== '') {
+            continue;
+        }
+
+        $item->delete_meta_data($raw_key);
+        $item->add_meta_data($canonical, $value, true);
+        $changed = true;
     }
 
     return $changed;

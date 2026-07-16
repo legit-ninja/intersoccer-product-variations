@@ -58,13 +58,111 @@ if (!function_exists('wc_get_product_terms')) {
     }
 }
 
+if (!function_exists('sanitize_text_field')) {
+    function sanitize_text_field($str) {
+        return is_scalar($str) ? (string) $str : '';
+    }
+}
+
+if (!function_exists('absint')) {
+    function absint($maybeint) {
+        return abs((int) $maybeint);
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
+if (!class_exists('WC_Order')) {
+    class WC_Order {
+        private $customer_id;
+        public function __construct($customer_id = 0) {
+            $this->customer_id = (int) $customer_id;
+        }
+        public function get_customer_id() {
+            return $this->customer_id;
+        }
+    }
+}
+
+if (!class_exists('WC_Order_Item_Product')) {
+    class WC_Order_Item_Product {
+        private $meta = [];
+
+        public function __construct(array $meta = []) {
+            foreach ($meta as $key => $value) {
+                $this->meta[] = ['key' => $key, 'value' => $value];
+            }
+        }
+
+        public function get_meta_data() {
+            $result = [];
+            foreach ($this->meta as $row) {
+                $result[] = (object) ['key' => $row['key'], 'value' => $row['value']];
+            }
+            return $result;
+        }
+
+        public function get_meta($key, $single = true) {
+            $values = [];
+            foreach ($this->meta as $row) {
+                if ($row['key'] === $key) {
+                    $values[] = $row['value'];
+                }
+            }
+
+            if (!$single) {
+                return $values;
+            }
+
+            return $values[0] ?? '';
+        }
+
+        public function get_product_id() {
+            return 0;
+        }
+
+        public function get_variation_id() {
+            return 0;
+        }
+
+        public function add_meta_data($key, $value, $unique = false) {
+            if ($unique) {
+                foreach ($this->meta as $index => $row) {
+                    if ($row['key'] === $key) {
+                        $this->meta[$index]['value'] = $value;
+                        return;
+                    }
+                }
+            }
+
+            $this->meta[] = ['key' => $key, 'value' => $value];
+        }
+
+        public function update_meta_data($key, $value) {
+            $this->delete_meta_data($key);
+            $this->meta[] = ['key' => $key, 'value' => $value];
+        }
+
+        public function delete_meta_data($key) {
+            $this->meta = array_values(array_filter($this->meta, static function ($row) use ($key) {
+                return $row['key'] !== $key;
+            }));
+        }
+
+        public function get_order() {
+            return null;
+        }
+    }
+}
+
 class OrderMetaContractTest extends TestCase {
     /** @var array<string,mixed> */
     public static $mock_player_details = [];
+
+    /** @var array<string,mixed>|null */
+    public static $mock_parent_attributes = null;
 
     protected function setUp(): void {
         parent::setUp();
@@ -72,6 +170,7 @@ class OrderMetaContractTest extends TestCase {
             MockFilters::reset();
         }
         self::$mock_player_details = [];
+        self::$mock_parent_attributes = null;
     }
 
     public function test_correctable_keys_include_attendee_fields() {
@@ -105,11 +204,7 @@ class OrderMetaContractTest extends TestCase {
                 'assigned_attendee' => 'Cart Name',
                 'assigned_player' => 1,
             ],
-            'order' => new class {
-                public function get_customer_id() {
-                    return 42;
-                }
-            },
+            'order' => new WC_Order(42),
         ]);
 
         $updates = $built['updates'];
@@ -147,11 +242,7 @@ class OrderMetaContractTest extends TestCase {
             'cart_values' => [
                 'assigned_player_id' => 'uuid-test-1234-5678-90ab-cdef12345678',
             ],
-            'order' => new class {
-                public function get_customer_id() {
-                    return 42;
-                }
-            },
+            'order' => new WC_Order(42),
         ]);
 
         $updates = $built['updates'];
@@ -201,4 +292,98 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('Girls Only', intersoccer_order_activity_type_girls_only_suffix('en'));
         $this->assertSame('Filles uniquement', intersoccer_order_activity_type_girls_only_suffix('fr'));
     }
+
+    public function test_checkout_write_does_not_duplicate_existing_attribute_keys() {
+        $item = new WC_Order_Item_Product([
+            'Activity Type' => 'Camp',
+        ]);
+
+        $written = intersoccer_write_order_line_meta($item, [
+            'mode' => 'checkout',
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+
+        $this->assertTrue($written);
+
+        $activity_type_count = 0;
+        foreach ($item->get_meta_data() as $meta) {
+            if ($meta->key === 'Activity Type') {
+                $activity_type_count++;
+            }
+        }
+
+        $this->assertSame(1, $activity_type_count);
+        $this->assertSame('Camp', $item->get_meta('Activity Type', true));
+    }
+
+    public function test_repair_mode_normalizes_french_meta_key_to_english() {
+        $item = new WC_Order_Item_Product([
+            'Lieux InterSoccer' => 'geneve-centre-sportif',
+        ]);
+
+        $changed = intersoccer_normalize_legacy_order_meta_keys($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('geneve-centre-sportif', $item->get_meta('Sites InterSoccer', true));
+        $this->assertSame('', $item->get_meta('Lieux InterSoccer', true));
+    }
+
+    public function test_repair_mode_normalizes_german_meta_key_to_english() {
+        $item = new WC_Order_Item_Product([
+            'Buchungstyp' => 'Full Week',
+        ]);
+
+        $changed = intersoccer_normalize_legacy_order_meta_keys($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('Full Week', $item->get_meta('Booking Type', true));
+        $this->assertSame('', $item->get_meta('Buchungstyp', true));
+    }
+
+    public function test_repair_mode_does_not_overwrite_existing_canonical_keys() {
+        $item = new WC_Order_Item_Product([
+            'Booking Type' => 'Full Week',
+            'Buchungstyp' => 'Ganze Woche',
+        ]);
+
+        $changed = intersoccer_normalize_legacy_order_meta_keys($item);
+
+        $this->assertFalse($changed);
+        $this->assertSame('Full Week', $item->get_meta('Booking Type', true));
+    }
+
+    public function test_checkout_write_removes_legacy_venue_label_when_writing_canonical() {
+        if (!function_exists('intersoccer_get_parent_product_attributes')) {
+            function intersoccer_get_parent_product_attributes($product_id, $variation_id) {
+                return OrderMetaContractTest::$mock_parent_attributes ?? [];
+            }
+        }
+
+        self::$mock_parent_attributes = [
+            'Sites InterSoccer' => 'Geneva',
+        ];
+
+        $item = new WC_Order_Item_Product([
+            'InterSoccer Venues' => 'Geneva',
+        ]);
+
+        $written = intersoccer_write_order_line_meta($item, [
+            'mode' => 'checkout',
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+
+        $this->assertTrue($written);
+
+        $keys = [];
+        foreach ($item->get_meta_data() as $meta) {
+            $keys[] = $meta->key;
+        }
+
+        $this->assertNotContains('InterSoccer Venues', $keys);
+        $this->assertContains('Sites InterSoccer', $keys);
+        $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
+    }
+
 }
