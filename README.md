@@ -5,7 +5,7 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 
 ## Version
 - **Version: 2.7.16**
-- Release Date: July 8, 2026
+- Release Date: July 16, 2026
 
 ## Features
 

@@ -51,16 +51,8 @@ function intersoccer_add_admin_submenus() {
         2
     );
 
-    // Variation Health Checker submenu
-    add_submenu_page(
-        'edit.php?post_type=product',
-        __('Variation Health Checker', 'intersoccer-product-variations'),
-        __('Variation Health', 'intersoccer-product-variations'),
-        'manage_woocommerce',
-        'intersoccer-variation-health',
-        'intersoccer_render_variation_health_page',
-        1
-    );
+    // Variation Health Checker — merged into Program Manager; submenu removed.
+    // The render function and AJAX handlers remain for backward compatibility.
 
     add_submenu_page(
         'woocommerce',
