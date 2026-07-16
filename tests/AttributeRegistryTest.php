@@ -108,4 +108,58 @@ class AttributeRegistryTest extends TestCase {
         $this->assertContains('girls-only', $templates['camp']['parent']);
         $this->assertContains('girls-only', $templates['course']['parent']);
     }
+
+    public function test_every_entry_has_legacy_order_meta_labels_array() {
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            $this->assertArrayHasKey('legacy_order_meta_labels', $def, "Missing legacy_order_meta_labels for $slug");
+            $this->assertIsArray($def['legacy_order_meta_labels'], "legacy_order_meta_labels must be array for $slug");
+        }
+    }
+
+    public function test_legacy_labels_are_lowercase_normalizable() {
+        $normalize = static function ($value) {
+            $n = strtolower(trim($value));
+            $n = str_replace(['_', '-'], ' ', $n);
+            $n = preg_replace('/[^a-z0-9\/ ]+/u', '', $n);
+            $n = preg_replace('/\s+/', ' ', $n);
+            return trim($n);
+        };
+
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            foreach ($def['legacy_order_meta_labels'] as $label) {
+                $normalized = $normalize($label);
+                $this->assertNotSame('', $normalized, "Legacy label '$label' for $slug normalizes to empty");
+            }
+        }
+    }
+
+    public function test_no_duplicate_legacy_labels_across_slugs() {
+        $all_labels = [];
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            foreach ($def['legacy_order_meta_labels'] as $label) {
+                $owner = isset($all_labels[$label]) ? $all_labels[$label] : '?';
+                $this->assertArrayNotHasKey(
+                    $label,
+                    $all_labels,
+                    "Duplicate legacy label '$label': claimed by both '$owner' and '$slug'"
+                );
+                $all_labels[$label] = $slug;
+            }
+        }
+        $this->assertNotEmpty($all_labels, 'At least some attributes should have legacy labels');
+    }
+
+    public function test_legacy_label_reverse_map_contains_all_legacy_labels() {
+        $reverse = intersoccer_attr_legacy_order_meta_label_reverse_map();
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            foreach ($def['legacy_order_meta_labels'] as $label) {
+                $this->assertArrayHasKey($label, $reverse, "Reverse map missing '$label' for $slug");
+                $this->assertSame(
+                    $def['order_meta_label'],
+                    $reverse[$label],
+                    "Reverse map for '$label' should point to '{$def['order_meta_label']}'"
+                );
+            }
+        }
+    }
 }

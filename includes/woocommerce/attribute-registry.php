@@ -39,7 +39,11 @@ function intersoccer_attr_registry() {
         'activity-type' => [
             'wc_label' => 'Activity Type',
             'order_meta_label' => 'Activity Type',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                "Type d'activité",
+                "Type d'activite",
+                'Aktivitätstyp',
+            ],
             'legacy_taxonomy_aliases' => [],
             'legacy_meta_keys' => [],
             'default_terms' => [
@@ -53,7 +57,12 @@ function intersoccer_attr_registry() {
         'intersoccer-venues' => [
             'wc_label' => 'InterSoccer Venues',
             'order_meta_label' => 'Sites InterSoccer',
-            'legacy_order_meta_labels' => ['InterSoccer Venues'],
+            'legacy_order_meta_labels' => [
+                'InterSoccer Venues',
+                'Lieux InterSoccer',
+                'Lieu InterSoccer',
+                'InterSoccer-Standorte',
+            ],
             'legacy_taxonomy_aliases' => ['pa_intersoccer_venues'],
             'legacy_meta_keys' => ['attribute_pa_intersoccer_venues'],
             'default_terms' => [],
@@ -62,16 +71,42 @@ function intersoccer_attr_registry() {
         'program-season' => [
             'wc_label' => 'Program Season',
             'order_meta_label' => 'Season',
+            'legacy_order_meta_labels' => [
+                'Saison',
+                'Saison (Programm)',
+                'Jahreszeit',
+            ],
+            'legacy_taxonomy_aliases' => [],
+            'legacy_meta_keys' => [],
+            'default_terms' => [
+                ['name' => 'Summer', 'slug' => 'summer'],
+                ['name' => 'Autumn', 'slug' => 'autumn'],
+                ['name' => 'Spring', 'slug' => 'spring'],
+                ['name' => 'Winter', 'slug' => 'winter'],
+            ],
+            'day_attribute' => false,
+        ],
+        'program-year' => [
+            'wc_label' => 'Program Year',
+            'order_meta_label' => 'Year',
             'legacy_order_meta_labels' => [],
             'legacy_taxonomy_aliases' => [],
             'legacy_meta_keys' => [],
-            'default_terms' => [],
+            'default_terms' => [
+                ['name' => '2025', 'slug' => '2025'],
+                ['name' => '2026', 'slug' => '2026'],
+                ['name' => '2027', 'slug' => '2027'],
+            ],
             'day_attribute' => false,
         ],
         'age-group' => [
             'wc_label' => 'Age Group',
             'order_meta_label' => 'Age Group',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                "Groupe d'âge",
+                'Groupe dage',
+                'Altersgruppe',
+            ],
             'legacy_taxonomy_aliases' => [],
             'legacy_meta_keys' => [],
             'default_terms' => [
@@ -84,7 +119,11 @@ function intersoccer_attr_registry() {
         'canton-region' => [
             'wc_label' => 'Canton / Region',
             'order_meta_label' => 'Canton / Region',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Canton / Région',
+                'Canton Region',
+                'Kanton Region',
+            ],
             'legacy_taxonomy_aliases' => ['pa_canton_region'],
             'legacy_meta_keys' => ['attribute_pa_canton_region'],
             'default_terms' => [],
@@ -93,7 +132,10 @@ function intersoccer_attr_registry() {
         'city' => [
             'wc_label' => 'City',
             'order_meta_label' => 'City',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Ville',
+                'Stadt',
+            ],
             'legacy_taxonomy_aliases' => [],
             'legacy_meta_keys' => [],
             'default_terms' => [],
@@ -102,7 +144,10 @@ function intersoccer_attr_registry() {
         'booking-type' => [
             'wc_label' => 'Booking Type',
             'order_meta_label' => 'Booking Type',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Type de réservation',
+                'Buchungstyp',
+            ],
             'legacy_taxonomy_aliases' => ['pa_booking_type'],
             'legacy_meta_keys' => [
                 'attribute_pa_booking_type',
@@ -128,7 +173,11 @@ function intersoccer_attr_registry() {
         'camp-terms' => [
             'wc_label' => 'Camp Terms',
             'order_meta_label' => 'Camp Terms',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Conditions du camp',
+                'Conditions de camp',
+                'Camp Begriffe',
+            ],
             'legacy_taxonomy_aliases' => ['pa_camp_terms'],
             'legacy_meta_keys' => ['attribute_pa_camp_terms'],
             'default_terms' => [],
@@ -137,7 +186,10 @@ function intersoccer_attr_registry() {
         'course-day' => [
             'wc_label' => 'Course Day',
             'order_meta_label' => 'Course Day',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Jour de cours',
+                'Kurstag',
+            ],
             'legacy_taxonomy_aliases' => ['pa_course_day'],
             'legacy_meta_keys' => ['attribute_pa_course_day'],
             'default_terms' => array_slice($weekdays, 0, 5),
@@ -146,7 +198,10 @@ function intersoccer_attr_registry() {
         'course-times' => [
             'wc_label' => 'Course Times',
             'order_meta_label' => 'Course Times',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Horaires du cours',
+                'Kurszeiten',
+            ],
             'legacy_taxonomy_aliases' => ['pa_course_times'],
             'legacy_meta_keys' => ['attribute_pa_course_times'],
             'default_terms' => [],
@@ -155,7 +210,10 @@ function intersoccer_attr_registry() {
         'camp-times' => [
             'wc_label' => 'Camp Times',
             'order_meta_label' => 'Camp Times',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Horaires du camp',
+                'Camp Zeiten',
+            ],
             'legacy_taxonomy_aliases' => ['pa_camp_times'],
             'legacy_meta_keys' => ['attribute_pa_camp_times'],
             'default_terms' => [],
@@ -164,7 +222,11 @@ function intersoccer_attr_registry() {
         'girls-only' => [
             'wc_label' => 'Girls Only',
             'order_meta_label' => 'Girls Only',
-            'legacy_order_meta_labels' => [],
+            'legacy_order_meta_labels' => [
+                'Filles uniquement',
+                'Nur Mädchen',
+                'Nur Madchen',
+            ],
             'legacy_taxonomy_aliases' => ['pa_girls_only', 'pa_girl-only', 'pa_girl_only'],
             'legacy_meta_keys' => [
                 'attribute_pa_girls_only',
@@ -234,6 +296,7 @@ function intersoccer_attr_product_type_templates() {
         'activity-type',
         'intersoccer-venues',
         'program-season',
+        'program-year',
         'age-group',
         'canton-region',
         'city',
@@ -515,6 +578,27 @@ function intersoccer_attr_get_variation_value($variation_id, $slug) {
     }
 
     return '';
+}
+
+/**
+ * Reverse lookup: legacy order-meta label => canonical order-meta label.
+ *
+ * @return array<string,string>
+ */
+function intersoccer_attr_legacy_order_meta_label_reverse_map() {
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+
+    $map = [];
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        $canonical = (string) $def['order_meta_label'];
+        foreach ($def['legacy_order_meta_labels'] ?? [] as $legacy) {
+            $map[(string) $legacy] = $canonical;
+        }
+    }
+    return $map;
 }
 
 /**
