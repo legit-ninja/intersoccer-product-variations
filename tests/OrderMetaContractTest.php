@@ -183,17 +183,12 @@ class OrderMetaContractTest extends TestCase {
     }
 
     public function test_build_order_line_meta_enriches_attendee_when_cart_has_name_and_player_index() {
-        if (!function_exists('intersoccer_get_player_details')) {
-            function intersoccer_get_player_details($user_id, $player_index) {
-                return OrderMetaContractTest::$mock_player_details;
-            }
-        }
-
-        self::$mock_player_details = [
+        $GLOBALS['intersoccer_test_player_details'] = [
             'name' => 'Fallback Name',
             'dob' => '2015-03-10',
             'gender' => 'Male',
             'medical_conditions' => 'Asthma',
+            'player_id' => 'pid-contract-1',
         ];
 
         $built = intersoccer_build_order_line_meta([
@@ -213,27 +208,27 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('2015-03-10', $updates['Attendee DOB']);
         $this->assertSame('Male', $updates['Attendee Gender']);
         $this->assertSame('Asthma', $updates['Medical Conditions']);
+
+        unset($GLOBALS['intersoccer_test_player_details']);
     }
 
     public function test_build_order_line_meta_writes_assigned_player_id_from_uuid() {
-        if (!function_exists('intersoccer_get_player_by_id')) {
-            function intersoccer_get_player_by_id($user_id, $player_id) {
-                if ($player_id === 'uuid-test-1234-5678-90ab-cdef12345678') {
-                    return [
-                        'key' => 2,
-                        'player' => [
-                            'player_id' => $player_id,
-                            'first_name' => 'Uuid',
-                            'last_name' => 'Child',
-                            'dob' => '2014-06-01',
-                            'gender' => 'Female',
-                            'medical_conditions' => '',
-                        ],
-                    ];
-                }
-                return null;
+        $GLOBALS['intersoccer_test_player_by_id'] = static function ($user_id, $player_id) {
+            if ($player_id === 'uuid-test-1234-5678-90ab-cdef12345678') {
+                return [
+                    'key' => 2,
+                    'player' => [
+                        'player_id' => $player_id,
+                        'first_name' => 'Uuid',
+                        'last_name' => 'Child',
+                        'dob' => '2014-06-01',
+                        'gender' => 'Female',
+                        'medical_conditions' => '',
+                    ],
+                ];
             }
-        }
+            return null;
+        };
 
         $built = intersoccer_build_order_line_meta([
             'product_id' => 100,
@@ -249,6 +244,8 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('uuid-test-1234-5678-90ab-cdef12345678', $updates['assigned_player_id']);
         $this->assertSame(2, $updates['assigned_player']);
         $this->assertSame('Uuid Child', $updates['Assigned Attendee']);
+
+        unset($GLOBALS['intersoccer_test_player_by_id']);
     }
 
     public function test_collect_variation_taxonomy_meta_returns_empty_without_variation() {

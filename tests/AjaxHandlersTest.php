@@ -85,7 +85,7 @@ class AjaxHandlersTest extends TestCase {
         
         $is_valid = wp_verify_nonce($nonce, $action);
         
-        $this->assertTrue($is_valid, 'Valid nonce should pass verification');
+        $this->assertNotFalse($is_valid, 'Valid nonce should pass verification');
     }
     
     /**
@@ -158,7 +158,7 @@ class AjaxHandlersTest extends TestCase {
     public function testTextFieldSanitization() {
         $inputs = [
             '  Hello World  ' => 'Hello World',
-            '<script>alert("XSS")</script>' => 'alert("XSS")',
+            '<script>alert("XSS")</script>' => '', // wp_strip_all_tags removes script contents
             'Normal Text' => 'Normal Text',
             '<b>Bold</b>' => 'Bold'
         ];
@@ -177,7 +177,7 @@ class AjaxHandlersTest extends TestCase {
         $sanitized = array_map('sanitize_text_field', $input_array);
         
         $this->assertEquals('Monday', $sanitized[0], 'Array element 0 should be sanitized');
-        $this->assertEquals('Tuesday', $sanitized[1], 'Array element 1 should strip tags');
+        $this->assertEquals('', $sanitized[1], 'Array element 1 should strip script tags and contents');
         $this->assertEquals('Wednesday', $sanitized[2], 'Array element 2 should remain unchanged');
     }
     

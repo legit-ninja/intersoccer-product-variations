@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
  * Get localized discount message for a specific discount rule
  * FIXED: Now uses safe language detection with proper error handling
  */
+if (!function_exists('intersoccer_get_discount_message')) {
 function intersoccer_get_discount_message($rule_id, $message_type = 'cart_message', $fallback = '') {
     // Use the safe version if available, otherwise implement basic version
     if (function_exists('intersoccer_get_discount_message_safe')) {
@@ -22,11 +23,13 @@ function intersoccer_get_discount_message($rule_id, $message_type = 'cart_messag
     // Basic implementation as fallback
     return intersoccer_get_discount_message_basic($rule_id, $message_type, $fallback);
 }
+}
 
 /**
  * Basic implementation without external dependencies
  * Used when language helper functions are not available
  */
+if (!function_exists('intersoccer_get_discount_message_basic')) {
 function intersoccer_get_discount_message_basic($rule_id, $message_type = 'cart_message', $fallback = '') {
     try {
         $discount_rules = get_option('intersoccer_discount_rules', []);
@@ -79,6 +82,7 @@ function intersoccer_get_discount_message_basic($rule_id, $message_type = 'cart_
         intersoccer_debug("InterSoccer: Error in intersoccer_get_discount_message_basic: " . $e->getMessage());
         return $fallback;
     }
+}
 }
 
 /**

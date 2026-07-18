@@ -18,6 +18,10 @@ class LatePickupTest extends TestCase {
     
     public function setUp(): void {
         parent::setUp();
+
+        update_post_meta($this->mock_variation_id, '_intersoccer_enable_late_pickup', 'yes');
+        $GLOBALS['intersoccer_test_options']['intersoccer_late_pickup_per_day'] = 25.0;
+        $GLOBALS['intersoccer_test_options']['intersoccer_late_pickup_full_week'] = 90.0;
         
         // Mock WordPress functions
         if (!function_exists('get_post_meta')) {
@@ -235,9 +239,10 @@ class LatePickupTest extends TestCase {
     public function testDaySanitization() {
         $raw_days = ['  Monday  ', '<script>Tuesday</script>', 'Wednesday'];
         $sanitized = array_map('sanitize_text_field', $raw_days);
-        
+
         $this->assertEquals('Monday', $sanitized[0], 'Should trim whitespace');
-        $this->assertEquals('Tuesday', $sanitized[1], 'Should strip HTML tags');
+        // wp_strip_all_tags removes script element contents (WordPress behavior).
+        $this->assertSame('', $sanitized[1], 'Should strip script tags and their contents');
         $this->assertEquals('Wednesday', $sanitized[2], 'Clean input should remain unchanged');
     }
     
@@ -272,7 +277,7 @@ class LatePickupTest extends TestCase {
         $per_day_total = count($all_days) * $this->per_day_cost;
         
         $this->assertEquals(125.0, $per_day_total, '5 days should cost 125 CHF');
-        $this->assertLessThan($this->full_week_cost, $per_day_total, 'Full week should be cheaper than 5 individual days');
+        $this->assertLessThan($per_day_total, $this->full_week_cost, 'Full week should be cheaper than 5 individual days');
     }
     
     /**

@@ -198,6 +198,15 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
                 $cart_item_data['unique_key'] = 'player_' . $player_details['player_id'];
             }
         }
+    } elseif (!empty($cart_item_data['assigned_player_id']) && function_exists('intersoccer_get_player_by_id')) {
+        // UUID posted without a resolvable index — still attach display name for cart meta / discounts.
+        $by_id = intersoccer_get_player_by_id(get_current_user_id(), $cart_item_data['assigned_player_id']);
+        if (is_array($by_id)) {
+            $cart_item_data['assigned_attendee'] = trim(($by_id['first_name'] ?? '') . ' ' . ($by_id['last_name'] ?? ''));
+            if (isset($by_id['key'])) {
+                $cart_item_data['assigned_player'] = $by_id['key'];
+            }
+        }
     }
 
     // Camp days

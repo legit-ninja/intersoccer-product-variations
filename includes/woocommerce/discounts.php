@@ -188,6 +188,74 @@ function intersoccer_discount_player_key($source) {
 }
 
 /**
+ * Collect comparable player identity tokens (UUID, attendee name/index, canonical key).
+ *
+ * @param array|object|string|int|float|null $source Cart/order player fields, WC item, or bare key
+ * @return array<int,string>
+ */
+function intersoccer_discount_player_identity_tokens($source) {
+    $tokens = [];
+
+    if ($source === null || $source === false) {
+        return [];
+    }
+
+    if (is_string($source) || is_int($source) || is_float($source)) {
+        $s = trim((string) $source);
+        return $s !== '' ? [$s] : [];
+    }
+
+    if (is_array($source)) {
+        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player'] as $field) {
+            if (!array_key_exists($field, $source)) {
+                continue;
+            }
+            $value = $source[$field];
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $tokens[] = trim((string) $value);
+        }
+    } elseif (is_object($source) && method_exists($source, 'get_meta')) {
+        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player'] as $field) {
+            $value = $source->get_meta($field);
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $tokens[] = trim((string) $value);
+        }
+    }
+
+    $key = intersoccer_discount_player_key($source);
+    if ($key !== null && $key !== '') {
+        $tokens[] = $key;
+    }
+
+    $tokens = array_values(array_unique(array_filter($tokens, static function ($t) {
+        return $t !== '';
+    })));
+
+    return $tokens;
+}
+
+/**
+ * Whether two player references refer to the same attendee (UUID and/or legacy overlap).
+ *
+ * @param array|object|string|int|float|null $a
+ * @param array|object|string|int|float|null $b
+ * @return bool
+ */
+function intersoccer_discount_players_match($a, $b) {
+    $tokens_a = intersoccer_discount_player_identity_tokens($a);
+    $tokens_b = intersoccer_discount_player_identity_tokens($b);
+    if ($tokens_a === [] || $tokens_b === []) {
+        return false;
+    }
+
+    return count(array_intersect($tokens_a, $tokens_b)) > 0;
+}
+
+/**
  * Whether a camp booking type qualifies for sibling discounts (full-week only).
  *
  * @param string|null $booking_type Slug or display label from order/cart meta.
@@ -248,7 +316,8 @@ function intersoccer_get_customer_previous_orders($customer_id, $customer_email 
     }
     
     $args = [
-        'status' => ['wc-completed', 'completed', 'wc-processing', 'processing'],
+        // Include on-hold: COD (and similar) leave paid/awaiting bookings there; they still count for retroactive discounts.
+        'status' => ['wc-completed', 'completed', 'wc-processing', 'processing', 'wc-on-hold', 'on-hold'],
         'limit' => -1,
         'return' => 'ids'
     ];
@@ -449,12 +518,12 @@ function intersoccer_parse_camp_week_from_terms($camp_terms) {
     if (empty($camp_terms)) {
         return null;
     }
-    
-    // Pattern: season-week-X-...
-    if (preg_match('/week-(\d+)/i', $camp_terms, $matches)) {
+
+    // Slug: summer-week-2-june-24-... or display label: "Summer Week 2: July 1-5 (5 days)"
+    if (preg_match('/week[\s\-]+(\d+)/i', (string) $camp_terms, $matches)) {
         return intval($matches[1]);
     }
-    
+
     return null;
 }
 
@@ -463,13 +532,17 @@ function intersoccer_parse_camp_week_from_terms($camp_terms) {
  * 
  * @param int $customer_id Customer user ID
  * @param int $parent_product_id Parent product ID
- * @param int $assigned_player Assigned player/attendee ID
+ * @param array|string|int|float|null $player_ref Player identity (cart item array or legacy key)
  * @param int $lookback_months Number of months to look back (default: 6)
  * @return array Array of course items
  */
-function intersoccer_get_previous_courses_by_parent($customer_id, $parent_product_id, $assigned_player, $lookback_months = 6) {
+function intersoccer_get_previous_courses_by_parent($customer_id, $parent_product_id, $player_ref, $lookback_months = 6) {
     static $cache = [];
-    $cache_key = 'courses_' . $customer_id . '_' . $parent_product_id . '_' . $assigned_player . '_' . $lookback_months;
+    $player_tokens = intersoccer_discount_player_identity_tokens($player_ref);
+    $player_cache = $player_tokens
+        ? implode('|', $player_tokens)
+        : md5(function_exists('wp_json_encode') ? wp_json_encode($player_ref) : json_encode($player_ref));
+    $cache_key = 'courses_' . $customer_id . '_' . $parent_product_id . '_' . $player_cache . '_' . $lookback_months;
     
     if (isset($cache[$cache_key])) {
         return $cache[$cache_key];
@@ -490,7 +563,7 @@ function intersoccer_get_previous_courses_by_parent($customer_id, $parent_produc
         $course_items = intersoccer_extract_course_items_from_order($order);
         foreach ($course_items as $course_item) {
             if ((int) $course_item['parent_product_id'] === (int) $parent_product_id &&
-                (string) $course_item['assigned_player'] === (string) $assigned_player) {
+                intersoccer_discount_players_match($course_item, $player_ref)) {
                 $matching_courses[] = $course_item;
             }
         }
@@ -558,13 +631,17 @@ function intersoccer_extract_tournament_items_from_order($order) {
  * 
  * @param int $customer_id Customer user ID
  * @param int $parent_product_id Parent product ID
- * @param int $assigned_player Assigned player/attendee ID
+ * @param array|string|int|float|null $player_ref Player identity (cart item array or legacy key)
  * @param int $lookback_months Number of months to look back (default: 6)
  * @return array Array of tournament items
  */
-function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_product_id, $assigned_player, $lookback_months = 6) {
+function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_product_id, $player_ref, $lookback_months = 6) {
     static $cache = [];
-    $cache_key = 'tournaments_' . $customer_id . '_' . $parent_product_id . '_' . $assigned_player . '_' . $lookback_months;
+    $player_tokens = intersoccer_discount_player_identity_tokens($player_ref);
+    $player_cache = $player_tokens
+        ? implode('|', $player_tokens)
+        : md5(function_exists('wp_json_encode') ? wp_json_encode($player_ref) : json_encode($player_ref));
+    $cache_key = 'tournaments_' . $customer_id . '_' . $parent_product_id . '_' . $player_cache . '_' . $lookback_months;
     
     if (isset($cache[$cache_key])) {
         return $cache[$cache_key];
@@ -585,7 +662,7 @@ function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_pr
         $tournament_items = intersoccer_extract_tournament_items_from_order($order);
         foreach ($tournament_items as $tournament_item) {
             if ((int) $tournament_item['parent_product_id'] === (int) $parent_product_id &&
-                (string) $tournament_item['assigned_player'] === (string) $assigned_player) {
+                intersoccer_discount_players_match($tournament_item, $player_ref)) {
                 $matching_tournaments[] = $tournament_item;
             }
         }
@@ -600,13 +677,17 @@ function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_pr
  * 
  * @param int $customer_id Customer user ID
  * @param int $parent_product_id Parent product ID
- * @param int $assigned_player Assigned player/attendee ID
+ * @param array|string|int|float|null $player_ref Player identity (cart item array or legacy key)
  * @param int $lookback_months Number of months to look back (default: 6)
  * @return array Array of camp items
  */
-function intersoccer_get_previous_camps_by_parent($customer_id, $parent_product_id, $assigned_player, $lookback_months = 6) {
+function intersoccer_get_previous_camps_by_parent($customer_id, $parent_product_id, $player_ref, $lookback_months = 6) {
     static $cache = [];
-    $cache_key = 'camps_' . $customer_id . '_' . $parent_product_id . '_' . $assigned_player . '_' . $lookback_months;
+    $player_tokens = intersoccer_discount_player_identity_tokens($player_ref);
+    $player_cache = $player_tokens
+        ? implode('|', $player_tokens)
+        : md5(function_exists('wp_json_encode') ? wp_json_encode($player_ref) : json_encode($player_ref));
+    $cache_key = 'camps_' . $customer_id . '_' . $parent_product_id . '_' . $player_cache . '_' . $lookback_months;
     
     if (isset($cache[$cache_key])) {
         return $cache[$cache_key];
@@ -627,7 +708,7 @@ function intersoccer_get_previous_camps_by_parent($customer_id, $parent_product_
         $camp_items = intersoccer_extract_camp_items_from_order($order);
         foreach ($camp_items as $camp_item) {
             if ((int) $camp_item['parent_product_id'] === (int) $parent_product_id &&
-                (string) $camp_item['assigned_player'] === (string) $assigned_player) {
+                intersoccer_discount_players_match($camp_item, $player_ref)) {
                 $matching_camps[] = $camp_item;
             }
         }
@@ -958,29 +1039,30 @@ function intersoccer_build_cart_context($cart_items) {
         $tournament_combinations = array();
         
         foreach ($context['all_items'] as $item) {
-            if ($item['assigned_player'] && $item['parent_product_id']) {
+            $player_key = intersoccer_discount_player_key($item);
+            if ($player_key && $item['parent_product_id']) {
                 if ($item['product_type'] === 'course' && $enable_retroactive_courses) {
-                    $key = $item['parent_product_id'] . '_' . $item['assigned_player'];
+                    $key = $item['parent_product_id'] . '_' . $player_key;
                     if (!isset($course_combinations[$key])) {
                         $course_combinations[$key] = array(
                             'parent_product_id' => $item['parent_product_id'],
-                            'assigned_player' => $item['assigned_player']
+                            'player_ref' => $item
                         );
                     }
                 } elseif ($item['product_type'] === 'camp' && $enable_retroactive_camps) {
-                    $key = $item['parent_product_id'] . '_' . $item['assigned_player'];
+                    $key = $item['parent_product_id'] . '_' . $player_key;
                     if (!isset($camp_combinations[$key])) {
                         $camp_combinations[$key] = array(
                             'parent_product_id' => $item['parent_product_id'],
-                            'assigned_player' => $item['assigned_player']
+                            'player_ref' => $item
                         );
                     }
                 } elseif ($item['product_type'] === 'tournament' && $enable_retroactive_tournaments) {
-                    $key = $item['parent_product_id'] . '_' . $item['assigned_player'];
+                    $key = $item['parent_product_id'] . '_' . $player_key;
                     if (!isset($tournament_combinations[$key])) {
                         $tournament_combinations[$key] = array(
                             'parent_product_id' => $item['parent_product_id'],
-                            'assigned_player' => $item['assigned_player']
+                            'player_ref' => $item
                         );
                     }
                 }
@@ -993,7 +1075,7 @@ function intersoccer_build_cart_context($cart_items) {
                 $previous_courses = intersoccer_get_previous_courses_by_parent(
                     $customer_id,
                     $combo['parent_product_id'],
-                    $combo['assigned_player'],
+                    $combo['player_ref'],
                     $lookback_months
                 );
                 if (!empty($previous_courses)) {
@@ -1008,7 +1090,7 @@ function intersoccer_build_cart_context($cart_items) {
                 $previous_camps = intersoccer_get_previous_camps_by_parent(
                     $customer_id,
                     $combo['parent_product_id'],
-                    $combo['assigned_player'],
+                    $combo['player_ref'],
                     $lookback_months
                 );
                 if (!empty($previous_camps)) {
@@ -1023,7 +1105,7 @@ function intersoccer_build_cart_context($cart_items) {
                 $previous_tournaments = intersoccer_get_previous_tournaments_by_parent(
                     $customer_id,
                     $combo['parent_product_id'],
-                    $combo['assigned_player'],
+                    $combo['player_ref'],
                     $lookback_months
                 );
                 if (!empty($previous_tournaments)) {
@@ -1325,13 +1407,11 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         continue; // Skip if we can't determine week number
                     }
 
-                    $lookup_player = $item['assigned_player'] ?? $assigned_player;
-                    
                     // Get previous camps for same parent product and assigned player
                     $previous_camps = intersoccer_get_previous_camps_by_parent(
                         $customer_id,
                         $parent_product_id,
-                        $lookup_player,
+                        $item,
                         $lookback_months
                     );
                     
@@ -1525,7 +1605,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         $previous_courses = intersoccer_get_previous_courses_by_parent(
                             $customer_id,
                             $parent_product_id,
-                            $assigned_player,
+                            $item,
                             $lookback_months
                         );
                         
@@ -1631,11 +1711,12 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 $assigned_player = $group['assigned_player'];
                 $cart_items = $group['cart_items'];
                 
-                // Get previous tournaments for this combination
+                // Get previous tournaments for this combination (prefer full cart item for UUID+legacy)
+                $player_ref = !empty($cart_items) ? $cart_items[0] : $assigned_player;
                 $previous_tournaments = intersoccer_get_previous_tournaments_by_parent(
                     $customer_id,
                     $parent_product_id,
-                    $assigned_player,
+                    $player_ref,
                     $lookback_months
                 );
                 

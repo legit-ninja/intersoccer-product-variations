@@ -1630,16 +1630,6 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Get the base price (must be already stored from variation data)
                 var basePrice = parseFloat($priceContainer.data('intersoccer-base-price'));
                 if (!basePrice || isNaN(basePrice)) {
-                    var $amount = $priceContainer.find('.woocommerce-Price-amount').first();
-                    if ($amount.length) {
-                        var parsedDisplay = parseFloat(String($amount.text()).replace(/[^\d.,-]/g, '').replace(',', '.'));
-                        if (parsedDisplay > 0) {
-                            basePrice = parsedDisplay;
-                            $priceContainer.data('intersoccer-base-price', basePrice);
-                        }
-                    }
-                }
-                if (!basePrice || isNaN(basePrice)) {
                     if (retryCount < 30) {
                         setTimeout(function () {
                             updateMainPriceWithLatePickup(latePickupCost, retryCount + 1);

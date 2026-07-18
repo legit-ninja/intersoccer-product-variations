@@ -52,6 +52,18 @@ require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
+if (!class_exists('WC_Order')) {
+    class WC_Order {
+        private $customer_id;
+        public function __construct($customer_id = 0) {
+            $this->customer_id = (int) $customer_id;
+        }
+        public function get_customer_id() {
+            return $this->customer_id;
+        }
+    }
+}
+
 class OrderMetadataTest extends TestCase {
     /** @var array<string,mixed> */
     public static $mock_player_details = [];
@@ -59,6 +71,7 @@ class OrderMetadataTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
         self::$mock_player_details = [];
+        unset($GLOBALS['intersoccer_test_player_details']);
     }
 
     public function test_build_order_line_meta_includes_days_selected_for_camp() {
@@ -75,11 +88,12 @@ class OrderMetadataTest extends TestCase {
     }
 
     public function test_build_order_line_meta_includes_attendee_fields_with_player_details() {
-        self::$mock_player_details = [
+        $GLOBALS['intersoccer_test_player_details'] = [
             'name' => 'John Doe',
             'dob' => '2014-01-02',
             'gender' => 'Female',
             'medical_conditions' => '',
+            'player_id' => 'pid-meta-1',
         ];
 
         $built = intersoccer_build_order_line_meta([
@@ -90,11 +104,7 @@ class OrderMetadataTest extends TestCase {
                 'assigned_attendee' => 'John Doe',
                 'assigned_player' => 0,
             ],
-            'order' => new class {
-                public function get_customer_id() {
-                    return 7;
-                }
-            },
+            'order' => new WC_Order(7),
         ]);
 
         $updates = $built['updates'];
@@ -102,6 +112,8 @@ class OrderMetadataTest extends TestCase {
         $this->assertSame('2014-01-02', $updates['Attendee DOB']);
         $this->assertSame('Female', $updates['Attendee Gender']);
         $this->assertSame('None', $updates['Medical Conditions']);
+
+        unset($GLOBALS['intersoccer_test_player_details']);
     }
     
     /**

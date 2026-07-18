@@ -421,25 +421,21 @@ class DiscountMessagesTest extends TestCase {
         // Functions should catch exceptions and return fallbacks
         $file_path = dirname(__DIR__) . '/includes/woocommerce/discount-messages.php';
         $contents = file_get_contents($file_path);
-        
-        // Check that key functions have try-catch blocks
+
         $functions_with_error_handling = [
             'intersoccer_get_discount_message_basic',
             'intersoccer_get_current_language_safe',
             'intersoccer_get_available_languages_safe',
             'intersoccer_get_discount_message_safe',
         ];
-        
+
         foreach ($functions_with_error_handling as $function) {
-            // Extract function code
-            $pattern = '/function ' . preg_quote($function) . '\(.*?\n    \}/s';
-            preg_match($pattern, $contents, $matches);
-            
-            if (!empty($matches[0])) {
-                $function_code = $matches[0];
-                $this->assertStringContainsString('try', $function_code, "Function {$function} should have try-catch");
-                $this->assertStringContainsString('catch', $function_code, "Function {$function} should have catch block");
-            }
+            $pos = strpos($contents, 'function ' . $function);
+            $this->assertNotFalse($pos, "Function {$function} should be defined");
+            // Snippet large enough to include nested braces + catch (regex-to-first-} was too brittle).
+            $snippet = substr($contents, $pos, 3000);
+            $this->assertStringContainsString('try {', $snippet, "Function {$function} should have try-catch");
+            $this->assertStringContainsString('catch (', $snippet, "Function {$function} should have catch block");
         }
     }
     
@@ -546,9 +542,11 @@ class DiscountMessagesTest extends TestCase {
     public function testFilesHaveLoadingLogs() {
         $file_path = dirname(__DIR__) . '/includes/woocommerce/discount-messages.php';
         $contents = file_get_contents($file_path);
-        
-        // Should have log statement at end
-        $this->assertStringContainsString("error_log('InterSoccer: Loaded discount messages integration with WPML support", $contents);
+
+        // Logging goes through intersoccer_debug (WP_DEBUG gated), not raw error_log.
+        $this->assertStringContainsString('intersoccer_debug', $contents);
+        $this->assertStringContainsString('Initialized default discount messages', $contents);
+        $this->assertStringContainsString('Language support test', $contents);
     }
     
     /**

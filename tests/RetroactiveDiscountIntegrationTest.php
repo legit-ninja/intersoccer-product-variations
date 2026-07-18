@@ -24,6 +24,8 @@ class RetroactiveDiscountIntegrationTest extends TestCase {
             'summer-week-2-july-1-july-5-5-days' => 2,
             'fall-week-10-october-15-october-19-5-days' => 10,
             'SUMMER-WEEK-5-AUGUST-1-AUGUST-5-5-DAYS' => 5,
+            'Summer Week 5: July 20-24 (5 days)' => 5,
+            'Summer Week 2: July 1-5 (5 days)' => 2,
         ];
         
         foreach ($test_cases as $camp_terms => $expected_week) {
@@ -229,11 +231,11 @@ class RetroactiveDiscountIntegrationTest extends TestCase {
         
         foreach ($scenarios as $scenario) {
             $discounted = $scenario['base_price'] * (1 - $scenario['discount_rate']);
-            $this->assertEquals(
+            $this->assertEqualsWithDelta(
                 $scenario['expected_discounted'],
                 $discounted,
-                "{$scenario['name']}: Expected {$scenario['expected_discounted']} CHF",
-                $scenario['tolerance']
+                $scenario['tolerance'],
+                "{$scenario['name']}: Expected {$scenario['expected_discounted']} CHF"
             );
         }
     }

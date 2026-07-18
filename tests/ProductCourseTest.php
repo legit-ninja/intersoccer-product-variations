@@ -14,24 +14,7 @@ class ProductCourseTest extends TestCase {
     
     public function setUp(): void {
         parent::setUp();
-        
-        // Mock DateTime if not available
-        if (!class_exists('DateTime')) {
-            class DateTime {
-                private $date;
-                public function __construct($date = 'now') {
-                    $this->date = $date === 'now' ? date('Y-m-d') : $date;
-                }
-                public function format($format) {
-                    return date($format, strtotime($this->date));
-                }
-                public function add($interval) {
-                    // Simplified add
-                    return $this;
-                }
-            }
-        }
-        
+
         if (!function_exists('__')) {
             function __($text, $domain = 'default') {
                 return $text;

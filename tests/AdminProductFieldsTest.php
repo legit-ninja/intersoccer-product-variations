@@ -14,35 +14,7 @@ class AdminProductFieldsTest extends TestCase {
     
     public function setUp(): void {
         parent::setUp();
-        
-        if (!class_exists('DateTime')) {
-            class DateTime {
-                private $date;
-                public function __construct($date = 'now') {
-                    $this->date = $date === 'now' ? date('Y-m-d') : $date;
-                }
-                public function format($format) {
-                    return date($format, strtotime($this->date));
-                }
-                public function add($interval) {
-                    if (isset($interval->days)) {
-                        $this->date = date('Y-m-d', strtotime("+{$interval->days} days", strtotime($this->date)));
-                    }
-                    return $this;
-                }
-            }
-            
-            class DateInterval {
-                public $days;
-                public function __construct($spec) {
-                    // Parse P1D format
-                    if (preg_match('/P(\d+)D/', $spec, $matches)) {
-                        $this->days = (int)$matches[1];
-                    }
-                }
-            }
-        }
-        
+
         if (!defined('WP_DEBUG')) {
             define('WP_DEBUG', false);
         }

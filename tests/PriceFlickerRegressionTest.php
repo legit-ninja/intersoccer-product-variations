@@ -135,7 +135,7 @@ class PriceFlickerRegressionTest extends TestCase {
             
             // Should log preservation message
             $this->assertStringContainsString(
-                'Same variation, preserving',
+                'preserving stored base price',
                 $handler_code,
                 'Should log when preserving base price'
             );
@@ -301,7 +301,7 @@ class PriceFlickerRegressionTest extends TestCase {
             
             // Should store variation ID with base price
             $this->assertMatchesRegularExpression(
-                '/data\([\'"]intersoccer-variation-id[\'"], *variation\.variation_id\)/s',
+                '/data\([\'"]intersoccer-variation-id[\'"],\s*(?:variation\.variation_id|currentVariationId)\)/s',
                 $handler_code,
                 'Should store current variation ID'
             );
@@ -314,7 +314,7 @@ class PriceFlickerRegressionTest extends TestCase {
             );
             
             $this->assertStringContainsString(
-                'Same variation',
+                'preserving stored base price',
                 $handler_code,
                 'Should log when variation ID unchanged'
             );
@@ -331,10 +331,10 @@ class PriceFlickerRegressionTest extends TestCase {
         $file_path = dirname(__DIR__) . '/includes/elementor-widgets.php';
         $file_contents = file_get_contents($file_path);
         
-        // Critical debugging messages
+        // Critical debugging messages (substring match against current debug() copy)
         $required_logs = [
             'New variation detected, storing base price from variation data',
-            'Same variation, preserving stored base price',
+            'preserving stored base price',
             'Updated base price from AJAX',
             'Base price not available yet',
             'Camp price updated, recalculating with late pickup',
@@ -385,7 +385,7 @@ class PriceFlickerRegressionTest extends TestCase {
             // Count how many times basePrice is assigned
             preg_match_all('/basePrice\s*=/', $function_code, $assignments);
             $assignment_count = count($assignments[0]);
-            
+
             $this->assertEquals(
                 1,
                 $assignment_count,

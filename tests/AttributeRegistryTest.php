@@ -18,7 +18,7 @@ class AttributeRegistryTest extends TestCase {
     public function test_every_registry_entry_has_required_fields() {
         foreach (intersoccer_attr_registry() as $slug => $def) {
             $this->assertMatchesRegularExpression('/^[a-z0-9-]+$/', $slug, 'Slug must be hyphenated: ' . $slug);
-            $this->assertNotContains('_', $slug, 'Canonical slug must not contain underscores: ' . $slug);
+            $this->assertStringNotContainsString('_', $slug, 'Canonical slug must not contain underscores: ' . $slug);
             $this->assertArrayHasKey('wc_label', $def, $slug);
             $this->assertArrayHasKey('order_meta_label', $def, $slug);
             $this->assertNotSame('', $def['wc_label'], $slug);
@@ -87,15 +87,17 @@ class AttributeRegistryTest extends TestCase {
         $this->assertSame('Sites InterSoccer', $map['pa_intersoccer-venues']);
     }
 
-    // Regression: AUDIT-007 — Variation health required keys expanded to full templates
+    // Regression: AUDIT-007 — Variation health required keys follow product-type templates
     public function test_health_required_keys_match_product_type_expectations() {
-        $this->assertEmpty(
+        $this->assertSame(
+            ['pa_age-group'],
             intersoccer_attr_health_required_keys('birthday'),
-            'Birthday products should not require full variation template attributes in health checks'
+            'Birthday health checks require age-group from the variation template'
         );
-        $this->assertEmpty(
+        $this->assertSame(
+            ['pa_tournament-day', 'pa_tournament-time', 'pa_age-group'],
             intersoccer_attr_health_required_keys('tournament'),
-            'Tournament products should not require previously optional attributes in health checks'
+            'Tournament health checks require day, time, and age-group from the variation template'
         );
 
         $camp_keys = intersoccer_attr_health_required_keys('camp');

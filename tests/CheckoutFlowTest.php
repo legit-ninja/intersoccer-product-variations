@@ -307,7 +307,7 @@ class CheckoutFlowTest extends TestCase {
         $this->assertSame('Course Day', $map['pa_course-day']);
     }
 
-    // Regression: ECO-006 — Player data helper and cache split across PM object cache and PV request cache
+    // Regression: ECO-006 — PM owns player read API + cache invalidation; PV must see PM CRUD without force_refresh
     public function test_checkout_sees_fresh_player_after_pm_edit()
     {
         if (!function_exists('get_user_meta')) {
@@ -321,33 +321,51 @@ class CheckoutFlowTest extends TestCase {
                 return true;
             }
         }
+        if (!function_exists('maybe_unserialize')) {
+            function maybe_unserialize($data) {
+                return $data;
+            }
+        }
 
         require_once dirname(__DIR__) . '/includes/helpers.php';
 
+        $pm_player_data = dirname(__DIR__, 2) . '/player-management/includes/player-data.php';
+        $this->assertFileExists($pm_player_data, 'PM player-data.php must be available for ECO-006');
+        require_once $pm_player_data;
+
         $user_id = 42;
-        update_user_meta($user_id, 'intersoccer_players', [
+        $original = [
             [
                 'first_name' => 'Original',
                 'last_name' => 'Player',
                 'dob' => '2015-01-01',
                 'gender' => 'female',
             ],
-        ]);
-
-        intersoccer_get_user_players($user_id);
-
-        update_user_meta($user_id, 'intersoccer_players', [
+        ];
+        $renamed = [
             [
                 'first_name' => 'Renamed',
                 'last_name' => 'Player',
                 'dob' => '2015-01-01',
                 'gender' => 'female',
             ],
-        ]);
+        ];
 
+        // Seed via PM persist so request + object caches are primed consistently.
+        intersoccer_persist_user_players($user_id, $original);
+        intersoccer_get_user_players($user_id);
+
+        // Control: raw meta write (bypasses PM invalidate) leaves request cache stale.
+        update_user_meta($user_id, 'intersoccer_players', $renamed);
+        $stale = intersoccer_get_user_players($user_id);
+
+        $this->assertSame('Original', $stale[0]['first_name'] ?? null, 'Raw meta write should not clear PM request cache');
+
+        // Real PM CRUD path: persist invalidates caches so checkout sees rename without force_refresh.
+        intersoccer_persist_user_players($user_id, $renamed);
         $players = intersoccer_get_user_players($user_id);
 
-        $this->assertSame('Renamed', $players[0]['first_name'] ?? null, 'PV should reflect player renamed in PM without force_refresh');
+        $this->assertSame('Renamed', $players[0]['first_name'] ?? null, 'PV should reflect player renamed via PM persist without force_refresh');
     }
 }
 

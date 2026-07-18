@@ -73,6 +73,45 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertSame('2', $key);
     }
 
+    public function testPlayersMatchUuidAcrossCartAndPriorOrder() {
+        $cart = [
+            'assigned_player_id' => 'uuid-abc',
+            'assigned_attendee' => 'Jane Doe',
+            'assigned_player' => 0,
+        ];
+        $prior = [
+            'assigned_player_id' => 'uuid-abc',
+            'assigned_player' => 'Jane Doe',
+        ];
+        $this->assertTrue(intersoccer_discount_players_match($cart, $prior));
+    }
+
+    public function testPlayersMatchWhenCartHasUuidAndNamePriorHasNameOnly() {
+        $cart = [
+            'assigned_player_id' => 'uuid-abc',
+            'assigned_attendee' => 'Jane Doe',
+        ];
+        $prior = [
+            'assigned_player' => 'Jane Doe',
+        ];
+        $this->assertTrue(
+            intersoccer_discount_players_match($cart, $prior),
+            'Progressive week lookup must match name token when prior order lacks UUID'
+        );
+    }
+
+    public function testPlayersDoNotMatchUuidOnlyVsNameOnly() {
+        $cart = ['assigned_player_id' => 'uuid-abc'];
+        $prior = ['assigned_player' => 'Jane Doe'];
+        $this->assertFalse(intersoccer_discount_players_match($cart, $prior));
+    }
+
+    public function testPlayersMatchBareKeyToLegacyField() {
+        $this->assertTrue(intersoccer_discount_players_match('Jane Doe', [
+            'assigned_player' => 'Jane Doe',
+        ]));
+    }
+
     public function testFullWeekBookingTypeLabelCountsForSibling() {
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling(''));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('full-week'));

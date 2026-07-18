@@ -26,8 +26,8 @@ class RetroactiveDiscountTest extends TestCase {
         $expected_discount = $tournament_price * $discount_rate;
         $expected_final_price = $tournament_price - $expected_discount;
         
-        $this->assertEquals(9.999, $expected_discount, 'Second tournament day should get ~10 CHF discount', 0.01);
-        $this->assertEquals(20.001, $expected_final_price, 'Second tournament day should cost ~20 CHF', 0.01);
+        $this->assertEqualsWithDelta(9.999, $expected_discount, 0.01, 'Second tournament day should get ~10 CHF discount');
+        $this->assertEqualsWithDelta(20.001, $expected_final_price, 0.01, 'Second tournament day should cost ~20 CHF');
     }
     
     /**
@@ -40,7 +40,7 @@ class RetroactiveDiscountTest extends TestCase {
         
         $total = $day1_price + $day2_price;
         
-        $this->assertEquals(50.00, $total, '2 tournament days should total 50 CHF', 0.1);
+        $this->assertEqualsWithDelta(50.00, $total, 0.1, '2 tournament days should total 50 CHF');
     }
     
     /**
@@ -181,7 +181,7 @@ class RetroactiveDiscountTest extends TestCase {
             $price = $tournament_price * (1 - $rate);
             
             if ($day['should_discount']) {
-                $this->assertEquals(20.00, $price, "Day {$day['position']} should be discounted", 0.1);
+                $this->assertEqualsWithDelta(20.00, $price, 0.1, "Day {$day['position']} should be discounted");
             } else {
                 $this->assertEquals(30.00, $price, "Day {$day['position']} should be full price");
             }
@@ -258,7 +258,7 @@ class RetroactiveDiscountTest extends TestCase {
         // Same-child multiple days discount
         $same_child_rate = 0.3333;
         $same_child_discount = $tournament_price * $same_child_rate;
-        $this->assertEquals(9.999, $same_child_discount, 'Same-child multiple days should be ~10 CHF', 0.01);
+        $this->assertEqualsWithDelta(9.999, $same_child_discount, 0.01, 'Same-child multiple days should be ~10 CHF');
         
         // They should NOT stack - only one applies
         $this->assertNotEquals($sibling_discount + $same_child_discount, $tournament_price, 'Discounts should not stack');
@@ -274,7 +274,7 @@ class RetroactiveDiscountTest extends TestCase {
         // Calculate actual rate needed for 10 CHF discount
         $actual_rate = $target_discount / $base_price;
         
-        $this->assertEquals(0.3333, $actual_rate, 'Discount rate should be 33.33%', 0.0001);
+        $this->assertEqualsWithDelta(0.3333, $actual_rate, 0.0001, 'Discount rate should be 33.33%');
     }
     
     /**

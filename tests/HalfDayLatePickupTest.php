@@ -79,8 +79,11 @@ class HalfDayLatePickupTest extends TestCase {
     }
 
     private function setVariationMeta($variation_id, $enabled, $age_slug) {
-        global $intersoccer_test_post_meta;
         $variation_id = (int) $variation_id;
+        // Bootstrap get_post_meta reads MockMetaData (local $intersoccer_test_post_meta stub never loads).
+        update_post_meta($variation_id, '_intersoccer_enable_late_pickup', $enabled ? 'yes' : 'no');
+        update_post_meta($variation_id, 'attribute_pa_age-group', $age_slug);
+        global $intersoccer_test_post_meta;
         $intersoccer_test_post_meta[$variation_id]['_intersoccer_enable_late_pickup'] = $enabled ? 'yes' : 'no';
         $intersoccer_test_post_meta[$variation_id]['attribute_pa_age-group'] = $age_slug;
     }

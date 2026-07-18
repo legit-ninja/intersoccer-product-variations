@@ -394,7 +394,9 @@ class DiscountCalculationTest extends TestCase {
         
         $this->assertCount(2, $camps_by_child, 'Should have 2 children with camps');
         $this->assertCount(1, $courses_by_child, 'Should have 1 child with courses');
-        $this->assertCount(2, $camps_by_child['Child 1'], 'Child 1 should have 2 items total (1 camp counted)');
+        $this->assertCount(1, $camps_by_child['Child 1'], 'Child 1 should have 1 camp');
+        $this->assertCount(1, $courses_by_child['Child 1'], 'Child 1 should have 1 course');
+        $this->assertCount(1, $camps_by_child['Child 2'], 'Child 2 should have 1 camp');
     }
     
     /**

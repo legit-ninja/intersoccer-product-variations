@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.7.16
+ * Version: 2.7.17
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -415,13 +415,7 @@ function intersoccer_refresh_nonce() {
     wp_send_json_success(['nonce' => $nonce]);
 }
 
-// Add custom roles
-add_action('init', function () {
-    add_role('coach', __('Coach', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
-    add_role('organizer', __('Organizer', 'intersoccer-product-variations'), ['read' => true, 'edit_posts' => true]);
-});
-
-// Manage Players endpoint and menu handled by Player Management plugin
+// Manage Players endpoint, coach/organizer roles: owned by Player Management plugin
 
 // Increase AJAX variation threshold
 add_filter('woocommerce_ajax_variation_threshold', function ($qty, $product) {
