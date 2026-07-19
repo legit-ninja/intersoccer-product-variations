@@ -417,6 +417,16 @@ if (!function_exists('update_post_meta')) {
     }
 }
 
+if (!function_exists('delete_post_meta')) {
+    function delete_post_meta($post_id, $key) {
+        if (class_exists('MockMetaData') && isset(MockMetaData::$data[$post_id][$key])) {
+            unset(MockMetaData::$data[$post_id][$key]);
+            return true;
+        }
+        return true;
+    }
+}
+
 if (!function_exists('update_postmeta_cache')) {
     function update_postmeta_cache($post_ids, $force = true) {
         return true;

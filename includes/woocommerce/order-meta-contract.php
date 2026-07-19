@@ -439,6 +439,23 @@ function intersoccer_build_order_line_meta($args) {
                 $updates['Late Pickup Cost'] = wc_price($cart_values['late_pickup_cost']);
             }
         }
+        // Stamp structured camp schedule onto the order item when variation meta exists.
+        $vid = $variation_id ?: $product_id;
+        if (function_exists('intersoccer_get_camp_schedule_meta')) {
+            $schedule = intersoccer_get_camp_schedule_meta($vid);
+            if ($schedule['start'] !== '') {
+                $updates['Camp Start Date'] = $schedule['start'];
+                $updates['_camp_start_date'] = $schedule['start'];
+            }
+            if ($schedule['end'] !== '') {
+                $updates['Camp End Date'] = $schedule['end'];
+                $updates['_camp_end_date'] = $schedule['end'];
+            }
+            if ($schedule['week'] !== null) {
+                $updates['Camp Week Index'] = (string) $schedule['week'];
+                $updates['_camp_week_index'] = (string) $schedule['week'];
+            }
+        }
     } elseif ($product_type === 'course') {
         $vid = $variation_id ?: $product_id;
         if (function_exists('intersoccer_get_course_meta')) {

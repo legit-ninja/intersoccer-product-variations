@@ -278,6 +278,8 @@ function intersoccer_get_variation_program_season_string($product_id, $variation
 /**
  * Parse camp start date (Y-m-d) from pa_camp-terms slug and season (ported from roster logic).
  *
+ * @deprecated since 2.7.18 Remove in 2.9.0 or next major — prefer `_camp_start_date` variation meta via intersoccer_get_camp_schedule().
+ *
  * @param string $camp_terms_slug Camp terms slug.
  * @param string $season          Season string for year extraction.
  * @return string|null
@@ -418,6 +420,7 @@ function intersoccer_program_reference_date_from_discovery_inputs($course_start_
     if ($course_start_ymd !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $course_start_ymd)) {
         return $course_start_ymd;
     }
+    // Optional 5th arg used by callers that already know variation id — keep signature stable.
     $from_camp = intersoccer_parse_camp_start_date_from_terms((string) $camp_terms_slug, (string) $season_str);
     if ($from_camp) {
         return $from_camp;
@@ -483,6 +486,13 @@ function intersoccer_get_program_reference_date($product_id, $variation_id, $pro
                 break;
 
             case 'camp':
+                if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
+                    $schedule = intersoccer_get_camp_schedule((int) $variation_id, true);
+                    if (!empty($schedule['start'])) {
+                        $computed = $schedule['start'];
+                        break;
+                    }
+                }
                 $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
                 $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
                 $computed = intersoccer_parse_camp_start_date_from_terms($camp_terms, $season);
@@ -503,10 +513,18 @@ function intersoccer_get_program_reference_date($product_id, $variation_id, $pro
         if ($variation_id && function_exists('intersoccer_get_course_meta')) {
             $course_start = (string) intersoccer_get_course_meta((int) $variation_id, '_course_start_date', '');
         }
-        $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
-        $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
-        $event_raw = intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id);
-        $computed = intersoccer_program_reference_date_from_discovery_inputs($course_start, $camp_terms, $season, $event_raw);
+        if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
+            $sched = intersoccer_get_camp_schedule((int) $variation_id, true);
+            if (!empty($sched['start'])) {
+                $computed = $sched['start'];
+            }
+        }
+        if ($computed === null) {
+            $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
+            $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
+            $event_raw = intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id);
+            $computed = intersoccer_program_reference_date_from_discovery_inputs($course_start, $camp_terms, $season, $event_raw);
+        }
     }
 
     /**

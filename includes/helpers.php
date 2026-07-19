@@ -136,3 +136,88 @@ function intersoccer_late_pickup_admin_fields_submitted($variation_id, $loop) {
 
     return false;
 }
+
+/**
+ * Canonical full-day camp time slug (10:00–17:00) used by the live catalogue.
+ */
+if (!defined('INTERSOCCER_CAMP_TIME_FULL_DAY')) {
+    define('INTERSOCCER_CAMP_TIME_FULL_DAY', '1000-1700');
+}
+
+/**
+ * Canonical half-day / Mini camp time slug (10:00–12:30) used by the live catalogue.
+ */
+if (!defined('INTERSOCCER_CAMP_TIME_HALF_DAY')) {
+    define('INTERSOCCER_CAMP_TIME_HALF_DAY', '1000-1230');
+}
+
+/**
+ * Preferred camp-time slug for an age-group slug (Full Day vs Half Day).
+ *
+ * Prefers matches from $allowed_time_slugs when provided; otherwise falls back to
+ * catalogue defaults. Returns empty string when no safe match exists in a non-empty pool.
+ *
+ * @param string   $age_slug            pa_age-group term slug.
+ * @param string[] $allowed_time_slugs  Optional pool (parent product times).
+ * @return string
+ */
+function intersoccer_pm_default_camp_time_slug_for_age($age_slug, $allowed_time_slugs = []) {
+    $age_slug = is_string($age_slug) ? strtolower(trim($age_slug)) : '';
+    if (function_exists('sanitize_title')) {
+        $age_slug = sanitize_title((string) $age_slug);
+    }
+    $allowed = array_values(array_filter(array_map('strval', (array) $allowed_time_slugs)));
+
+    $is_half = function_exists('intersoccer_is_half_day_age_group')
+        ? intersoccer_is_half_day_age_group('', $age_slug)
+        : (strpos($age_slug, 'half-day') !== false || strpos($age_slug, 'half_day') !== false);
+
+    $preferred = $is_half
+        ? [
+            INTERSOCCER_CAMP_TIME_HALF_DAY,
+            '1000-1200',
+            '0900-1200',
+            '1000-1230',
+        ]
+        : [
+            INTERSOCCER_CAMP_TIME_FULL_DAY,
+            '1000-1700',
+            '1000-1500',
+            '0900-1700',
+        ];
+
+    /**
+     * Filter preferred camp-time slug candidates for an age group.
+     *
+     * @param string[] $preferred Preferred slugs (first match wins).
+     * @param string   $age_slug
+     * @param bool     $is_half
+     * @param string[] $allowed
+     */
+    if (function_exists('apply_filters')) {
+        $preferred = apply_filters('intersoccer_pm_camp_time_slug_candidates', $preferred, $age_slug, $is_half, $allowed);
+    }
+
+    $pool = !empty($allowed) ? $allowed : $preferred;
+
+    foreach ($preferred as $candidate) {
+        if (in_array($candidate, $pool, true)) {
+            return $candidate;
+        }
+    }
+
+    if (!empty($allowed)) {
+        foreach ($allowed as $slug) {
+            $s = strtolower((string) $slug);
+            if ($is_half && (preg_match('/12[0-3]0$/', $s) || strpos($s, '1200') !== false || strpos($s, '1230') !== false)) {
+                return $slug;
+            }
+            if (!$is_half && (preg_match('/17[0-3]0$/', $s) || strpos($s, '1700') !== false || strpos($s, '1500') !== false)) {
+                return $slug;
+            }
+        }
+        return '';
+    }
+
+    return $is_half ? INTERSOCCER_CAMP_TIME_HALF_DAY : INTERSOCCER_CAMP_TIME_FULL_DAY;
+}

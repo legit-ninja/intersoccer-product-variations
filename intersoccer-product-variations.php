@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.7.17
+ * Version: 2.7.18
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -330,6 +330,8 @@ $includes = [
     'includes/woocommerce/product-types.php',
     'includes/woocommerce/product-course.php',
     'includes/woocommerce/product-camp.php',
+    'includes/woocommerce/camp-schedule.php',
+    'includes/woocommerce/camp-schedule-migrate.php',
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
