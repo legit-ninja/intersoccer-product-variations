@@ -4,10 +4,10 @@
 This plugin enhances the WooCommerce booking system for InterSoccer Switzerland by managing complex product variations, dynamic pricing calculations, and sophisticated sibling discount systems. It supports three main product types: Camps (full-week and single-day), Courses (seasonal with prorated pricing), and Birthdays, with comprehensive admin interfaces and multilingual support.
 
 ## Version
-- **Version: 2.7.18**
-- Release Date: July 19, 2026
+- **Version: 2.7.20**
+- Release Date: July 20, 2026
 
-## Camp schedule meta (2.7.18)
+## Camp schedule meta (2.7.18+)
 
 Camp variations store `_camp_start_date`, `_camp_end_date`, and `_camp_week_index`. Program Manager can edit/pre-fill these and seed them from camp-terms via `wp intersoccer migrate-camp-dates`. Parsing dates from `pa_camp-terms` remains a **deprecated fallback** during migration — see `scratch/BACKLOG-remove-camp-terms-date-parse.md` and `.cursor/rules/camp-date-meta.mdc`.
 
