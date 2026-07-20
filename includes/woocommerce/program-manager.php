@@ -67,7 +67,7 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'1.2.0',
+			'2.7.20',
 			true
 		);
 
