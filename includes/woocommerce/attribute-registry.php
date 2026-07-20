@@ -216,7 +216,11 @@ function intersoccer_attr_registry() {
             ],
             'legacy_taxonomy_aliases' => ['pa_camp_times'],
             'legacy_meta_keys' => ['attribute_pa_camp_times'],
-            'default_terms' => [],
+            // Catalogue defaults: Full Day 10:00–17:00, Half Day Mini 10:00–12:30.
+            'default_terms' => [
+                ['name' => '1000-1700', 'slug' => '1000-1700'],
+                ['name' => '1000-1230', 'slug' => '1000-1230'],
+            ],
             'day_attribute' => false,
         ],
         'girls-only' => [
@@ -305,8 +309,8 @@ function intersoccer_attr_product_type_templates() {
     $templates = [
         'camp' => [
             'parent' => array_merge($core_parent, ['girls-only', 'days-of-week', 'camp-terms', 'camp-times']),
-            'variation' => ['booking-type', 'age-group'],
-            'meta' => [],
+            'variation' => ['booking-type', 'age-group', 'camp-times'],
+            'meta' => ['_camp_start_date', '_camp_end_date', '_camp_week_index'],
         ],
         'course' => [
             'parent' => array_merge($core_parent, ['girls-only']),
@@ -458,7 +462,7 @@ function intersoccer_attr_health_required_keys($product_type) {
     $type = strtolower((string) $product_type);
     $keys = intersoccer_attr_required($type, 'variation');
 
-    if ($type === 'course') {
+    if ($type === 'course' || $type === 'camp') {
         $keys = array_merge($keys, intersoccer_attr_required($type, 'meta'));
     }
 
@@ -477,6 +481,7 @@ function intersoccer_attr_refresh_defaults($product_type) {
         'camp' => [
             'pa_booking-type' => 'full-week',
             'pa_age-group' => '5-13y-full-day',
+            'pa_camp-times' => '1000-1700',
         ],
         'course' => [
             'pa_course-day' => 'monday',

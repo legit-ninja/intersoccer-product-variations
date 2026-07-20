@@ -485,8 +485,15 @@ function intersoccer_extract_camp_items_from_order($order) {
             }
         }
         
-        // Parse week number from camp-terms
-        $week_number = intersoccer_parse_camp_week_from_terms($camp_terms);
+        // Week index: prefer variation meta, fall back to deprecated camp-terms parse.
+        $week_number = null;
+        if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
+            $schedule = intersoccer_get_camp_schedule((int) $variation_id, true);
+            $week_number = $schedule['week'];
+        }
+        if ($week_number === null) {
+            $week_number = intersoccer_parse_camp_week_from_terms($camp_terms);
+        }
         
         $camp_items[] = [
             'order_id' => $order->get_id(),
@@ -510,7 +517,9 @@ function intersoccer_extract_camp_items_from_order($order) {
 
 /**
  * Parse week number from camp-terms attribute
- * 
+ *
+ * @deprecated since 2.7.18 Remove in 2.9.0 or next major — prefer `_camp_week_index` variation meta.
+ *
  * @param string $camp_terms Camp terms string (e.g., "summer-week-2-june-24-june-28-5-days")
  * @return int|null Week number or null if not found
  */
@@ -1402,7 +1411,14 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         }
                     }
                     
-                    $current_week = intersoccer_parse_camp_week_from_terms($camp_terms);
+                    $current_week = null;
+                    if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
+                        $schedule = intersoccer_get_camp_schedule((int) $variation_id, true);
+                        $current_week = $schedule['week'];
+                    }
+                    if ($current_week === null) {
+                        $current_week = intersoccer_parse_camp_week_from_terms($camp_terms);
+                    }
                     if (!$current_week) {
                         continue; // Skip if we can't determine week number
                     }

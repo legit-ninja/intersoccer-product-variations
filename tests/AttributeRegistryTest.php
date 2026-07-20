@@ -102,7 +102,22 @@ class AttributeRegistryTest extends TestCase {
 
         $camp_keys = intersoccer_attr_health_required_keys('camp');
         $this->assertContains('pa_booking-type', $camp_keys);
+        $this->assertContains('pa_age-group', $camp_keys);
+        $this->assertContains('pa_camp-times', $camp_keys);
+        $this->assertContains('_camp_start_date', $camp_keys);
+        $this->assertContains('_camp_end_date', $camp_keys);
+        $this->assertContains('_camp_week_index', $camp_keys);
         $this->assertNotContains('pa_course-day', $camp_keys);
+    }
+
+    public function test_camp_variation_template_includes_camp_times() {
+        $templates = intersoccer_attr_product_type_templates();
+        $this->assertContains('camp-times', $templates['camp']['variation']);
+        $this->assertContains('camp-times', $templates['camp']['parent']);
+        $terms = intersoccer_attr_definition('camp-times')['default_terms'] ?? [];
+        $slugs = array_column($terms, 'slug');
+        $this->assertContains('1000-1700', $slugs);
+        $this->assertContains('1000-1230', $slugs);
     }
 
     public function test_camp_and_course_templates_include_girls_only() {
