@@ -355,7 +355,29 @@ class InterSoccer_Program_Manager {
 		$table->prepare_items();
 		$create_url = add_query_arg(['post_type' => 'product', 'page' => self::PAGE_SLUG, 'action' => 'create'], admin_url('edit.php'));
 		$show_issues = isset($_GET['show_issues_only']) && $_GET['show_issues_only'] === '1';
-		$filter_action = menu_page_url(self::PAGE_SLUG, false);
+		$pm_status   = isset($_GET['pm_status']) ? sanitize_key(wp_unslash($_GET['pm_status'])) : 'publish';
+		if (!in_array($pm_status, ['publish', 'draft', 'all'], true)) {
+			$pm_status = 'publish';
+		}
+		$include_drafts = in_array($pm_status, ['all', 'draft'], true);
+		$drafts_only    = ($pm_status === 'draft');
+		$filter_action  = menu_page_url(self::PAGE_SLUG, false);
+		$base_args      = [
+			'post_type' => 'product',
+			'page'      => self::PAGE_SLUG,
+		];
+		if ($show_issues) {
+			$base_args['show_issues_only'] = '1';
+		}
+		if (!empty($_REQUEST['s'])) {
+			$base_args['s'] = sanitize_text_field(wp_unslash($_REQUEST['s']));
+		}
+		$view_urls = [
+			'all'     => add_query_arg(array_merge($base_args, ['pm_status' => 'all']), admin_url('edit.php')),
+			'publish' => add_query_arg(array_merge($base_args, ['pm_status' => 'publish']), admin_url('edit.php')),
+			'draft'   => add_query_arg(array_merge($base_args, ['pm_status' => 'draft']), admin_url('edit.php')),
+		];
+		$filter_pm_status = $drafts_only ? 'draft' : ($include_drafts ? 'all' : 'publish');
 		?>
 		<div class="wrap">
 			<h1 class="wp-heading-inline"><?php esc_html_e('Program Manager', 'intersoccer-product-variations'); ?></h1>
@@ -363,25 +385,49 @@ class InterSoccer_Program_Manager {
 			<hr class="wp-header-end">
 			<p class="description"><?php esc_html_e('Manage InterSoccer programs. Green = complete, yellow = partially complete, red = missing required attributes.', 'intersoccer-product-variations'); ?></p>
 
-			<form method="get" action="<?php echo esc_url($filter_action); ?>" style="margin: 12px 0;">
+			<ul class="subsubsub" style="margin: 8px 0 12px;">
+				<li class="all"><a href="<?php echo esc_url($view_urls['all']); ?>" class="<?php echo $pm_status === 'all' ? 'current' : ''; ?>"><?php esc_html_e('All', 'intersoccer-product-variations'); ?></a> |</li>
+				<li class="publish"><a href="<?php echo esc_url($view_urls['publish']); ?>" class="<?php echo $pm_status === 'publish' ? 'current' : ''; ?>"><?php esc_html_e('Published', 'intersoccer-product-variations'); ?></a> |</li>
+				<li class="draft"><a href="<?php echo esc_url($view_urls['draft']); ?>" class="<?php echo $pm_status === 'draft' ? 'current' : ''; ?>"><?php esc_html_e('Drafts', 'intersoccer-product-variations'); ?></a></li>
+			</ul>
+
+			<form method="get" action="<?php echo esc_url($filter_action); ?>" class="intersoccer-pm-list-filters" style="margin: 12px 0; clear: both;">
 				<input type="hidden" name="post_type" value="product" />
 				<input type="hidden" name="page" value="<?php echo esc_attr(self::PAGE_SLUG); ?>" />
+				<input type="hidden" name="pm_status" value="<?php echo esc_attr($filter_pm_status); ?>" class="intersoccer-pm-status-field" />
+				<?php if (!empty($_REQUEST['s'])) : ?>
+					<input type="hidden" name="s" value="<?php echo esc_attr(sanitize_text_field(wp_unslash($_REQUEST['s']))); ?>" />
+				<?php endif; ?>
+				<label style="margin-right: 16px;">
+					<input type="checkbox"
+						name="include_drafts"
+						value="1"
+						class="intersoccer-pm-include-drafts"
+						<?php checked($include_drafts); ?>
+						<?php disabled($drafts_only); ?>
+						onchange="var f=this.form,h=f.querySelector('.intersoccer-pm-status-field'); if(this.disabled){return;} h.value=this.checked?'all':'publish'; f.submit();" />
+					<?php esc_html_e('Include drafts', 'intersoccer-product-variations'); ?>
+				</label>
 				<label>
 					<input type="checkbox" name="show_issues_only" value="1" <?php checked($show_issues); ?> onchange="this.form.submit();" />
 					<?php esc_html_e('Show only programs with issues', 'intersoccer-product-variations'); ?>
 				</label>
+				<?php if ($drafts_only) : ?>
+					<span class="description" style="margin-left:8px;"><?php esc_html_e('Drafts-only view — use Published or All to change.', 'intersoccer-product-variations'); ?></span>
+				<?php endif; ?>
 			</form>
 
 			<form method="get" action="<?php echo esc_url($filter_action); ?>" class="search-box" style="margin: 0 0 12px;">
 				<input type="hidden" name="post_type" value="product" />
 				<input type="hidden" name="page" value="<?php echo esc_attr(self::PAGE_SLUG); ?>" />
+				<input type="hidden" name="pm_status" value="<?php echo esc_attr($pm_status); ?>" />
 				<?php if ($show_issues) : ?>
 					<input type="hidden" name="show_issues_only" value="1" />
 				<?php endif; ?>
 				<input type="search" name="s" value="<?php echo esc_attr(isset($_REQUEST['s']) ? $_REQUEST['s'] : ''); ?>" placeholder="<?php esc_attr_e('Search by name…', 'intersoccer-product-variations'); ?>" />
 				<input type="submit" class="button" value="<?php esc_attr_e('Search Programs', 'intersoccer-product-variations'); ?>" />
 				<?php if (!empty($_REQUEST['s'])) : ?>
-					<a href="<?php echo esc_url($filter_action . '&post_type=product&page=' . self::PAGE_SLUG); ?>" class="button"><?php esc_html_e('Clear', 'intersoccer-product-variations'); ?></a>
+					<a href="<?php echo esc_url(add_query_arg(array_merge(['post_type' => 'product', 'page' => self::PAGE_SLUG, 'pm_status' => $pm_status], $show_issues ? ['show_issues_only' => '1'] : []), admin_url('edit.php'))); ?>" class="button"><?php esc_html_e('Clear', 'intersoccer-product-variations'); ?></a>
 				<?php endif; ?>
 			</form>
 
@@ -389,6 +435,10 @@ class InterSoccer_Program_Manager {
 				<?php wp_nonce_field('intersoccer_pm_bulk_nonce'); ?>
 				<?php if (!empty($_REQUEST['s'])) : ?>
 					<input type="hidden" name="s" value="<?php echo esc_attr($_REQUEST['s']); ?>" />
+				<?php endif; ?>
+				<input type="hidden" name="pm_status" value="<?php echo esc_attr($pm_status); ?>" />
+				<?php if ($show_issues) : ?>
+					<input type="hidden" name="show_issues_only" value="1" />
 				<?php endif; ?>
 				<?php $table->display(); ?>
 			</form>
@@ -2152,9 +2202,21 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 
 		$search = isset($_REQUEST['s']) ? sanitize_text_field($_REQUEST['s']) : '';
 
+		$pm_status = isset($_REQUEST['pm_status']) ? sanitize_key(wp_unslash($_REQUEST['pm_status'])) : 'publish';
+		if (!in_array($pm_status, ['publish', 'draft', 'all'], true)) {
+			$pm_status = 'publish';
+		}
+		if ($pm_status === 'publish') {
+			$status = ['publish'];
+		} elseif ($pm_status === 'draft') {
+			$status = ['draft'];
+		} else {
+			$status = ['publish', 'draft'];
+		}
+
 		$products = wc_get_products([
 			'type'   => 'variable',
-			'status' => ['publish', 'draft'],
+			'status' => $status,
 			'limit'  => -1,
 			's'      => $search,
 		]);
