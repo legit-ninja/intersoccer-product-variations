@@ -57,7 +57,11 @@ function intersoccer_attr_allowed_slugs_for_product_type($product_type) {
         return [];
     }
 
-    $slugs = array_merge($templates[$type]['parent'], $templates[$type]['variation']);
+    $slugs = array_merge(
+        $templates[$type]['parent'],
+        $templates[$type]['parent_optional'] ?? [],
+        $templates[$type]['variation']
+    );
     return array_values(array_unique($slugs));
 }
 

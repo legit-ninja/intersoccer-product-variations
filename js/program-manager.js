@@ -796,6 +796,11 @@
 			attrs['pa_camp-terms'] = $panel.find('.pm-qe-camp-terms').val() || [];
 			attrs['pa_camp-times'] = $panel.find('.pm-qe-camp-times').val() || [];
 		}
+		if ($panel.data('type') === 'birthday') {
+			attrs = {
+				'pa_city': $panel.find('.pm-qe-city').val() || []
+			};
+		}
 
 		$msg.text(PM.i18n.saving).css('color', '#666');
 		$.post(PM.ajax_url, {

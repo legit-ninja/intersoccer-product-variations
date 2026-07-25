@@ -65,4 +65,16 @@ class AttributeEnforcementTest extends TestCase {
         $this->assertContains('girls-only', $slugs);
         $this->assertNotContains('camp-terms', $slugs);
     }
+
+    public function test_birthday_allowed_slugs_include_optional_exclude_season_year() {
+        $slugs = intersoccer_attr_allowed_slugs_for_product_type('birthday');
+        $this->assertContains('activity-type', $slugs);
+        $this->assertContains('intersoccer-venues', $slugs);
+        $this->assertContains('age-group', $slugs);
+        $this->assertContains('canton-region', $slugs);
+        $this->assertContains('city', $slugs);
+        $this->assertNotContains('program-season', $slugs);
+        $this->assertNotContains('program-year', $slugs);
+        $this->assertNotContains('camp-terms', $slugs);
+    }
 }

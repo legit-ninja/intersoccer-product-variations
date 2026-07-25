@@ -309,7 +309,8 @@ function intersoccer_attr_product_type_templates() {
     $templates = [
         'camp' => [
             'parent' => array_merge($core_parent, ['girls-only', 'days-of-week', 'camp-terms', 'camp-times']),
-            'variation' => ['booking-type', 'age-group', 'camp-times'],
+            // Venue + camp-terms are variation dimensions in the live catalogue (per venue/week SKUs).
+            'variation' => ['booking-type', 'age-group', 'camp-times', 'intersoccer-venues', 'camp-terms'],
             'meta' => ['_camp_start_date', '_camp_end_date', '_camp_week_index'],
         ],
         'course' => [
@@ -318,9 +319,13 @@ function intersoccer_attr_product_type_templates() {
             'meta' => ['_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
         ],
         'birthday' => [
-            'parent' => $core_parent,
-            'variation' => ['age-group'],
+            // Deposit/venue packages — not season/year programs.
+            // Real catalog (e.g. Football Birthday Party) uses city / length-of-party, not InterSoccer Venues.
+            'parent' => ['activity-type'],
+            'variation' => [],
             'meta' => [],
+            // Present on some birthday products; never required for PM completeness.
+            'parent_optional' => ['intersoccer-venues', 'age-group', 'canton-region', 'city'],
         ],
         'tournament' => [
             'parent' => array_merge($core_parent, ['date']),

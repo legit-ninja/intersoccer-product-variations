@@ -68,7 +68,7 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.7.20',
+			'2.7.21-birthday',
 			true
 		);
 
@@ -142,6 +142,19 @@ class InterSoccer_Program_Manager {
 		}
 
 		$required_parent = intersoccer_attr_required($type, 'parent');
+		// Birthday packages are city/length-of-party priced — never score InterSoccer Venues (or camp season/year).
+		if ($type === 'birthday') {
+			$required_parent = array_values(array_filter(
+				$required_parent,
+				static function ($taxonomy) {
+					return !in_array($taxonomy, [
+						'pa_intersoccer-venues',
+						'pa_program-season',
+						'pa_program-year',
+					], true);
+				}
+			));
+		}
 		$parent_attrs    = $product->get_attributes();
 		$parent_complete = 0;
 		$parent_missing  = [];
@@ -430,6 +443,18 @@ class InterSoccer_Program_Manager {
 			<?php
 			$multi_select_slugs = ['days-of-week', 'camp-terms', 'camp-times', 'course-times', 'intersoccer-venues', 'age-group'];
 			$required_parent = intersoccer_attr_required($type, 'parent');
+			if ($type === 'birthday') {
+				$required_parent = array_values(array_filter(
+					$required_parent,
+					static function ($taxonomy) {
+						return !in_array($taxonomy, [
+							'pa_intersoccer-venues',
+							'pa_program-season',
+							'pa_program-year',
+						], true);
+					}
+				));
+			}
 			?>
 			<table class="widefat striped" style="max-width: 700px;">
 				<thead>
@@ -2153,6 +2178,13 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 			$season_terms = wc_get_product_terms($product_id, 'pa_program-season', ['fields' => 'names']);
 			$year_terms   = wc_get_product_terms($product_id, 'pa_program-year', ['fields' => 'names']);
 			$venue_terms  = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'names']);
+			// Birthday packages use city (not InterSoccer Venues) — surface that in the Venue column.
+			if ($type === 'birthday' && empty($venue_terms)) {
+				$city_terms = wc_get_product_terms($product_id, 'pa_city', ['fields' => 'names']);
+				if (!empty($city_terms) && !is_wp_error($city_terms)) {
+					$venue_terms = $city_terms;
+				}
+			}
 
 			$data[] = [
 				'product_id'   => $product_id,
@@ -2256,9 +2288,13 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 					. '<option value="draft"' . selected($item['status'], 'draft', false) . '>Draft</option>'
 					. '<option value="publish"' . selected($item['status'], 'publish', false) . '>Publish</option>'
 					. '<option value="private"' . selected($item['status'], 'private', false) . '>Private</option>'
-					. '</select></label></p>'
-					. $render_multi('pa_program-season', 'pm-qe-season', __('Season', 'intersoccer-product-variations'))
-					. $render_multi('pa_intersoccer-venues', 'pm-qe-venues', __('Venues', 'intersoccer-product-variations'));
+					. '</select></label></p>';
+				if ($item['type'] !== 'birthday') {
+					$qe_panel .= $render_multi('pa_program-season', 'pm-qe-season', __('Season', 'intersoccer-product-variations'))
+						. $render_multi('pa_intersoccer-venues', 'pm-qe-venues', __('Venues', 'intersoccer-product-variations'));
+				} else {
+					$qe_panel .= $render_multi('pa_city', 'pm-qe-city', __('Cities', 'intersoccer-product-variations'));
+				}
 				if ($item['type'] === 'camp') {
 					$qe_panel .= $render_multi('pa_camp-terms', 'pm-qe-camp-terms', __('Camp Terms', 'intersoccer-product-variations'))
 						. $render_multi('pa_camp-times', 'pm-qe-camp-times', __('Camp Times', 'intersoccer-product-variations'));

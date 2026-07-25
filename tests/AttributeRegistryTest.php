@@ -72,7 +72,10 @@ class AttributeRegistryTest extends TestCase {
 
     public function test_product_type_templates_reference_registry_slugs() {
         foreach (intersoccer_attr_product_type_templates() as $type => $template) {
-            foreach (['parent', 'variation'] as $scope) {
+            foreach (['parent', 'variation', 'parent_optional'] as $scope) {
+                if (!isset($template[$scope])) {
+                    continue;
+                }
                 foreach ($template[$scope] as $slug) {
                     $this->assertArrayHasKey($slug, intersoccer_attr_registry(), "$type.$scope slug: $slug");
                 }
@@ -90,9 +93,9 @@ class AttributeRegistryTest extends TestCase {
     // Regression: AUDIT-007 — Variation health required keys follow product-type templates
     public function test_health_required_keys_match_product_type_expectations() {
         $this->assertSame(
-            ['pa_age-group'],
+            [],
             intersoccer_attr_health_required_keys('birthday'),
-            'Birthday health checks require age-group from the variation template'
+            'Birthday variation health is price-only (no age-group / season attrs)'
         );
         $this->assertSame(
             ['pa_tournament-day', 'pa_tournament-time', 'pa_age-group'],
@@ -110,10 +113,36 @@ class AttributeRegistryTest extends TestCase {
         $this->assertNotContains('pa_course-day', $camp_keys);
     }
 
+    public function test_birthday_parent_required_excludes_season_year() {
+        $required = intersoccer_attr_required('birthday', 'parent');
+        $this->assertSame(
+            ['pa_activity-type'],
+            $required,
+            'Birthday parent completeness requires activity-type only'
+        );
+        $this->assertNotContains('pa_intersoccer-venues', $required);
+        $this->assertNotContains('pa_program-season', $required);
+        $this->assertNotContains('pa_program-year', $required);
+        $this->assertNotContains('pa_age-group', $required);
+        $this->assertNotContains('pa_canton-region', $required);
+        $this->assertNotContains('pa_city', $required);
+    }
+
+    public function test_birthday_template_optional_parent_attrs() {
+        $templates = intersoccer_attr_product_type_templates();
+        $this->assertSame(
+            ['intersoccer-venues', 'age-group', 'canton-region', 'city'],
+            $templates['birthday']['parent_optional']
+        );
+        $this->assertSame([], $templates['birthday']['variation']);
+    }
+
     public function test_camp_variation_template_includes_camp_times() {
         $templates = intersoccer_attr_product_type_templates();
         $this->assertContains('camp-times', $templates['camp']['variation']);
         $this->assertContains('camp-times', $templates['camp']['parent']);
+        $this->assertContains('intersoccer-venues', $templates['camp']['variation']);
+        $this->assertContains('camp-terms', $templates['camp']['variation']);
         $terms = intersoccer_attr_definition('camp-times')['default_terms'] ?? [];
         $slugs = array_column($terms, 'slug');
         $this->assertContains('1000-1700', $slugs);

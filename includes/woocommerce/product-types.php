@@ -61,6 +61,12 @@ class InterSoccer_Product_Types {
         // Check existing meta first
         $product_type = get_post_meta($product_id, '_intersoccer_product_type', true);
         if ($product_type && in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
+            // Prod data: Football Birthday Party was meta-typed as camp while using birthday attrs.
+            if (in_array($product_type, ['camp', 'course'], true)
+                && self::product_has_birthday_signals($product_id, $product)) {
+                $product_type = 'birthday';
+                update_post_meta($product_id, '_intersoccer_product_type', 'birthday');
+            }
             set_transient($transient_key, $product_type, HOUR_IN_SECONDS);
             return $product_type;
         }
@@ -219,7 +225,14 @@ class InterSoccer_Product_Types {
                 'mädchen',
             ],
             'course' => ['course', 'cours', 'kurs', 'corso', 'stage'],
-            'birthday' => ['birthday', 'anniversaire', 'geburtstag', 'compleanno'],
+            'birthday' => [
+                'birthday',
+                'birthday-party',
+                'birthday party',
+                'anniversaire',
+                'geburtstag',
+                'compleanno',
+            ],
             'tournament' => ['tournament', 'tournoi', 'turnier', 'torneo'],
         ];
 
@@ -264,6 +277,49 @@ class InterSoccer_Product_Types {
         }
 
         return null;
+    }
+
+    /**
+     * True when the product is structured as a birthday package (not a camp/course).
+     *
+     * Used to correct stale `_intersoccer_product_type` meta (e.g. camp) on birthday products.
+     *
+     * @param int             $product_id
+     * @param WC_Product|null $product
+     * @return bool
+     */
+    private static function product_has_birthday_signals($product_id, $product = null) {
+        $product_id = (int) $product_id;
+        if ($product_id <= 0) {
+            return false;
+        }
+
+        if (!$product) {
+            $product = wc_get_product($product_id);
+        }
+        if ($product) {
+            $attributes = $product->get_attributes();
+            // Real birthday catalog uses length-of-party (deposit packages), not camp weeks.
+            if (isset($attributes['pa_length-of-party'])) {
+                return true;
+            }
+        }
+
+        if (taxonomy_exists('pa_activity-type')) {
+            $activity_terms = wc_get_product_terms($product_id, 'pa_activity-type', ['fields' => 'all']);
+            if (!empty($activity_terms) && !is_wp_error($activity_terms)) {
+                foreach ($activity_terms as $term) {
+                    $slug = isset($term->slug) ? strtolower((string) $term->slug) : '';
+                    $name = isset($term->name) ? strtolower(trim((string) $term->name)) : '';
+                    if (strpos($slug, 'birthday') !== false || strpos($name, 'birthday') !== false
+                        || strpos($name, 'anniversaire') !== false || strpos($name, 'geburtstag') !== false) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return self::detect_type_from_category($product_id) === 'birthday';
     }
 
     /**
