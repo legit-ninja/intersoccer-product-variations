@@ -2620,6 +2620,24 @@ function intersoccer_refresh_variation_attributes_callback() {
         }
     }
 
+    $camp_parents = [];
+    foreach ($variation_ids as $variation_id) {
+        $product = wc_get_product($variation_id);
+        if (!$product || !($product instanceof WC_Product_Variation)) {
+            continue;
+        }
+        $parent_id = $product->get_parent_id();
+        $type = InterSoccer_Product_Types::get_product_type($parent_id);
+        if ($type === 'camp') {
+            $camp_parents[$parent_id] = true;
+        }
+    }
+    foreach (array_keys($camp_parents) as $camp_parent_id) {
+        if (class_exists('InterSoccer_Program_Manager')) {
+            InterSoccer_Program_Manager::repair_camp_variation_facets($camp_parent_id);
+        }
+    }
+
     wp_send_json_success(['message' => __('Attributes refreshed.', 'intersoccer-product-variations')]);
     wp_die();
 }

@@ -221,3 +221,64 @@ function intersoccer_pm_default_camp_time_slug_for_age($age_slug, $allowed_time_
 
     return $is_half ? INTERSOCCER_CAMP_TIME_HALF_DAY : INTERSOCCER_CAMP_TIME_FULL_DAY;
 }
+
+/**
+ * Infer a camp-terms slug for a variation from schedule meta + parent term pool.
+ *
+ * @param int      $variation_id
+ * @param string[] $allowed_term_slugs Parent pa_camp-terms slugs.
+ * @return string
+ */
+function intersoccer_pm_infer_camp_term_slug_for_variation($variation_id, $allowed_term_slugs = []) {
+    $allowed = array_values(array_filter(array_map('strval', (array) $allowed_term_slugs)));
+    if ($allowed === []) {
+        return '';
+    }
+
+    $week = (int) get_post_meta($variation_id, '_camp_week_index', true);
+    $start = (string) get_post_meta($variation_id, '_camp_start_date', true);
+
+    if ($week > 0) {
+        foreach ($allowed as $slug) {
+            if (preg_match('/(?:^|[-_])week[-_]?0*' . preg_quote((string) $week, '/') . '(?:[-_]|$)/i', $slug)) {
+                return $slug;
+            }
+        }
+    }
+
+    if ($start !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $start, $m)) {
+        $month = (int) $m[2];
+        $day = (int) $m[3];
+        $month_names = [
+            1 => 'january', 2 => 'february', 3 => 'march', 4 => 'april',
+            5 => 'may', 6 => 'june', 7 => 'july', 8 => 'august',
+            9 => 'september', 10 => 'october', 11 => 'november', 12 => 'december',
+        ];
+        $month_name = $month_names[$month] ?? '';
+        if ($month_name !== '') {
+            foreach ($allowed as $slug) {
+                $s = strtolower($slug);
+                if (strpos($s, $month_name) !== false && preg_match('/(?:^|[-_])' . $day . '(?:[-_]|$)/', $s)) {
+                    return $slug;
+                }
+            }
+        }
+    }
+
+    if (count($allowed) === 1) {
+        return $allowed[0];
+    }
+
+    return '';
+}
+
+/**
+ * Infer a venue slug when the parent has a single venue (safe default).
+ *
+ * @param string[] $allowed_venue_slugs
+ * @return string
+ */
+function intersoccer_pm_infer_venue_slug_for_variation($allowed_venue_slugs = []) {
+    $allowed = array_values(array_filter(array_map('strval', (array) $allowed_venue_slugs)));
+    return count($allowed) === 1 ? $allowed[0] : '';
+}

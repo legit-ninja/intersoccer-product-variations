@@ -38,6 +38,7 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_prefill_camp_schedules', [__CLASS__, 'ajax_prefill_camp_schedules']);
 		add_action('wp_ajax_intersoccer_pm_apply_parsed_camp_dates', [__CLASS__, 'ajax_apply_parsed_camp_dates']);
 		add_action('wp_ajax_intersoccer_pm_propose_camp_times', [__CLASS__, 'ajax_propose_camp_times']);
+		add_action('wp_ajax_intersoccer_pm_repair_camp_facets', [__CLASS__, 'ajax_repair_camp_facets']);
 		add_action('wp_ajax_intersoccer_pm_quick_edit', [__CLASS__, 'ajax_quick_edit']);
 		add_action('wp_ajax_intersoccer_pm_duplicate_program', [__CLASS__, 'ajax_duplicate_program']);
 		add_action('wp_ajax_intersoccer_pm_save_parent_attrs', [__CLASS__, 'ajax_save_parent_attrs']);
@@ -290,20 +291,28 @@ class InterSoccer_Program_Manager {
 						if (!$product || !$product->is_type('variable')) {
 							continue;
 						}
-						foreach ($product->get_children() as $var_id) {
-							$variation = wc_get_product($var_id);
-							if (!$variation) {
-								continue;
-							}
-							$parent_attrs = $product->get_attributes();
-							$var_attrs    = [];
-							foreach ($parent_attrs as $attr) {
-								if ($attr->get_variation()) {
-									$var_attrs[$attr->get_name()] = '';
+						$type = class_exists('InterSoccer_Product_Types')
+							? InterSoccer_Product_Types::get_product_type($pid)
+							: '';
+						if ($type === 'camp') {
+							// Promote Venue/Camp Term/Camp Time and backfill — do not wipe attributes.
+							self::repair_camp_variation_facets($pid);
+						} else {
+							foreach ($product->get_children() as $var_id) {
+								$variation = wc_get_product($var_id);
+								if (!$variation) {
+									continue;
 								}
+								$parent_attrs = $product->get_attributes();
+								$var_attrs    = [];
+								foreach ($parent_attrs as $attr) {
+									if ($attr->get_variation()) {
+										$var_attrs[$attr->get_name()] = '';
+									}
+								}
+								$variation->set_attributes($var_attrs);
+								$variation->save();
 							}
-							$variation->set_attributes($var_attrs);
-							$variation->save();
 						}
 						$processed++;
 					}
@@ -511,8 +520,11 @@ class InterSoccer_Program_Manager {
 					<button type="button" class="button" id="intersoccer-pm-propose-times-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
 						<?php esc_html_e('Propose times from age', 'intersoccer-product-variations'); ?>
 					</button>
+					<button type="button" class="button button-primary" id="intersoccer-pm-repair-facets-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
+						<?php esc_html_e('Repair Venue / Camp Term on variations', 'intersoccer-product-variations'); ?>
+					</button>
 				</p>
-				<p class="description"><?php esc_html_e('Propose fills empty rows only (+7 days per week index). Apply parsed uses the deprecated camp-terms parser once to seed meta. Propose times fills empty pa_camp-times from age (Half Day → 1000-1230, Full Day → 1000-1700).', 'intersoccer-product-variations'); ?></p>
+				<p class="description"><?php esc_html_e('Propose fills empty rows only (+7 days per week index). Apply parsed uses the deprecated camp-terms parser once to seed meta. Propose times fills empty pa_camp-times from age (Half Day → 1000-1230, Full Day → 1000-1700). Repair promotes Venue and Camp Term to variation attributes and backfills Camp Term from week meta (single-venue products also get Venue).', 'intersoccer-product-variations'); ?></p>
 				<span id="intersoccer-pm-schedule-tools-status"></span>
 			</div>
 			<?php endif; ?>
@@ -1347,6 +1359,7 @@ class InterSoccer_Program_Manager {
 
 		// Ensure parent attribute includes proposed times and is used for variations.
 		self::ensure_parent_camp_times_variation_attribute($product_id, array_column($rows, 'pa_camp-times'));
+		self::repair_camp_variation_facets($product_id);
 
 		wc_delete_product_transients($product_id);
 		wp_send_json_success([
@@ -1358,6 +1371,34 @@ class InterSoccer_Program_Manager {
 				__('Updated %1$d, skipped %2$d.', 'intersoccer-product-variations'),
 				$updated,
 				$skipped
+			),
+		]);
+	}
+
+	/**
+	 * AJAX: promote Venue/Camp Term to variation attrs and backfill empty values.
+	 */
+	public static function ajax_repair_camp_facets() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
+		$result = self::repair_camp_variation_facets($product_id);
+		if (empty($result['promoted'])) {
+			wp_send_json_error(['message' => __('Not a camp variable product.', 'intersoccer-product-variations')]);
+		}
+
+		wp_send_json_success([
+			'result' => $result,
+			'completeness' => self::get_product_completeness($product_id),
+			'message' => sprintf(
+				/* translators: 1: updated variations, 2: venue rows still needing manual venue */
+				__('Camp facets repaired: %1$d variations updated. %2$d still need a venue (multi-venue products).', 'intersoccer-product-variations'),
+				(int) $result['updated'],
+				(int) $result['venue_needs_manual']
 			),
 		]);
 	}
@@ -1585,6 +1626,10 @@ class InterSoccer_Program_Manager {
 		$product->save();
 		wc_delete_product_transients($product_id);
 
+		if ($type === 'camp') {
+			self::repair_camp_variation_facets($product_id);
+		}
+
 		$completeness = self::get_product_completeness($product_id);
 
 		wp_send_json_success([
@@ -1781,40 +1826,218 @@ class InterSoccer_Program_Manager {
 	 * @param string[] $extra_slugs
 	 */
 	private static function ensure_parent_camp_times_variation_attribute($product_id, $extra_slugs = []) {
+		self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', $extra_slugs);
+	}
+
+	/**
+	 * Mark a parent taxonomy as used for variations and merge option slugs.
+	 *
+	 * @param int      $product_id
+	 * @param string   $taxonomy
+	 * @param string[] $extra_slugs
+	 * @return bool True when parent attribute is marked is_variation after save.
+	 */
+	private static function ensure_parent_taxonomy_variation_attribute($product_id, $taxonomy, $extra_slugs = []) {
 		$product = wc_get_product($product_id);
-		if (!$product) {
-			return;
+		if (!$product || !taxonomy_exists($taxonomy)) {
+			return false;
 		}
 
 		$extra_slugs = array_values(array_unique(array_filter(array_map('strval', (array) $extra_slugs))));
-		$current     = wc_get_product_terms($product_id, 'pa_camp-times', ['fields' => 'slugs']);
+		$current     = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'slugs']);
 		if (is_wp_error($current)) {
 			$current = [];
 		}
 		$merged = array_values(array_unique(array_merge($current, $extra_slugs)));
 		if (empty($merged)) {
-			return;
+			return false;
 		}
 
-		wp_set_object_terms($product_id, $merged, 'pa_camp-times');
+		wp_set_object_terms($product_id, $merged, $taxonomy);
+
+		$term_ids = [];
+		foreach ($merged as $slug) {
+			$term = get_term_by('slug', $slug, $taxonomy);
+			if ($term && !is_wp_error($term)) {
+				$term_ids[] = (int) $term->term_id;
+			}
+		}
+		if ($term_ids === []) {
+			return false;
+		}
+
+		// Fresh load — avoid stale attribute objects after wp_set_object_terms.
+		$product = wc_get_product($product_id);
+		if (!$product) {
+			return false;
+		}
 
 		$attributes = $product->get_attributes();
-		$taxonomy   = 'pa_camp-times';
 		if (isset($attributes[$taxonomy]) && is_object($attributes[$taxonomy])) {
+			$attributes[$taxonomy]->set_id(wc_attribute_taxonomy_id_by_name($taxonomy));
+			$attributes[$taxonomy]->set_name($taxonomy);
+			$attributes[$taxonomy]->set_options($term_ids);
 			$attributes[$taxonomy]->set_variation(true);
 			$attributes[$taxonomy]->set_visible(true);
-			$attributes[$taxonomy]->set_options($merged);
 		} else {
 			$attribute = new WC_Product_Attribute();
 			$attribute->set_id(wc_attribute_taxonomy_id_by_name($taxonomy));
 			$attribute->set_name($taxonomy);
-			$attribute->set_options($merged);
+			$attribute->set_options($term_ids);
 			$attribute->set_visible(true);
 			$attribute->set_variation(true);
 			$attributes[$taxonomy] = $attribute;
 		}
 		$product->set_attributes($attributes);
 		$product->save();
+
+		// Hard-confirm is_variation in _product_attributes (WC can drop the flag when options were slugs).
+		$raw = get_post_meta($product_id, '_product_attributes', true);
+		if (!is_array($raw)) {
+			$raw = [];
+		}
+		if (!isset($raw[$taxonomy]) || !is_array($raw[$taxonomy])) {
+			$raw[$taxonomy] = [
+				'name' => $taxonomy,
+				'value' => '',
+				'position' => count($raw),
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			];
+		} else {
+			$raw[$taxonomy]['is_variation'] = 1;
+			$raw[$taxonomy]['is_visible'] = 1;
+			$raw[$taxonomy]['is_taxonomy'] = 1;
+			$raw[$taxonomy]['name'] = $taxonomy;
+		}
+		update_post_meta($product_id, '_product_attributes', $raw);
+		wc_delete_product_transients($product_id);
+		clean_post_cache($product_id);
+
+		$product = wc_get_product($product_id);
+		$attrs = $product ? $product->get_attributes() : [];
+		$ok = isset($attrs[$taxonomy]) && is_object($attrs[$taxonomy]) && $attrs[$taxonomy]->get_variation();
+
+		return (bool) $ok;
+	}
+
+	/**
+	 * Promote Venue/Camp Term to variation attrs and backfill empty variation values.
+	 *
+	 * Camp Times are left to propose/refresh helpers. Venue is only auto-filled when
+	 * the parent has a single venue (multi-venue still needs staff assignment).
+	 *
+	 * @param int $product_id
+	 * @return array{promoted:bool,updated:int,skipped:int,venue_needs_manual:int}
+	 */
+	public static function repair_camp_variation_facets($product_id) {
+		$product_id = absint($product_id);
+		$result = [
+			'promoted' => false,
+			'updated' => 0,
+			'skipped' => 0,
+			'venue_needs_manual' => 0,
+		];
+
+		$product = wc_get_product($product_id);
+		if (!$product || !$product->is_type('variable')) {
+			return $result;
+		}
+
+		$type = class_exists('InterSoccer_Product_Types')
+			? InterSoccer_Product_Types::get_product_type($product_id)
+			: '';
+		if ($type !== 'camp') {
+			return $result;
+		}
+
+		if (!function_exists('intersoccer_pm_infer_camp_term_slug_for_variation')) {
+			require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/helpers.php';
+		}
+
+		$venues = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
+		$terms  = wc_get_product_terms($product_id, 'pa_camp-terms', ['fields' => 'slugs']);
+		if (is_wp_error($venues)) {
+			$venues = [];
+		}
+		if (is_wp_error($terms)) {
+			$terms = [];
+		}
+
+		$venue_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $venues);
+		$terms_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-terms', $terms);
+		$times_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', []);
+		$result['promoted'] = ($venue_ok || $venues === []) && ($terms_ok || $terms === []) && $times_ok !== false;
+		$result['parent_flags'] = [
+			'pa_intersoccer-venues' => $venue_ok,
+			'pa_camp-terms' => $terms_ok,
+			'pa_camp-times' => $times_ok,
+		];
+
+		$product = wc_get_product($product_id);
+		if (!$product) {
+			return $result;
+		}
+
+		foreach ($product->get_children() as $var_id) {
+			$variation = wc_get_product($var_id);
+			if (!$variation || !($variation instanceof WC_Product_Variation)) {
+				continue;
+			}
+
+			$attrs = $variation->get_attributes();
+			$changed = false;
+
+			$venue = isset($attrs['pa_intersoccer-venues']) ? (string) $attrs['pa_intersoccer-venues'] : '';
+			$term  = isset($attrs['pa_camp-terms']) ? (string) $attrs['pa_camp-terms'] : '';
+
+			if ($term === '' && $terms_ok) {
+				$proposed_term = intersoccer_pm_infer_camp_term_slug_for_variation($var_id, $terms);
+				if ($proposed_term !== '') {
+					$attrs['pa_camp-terms'] = $proposed_term;
+					$changed = true;
+				}
+			}
+
+			if ($venue === '') {
+				$proposed_venue = intersoccer_pm_infer_venue_slug_for_variation($venues);
+				if ($proposed_venue !== '' && $venue_ok) {
+					$attrs['pa_intersoccer-venues'] = $proposed_venue;
+					$changed = true;
+				} elseif ($venue === '' && count($venues) > 1) {
+					$result['venue_needs_manual']++;
+				}
+			}
+
+			if ($changed) {
+				$variation->set_attributes($attrs);
+				$variation->save();
+				// Persist taxonomy attrs as post meta — WC may ignore keys not yet marked for variations.
+				if (!empty($attrs['pa_camp-terms'])) {
+					update_post_meta($var_id, 'attribute_pa_camp-terms', $attrs['pa_camp-terms']);
+					wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+				}
+				if (!empty($attrs['pa_intersoccer-venues'])) {
+					update_post_meta($var_id, 'attribute_pa_intersoccer-venues', $attrs['pa_intersoccer-venues']);
+					wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+				}
+				$persisted = wc_get_product($var_id);
+				$pa = $persisted ? $persisted->get_attributes() : [];
+				$term_ok = !empty($attrs['pa_camp-terms']) && (($pa['pa_camp-terms'] ?? '') === $attrs['pa_camp-terms'] || get_post_meta($var_id, 'attribute_pa_camp-terms', true) === $attrs['pa_camp-terms']);
+				if ($term_ok || (!empty($attrs['pa_intersoccer-venues']) && (($pa['pa_intersoccer-venues'] ?? '') !== '' || get_post_meta($var_id, 'attribute_pa_intersoccer-venues', true) !== ''))) {
+					$result['updated']++;
+				} else {
+					$result['skipped']++;
+				}
+			} else {
+				$result['skipped']++;
+			}
+		}
+
+		wc_delete_product_transients($product_id);
+
+		return $result;
 	}
 
 	/**

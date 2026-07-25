@@ -745,6 +745,30 @@
 		});
 	});
 
+	$(document).on('click', '#intersoccer-pm-repair-facets-btn', function() {
+		var $btn = $(this);
+		var productId = $btn.data('product-id');
+		var $status = $('#intersoccer-pm-schedule-tools-status');
+		$status.text(PM.i18n.saving).css('color', '#666');
+		$btn.prop('disabled', true);
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_repair_camp_facets',
+			nonce: PM.nonce,
+			product_id: productId
+		}).done(function(response) {
+			$btn.prop('disabled', false);
+			if (!response.success) {
+				$status.text(response.data && response.data.message ? response.data.message : PM.i18n.error).css('color', 'red');
+				return;
+			}
+			$status.text(response.data.message || 'Repaired').css('color', 'green');
+			setTimeout(function() { window.location.reload(); }, 1000);
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
 	// =========================================================================
 	// List quick edit
 	// =========================================================================
