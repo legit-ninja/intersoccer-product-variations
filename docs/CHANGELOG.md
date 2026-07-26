@@ -5,6 +5,16 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.25] - 2026-07-25
+
+### Added
+- Program Manager repair for camp Venue and Camp Term on variations (promote parent-only facets, repair AJAX/UI, admin attribute refresh hook).
+- Program Manager publish / draft / all status views and Include drafts checkbox.
+- Documentation: language-neutral canonical order-item meta contract (`docs/ORDER-META-CONTRACT.md`).
+
+### Changed
+- Birthday product typing and attribute completeness scoring (retype mis-tagged birthday products; exclude camp-only attrs from birthday scoring).
+
 ## [1.10.16] - 2025-10-16
 
 ### Added
