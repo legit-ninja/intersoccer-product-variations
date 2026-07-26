@@ -34,6 +34,7 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_scaffold_variations', [__CLASS__, 'ajax_scaffold_variations']);
 		add_action('wp_ajax_intersoccer_pm_check_completeness', [__CLASS__, 'ajax_check_completeness']);
 		add_action('wp_ajax_intersoccer_pm_save_variation_price', [__CLASS__, 'ajax_save_variation_price']);
+		add_action('wp_ajax_intersoccer_pm_save_variation_venue', [__CLASS__, 'ajax_save_variation_venue']);
 		add_action('wp_ajax_intersoccer_pm_save_camp_schedule', [__CLASS__, 'ajax_save_camp_schedule']);
 		add_action('wp_ajax_intersoccer_pm_prefill_camp_schedules', [__CLASS__, 'ajax_prefill_camp_schedules']);
 		add_action('wp_ajax_intersoccer_pm_apply_parsed_camp_dates', [__CLASS__, 'ajax_apply_parsed_camp_dates']);
@@ -563,6 +564,34 @@ class InterSoccer_Program_Manager {
 				<span class="intersoccer-pm-variation-count">(<?php echo esc_html($completeness['variations_healthy'] . '/' . $completeness['variations_total'] . ' ' . __('healthy', 'intersoccer-product-variations')); ?>)</span>
 			</h2>
 
+			<?php
+			$parent_venue_slugs = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
+			if (is_wp_error($parent_venue_slugs)) {
+				$parent_venue_slugs = [];
+			}
+			$parent_venue_slugs = array_values(array_filter(array_map('strval', (array) $parent_venue_slugs)));
+			$venue_missing_count = 0;
+			foreach ($completeness['variations_issues'] as $issue_list) {
+				if (in_array('pa_intersoccer-venues', (array) $issue_list, true)) {
+					$venue_missing_count++;
+				}
+			}
+			if ($type === 'camp' && $parent_venue_slugs !== [] && $venue_missing_count > 0) :
+				?>
+			<div class="notice notice-warning inline" style="margin: 12px 0; padding: 8px 12px;">
+				<p style="margin:0;">
+					<?php
+					printf(
+						/* translators: 1: variations missing venue, 2: parent venue count */
+						esc_html__('Parent has %2$d venue(s), but %1$d variation(s) still need a venue assigned below. Parent venue terms alone do not fill variation SKUs on multi-venue camps.', 'intersoccer-product-variations'),
+						(int) $venue_missing_count,
+						(int) count($parent_venue_slugs)
+					);
+					?>
+				</p>
+			</div>
+			<?php endif; ?>
+
 			<?php if ($type && $completeness['variations_total'] === 0) : ?>
 				<p>
 					<button type="button" class="button button-primary" id="intersoccer-pm-scaffold-btn" data-product-id="<?php echo esc_attr($product_id); ?>" data-product-type="<?php echo esc_attr($type); ?>">
@@ -609,6 +638,9 @@ class InterSoccer_Program_Manager {
 					<tr>
 						<th><?php esc_html_e('ID', 'intersoccer-product-variations'); ?></th>
 						<th><?php esc_html_e('Attributes', 'intersoccer-product-variations'); ?></th>
+						<?php if ($type === 'camp') : ?>
+							<th><?php esc_html_e('Venue', 'intersoccer-product-variations'); ?></th>
+						<?php endif; ?>
 						<th><?php esc_html_e('Price (CHF)', 'intersoccer-product-variations'); ?></th>
 						<?php if ($type === 'camp') : ?>
 							<th><?php esc_html_e('Week', 'intersoccer-product-variations'); ?></th>
@@ -622,6 +654,15 @@ class InterSoccer_Program_Manager {
 				<tbody>
 					<?php
 					$children = $product->get_children();
+					$parent_venue_terms = [];
+					if ($type === 'camp' && $parent_venue_slugs !== []) {
+						foreach ($parent_venue_slugs as $vslug) {
+							$vterm = get_term_by('slug', $vslug, 'pa_intersoccer-venues');
+							if ($vterm && !is_wp_error($vterm)) {
+								$parent_venue_terms[] = $vterm;
+							}
+						}
+					}
 					foreach ($children as $var_id) :
 						$variation    = wc_get_product($var_id);
 						if (!$variation) continue;
@@ -629,6 +670,9 @@ class InterSoccer_Program_Manager {
 						$var_attrs    = $variation->get_attributes();
 						$attr_display = [];
 						foreach ($var_attrs as $tax => $val) {
+							if ($tax === 'pa_intersoccer-venues') {
+								continue;
+							}
 							$slug  = str_replace('pa_', '', $tax);
 							$label = intersoccer_attr_wc_label($slug) ?: $slug;
 							if ($val) {
@@ -640,10 +684,28 @@ class InterSoccer_Program_Manager {
 						$sched = ($type === 'camp' && function_exists('intersoccer_get_camp_schedule_meta'))
 							? intersoccer_get_camp_schedule_meta($var_id)
 							: ['start' => '', 'end' => '', 'week' => null];
+						$current_venue = isset($var_attrs['pa_intersoccer-venues']) ? (string) $var_attrs['pa_intersoccer-venues'] : '';
+						if ($current_venue === '') {
+							$current_venue = (string) get_post_meta($var_id, 'attribute_pa_intersoccer-venues', true);
+						}
+						$issue_labels = array_map([__CLASS__, 'format_missing_key_label'], $var_result['missing']);
 					?>
 					<tr data-variation-id="<?php echo esc_attr($var_id); ?>">
 						<td><?php echo esc_html($var_id); ?></td>
 						<td><?php echo esc_html(implode(' | ', $attr_display) ?: '—'); ?></td>
+						<?php if ($type === 'camp') : ?>
+							<td>
+								<select class="intersoccer-pm-venue-select" data-variation-id="<?php echo esc_attr($var_id); ?>" style="min-width: 180px; max-width: 260px;">
+									<option value=""><?php esc_html_e('— Select venue —', 'intersoccer-product-variations'); ?></option>
+									<?php foreach ($parent_venue_terms as $vterm) : ?>
+										<option value="<?php echo esc_attr($vterm->slug); ?>" <?php selected($current_venue, $vterm->slug); ?>>
+											<?php echo esc_html($vterm->name); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+								<span class="intersoccer-pm-venue-status"></span>
+							</td>
+						<?php endif; ?>
 						<td>
 							<input type="number" step="0.01" min="0" class="intersoccer-pm-price-input" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($price); ?>" style="width: 100px;" />
 							<span class="intersoccer-pm-price-status"></span>
@@ -667,7 +729,7 @@ class InterSoccer_Program_Manager {
 								<span style="color:red;">&#10007; <?php esc_html_e('Issues', 'intersoccer-product-variations'); ?></span>
 							<?php endif; ?>
 						</td>
-						<td><?php echo esc_html(implode(', ', $var_result['missing'])); ?></td>
+						<td><?php echo esc_html(implode(', ', $issue_labels)); ?></td>
 					</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -1256,6 +1318,65 @@ class InterSoccer_Program_Manager {
 		wp_send_json_success(['variation_id' => $variation_id, 'price' => $price]);
 	}
 
+	public static function ajax_save_variation_venue() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		$variation_id = isset($_POST['variation_id']) ? absint($_POST['variation_id']) : 0;
+		$venue_slug   = isset($_POST['venue']) ? sanitize_text_field(wp_unslash($_POST['venue'])) : '';
+
+		if (!$variation_id) {
+			wp_send_json_error(['message' => __('Missing variation ID.', 'intersoccer-product-variations')]);
+		}
+
+		$variation = wc_get_product($variation_id);
+		if (!$variation || !($variation instanceof WC_Product_Variation)) {
+			wp_send_json_error(['message' => __('Invalid variation.', 'intersoccer-product-variations')]);
+		}
+
+		$parent_id = (int) $variation->get_parent_id();
+		$type      = class_exists('InterSoccer_Product_Types')
+			? InterSoccer_Product_Types::get_product_type($parent_id)
+			: '';
+		if ($type !== 'camp') {
+			wp_send_json_error(['message' => __('Venue assignment is only supported for camps.', 'intersoccer-product-variations')]);
+		}
+
+		$allowed = wc_get_product_terms($parent_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
+		if (is_wp_error($allowed)) {
+			$allowed = [];
+		}
+		$allowed = array_map('strval', (array) $allowed);
+
+		if ($venue_slug !== '' && !in_array($venue_slug, $allowed, true)) {
+			wp_send_json_error(['message' => __('Venue is not assigned on the parent product.', 'intersoccer-product-variations')]);
+		}
+
+		self::ensure_parent_taxonomy_variation_attribute($parent_id, 'pa_intersoccer-venues', $allowed);
+
+		$attrs = $variation->get_attributes();
+		$attrs['pa_intersoccer-venues'] = $venue_slug;
+		$variation->set_attributes($attrs);
+		$variation->save();
+		update_post_meta($variation_id, 'attribute_pa_intersoccer-venues', $venue_slug);
+		if ($venue_slug !== '') {
+			wp_set_object_terms($variation_id, $venue_slug, 'pa_intersoccer-venues');
+		} else {
+			wp_set_object_terms($variation_id, [], 'pa_intersoccer-venues');
+		}
+
+		wc_delete_product_transients($parent_id);
+
+		wp_send_json_success([
+			'variation_id' => $variation_id,
+			'venue'        => $venue_slug,
+			'completeness' => self::get_variation_completeness($variation_id, 'camp'),
+		]);
+	}
+
 	public static function ajax_save_camp_schedule() {
 		check_ajax_referer(self::NONCE_ACTION, 'nonce');
 
@@ -1760,6 +1881,28 @@ class InterSoccer_Program_Manager {
 		return in_array($taxonomy, $variation_taxonomies, true);
 	}
 
+	/**
+	 * Human-readable label for a missing completeness key.
+	 *
+	 * @param string $key
+	 * @return string
+	 */
+	private static function format_missing_key_label($key) {
+		$key = (string) $key;
+		if (strpos($key, 'pa_') === 0) {
+			$slug  = substr($key, 3);
+			$label = function_exists('intersoccer_attr_wc_label') ? intersoccer_attr_wc_label($slug) : '';
+			return $label !== '' ? $label : $key;
+		}
+		$meta_labels = [
+			'_regular_price'   => __('Regular price', 'intersoccer-product-variations'),
+			'_camp_start_date' => __('Camp start date', 'intersoccer-product-variations'),
+			'_camp_end_date'   => __('Camp end date', 'intersoccer-product-variations'),
+			'_camp_week_index' => __('Camp week', 'intersoccer-product-variations'),
+		];
+		return $meta_labels[$key] ?? $key;
+	}
+
 	private static function get_default_matrix($type, $product_id = 0) {
 		switch ($type) {
 			case 'camp':
@@ -2066,6 +2209,22 @@ class InterSoccer_Program_Manager {
 
 			$venue = isset($attrs['pa_intersoccer-venues']) ? (string) $attrs['pa_intersoccer-venues'] : '';
 			$term  = isset($attrs['pa_camp-terms']) ? (string) $attrs['pa_camp-terms'] : '';
+
+			// Prefer stored meta when WC attribute object is empty (avoids wiping on save).
+			if ($venue === '') {
+				$meta_venue = get_post_meta($var_id, 'attribute_pa_intersoccer-venues', true);
+				if (is_string($meta_venue) && $meta_venue !== '') {
+					$attrs['pa_intersoccer-venues'] = $meta_venue;
+					$venue = $meta_venue;
+				}
+			}
+			if ($term === '') {
+				$meta_term = get_post_meta($var_id, 'attribute_pa_camp-terms', true);
+				if (is_string($meta_term) && $meta_term !== '') {
+					$attrs['pa_camp-terms'] = $meta_term;
+					$term = $meta_term;
+				}
+			}
 
 			if ($term === '' && $terms_ok) {
 				$proposed_term = intersoccer_pm_infer_camp_term_slug_for_variation($var_id, $terms);

@@ -360,6 +360,33 @@
 	});
 
 	// =========================================================================
+	// Camp variation venue assignment (detail view)
+	// =========================================================================
+
+	$(document).on('change', '.intersoccer-pm-venue-select', function() {
+		var $select = $(this);
+		var $row = $select.closest('tr');
+		var $status = $row.find('.intersoccer-pm-venue-status');
+		$status.text(PM.i18n.saving).css('color', '#666');
+
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_save_variation_venue',
+			nonce: PM.nonce,
+			variation_id: $select.data('variation-id'),
+			venue: $select.val() || ''
+		}).done(function(response) {
+			if (response.success) {
+				$status.text(PM.i18n.saved).css('color', 'green');
+				setTimeout(function() { $status.text(''); }, 2000);
+			} else {
+				$status.text(PM.i18n.error + ': ' + ((response.data && response.data.message) || '')).css('color', 'red');
+			}
+		}).fail(function() {
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	// =========================================================================
 	// Duplicate program
 	// =========================================================================
 
