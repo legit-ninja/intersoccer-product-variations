@@ -576,14 +576,14 @@ class InterSoccer_Program_Manager {
 					$venue_missing_count++;
 				}
 			}
-			if ($type === 'camp' && $parent_venue_slugs !== [] && $venue_missing_count > 0) :
+			if (in_array($type, ['camp', 'course'], true) && $parent_venue_slugs !== [] && $venue_missing_count > 0) :
 				?>
 			<div class="notice notice-warning inline" style="margin: 12px 0; padding: 8px 12px;">
 				<p style="margin:0;">
 					<?php
 					printf(
 						/* translators: 1: variations missing venue, 2: parent venue count */
-						esc_html__('Parent has %2$d venue(s), but %1$d variation(s) still need a venue assigned below. Parent venue terms alone do not fill variation SKUs on multi-venue camps.', 'intersoccer-product-variations'),
+						esc_html__('Parent has %2$d venue(s), but %1$d variation(s) still need a venue assigned below. Parent venue terms alone do not fill variation SKUs on multi-venue programs.', 'intersoccer-product-variations'),
 						(int) $venue_missing_count,
 						(int) count($parent_venue_slugs)
 					);
@@ -638,7 +638,7 @@ class InterSoccer_Program_Manager {
 					<tr>
 						<th><?php esc_html_e('ID', 'intersoccer-product-variations'); ?></th>
 						<th><?php esc_html_e('Attributes', 'intersoccer-product-variations'); ?></th>
-						<?php if ($type === 'camp') : ?>
+						<?php if (in_array($type, ['camp', 'course'], true)) : ?>
 							<th><?php esc_html_e('Venue', 'intersoccer-product-variations'); ?></th>
 						<?php endif; ?>
 						<th><?php esc_html_e('Price (CHF)', 'intersoccer-product-variations'); ?></th>
@@ -655,7 +655,7 @@ class InterSoccer_Program_Manager {
 					<?php
 					$children = $product->get_children();
 					$parent_venue_terms = [];
-					if ($type === 'camp' && $parent_venue_slugs !== []) {
+					if (in_array($type, ['camp', 'course'], true) && $parent_venue_slugs !== []) {
 						foreach ($parent_venue_slugs as $vslug) {
 							$vterm = get_term_by('slug', $vslug, 'pa_intersoccer-venues');
 							if ($vterm && !is_wp_error($vterm)) {
@@ -693,7 +693,7 @@ class InterSoccer_Program_Manager {
 					<tr data-variation-id="<?php echo esc_attr($var_id); ?>">
 						<td><?php echo esc_html($var_id); ?></td>
 						<td><?php echo esc_html(implode(' | ', $attr_display) ?: '—'); ?></td>
-						<?php if ($type === 'camp') : ?>
+						<?php if (in_array($type, ['camp', 'course'], true)) : ?>
 							<td>
 								<select class="intersoccer-pm-venue-select" data-variation-id="<?php echo esc_attr($var_id); ?>" style="min-width: 180px; max-width: 260px;">
 									<option value=""><?php esc_html_e('— Select venue —', 'intersoccer-product-variations'); ?></option>
@@ -1341,8 +1341,8 @@ class InterSoccer_Program_Manager {
 		$type      = class_exists('InterSoccer_Product_Types')
 			? InterSoccer_Product_Types::get_product_type($parent_id)
 			: '';
-		if ($type !== 'camp') {
-			wp_send_json_error(['message' => __('Venue assignment is only supported for camps.', 'intersoccer-product-variations')]);
+		if (!in_array($type, ['camp', 'course'], true)) {
+			wp_send_json_error(['message' => __('Venue assignment is only supported for camps and courses.', 'intersoccer-product-variations')]);
 		}
 
 		$allowed = wc_get_product_terms($parent_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
@@ -1373,7 +1373,7 @@ class InterSoccer_Program_Manager {
 		wp_send_json_success([
 			'variation_id' => $variation_id,
 			'venue'        => $venue_slug,
-			'completeness' => self::get_variation_completeness($variation_id, 'camp'),
+			'completeness' => self::get_variation_completeness($variation_id, $type),
 		]);
 	}
 
@@ -1824,6 +1824,12 @@ class InterSoccer_Program_Manager {
 
 		if ($type === 'camp') {
 			self::repair_camp_variation_facets($product_id);
+		} elseif ($type === 'course') {
+			// Keep venues as a variation attribute so storefront shows InterSoccer Venues.
+			$course_venues = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
+			if (!is_wp_error($course_venues) && !empty($course_venues)) {
+				self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $course_venues);
+			}
 		}
 
 		$completeness = self::get_product_completeness($product_id);

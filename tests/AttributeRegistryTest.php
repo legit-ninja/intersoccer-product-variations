@@ -149,6 +149,18 @@ class AttributeRegistryTest extends TestCase {
         $this->assertContains('1000-1230', $slugs);
     }
 
+    public function test_course_variation_template_includes_venues() {
+        $templates = intersoccer_attr_product_type_templates();
+        $this->assertContains('intersoccer-venues', $templates['course']['variation']);
+        $this->assertContains('course-day', $templates['course']['variation']);
+        $this->assertContains('course-times', $templates['course']['variation']);
+        $this->assertContains('age-group', $templates['course']['variation']);
+        $this->assertContains(
+            'pa_intersoccer-venues',
+            intersoccer_attr_required('course', 'variation')
+        );
+    }
+
     public function test_camp_and_course_templates_include_girls_only() {
         $templates = intersoccer_attr_product_type_templates();
         $this->assertContains('girls-only', $templates['camp']['parent']);

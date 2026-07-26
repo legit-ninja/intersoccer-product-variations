@@ -315,7 +315,8 @@ function intersoccer_attr_product_type_templates() {
         ],
         'course' => [
             'parent' => array_merge($core_parent, ['girls-only']),
-            'variation' => ['course-day', 'course-times', 'age-group'],
+            // Venue is a variation dimension in the live catalogue (per-venue day/age/time SKUs).
+            'variation' => ['course-day', 'course-times', 'age-group', 'intersoccer-venues'],
             'meta' => ['_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
         ],
         'birthday' => [
