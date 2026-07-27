@@ -8,6 +8,10 @@
 
 	var PM = window.intersoccerPM || {};
 	var Matrix = window.intersoccerPMMatrix || {};
+	/** Snapshot of selected matrix rows (Step 3 checkboxes are hidden on Step 4). */
+	var lastMatrixRows = [];
+	/** Snapshot of parent attrs for selected type (Step 2 rows hidden on Step 4). */
+	var lastParentAttrs = {};
 
 	// =========================================================================
 	// Wizard navigation
@@ -51,10 +55,16 @@
 				alert(PM.i18n.enter_name);
 				return;
 			}
+			var attrs = snapshotParentAttrs();
+			if (getSelectedType() === 'course' && !(attrs['pa_course-day'] || []).length) {
+				alert('Please select at least one Course Day before continuing.');
+				return;
+			}
 			buildMatrixPreview();
 		}
 
 		if (current === 3) {
+			snapshotMatrixRows();
 			buildReviewSummary();
 		}
 
@@ -70,14 +80,48 @@
 	// Step 2: Show/hide attribute fields based on type
 	// =========================================================================
 
+	function rowTypeList($row) {
+		return String($row.attr('data-types') || '')
+			.split(',')
+			.map(function(s) { return s.trim(); })
+			.filter(Boolean);
+	}
+
+	function rowMatchesType($row, type) {
+		return rowTypeList($row).indexOf(type) !== -1;
+	}
+
 	function showAttrFieldsForType(type) {
 		$('.intersoccer-pm-attr-row').hide();
 		$('.intersoccer-pm-attr-row').each(function() {
-			var types = $(this).data('types').toString().split(',');
-			if (types.indexOf(type) !== -1) {
+			if (rowMatchesType($(this), type)) {
 				$(this).show();
 			}
 		});
+	}
+
+	/**
+	 * Read selected option values (works for single + multi, hidden or visible).
+	 */
+	function readSelectSlugs($select) {
+		if (!$select || !$select.length) {
+			return [];
+		}
+		var slugs = [];
+		$select.find('option').filter(':selected').each(function() {
+			var v = this.value || $(this).attr('value') || '';
+			if (v) {
+				slugs.push(String(v));
+			}
+		});
+		if (slugs.length) {
+			return slugs;
+		}
+		var val = $select.val();
+		if (!val) {
+			return [];
+		}
+		return (Array.isArray(val) ? val : [val]).map(String).filter(Boolean);
 	}
 
 	// =========================================================================
@@ -93,11 +137,25 @@
 			Matrix.camp = rows;
 		}
 
+		if (type === 'course') {
+			rows = rebuildCourseMatrixFromParentAttrs();
+			Matrix.course = rows;
+		}
+
 		var $container = $('#intersoccer-pm-matrix-container');
 		$container.empty();
 
+		var summaryHtml = buildParentAttrSummaryHtml();
+		if (summaryHtml) {
+			$container.append(summaryHtml);
+		}
+
 		if (rows.length === 0) {
-			$container.html('<p><em>' + 'No default variations for this type.' + '</em></p>');
+			var emptyMsg = type === 'course'
+				? 'Select at least one Course Day in Step 2 to build variations.'
+				: 'No default variations for this type.';
+			$container.append('<p><em>' + emptyMsg + '</em></p>');
+			lastMatrixRows = [];
 			return;
 		}
 
@@ -110,8 +168,92 @@
 			html += '</tr>';
 		}
 		html += '</tbody></table>';
-		$container.html(html);
+		$container.append(html);
+		snapshotMatrixRows();
 	}
+
+	function buildParentAttrSummaryHtml() {
+		var lines = collectParentAttrLabels();
+		if (!lines.length) {
+			return '';
+		}
+		var html = '<div class="intersoccer-pm-step2-summary" style="margin:0 0 16px;padding:12px;background:#f6f7f7;border-left:4px solid #2271b1;">';
+		html += '<p style="margin:0 0 8px;"><strong>Selections from Step 2</strong></p><ul style="margin:0;">';
+		for (var i = 0; i < lines.length; i++) {
+			html += '<li>' + escHtml(lines[i]) + '</li>';
+		}
+		html += '</ul></div>';
+		return html;
+	}
+
+	function collectParentAttrLabels() {
+		var type = getSelectedType();
+		var lines = [];
+		$('.intersoccer-pm-attr-row').each(function() {
+			var $row = $(this);
+			if (!rowMatchesType($row, type)) {
+				return;
+			}
+			var $select = $row.find('select.intersoccer-pm-attr-select').first();
+			if (!$select.length) {
+				return;
+			}
+			var labels = $select.find('option').filter(':selected').map(function() {
+				return $(this).text();
+			}).get().filter(function(t) {
+				return t && t !== '— Select —';
+			});
+			if (!labels.length) {
+				return;
+			}
+			var label = $row.find('th label').text().replace(/\s*\*\s*$/, '');
+			lines.push(label + ': ' + labels.join(', '));
+		});
+		var start = $('#pm-course-start-date').val();
+		var weeks = $('#pm-course-total-weeks').val();
+		var price = $('#pm-regular-price').val();
+		if (start) {
+			lines.push('Course start date: ' + start);
+		}
+		if (weeks) {
+			lines.push('Total weeks / sessions: ' + weeks);
+		}
+		if (price) {
+			lines.push('Regular price (CHF): ' + price);
+		}
+		return lines;
+	}
+
+	/**
+	 * Collect parent attribute selections for the active program type (works when Step 2 is hidden).
+	 */
+	function snapshotParentAttrs() {
+		var type = getSelectedType();
+		var attrs = {};
+		$('.intersoccer-pm-attr-row').each(function() {
+			var $row = $(this);
+			if (!rowMatchesType($row, type)) {
+				return;
+			}
+			var $select = $row.find('select.intersoccer-pm-attr-select').first();
+			if (!$select.length) {
+				return;
+			}
+			var taxonomy = $select.attr('data-taxonomy') || $select.data('taxonomy');
+			var slugs = readSelectSlugs($select);
+			if (taxonomy && slugs.length) {
+				attrs[taxonomy] = slugs;
+			}
+		});
+		lastParentAttrs = attrs;
+		return attrs;
+	}
+
+	function snapshotMatrixRows() {
+		lastMatrixRows = getSelectedMatrixRows();
+		return lastMatrixRows;
+	}
+
 
 	/**
 	 * Rebuild camp matrix from selected parent ages/times (pairs Full/Half Day with clock hours).
@@ -155,16 +297,63 @@
 		return rows;
 	}
 
+	/**
+	 * Rebuild course matrix from selected Course Day(s) × ages × times × venues.
+	 */
+	function rebuildCourseMatrixFromParentAttrs() {
+		// Course times are variation-only — not selected at program create.
+		var days = getSelectedAttrSlugs('pa_course-day');
+		if (!days.length) {
+			return [];
+		}
+		var ages = getSelectedAttrSlugs('pa_age-group');
+		var venues = getSelectedAttrSlugs('pa_intersoccer-venues');
+
+		var ageList = ages.length ? ages : [''];
+		var venueList = venues.length ? venues : [''];
+
+		var rows = [];
+		days.forEach(function(day) {
+			ageList.forEach(function(age) {
+				venueList.forEach(function(venue) {
+					var row = { 'pa_course-day': day };
+					var parts = [day];
+					if (age) {
+						row['pa_age-group'] = age;
+						parts.push(age);
+					}
+					if (venue) {
+						row['pa_intersoccer-venues'] = venue;
+						parts.push(venue);
+					}
+					row.label = parts.join(' / ');
+					rows.push(row);
+				});
+			});
+		});
+		return rows;
+	}
+
 	function getSelectedAttrSlugs(taxonomy) {
-		var $select = $('.intersoccer-pm-attr-row:visible select[data-taxonomy="' + taxonomy + '"]');
-		if (!$select.length) {
-			return [];
+		if (lastParentAttrs[taxonomy] && lastParentAttrs[taxonomy].length) {
+			return lastParentAttrs[taxonomy].slice();
 		}
-		var vals = $select.val();
-		if (!vals) {
-			return [];
-		}
-		return Array.isArray(vals) ? vals.filter(Boolean) : [vals].filter(Boolean);
+		var type = getSelectedType();
+		var found = [];
+		$('.intersoccer-pm-attr-row').each(function() {
+			var $row = $(this);
+			if (!rowMatchesType($row, type)) {
+				return;
+			}
+			var $select = $row.find('select.intersoccer-pm-attr-select').filter(function() {
+				return ($(this).attr('data-taxonomy') || '') === taxonomy;
+			}).first();
+			if (!$select.length) {
+				return;
+			}
+			found = readSelectSlugs($select);
+		});
+		return found;
 	}
 
 	function pairCampTimeForAge(ageSlug, allowedTimes) {
@@ -198,19 +387,9 @@
 	function buildReviewSummary() {
 		var type = getSelectedType();
 		var name = $('#pm-product-name').val().trim();
-		var selectedRows = getSelectedMatrixRows();
-
-		var attrs = [];
-		$('.intersoccer-pm-attr-row:visible').each(function() {
-			var label = $(this).find('th label').text().replace(' *', '');
-			var $select = $(this).find('select');
-			var val = $select.find('option:selected').map(function() {
-				return $(this).text();
-			}).get().join(', ');
-			if (val && val !== '— Select —') {
-				attrs.push(label + ': ' + val);
-			}
-		});
+		snapshotParentAttrs();
+		var selectedRows = lastMatrixRows.length ? lastMatrixRows : getSelectedMatrixRows();
+		var attrs = collectParentAttrLabels();
 
 		var html = '<table class="form-table">';
 		html += '<tr><th>Name</th><td><strong>' + escHtml(name) + '</strong></td></tr>';
@@ -252,24 +431,37 @@
 
 		var type = getSelectedType();
 		var name = $('#pm-product-name').val().trim();
-		var matrix = getSelectedMatrixRows();
-		var parentAttrs = {};
+		snapshotParentAttrs();
+		snapshotMatrixRows();
+		var matrix = lastMatrixRows.length ? lastMatrixRows : getSelectedMatrixRows();
+		var parentAttrs = Object.keys(lastParentAttrs).length ? lastParentAttrs : {};
 
-		$('.intersoccer-pm-attr-row:visible select').each(function() {
-			var taxonomy = $(this).data('taxonomy');
-			var val = $(this).val();
-			if (val && taxonomy) {
-				parentAttrs[taxonomy] = Array.isArray(val) ? val : [val];
-			}
-		});
+		if (!Object.keys(parentAttrs).length) {
+			parentAttrs = snapshotParentAttrs();
+		}
+		if (type === 'course' && !(parentAttrs['pa_course-day'] || []).length) {
+			alert('Please select at least one Course Day in Step 2 before creating.');
+			$btn.prop('disabled', false).text('Create as Draft');
+			return;
+		}
+
+		var courseMeta = {
+			_course_start_date: $('#pm-course-start-date').val() || '',
+			_course_total_weeks: $('#pm-course-total-weeks').val() || '',
+			_course_holiday_dates: $('#pm-course-holiday-dates').val() || ''
+		};
+		var regularPrice = $('#pm-regular-price').val() || '';
+
 
 		$.post(PM.ajax_url, {
 			action: 'intersoccer_pm_create_product',
 			nonce: PM.nonce,
 			name: name,
 			program_type: type,
-			parent_attrs: parentAttrs,
-			matrix: matrix
+			parent_attrs_json: JSON.stringify(parentAttrs),
+			matrix_json: JSON.stringify(matrix),
+			course_meta_json: JSON.stringify(courseMeta),
+			regular_price: regularPrice
 		}).done(function(response) {
 			if (response.success) {
 				$('#intersoccer-pm-create-result')
@@ -374,6 +566,33 @@
 			nonce: PM.nonce,
 			variation_id: $select.data('variation-id'),
 			venue: $select.val() || ''
+		}).done(function(response) {
+			if (response.success) {
+				$status.text(PM.i18n.saved).css('color', 'green');
+				setTimeout(function() { $status.text(''); }, 2000);
+			} else {
+				$status.text(PM.i18n.error + ': ' + ((response.data && response.data.message) || '')).css('color', 'red');
+			}
+		}).fail(function() {
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	// =========================================================================
+	// Course variation time assignment (detail view)
+	// =========================================================================
+
+	$(document).on('change', '.intersoccer-pm-course-time-select', function() {
+		var $select = $(this);
+		var $row = $select.closest('tr');
+		var $status = $row.find('.intersoccer-pm-course-time-status');
+		$status.text(PM.i18n.saving).css('color', '#666');
+
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_save_variation_course_time',
+			nonce: PM.nonce,
+			variation_id: $select.data('variation-id'),
+			course_time: $select.val() || ''
 		}).done(function(response) {
 			if (response.success) {
 				$status.text(PM.i18n.saved).css('color', 'green');
@@ -793,6 +1012,53 @@
 		}).fail(function() {
 			$btn.prop('disabled', false);
 			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	// =========================================================================
+	// Detail view: product status (draft / publish / private)
+	// =========================================================================
+
+	var PM_STATUS_LABELS = {
+		draft: 'Draft',
+		publish: 'Published',
+		private: 'Private'
+	};
+
+	$(document).on('click', '#intersoccer-pm-save-status-btn', function() {
+		var $btn = $(this);
+		if ($btn.prop('disabled')) {
+			return;
+		}
+		var productId = $btn.data('product-id');
+		var status = $('#intersoccer-pm-detail-status').val() || '';
+		var $msg = $('#intersoccer-pm-status-save-msg');
+
+		$btn.prop('disabled', true);
+		$msg.text(PM.i18n.saving).css('color', '#666');
+
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_quick_edit',
+			nonce: PM.nonce,
+			product_id: productId,
+			status: status
+		}).done(function(response) {
+			if (response.success) {
+				var saved = (response.data && response.data.status) ? response.data.status : status;
+				var label = PM_STATUS_LABELS[saved] || saved;
+				$('#intersoccer-pm-status-badge').text(label);
+				$('#intersoccer-pm-detail-status').val(saved);
+				$msg.text(PM.i18n.saved).css('color', 'green');
+				setTimeout(function() {
+					window.location.reload();
+				}, 800);
+			} else {
+				$msg.text(response.data && response.data.message ? response.data.message : PM.i18n.error).css('color', 'red');
+				$btn.prop('disabled', false);
+			}
+		}).fail(function() {
+			$msg.text(PM.i18n.error).css('color', 'red');
+			$btn.prop('disabled', false);
 		});
 	});
 

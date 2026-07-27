@@ -161,6 +161,23 @@ class AttributeRegistryTest extends TestCase {
         );
     }
 
+    public function test_course_parent_template_includes_course_day_not_times() {
+        $templates = intersoccer_attr_product_type_templates();
+        $this->assertContains('course-day', $templates['course']['parent']);
+        $this->assertNotContains('course-times', $templates['course']['parent']);
+        $this->assertContains('pa_course-day', intersoccer_attr_required('course', 'parent'));
+        $this->assertNotContains('pa_course-times', intersoccer_attr_required('course', 'parent'));
+        $this->assertContains('course-times', $templates['course']['variation']);
+    }
+
+    public function test_course_day_defaults_include_weekend() {
+        $terms = intersoccer_attr_definition('course-day')['default_terms'] ?? [];
+        $slugs = array_column($terms, 'slug');
+        $this->assertContains('wednesday', $slugs);
+        $this->assertContains('saturday', $slugs);
+        $this->assertContains('sunday', $slugs);
+    }
+
     public function test_camp_and_course_templates_include_girls_only() {
         $templates = intersoccer_attr_product_type_templates();
         $this->assertContains('girls-only', $templates['camp']['parent']);

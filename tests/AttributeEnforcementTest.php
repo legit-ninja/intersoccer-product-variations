@@ -63,6 +63,8 @@ class AttributeEnforcementTest extends TestCase {
     public function test_course_allowed_slugs_include_girls_only_not_camp_terms() {
         $slugs = intersoccer_attr_allowed_slugs_for_product_type('course');
         $this->assertContains('girls-only', $slugs);
+        $this->assertContains('course-day', $slugs);
+        $this->assertContains('course-times', $slugs);
         $this->assertNotContains('camp-terms', $slugs);
     }
 

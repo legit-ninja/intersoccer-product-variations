@@ -35,6 +35,7 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_check_completeness', [__CLASS__, 'ajax_check_completeness']);
 		add_action('wp_ajax_intersoccer_pm_save_variation_price', [__CLASS__, 'ajax_save_variation_price']);
 		add_action('wp_ajax_intersoccer_pm_save_variation_venue', [__CLASS__, 'ajax_save_variation_venue']);
+		add_action('wp_ajax_intersoccer_pm_save_variation_course_time', [__CLASS__, 'ajax_save_variation_course_time']);
 		add_action('wp_ajax_intersoccer_pm_save_camp_schedule', [__CLASS__, 'ajax_save_camp_schedule']);
 		add_action('wp_ajax_intersoccer_pm_prefill_camp_schedules', [__CLASS__, 'ajax_prefill_camp_schedules']);
 		add_action('wp_ajax_intersoccer_pm_apply_parsed_camp_dates', [__CLASS__, 'ajax_apply_parsed_camp_dates']);
@@ -69,7 +70,7 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.7.21-birthday',
+			'2.7.27',
 			true
 		);
 
@@ -467,6 +468,7 @@ class InterSoccer_Program_Manager {
 		$completeness = self::get_product_completeness($product_id);
 		$type         = $completeness['type'];
 		$templates    = intersoccer_attr_product_type_templates();
+
 		$list_url     = menu_page_url(self::PAGE_SLUG, false);
 		$edit_url     = get_edit_post_link($product_id, 'raw');
 		$duplicate_url = add_query_arg([
@@ -475,12 +477,20 @@ class InterSoccer_Program_Manager {
 			'action'    => 'duplicate',
 			'source_id' => $product_id,
 		], admin_url('edit.php'));
+		$post_status   = $product->get_status();
+		$status_labels = [
+			'draft'   => __('Draft', 'intersoccer-product-variations'),
+			'publish' => __('Published', 'intersoccer-product-variations'),
+			'private' => __('Private', 'intersoccer-product-variations'),
+		];
+		$status_badge  = $status_labels[$post_status] ?? ucfirst((string) $post_status);
 
 		?>
 		<div class="wrap intersoccer-pm-detail">
 			<h1>
 				<?php echo esc_html($product->get_name()); ?>
 				<span class="intersoccer-pm-type-badge"><?php echo esc_html(ucfirst($type ?: 'unknown')); ?></span>
+				<span class="intersoccer-pm-post-status-badge post-state" id="intersoccer-pm-status-badge"><?php echo esc_html($status_badge); ?></span>
 			</h1>
 			<p>
 				<a href="<?php echo esc_url($list_url); ?>">&larr; <?php esc_html_e('Back to Program List', 'intersoccer-product-variations'); ?></a>
@@ -489,10 +499,24 @@ class InterSoccer_Program_Manager {
 				&nbsp;|&nbsp;
 				<a href="<?php echo esc_url($duplicate_url); ?>"><?php esc_html_e('Duplicate Program', 'intersoccer-product-variations'); ?></a>
 			</p>
+			<p class="intersoccer-pm-detail-status-row" style="margin:12px 0 20px;">
+				<label for="intersoccer-pm-detail-status" style="font-weight:600;margin-right:8px;">
+					<?php esc_html_e('Status', 'intersoccer-product-variations'); ?>
+				</label>
+				<select id="intersoccer-pm-detail-status" style="min-width:140px;">
+					<option value="draft" <?php selected($post_status, 'draft'); ?>><?php esc_html_e('Draft', 'intersoccer-product-variations'); ?></option>
+					<option value="publish" <?php selected($post_status, 'publish'); ?>><?php esc_html_e('Publish', 'intersoccer-product-variations'); ?></option>
+					<option value="private" <?php selected($post_status, 'private'); ?>><?php esc_html_e('Private', 'intersoccer-product-variations'); ?></option>
+				</select>
+				<button type="button" class="button button-primary" id="intersoccer-pm-save-status-btn" data-product-id="<?php echo esc_attr((string) $product_id); ?>">
+					<?php esc_html_e('Update status', 'intersoccer-product-variations'); ?>
+				</button>
+				<span id="intersoccer-pm-status-save-msg" style="margin-left:8px;"></span>
+			</p>
 
 			<h2><?php esc_html_e('Parent Attributes', 'intersoccer-product-variations'); ?></h2>
 			<?php
-			$multi_select_slugs = ['days-of-week', 'camp-terms', 'camp-times', 'course-times', 'intersoccer-venues', 'age-group'];
+			$multi_select_slugs = ['days-of-week', 'camp-terms', 'camp-times', 'course-day', 'course-times', 'intersoccer-venues', 'age-group'];
 			$required_parent = intersoccer_attr_required($type, 'parent');
 			if ($type === 'birthday') {
 				$required_parent = array_values(array_filter(
@@ -553,6 +577,11 @@ class InterSoccer_Program_Manager {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			<?php if ($type === 'course') : ?>
+			<p class="description" style="max-width:700px;">
+				<?php esc_html_e('Select Course Day(s) here, then Save Attributes. Assign Course Times on each variation below (times differ per SKU). Use Auto-generate Variations to create missing day × age × venue SKUs.', 'intersoccer-product-variations'); ?>
+			</p>
+			<?php endif; ?>
 			<p style="margin-top: 12px;">
 				<button type="button" class="button button-primary" id="intersoccer-pm-save-attrs-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
 					<?php esc_html_e('Save Attributes', 'intersoccer-product-variations'); ?>
@@ -592,7 +621,7 @@ class InterSoccer_Program_Manager {
 			</div>
 			<?php endif; ?>
 
-			<?php if ($type && $completeness['variations_total'] === 0) : ?>
+			<?php if ($type && ($completeness['variations_total'] === 0 || $type === 'course')) : ?>
 				<p>
 					<button type="button" class="button button-primary" id="intersoccer-pm-scaffold-btn" data-product-id="<?php echo esc_attr($product_id); ?>" data-product-type="<?php echo esc_attr($type); ?>">
 						<?php esc_html_e('Auto-generate Variations', 'intersoccer-product-variations'); ?>
@@ -641,6 +670,9 @@ class InterSoccer_Program_Manager {
 						<?php if (in_array($type, ['camp', 'course'], true)) : ?>
 							<th><?php esc_html_e('Venue', 'intersoccer-product-variations'); ?></th>
 						<?php endif; ?>
+						<?php if ($type === 'course') : ?>
+							<th><?php esc_html_e('Course Time', 'intersoccer-product-variations'); ?></th>
+						<?php endif; ?>
 						<th><?php esc_html_e('Price (CHF)', 'intersoccer-product-variations'); ?></th>
 						<?php if ($type === 'camp') : ?>
 							<th><?php esc_html_e('Week', 'intersoccer-product-variations'); ?></th>
@@ -663,6 +695,13 @@ class InterSoccer_Program_Manager {
 							}
 						}
 					}
+					$course_time_terms = [];
+					if ($type === 'course' && taxonomy_exists('pa_course-times')) {
+						$ct_terms = get_terms(['taxonomy' => 'pa_course-times', 'hide_empty' => false]);
+						if (!is_wp_error($ct_terms)) {
+							$course_time_terms = $ct_terms;
+						}
+					}
 					foreach ($children as $var_id) :
 						$variation    = wc_get_product($var_id);
 						if (!$variation) continue;
@@ -670,7 +709,7 @@ class InterSoccer_Program_Manager {
 						$var_attrs    = $variation->get_attributes();
 						$attr_display = [];
 						foreach ($var_attrs as $tax => $val) {
-							if ($tax === 'pa_intersoccer-venues') {
+							if ($tax === 'pa_intersoccer-venues' || ($type === 'course' && $tax === 'pa_course-times')) {
 								continue;
 							}
 							$slug  = str_replace('pa_', '', $tax);
@@ -688,6 +727,10 @@ class InterSoccer_Program_Manager {
 						if ($current_venue === '') {
 							$current_venue = (string) get_post_meta($var_id, 'attribute_pa_intersoccer-venues', true);
 						}
+						$current_course_time = isset($var_attrs['pa_course-times']) ? (string) $var_attrs['pa_course-times'] : '';
+						if ($current_course_time === '') {
+							$current_course_time = (string) get_post_meta($var_id, 'attribute_pa_course-times', true);
+						}
 						$issue_labels = array_map([__CLASS__, 'format_missing_key_label'], $var_result['missing']);
 					?>
 					<tr data-variation-id="<?php echo esc_attr($var_id); ?>">
@@ -704,6 +747,19 @@ class InterSoccer_Program_Manager {
 									<?php endforeach; ?>
 								</select>
 								<span class="intersoccer-pm-venue-status"></span>
+							</td>
+						<?php endif; ?>
+						<?php if ($type === 'course') : ?>
+							<td>
+								<select class="intersoccer-pm-course-time-select" data-variation-id="<?php echo esc_attr($var_id); ?>" style="min-width: 140px; max-width: 220px;">
+									<option value=""><?php esc_html_e('— Select time —', 'intersoccer-product-variations'); ?></option>
+									<?php foreach ($course_time_terms as $tterm) : ?>
+										<option value="<?php echo esc_attr($tterm->slug); ?>" <?php selected($current_course_time, $tterm->slug); ?>>
+											<?php echo esc_html($tterm->name); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+								<span class="intersoccer-pm-course-time-status"></span>
 							</td>
 						<?php endif; ?>
 						<td>
@@ -782,6 +838,7 @@ class InterSoccer_Program_Manager {
 		</div>
 		<style>
 			.intersoccer-pm-type-badge { background: #2271b1; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 12px; vertical-align: middle; margin-left: 8px; }
+			.intersoccer-pm-post-status-badge { font-size: 13px; font-weight: 600; margin-left: 10px; color: #646970; vertical-align: middle; }
 			.intersoccer-pm-variation-count { font-size: 14px; font-weight: normal; color: #666; }
 			.intersoccer-pm-price-status { font-size: 11px; margin-left: 4px; }
 		</style>
@@ -859,12 +916,12 @@ class InterSoccer_Program_Manager {
 								$taxonomy = intersoccer_attr_taxonomy($slug);
 								$label    = intersoccer_attr_wc_label($slug) ?: $slug;
 								$terms    = $term_options[$taxonomy] ?? [];
-								$is_multi = in_array($slug, ['days-of-week', 'camp-terms', 'camp-times', 'course-times', 'intersoccer-venues', 'age-group'], true);
+								$is_multi = in_array($slug, ['days-of-week', 'camp-terms', 'camp-times', 'course-day', 'course-times', 'intersoccer-venues', 'age-group'], true);
 						?>
 						<tr class="intersoccer-pm-attr-row" data-types="<?php echo esc_attr($t); ?>" style="display:none;">
 							<th><label><?php echo esc_html($label); ?> *</label></th>
 							<td>
-								<select name="parent_attrs[<?php echo esc_attr($taxonomy); ?>][]" class="intersoccer-pm-attr-select" data-taxonomy="<?php echo esc_attr($taxonomy); ?>" <?php echo $is_multi ? 'multiple size="5"' : ''; ?>>
+								<select name="parent_attrs[<?php echo esc_attr($t); ?>][<?php echo esc_attr($taxonomy); ?>][]" class="intersoccer-pm-attr-select" data-taxonomy="<?php echo esc_attr($taxonomy); ?>" data-program-type="<?php echo esc_attr($t); ?>" <?php echo $is_multi ? 'multiple size="5"' : ''; ?>>
 									<?php if (!$is_multi) : ?>
 										<option value=""><?php esc_html_e('— Select —', 'intersoccer-product-variations'); ?></option>
 									<?php endif; ?>
@@ -875,6 +932,28 @@ class InterSoccer_Program_Manager {
 							</td>
 						</tr>
 						<?php endforeach; endforeach; ?>
+						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
+							<th><label for="pm-course-start-date"><?php esc_html_e('Course start date', 'intersoccer-product-variations'); ?></label></th>
+							<td><input type="date" id="pm-course-start-date" /></td>
+						</tr>
+						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
+							<th><label for="pm-course-total-weeks"><?php esc_html_e('Total weeks / sessions', 'intersoccer-product-variations'); ?></label></th>
+							<td><input type="number" id="pm-course-total-weeks" min="1" max="52" value="16" style="width:80px;" /></td>
+						</tr>
+						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
+							<th><label for="pm-course-holiday-dates"><?php esc_html_e('Holiday dates', 'intersoccer-product-variations'); ?></label></th>
+							<td>
+								<textarea id="pm-course-holiday-dates" rows="3" class="large-text" placeholder="<?php esc_attr_e('One Y-m-d per line, e.g. 2026-12-25', 'intersoccer-product-variations'); ?>"></textarea>
+								<p class="description"><?php esc_html_e('Applied to each variation as _course_holiday_dates before generation.', 'intersoccer-product-variations'); ?></p>
+							</td>
+						</tr>
+						<tr class="intersoccer-pm-attr-row" data-types="camp,course,birthday,tournament" style="display:none;">
+							<th><label for="pm-regular-price"><?php esc_html_e('Regular price (CHF)', 'intersoccer-product-variations'); ?></label></th>
+							<td>
+								<input type="number" id="pm-regular-price" min="0" step="0.01" style="width:120px;" />
+								<p class="description"><?php esc_html_e('Optional. Applied to all generated variations.', 'intersoccer-product-variations'); ?></p>
+							</td>
+						</tr>
 					</table>
 					<p>
 						<button type="button" class="button intersoccer-pm-prev" data-prev="1"><?php esc_html_e('Back', 'intersoccer-product-variations'); ?></button>
@@ -912,7 +991,8 @@ class InterSoccer_Program_Manager {
 		<script type="text/javascript">
 			var intersoccerPMMatrix = {
 				camp: <?php echo wp_json_encode(self::build_camp_matrix_rows()); ?>,
-				course: <?php echo wp_json_encode(self::get_course_matrix_options($term_options)); ?>,
+				// Course matrix is rebuilt in JS from Step 2 multi-selects (days/ages/times/venues).
+				course: [],
 				birthday: <?php echo wp_json_encode(self::get_birthday_matrix_options($term_options)); ?>,
 				tournament: <?php echo wp_json_encode(self::get_tournament_matrix_options($term_options)); ?>
 			};
@@ -943,24 +1023,51 @@ class InterSoccer_Program_Manager {
 	}
 
 	/**
-	 * Build course variation matrix from available terms.
+	 * Build course variation matrix from selected day / age / time / venue slugs.
+	 *
+	 * @param string[] $day_slugs
+	 * @param string[] $age_slugs
+	 * @param string[] $time_slugs
+	 * @param string[] $venue_slugs
+	 * @return array<int,array<string,string>>
 	 */
-	private static function get_course_matrix_options($term_options) {
-		$days  = $term_options['pa_course-day'] ?? [];
-		$times = $term_options['pa_course-times'] ?? [];
-		$ages  = $term_options['pa_age-group'] ?? [];
-
-		$matrix = [];
-		foreach ($days as $day) {
-			foreach ($ages as $age) {
-				$matrix[] = [
-					'pa_course-day' => $day->slug,
-					'pa_age-group'  => $age->slug,
-					'label'         => $day->name . ' / ' . $age->name,
-				];
+	public static function build_course_matrix_rows($day_slugs = [], $age_slugs = [], $time_slugs = [], $venue_slugs = []) {
+		if (!function_exists('intersoccer_pm_build_course_matrix_rows')) {
+			$helpers = INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/helpers.php';
+			if (is_readable($helpers)) {
+				require_once $helpers;
 			}
 		}
-		return $matrix;
+		return function_exists('intersoccer_pm_build_course_matrix_rows')
+			? intersoccer_pm_build_course_matrix_rows($day_slugs, $age_slugs, $time_slugs, $venue_slugs)
+			: [];
+	}
+
+	/**
+	 * @param array<string,array<int,object>> $term_options
+	 * @return array<int,array<string,string>>
+	 */
+	private static function get_course_matrix_options($term_options) {
+		$day_slugs   = [];
+		$age_slugs   = [];
+		$venue_slugs = [];
+		foreach ($term_options['pa_course-day'] ?? [] as $term) {
+			if (is_object($term) && isset($term->slug)) {
+				$day_slugs[] = (string) $term->slug;
+			}
+		}
+		foreach ($term_options['pa_age-group'] ?? [] as $term) {
+			if (is_object($term) && isset($term->slug)) {
+				$age_slugs[] = (string) $term->slug;
+			}
+		}
+		foreach ($term_options['pa_intersoccer-venues'] ?? [] as $term) {
+			if (is_object($term) && isset($term->slug)) {
+				$venue_slugs[] = (string) $term->slug;
+			}
+		}
+		// Omit course-times: assigned per variation, not at program create.
+		return self::build_course_matrix_rows($day_slugs, $age_slugs, [], $venue_slugs);
 	}
 
 	private static function get_birthday_matrix_options($term_options) {
@@ -1072,8 +1179,36 @@ class InterSoccer_Program_Manager {
 		$product->set_status('draft');
 		$product->set_catalog_visibility('visible');
 
-		$parent_attrs_raw = isset($_POST['parent_attrs']) && is_array($_POST['parent_attrs']) ? $_POST['parent_attrs'] : [];
+		$parent_attrs_raw = [];
+		if (!empty($_POST['parent_attrs_json'])) {
+			$decoded = json_decode(wp_unslash((string) $_POST['parent_attrs_json']), true);
+			if (is_array($decoded)) {
+				$parent_attrs_raw = $decoded;
+			}
+		} elseif (isset($_POST['parent_attrs']) && is_array($_POST['parent_attrs'])) {
+			$parent_attrs_raw = $_POST['parent_attrs'];
+		}
 		$wc_attributes    = [];
+
+		$matrix = [];
+		if (!empty($_POST['matrix_json'])) {
+			$decoded_matrix = json_decode(wp_unslash((string) $_POST['matrix_json']), true);
+			if (is_array($decoded_matrix)) {
+				$matrix = $decoded_matrix;
+			}
+		} elseif (isset($_POST['matrix']) && is_array($_POST['matrix'])) {
+			$matrix = $_POST['matrix'];
+		}
+
+		$course_meta = [];
+		if (!empty($_POST['course_meta_json'])) {
+			$decoded_meta = json_decode(wp_unslash((string) $_POST['course_meta_json']), true);
+			if (is_array($decoded_meta)) {
+				$course_meta = $decoded_meta;
+			}
+		}
+		$regular_price = isset($_POST['regular_price']) ? wc_format_decimal(wp_unslash((string) $_POST['regular_price'])) : '';
+
 
 		foreach ($parent_attrs_raw as $taxonomy => $term_slugs) {
 			$taxonomy = sanitize_text_field($taxonomy);
@@ -1107,6 +1242,23 @@ class InterSoccer_Program_Manager {
 		}
 
 		$variation_taxonomies = intersoccer_attr_required($type, 'variation');
+		// Collect variation option slugs from matrix so we never dump the full taxonomy.
+		$matrix_slugs_by_tax = [];
+		foreach ($matrix as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+			foreach ($row as $tax => $slug) {
+				if ($tax === 'label' || $slug === '' || $slug === null) {
+					continue;
+				}
+				$tax = (strpos((string) $tax, 'pa_') === 0) ? (string) $tax : 'pa_' . ltrim((string) $tax, '_');
+				if (!isset($matrix_slugs_by_tax[$tax])) {
+					$matrix_slugs_by_tax[$tax] = [];
+				}
+				$matrix_slugs_by_tax[$tax][] = sanitize_text_field((string) $slug);
+			}
+		}
 		foreach ($variation_taxonomies as $taxonomy) {
 			$already_set = false;
 			foreach ($wc_attributes as $attr) {
@@ -1116,18 +1268,30 @@ class InterSoccer_Program_Manager {
 					break;
 				}
 			}
-			if (!$already_set && taxonomy_exists($taxonomy)) {
-				$all_terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'fields' => 'ids']);
-				if (!is_wp_error($all_terms) && !empty($all_terms)) {
-					$attribute = new WC_Product_Attribute();
-					$attribute->set_id(wc_attribute_taxonomy_id_by_name($taxonomy));
-					$attribute->set_name($taxonomy);
-					$attribute->set_options($all_terms);
-					$attribute->set_visible(true);
-					$attribute->set_variation(true);
-					$wc_attributes[] = $attribute;
+			if ($already_set || !taxonomy_exists($taxonomy)) {
+				continue;
+			}
+			$slugs = array_values(array_unique($matrix_slugs_by_tax[$taxonomy] ?? []));
+			if ($slugs === []) {
+				continue;
+			}
+			$term_ids = [];
+			foreach ($slugs as $slug) {
+				$term = get_term_by('slug', $slug, $taxonomy);
+				if ($term && !is_wp_error($term)) {
+					$term_ids[] = (int) $term->term_id;
 				}
 			}
+			if ($term_ids === []) {
+				continue;
+			}
+			$attribute = new WC_Product_Attribute();
+			$attribute->set_id(wc_attribute_taxonomy_id_by_name($taxonomy));
+			$attribute->set_name($taxonomy);
+			$attribute->set_options($term_ids);
+			$attribute->set_visible(true);
+			$attribute->set_variation(true);
+			$wc_attributes[] = $attribute;
 		}
 
 		$product->set_attributes($wc_attributes);
@@ -1174,8 +1338,10 @@ class InterSoccer_Program_Manager {
 		}
 
 		$variations_created = 0;
-		$matrix = isset($_POST['matrix']) && is_array($_POST['matrix']) ? $_POST['matrix'] : [];
 		$times_from_matrix = [];
+		$course_days_from_matrix = [];
+		$course_times_from_matrix = [];
+		$venues_from_matrix = [];
 		foreach ($matrix as $row) {
 			if (!is_array($row)) {
 				continue;
@@ -1183,7 +1349,16 @@ class InterSoccer_Program_Manager {
 			if (!empty($row['pa_camp-times'])) {
 				$times_from_matrix[] = sanitize_text_field((string) $row['pa_camp-times']);
 			}
-			$var_id = self::create_single_variation($product_id, $type, $row);
+			if (!empty($row['pa_course-day'])) {
+				$course_days_from_matrix[] = sanitize_text_field((string) $row['pa_course-day']);
+			}
+			if (!empty($row['pa_course-times'])) {
+				$course_times_from_matrix[] = sanitize_text_field((string) $row['pa_course-times']);
+			}
+			if (!empty($row['pa_intersoccer-venues'])) {
+				$venues_from_matrix[] = sanitize_text_field((string) $row['pa_intersoccer-venues']);
+			}
+			$var_id = self::create_single_variation($product_id, $type, $row, $course_meta, $regular_price);
 			if ($var_id) {
 				$variations_created++;
 			}
@@ -1192,8 +1367,17 @@ class InterSoccer_Program_Manager {
 		if ($type === 'camp' && !empty($times_from_matrix)) {
 			self::ensure_parent_camp_times_variation_attribute($product_id, $times_from_matrix);
 		}
+		if ($type === 'course') {
+			self::ensure_parent_course_variation_attributes(
+				$product_id,
+				$course_days_from_matrix,
+				$course_times_from_matrix,
+				$venues_from_matrix
+			);
+		}
 
 		wc_delete_product_transients($product_id);
+
 
 		$detail_url = add_query_arg([
 			'post_type'  => 'product',
@@ -1231,6 +1415,9 @@ class InterSoccer_Program_Manager {
 		$created = 0;
 		$skipped = 0;
 		$times_from_matrix = [];
+		$course_days_from_matrix = [];
+		$course_times_from_matrix = [];
+		$venues_from_matrix = [];
 
 		$existing_keys = [];
 		foreach ($product->get_children() as $child_id) {
@@ -1254,11 +1441,28 @@ class InterSoccer_Program_Manager {
 				if (!empty($row['pa_camp-times'])) {
 					$times_from_matrix[] = (string) $row['pa_camp-times'];
 				}
+				if (!empty($row['pa_course-day'])) {
+					$course_days_from_matrix[] = (string) $row['pa_course-day'];
+				}
+				if (!empty($row['pa_course-times'])) {
+					$course_times_from_matrix[] = (string) $row['pa_course-times'];
+				}
+				if (!empty($row['pa_intersoccer-venues'])) {
+					$venues_from_matrix[] = (string) $row['pa_intersoccer-venues'];
+				}
 			}
 		}
 
 		if ($type === 'camp') {
 			self::ensure_parent_camp_times_variation_attribute($product_id, $times_from_matrix);
+		}
+		if ($type === 'course') {
+			self::ensure_parent_course_variation_attributes(
+				$product_id,
+				$course_days_from_matrix,
+				$course_times_from_matrix,
+				$venues_from_matrix
+			);
 		}
 
 		wc_delete_product_transients($product_id);
@@ -1373,6 +1577,63 @@ class InterSoccer_Program_Manager {
 		wp_send_json_success([
 			'variation_id' => $variation_id,
 			'venue'        => $venue_slug,
+			'completeness' => self::get_variation_completeness($variation_id, $type),
+		]);
+	}
+
+
+	public static function ajax_save_variation_course_time() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		$variation_id = isset($_POST['variation_id']) ? absint($_POST['variation_id']) : 0;
+		$time_slug    = isset($_POST['course_time']) ? sanitize_text_field(wp_unslash($_POST['course_time'])) : '';
+
+		if (!$variation_id) {
+			wp_send_json_error(['message' => __('Missing variation ID.', 'intersoccer-product-variations')]);
+		}
+
+		$variation = wc_get_product($variation_id);
+		if (!$variation || !($variation instanceof WC_Product_Variation)) {
+			wp_send_json_error(['message' => __('Invalid variation.', 'intersoccer-product-variations')]);
+		}
+
+		$parent_id = (int) $variation->get_parent_id();
+		$type      = class_exists('InterSoccer_Product_Types')
+			? InterSoccer_Product_Types::get_product_type($parent_id)
+			: '';
+		if ($type !== 'course') {
+			wp_send_json_error(['message' => __('Course time assignment is only supported for courses.', 'intersoccer-product-variations')]);
+		}
+
+		if ($time_slug !== '') {
+			$term = get_term_by('slug', $time_slug, 'pa_course-times');
+			if (!$term || is_wp_error($term)) {
+				wp_send_json_error(['message' => __('Invalid course time.', 'intersoccer-product-variations')]);
+			}
+			self::ensure_parent_taxonomy_variation_attribute($parent_id, 'pa_course-times', [$time_slug]);
+		}
+
+		$attrs = $variation->get_attributes();
+		$attrs['pa_course-times'] = $time_slug;
+		$variation->set_attributes($attrs);
+		$variation->save();
+		update_post_meta($variation_id, 'attribute_pa_course-times', $time_slug);
+		if ($time_slug !== '') {
+			wp_set_object_terms($variation_id, $time_slug, 'pa_course-times');
+		} else {
+			wp_set_object_terms($variation_id, [], 'pa_course-times');
+		}
+
+		wc_delete_product_transients($parent_id);
+
+
+		wp_send_json_success([
+			'variation_id' => $variation_id,
+			'course_time'  => $time_slug,
 			'completeness' => self::get_variation_completeness($variation_id, $type),
 		]);
 	}
@@ -1619,7 +1880,10 @@ class InterSoccer_Program_Manager {
 		if ($name !== '') {
 			$product->set_name($name);
 		}
-		if (in_array($status, ['draft', 'publish', 'private'], true)) {
+		$allowed_status = function_exists('intersoccer_pm_is_allowed_product_status')
+			? intersoccer_pm_is_allowed_product_status($status)
+			: in_array((string) $status, ['draft', 'publish', 'private'], true);
+		if ($allowed_status) {
 			$product->set_status($status);
 		}
 
@@ -1926,17 +2190,25 @@ class InterSoccer_Program_Manager {
 				}
 				return self::build_camp_matrix_rows($ages, $times);
 			case 'course':
-				$days = get_terms(['taxonomy' => 'pa_course-day', 'hide_empty' => false]);
-				$ages = get_terms(['taxonomy' => 'pa_age-group', 'hide_empty' => false]);
-				$matrix = [];
-				if (!is_wp_error($days) && !is_wp_error($ages)) {
-					foreach ($days as $day) {
-						foreach ($ages as $age) {
-							$matrix[] = ['pa_course-day' => $day->slug, 'pa_age-group' => $age->slug];
-						}
+				$days   = [];
+				$ages   = [];
+				$venues = [];
+				if ($product_id) {
+					$days   = wc_get_product_terms($product_id, 'pa_course-day', ['fields' => 'slugs']);
+					$ages   = wc_get_product_terms($product_id, 'pa_age-group', ['fields' => 'slugs']);
+					$venues = wc_get_product_terms($product_id, 'pa_intersoccer-venues', ['fields' => 'slugs']);
+					if (is_wp_error($days)) {
+						$days = [];
+					}
+					if (is_wp_error($ages)) {
+						$ages = [];
+					}
+					if (is_wp_error($venues)) {
+						$venues = [];
 					}
 				}
-				return $matrix;
+				// Course times are variation-only — do not expand matrix from parent times.
+				return self::build_course_matrix_rows($days, $ages, [], $venues);
 			case 'birthday':
 				$ages = get_terms(['taxonomy' => 'pa_age-group', 'hide_empty' => false]);
 				$matrix = [];
@@ -2051,6 +2323,26 @@ class InterSoccer_Program_Manager {
 	 */
 	private static function ensure_parent_camp_times_variation_attribute($product_id, $extra_slugs = []) {
 		self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', $extra_slugs);
+	}
+
+	/**
+	 * Ensure course variation taxonomies on the parent are limited to matrix values.
+	 *
+	 * @param int      $product_id
+	 * @param string[] $day_slugs
+	 * @param string[] $time_slugs
+	 * @param string[] $venue_slugs
+	 */
+	private static function ensure_parent_course_variation_attributes($product_id, $day_slugs = [], $time_slugs = [], $venue_slugs = []) {
+		if (!empty($day_slugs)) {
+			self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_course-day', $day_slugs);
+		}
+		if (!empty($time_slugs)) {
+			self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_course-times', $time_slugs);
+		}
+		if (!empty($venue_slugs)) {
+			self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $venue_slugs);
+		}
 	}
 
 	/**
@@ -2284,9 +2576,11 @@ class InterSoccer_Program_Manager {
 	 * @param int    $product_id
 	 * @param string $type
 	 * @param array  $attributes Key-value pairs of taxonomy => slug
+	 * @param array  $course_meta Optional course meta overrides (_course_*).
+	 * @param string $regular_price Optional CHF price applied to the variation.
 	 * @return int|false Variation ID or false on failure.
 	 */
-	private static function create_single_variation($product_id, $type, $attributes) {
+	private static function create_single_variation($product_id, $type, $attributes, $course_meta = [], $regular_price = '') {
 		$attributes = array_map('sanitize_text_field', (array) $attributes);
 		unset($attributes['label']);
 
@@ -2294,6 +2588,11 @@ class InterSoccer_Program_Manager {
 		$variation->set_parent_id($product_id);
 		$variation->set_status('publish');
 		$variation->set_attributes($attributes);
+
+		if ($regular_price !== '' && $regular_price !== null && is_numeric($regular_price)) {
+			$variation->set_regular_price((string) $regular_price);
+			$variation->set_price((string) $regular_price);
+		}
 
 		$var_id = $variation->save();
 		if (!$var_id) {
@@ -2309,13 +2608,44 @@ class InterSoccer_Program_Manager {
 		if ($type === 'course') {
 			$defaults = intersoccer_attr_refresh_defaults('course');
 			foreach ($defaults as $meta_key => $default_value) {
-				if (strpos($meta_key, '_') === 0) {
-					update_post_meta($var_id, $meta_key, $default_value);
+				if (strpos($meta_key, '_') !== 0) {
+					continue;
 				}
+				$value = $default_value;
+				if (isset($course_meta[$meta_key]) && $course_meta[$meta_key] !== '' && $course_meta[$meta_key] !== null) {
+					$value = $course_meta[$meta_key];
+				}
+				if ($meta_key === '_course_holiday_dates') {
+					$value = self::normalize_course_holiday_dates($value);
+				}
+				if ($meta_key === '_course_total_weeks') {
+					$value = (string) max(0, (int) $value);
+				}
+				update_post_meta($var_id, $meta_key, $value);
 			}
 		}
 
 		return $var_id;
+	}
+
+	/**
+	 * @param mixed $raw
+	 * @return array<int,string>
+	 */
+	private static function normalize_course_holiday_dates($raw) {
+		if (is_array($raw)) {
+			$lines = $raw;
+		} else {
+			$lines = preg_split('/[\r\n,]+/', (string) $raw) ?: [];
+		}
+		$out = [];
+		foreach ($lines as $line) {
+			$line = trim((string) $line);
+			if ($line !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) {
+				$out[] = $line;
+			}
+		}
+		return array_values(array_unique($out));
 	}
 }
 

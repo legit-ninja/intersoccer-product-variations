@@ -192,7 +192,7 @@ function intersoccer_attr_registry() {
             ],
             'legacy_taxonomy_aliases' => ['pa_course_day'],
             'legacy_meta_keys' => ['attribute_pa_course_day'],
-            'default_terms' => array_slice($weekdays, 0, 5),
+            'default_terms' => $weekdays,
             'day_attribute' => true,
         ],
         'course-times' => [
@@ -314,8 +314,9 @@ function intersoccer_attr_product_type_templates() {
             'meta' => ['_camp_start_date', '_camp_end_date', '_camp_week_index'],
         ],
         'course' => [
-            'parent' => array_merge($core_parent, ['girls-only']),
-            // Venue is a variation dimension in the live catalogue (per-venue day/age/time SKUs).
+            // course-day on parent for PM day multi-select; course-times is variation-only (per-SKU).
+            'parent' => array_merge($core_parent, ['girls-only', 'course-day']),
+            // Venue is a variation dimension in the live catalogue (per-venue day/age SKUs); times set per variation.
             'variation' => ['course-day', 'course-times', 'age-group', 'intersoccer-venues'],
             'meta' => ['_course_start_date', '_course_total_weeks', '_course_holiday_dates'],
         ],
