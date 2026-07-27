@@ -282,3 +282,75 @@ function intersoccer_pm_infer_venue_slug_for_variation($allowed_venue_slugs = []
     $allowed = array_values(array_filter(array_map('strval', (array) $allowed_venue_slugs)));
     return count($allowed) === 1 ? $allowed[0] : '';
 }
+
+/**
+ * Build course variation matrix rows from selected day / age / time / venue slugs.
+ *
+ * Empty days → empty matrix. Empty optional dimensions are omitted from each row.
+ * Prefer empty $time_slugs at create — course times are assigned per variation.
+ *
+ * @param string[] $day_slugs
+ * @param string[] $age_slugs
+ * @param string[] $time_slugs
+ * @param string[] $venue_slugs
+ * @return array<int,array<string,string>>
+ */
+function intersoccer_pm_build_course_matrix_rows($day_slugs = [], $age_slugs = [], $time_slugs = [], $venue_slugs = []) {
+    $days = array_values(array_filter(array_map('strval', (array) $day_slugs)));
+    if ($days === []) {
+        return [];
+    }
+
+    $ages = array_values(array_filter(array_map('strval', (array) $age_slugs)));
+    if ($ages === []) {
+        $ages = [''];
+    }
+
+    $times = array_values(array_filter(array_map('strval', (array) $time_slugs)));
+    if ($times === []) {
+        $times = [''];
+    }
+
+    $venues = array_values(array_filter(array_map('strval', (array) $venue_slugs)));
+    if ($venues === []) {
+        $venues = [''];
+    }
+
+    $matrix = [];
+    foreach ($days as $day) {
+        foreach ($ages as $age) {
+            foreach ($times as $time) {
+                foreach ($venues as $venue) {
+                    $row   = ['pa_course-day' => $day];
+                    $parts = [$day];
+                    if ($age !== '') {
+                        $row['pa_age-group'] = $age;
+                        $parts[]            = $age;
+                    }
+                    if ($time !== '') {
+                        $row['pa_course-times'] = $time;
+                        $parts[]                = $time;
+                    }
+                    if ($venue !== '') {
+                        $row['pa_intersoccer-venues'] = $venue;
+                        $parts[]                      = $venue;
+                    }
+                    $row['label'] = implode(' / ', $parts);
+                    $matrix[]     = $row;
+                }
+            }
+        }
+    }
+
+    return $matrix;
+}
+
+/**
+ * Whether a WooCommerce product status may be set via Program Manager quick/detail edit.
+ *
+ * @param string $status
+ * @return bool
+ */
+function intersoccer_pm_is_allowed_product_status($status) {
+    return in_array((string) $status, ['draft', 'publish', 'private'], true);
+}

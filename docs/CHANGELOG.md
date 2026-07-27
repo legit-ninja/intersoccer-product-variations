@@ -5,6 +5,18 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.27] - 2026-07-27
+
+### Added
+- Program Manager course create: Course Day multi-select and day × age × venue matrix (course times assigned per variation).
+- Program Manager Edit Program: Draft / Publish / Private status control (reuses quick-edit AJAX).
+- Program Manager variation Course Time dropdown on course detail.
+- Create-wizard course schedule fields (start date, weeks, holidays) and regular price applied on create.
+
+### Fixed
+- Create wizard Step 2→4 handoff: parent attributes and matrix snapshot when Step 2 is hidden (JSON payload).
+- Course times no longer required on parent at create; set per SKU on Edit Program.
+
 ## [2.7.25] - 2026-07-25
 
 ### Added
