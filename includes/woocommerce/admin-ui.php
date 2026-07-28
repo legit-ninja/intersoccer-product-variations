@@ -77,7 +77,7 @@ function intersoccer_render_order_meta_repair_page() {
     ?>
     <div class="wrap">
         <h1><?php esc_html_e('Order Meta Repair', 'intersoccer-product-variations'); ?></h1>
-        <p><?php esc_html_e('Scan orders for missing or twin metadata, then repair selected rows or run an automated batch. After repair, run Reports → Reconcile Rosters if needed.', 'intersoccer-product-variations'); ?></p>
+        <p><?php esc_html_e('Scan orders for missing or twin metadata, then repair selected rows or run an automated batch. Scan and Automated batch use the same need-repair criteria — re-run Scan after a batch to confirm leftovers. After repair, run Reports → Reconcile Rosters if needed.', 'intersoccer-product-variations'); ?></p>
         <nav class="nav-tab-wrapper" style="margin-bottom: 16px;">
             <a href="<?php echo esc_url(add_query_arg('tab', 'scan', $base_url)); ?>" class="nav-tab <?php echo $tab === 'scan' ? 'nav-tab-active' : ''; ?>">
                 <?php esc_html_e('Scan &amp; preview', 'intersoccer-product-variations'); ?>
@@ -1006,7 +1006,7 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
         $this->all_items = $this->analyze_orders($orders, $fix_activity_type_only);
         
         // Handle pagination properly
-        $per_page = 10;
+        $per_page = 25;
         $current_page = $this->get_pagenum();
         $total_items = count($this->all_items);
 
@@ -1266,7 +1266,7 @@ function intersoccer_render_update_orders_page($embedded = false) {
         <p><?php _e('Find and update orders that are missing metadata fields needed for accurate rosters and reports.', 'intersoccer-product-variations'); ?></p>
     <?php else : ?>
         <h2><?php esc_html_e('Scan &amp; preview', 'intersoccer-product-variations'); ?></h2>
-        <p><?php esc_html_e('Find orders with missing metadata or label twins, preview proposed fixes, then update selected orders.', 'intersoccer-product-variations'); ?></p>
+        <p><?php esc_html_e('Find orders with missing metadata or label twins, preview proposed fixes, then update selected orders. Uses the same need-repair criteria as Automated batch — re-run this scan after a batch to confirm leftovers.', 'intersoccer-product-variations'); ?></p>
     <?php endif; ?>
         
         <?php if ($message) : ?>
@@ -1367,26 +1367,31 @@ function intersoccer_render_update_orders_page($embedded = false) {
                 $total_orders_scanned = count($table->all_items);  // We'll need to track this
                 $orders_with_missing = count($table->all_items);   // Orders that have missing metadata
                 $total_missing_items = 0;
-                $all_low_risk_ids = [];
                 foreach ($table->all_items as $order_data) {
                     foreach ($order_data['missing_keys'] as $item_missing) {
                         $total_missing_items += count($item_missing);
                     }
-                    if (($order_data['risk_level'] ?? '') === 'low') {
-                        $all_low_risk_ids[] = (int) $order_data['order_id'];
-                    }
                 }
+                $all_low_risk_ids = function_exists('intersoccer_collect_order_ids_by_risk')
+                    ? intersoccer_collect_order_ids_by_risk($table->all_items, 'low')
+                    : [];
+                $all_medium_risk_ids = function_exists('intersoccer_collect_order_ids_by_risk')
+                    ? intersoccer_collect_order_ids_by_risk($table->all_items, 'medium')
+                    : [];
+                $all_high_risk_ids = function_exists('intersoccer_collect_order_ids_by_risk')
+                    ? intersoccer_collect_order_ids_by_risk($table->all_items, 'high')
+                    : [];
                 ?>
                 <!-- Fixed Summary Statistics -->
                 <div class="intersoccer-summary-stats" style="background: #fff; border: 1px solid #ccd0d4; padding: 15px; margin: 15px 0;">
                     <h3><?php _e('Scan Results', 'intersoccer-product-variations'); ?></h3>
                     <div style="display: flex; gap: 30px; flex-wrap: wrap;">
-                        <div><strong><?php echo $orders_with_missing; ?></strong> orders need updates</div>
-                        <div><strong><?php echo $total_missing_items; ?></strong> total missing metadata fields</div>
+                        <div><strong><?php echo (int) $orders_with_missing; ?></strong> orders need updates</div>
+                        <div><strong><?php echo (int) $total_missing_items; ?></strong> total missing metadata fields</div>
                         <div><strong id="selected-count">0</strong> orders selected for update</div>
-                        <div style="color: red;"><strong id="high-risk-count">0</strong> high-risk orders</div>
-                        <div style="color: orange;"><strong id="medium-risk-count">0</strong> medium-risk orders</div>
-                        <div style="color: green;"><strong id="low-risk-count">0</strong> low-risk orders</div>
+                        <div style="color: red;"><strong id="high-risk-count"><?php echo (int) count($all_high_risk_ids); ?></strong> high-risk orders</div>
+                        <div style="color: orange;"><strong id="medium-risk-count"><?php echo (int) count($all_medium_risk_ids); ?></strong> medium-risk orders</div>
+                        <div style="color: green;"><strong id="low-risk-count"><?php echo (int) count($all_low_risk_ids); ?></strong> low-risk orders</div>
                     </div>
                 </div>
 
@@ -1394,7 +1399,10 @@ function intersoccer_render_update_orders_page($embedded = false) {
                 <form method="post" id="bulk-update-form">
                     <div class="tablenav top">
                         <div class="alignleft actions">
-                            <button type="button" id="select-all-low-risk" class="button" data-all-low-risk-ids="<?php echo esc_attr(wp_json_encode($all_low_risk_ids)); ?>"><?php _e('Select All Low Risk', 'intersoccer-product-variations'); ?></button>
+                            <button type="button" id="select-all-low-risk" class="button intersoccer-select-by-risk" data-risk="low" data-all-risk-ids="<?php echo esc_attr(wp_json_encode($all_low_risk_ids)); ?>"><?php _e('Select All Low Risk', 'intersoccer-product-variations'); ?></button>
+                            <button type="button" id="select-all-medium-risk" class="button intersoccer-select-by-risk" data-risk="medium" data-all-risk-ids="<?php echo esc_attr(wp_json_encode($all_medium_risk_ids)); ?>"><?php _e('Select All Medium Risk', 'intersoccer-product-variations'); ?></button>
+                            <button type="button" id="select-all-high-risk" class="button intersoccer-select-by-risk" data-risk="high" data-all-risk-ids="<?php echo esc_attr(wp_json_encode($all_high_risk_ids)); ?>"><?php _e('Select All High Risk', 'intersoccer-product-variations'); ?></button>
+                            <span id="intersoccer-all-high-risk-ids" data-all-high-risk-ids="<?php echo esc_attr(wp_json_encode($all_high_risk_ids)); ?>" style="display:none;"></span>
                             <button type="button" id="select-none" class="button"><?php _e('Deselect All', 'intersoccer-product-variations'); ?></button>
                             <button type="submit" name="update_selected_orders" class="button button-primary" id="update-selected-btn" disabled>
                                 <?php _e('Update Selected Orders', 'intersoccer-product-variations'); ?>
@@ -1464,84 +1472,88 @@ function intersoccer_render_update_orders_page($embedded = false) {
     <script>
         jQuery(document).ready(function($) {
             let selectedOrders = [];
-            
-            // Handle checkbox changes
-            $('input[name="order_ids[]"]').on('change', function() {
-                updateSelection();
-                updateSummaryStats();
-            });
-            
-            // Select all low risk across the full scan result set (not only the current table page).
-            $('#select-all-low-risk').on('click', function() {
-                var allLowIds = [];
-                try { allLowIds = JSON.parse($(this).attr('data-all-low-risk-ids') || '[]'); } catch (e) { allLowIds = []; }
-                allLowIds = allLowIds.map(function(id) { return String(id); });
-                $('input[name="order_ids[]"][data-risk="low"]').prop('checked', true);
-                selectedOrders = allLowIds.length ? allLowIds.slice() : $('input[name="order_ids[]"][data-risk="low"]').map(function() {
-                    return $(this).val();
-                }).get();
+            let allHighRiskIds = [];
+            try {
+                allHighRiskIds = JSON.parse($('#intersoccer-all-high-risk-ids').attr('data-all-high-risk-ids') || '[]');
+            } catch (e) {
+                allHighRiskIds = [];
+            }
+            allHighRiskIds = allHighRiskIds.map(function(id) { return String(id); });
+
+            function syncSelectedHidden() {
                 $('#selected-order-ids').val(selectedOrders.join(','));
                 $('#update-selected-btn').prop('disabled', selectedOrders.length === 0);
                 $('#selected-count').text(selectedOrders.length);
-                updateSummaryStats();
+            }
+
+            function syncVisibleCheckboxes() {
+                $('input[name="order_ids[]"]').each(function() {
+                    var id = String($(this).val());
+                    $(this).prop('checked', selectedOrders.indexOf(id) !== -1);
+                });
+            }
+
+            // Merge/remove a single visible checkbox without wiping cross-page selection.
+            $('input[name="order_ids[]"]').on('change', function() {
+                var id = String($(this).val());
+                var idx = selectedOrders.indexOf(id);
+                if ($(this).is(':checked')) {
+                    if (idx === -1) {
+                        selectedOrders.push(id);
+                    }
+                } else if (idx !== -1) {
+                    selectedOrders.splice(idx, 1);
+                }
+                syncSelectedHidden();
             });
-            
+
+            // Select all orders for a risk level across the full scan result set.
+            $('.intersoccer-select-by-risk').on('click', function() {
+                var risk = String($(this).data('risk') || '');
+                var riskIds = [];
+                try {
+                    riskIds = JSON.parse($(this).attr('data-all-risk-ids') || '[]');
+                } catch (e) {
+                    riskIds = [];
+                }
+                riskIds = riskIds.map(function(id) { return String(id); });
+                if (!riskIds.length) {
+                    riskIds = $('input[name="order_ids[]"][data-risk="' + risk + '"]').map(function() {
+                        return String($(this).val());
+                    }).get();
+                }
+                selectedOrders = riskIds.slice();
+                syncVisibleCheckboxes();
+                syncSelectedHidden();
+            });
+
             // Deselect all
             $('#select-none').on('click', function() {
-                $('input[name="order_ids[]"]').prop('checked', false);
                 selectedOrders = [];
-                $('#selected-order-ids').val('');
-                $('#update-selected-btn').prop('disabled', true);
-                $('#selected-count').text(0);
-                updateSummaryStats();
+                $('input[name="order_ids[]"]').prop('checked', false);
+                syncSelectedHidden();
             });
-            
-            // Update selected orders list from visible checkboxes (page-local toggles).
-            function updateSelection() {
-                selectedOrders = $('input[name="order_ids[]"]:checked').map(function() {
-                    return $(this).val();
-                }).get();
-                
-                $('#selected-order-ids').val(selectedOrders.join(','));
-                $('#update-selected-btn').prop('disabled', selectedOrders.length === 0);
-                $('#selected-count').text(selectedOrders.length);
-            }
-            
-            // Update summary statistics
-            function updateSummaryStats() {
-                let highRisk = $('input[name="order_ids[]"][data-risk="high"]:checked').length;
-                let mediumRisk = $('input[name="order_ids[]"][data-risk="medium"]:checked').length;
-                let lowRisk = $('input[name="order_ids[]"][data-risk="low"]:checked').length;
-                
-                $('#high-risk-count').text(highRisk);
-                $('#medium-risk-count').text(mediumRisk);
-                $('#low-risk-count').text(lowRisk);
-            }
-            
-            // Initialize stats
-            updateSummaryStats();
-            
-            // Handle bulk update with progress (your existing logic)
+
+            // Handle bulk update with progress (footer script overrides and runs AJAX).
             $('#bulk-update-form').on('submit', function(e) {
                 e.preventDefault();
-                
+
                 if (selectedOrders.length === 0) {
                     alert('<?php _e('Please select at least one order to update.', 'intersoccer-product-variations'); ?>');
                     return false;
                 }
-                
-                let highRiskSelected = $('input[name="order_ids[]"][data-risk="high"]:checked').length;
-                if (highRiskSelected > 0) {
+
+                var hasHighRisk = selectedOrders.some(function(id) {
+                    return allHighRiskIds.indexOf(String(id)) !== -1;
+                });
+                if (hasHighRisk) {
                     if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-product-variations'); ?>')) {
                         return false;
                     }
                 }
-                
-                // Show progress bar and start batch processing (your existing logic)
+
                 $('#update-progress').show();
-                // ... rest of your batch processing code
             });
-            
         });
     </script>
     <?php
@@ -1582,7 +1594,7 @@ function intersoccer_update_orders_scripts() {
             $('#bulk-update-form').off('submit').on('submit', function(e) {
                 e.preventDefault();
                 
-                // Prefer the hidden full selection (covers Select All Low Risk across pages).
+                // Prefer the hidden full selection (covers Select All risk buttons across pages).
                 let selectedOrders = ($('#selected-order-ids').val() || '').split(',').filter(Boolean).map(function(v) {
                     return parseInt(v, 10);
                 }).filter(function(id) { return id > 0; });
@@ -1596,9 +1608,18 @@ function intersoccer_update_orders_scripts() {
                     alert('<?php _e('Please select at least one order to update.', 'intersoccer-product-variations'); ?>');
                     return false;
                 }
-                
-                let highRiskSelected = $('input[name="order_ids[]"][data-risk="high"]:checked').length;
-                if (highRiskSelected > 0) {
+
+                var allHighRiskIds = [];
+                try {
+                    allHighRiskIds = JSON.parse($('#intersoccer-all-high-risk-ids').attr('data-all-high-risk-ids') || '[]');
+                } catch (err) {
+                    allHighRiskIds = [];
+                }
+                allHighRiskIds = allHighRiskIds.map(function(id) { return String(id); });
+                var hasHighRisk = selectedOrders.some(function(id) {
+                    return allHighRiskIds.indexOf(String(id)) !== -1;
+                });
+                if (hasHighRisk) {
                     if (!confirm('<?php _e('You have selected high-risk orders. These may have unexpected results. Continue?', 'intersoccer-product-variations'); ?>')) {
                         return false;
                     }
@@ -2075,6 +2096,38 @@ function intersoccer_analyze_item_metadata($order, $item, $product_type) {
         'missing' => $missing,
         'proposed' => $proposed,
     ];
+}
+
+/**
+ * Whether an order has fillable missing line meta (same criteria as Scan & preview).
+ *
+ * @param WC_Order $order
+ * @return bool
+ */
+function intersoccer_order_has_fillable_missing_meta($order) {
+    if (!($order instanceof WC_Order)) {
+        return false;
+    }
+
+    foreach ($order->get_items() as $item) {
+        if (!($item instanceof WC_Order_Item_Product)) {
+            continue;
+        }
+
+        $resolved_context = intersoccer_resolve_order_item_product_context($item);
+        $product_type = $resolved_context['product_type'];
+
+        if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+            continue;
+        }
+
+        $analysis = intersoccer_analyze_item_metadata($order, $item, $product_type);
+        if (!empty($analysis['missing'])) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -3161,40 +3214,12 @@ function intersoccer_get_orders_needing_updates($statuses, $limit = 1000) {
     $orders_needing_updates = [];
     
     foreach ($orders as $order) {
-        if (!($order instanceof WC_Order)) continue;
-        
-        $needs_update = false;
-        
-        foreach ($order->get_items() as $item) {
-            $resolved_context = intersoccer_resolve_order_item_product_context($item);
-            $product_type = $resolved_context['product_type'];
-            
-            if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'])) {
-                continue;
-            }
-            
-            // Quick check - if any relevant item is missing key metadata, include this order
-            $existing_meta = $item->get_meta_data();
-            $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
-            
-            // Check for common missing fields (quick version)
-            $essential_fields = ['Medical Conditions', 'Activity Type', 'Season', 'Attendee DOB', 'Attendee Gender'];
-            foreach ($essential_fields as $field) {
-                if (!in_array($field, $existing_keys)) {
-                    $needs_update = true;
-                    break 2; // Break both loops
-                }
-            }
-
-            $has_player_ref = in_array('assigned_player', $existing_keys, true)
-                || in_array('Assigned Attendee', $existing_keys, true);
-            if ($has_player_ref && !in_array('assigned_player_id', $existing_keys, true)) {
-                $needs_update = true;
-                break;
-            }
+        if (!($order instanceof WC_Order)) {
+            continue;
         }
-        
-        if ($needs_update) {
+
+        // Same criteria as Scan & preview (full fillable missing meta analysis).
+        if (function_exists('intersoccer_order_has_fillable_missing_meta') && intersoccer_order_has_fillable_missing_meta($order)) {
             $orders_needing_updates[] = $order->get_id();
         }
     }
@@ -3212,10 +3237,10 @@ function intersoccer_render_automated_update_orders_page($embedded = false) {
     <?php if (!$embedded) : ?>
     <div class="wrap">
         <h1><?php _e('Automated Order Metadata Update', 'intersoccer-product-variations'); ?></h1>
-        <p><?php _e('Automatically find and update orders missing metadata. This tool can process hundreds or thousands of orders efficiently.', 'intersoccer-product-variations'); ?></p>
+        <p><?php _e('Automatically find and update orders missing metadata using the same need-repair criteria as Scan & preview. Re-run Scan after a batch to confirm leftovers. This tool can process hundreds or thousands of orders efficiently.', 'intersoccer-product-variations'); ?></p>
     <?php else : ?>
         <h2><?php esc_html_e('Automated batch', 'intersoccer-product-variations'); ?></h2>
-        <p><?php esc_html_e('Scan for orders needing updates, then process them in batches. Confirm before running with prune/strip enabled.', 'intersoccer-product-variations'); ?></p>
+        <p><?php esc_html_e('Scan for orders needing updates (same criteria as Scan & preview), then process them in batches. Re-run Scan after completion to confirm leftovers. Confirm before running with prune/strip enabled.', 'intersoccer-product-variations'); ?></p>
     <?php endif; ?>
         
         <!-- Scan Configuration -->

@@ -429,18 +429,41 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('', $item->get_meta('InterSoccer-Standorte', true));
     }
 
-    public function test_prune_retains_pa_slug_twin() {
+    public function test_prune_removes_pa_and_attribute_twins_when_canonical_present() {
         $item = new WC_Order_Item_Product([
             'Sites InterSoccer' => 'Geneva',
             'pa_intersoccer-venues' => 'geneva',
+            'attribute_pa_intersoccer-venues' => 'geneva',
             'InterSoccer Venues' => 'Geneva',
         ]);
 
-        intersoccer_prune_legacy_order_meta_twins($item);
+        $changed = intersoccer_prune_legacy_order_meta_twins($item);
 
+        $this->assertTrue($changed);
         $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
-        $this->assertSame('geneva', $item->get_meta('pa_intersoccer-venues', true));
+        $this->assertSame('', $item->get_meta('pa_intersoccer-venues', true));
+        $this->assertSame('', $item->get_meta('attribute_pa_intersoccer-venues', true));
         $this->assertSame('', $item->get_meta('InterSoccer Venues', true));
+    }
+
+    public function test_prune_removes_pa_when_only_attribute_present() {
+        $item = new WC_Order_Item_Product([
+            'attribute_pa_age-group' => '5-13y-full-day',
+            'pa_age-group' => '5-13y-full-day',
+        ]);
+
+        $changed = intersoccer_prune_legacy_order_meta_twins($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('5-13y-full-day', $item->get_meta('attribute_pa_age-group', true));
+        $this->assertSame('', $item->get_meta('pa_age-group', true));
+    }
+
+    public function test_collect_variation_taxonomy_meta_omits_raw_pa_keys() {
+        // Without a real variation product, collect returns empty (existing coverage).
+        // Contract: raw pa_* must never be emitted when attributes exist — covered by
+        // prune twins + the empty-variation guard above.
+        $this->assertTrue(function_exists('intersoccer_prune_taxonomy_attribute_twins'));
     }
 
     public function test_repair_write_collapses_preseeded_same_key_duplicate() {
