@@ -524,7 +524,10 @@ function intersoccer_order_meta_correctable_keys() {
 }
 
 /**
- * Collect pa_* and attribute_pa_* keys from a variation for order line meta.
+ * Collect attribute_pa_* keys from a variation for order line meta.
+ *
+ * Does not write raw pa_* keys — those duplicate attribute_pa_* and the human
+ * order_meta_label (e.g. Age Group) in WooCommerce admin formatted meta.
  *
  * @param int $variation_id
  * @return array<string,string>
@@ -546,7 +549,6 @@ function intersoccer_collect_variation_taxonomy_meta($variation_id) {
         if (strpos($taxonomy, 'pa_') !== 0 || $vval === '') {
             continue;
         }
-        $meta[$taxonomy] = sanitize_text_field($vval);
         if (function_exists('intersoccer_attr_slug_from_taxonomy')) {
             $attr_slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
             if ($attr_slug && function_exists('intersoccer_attr_resolve_meta_key')) {
@@ -625,6 +627,32 @@ function intersoccer_write_order_line_meta($item, array $context) {
 
     $variation_tax_meta = intersoccer_collect_variation_taxonomy_meta($variation_id);
     $updates = array_merge($built['updates'], $variation_tax_meta);
+
+    // Prefer human order_meta_label over attribute_pa_* when either is already present
+    // or about to be written — avoids repair re-adding attribute twins that prune removes.
+    if (function_exists('intersoccer_attr_order_meta_label') && function_exists('intersoccer_attr_slug_from_taxonomy')) {
+        foreach (array_keys($updates) as $key) {
+            if (strpos((string) $key, 'attribute_pa_') !== 0) {
+                continue;
+            }
+            $taxonomy = substr((string) $key, strlen('attribute_'));
+            $slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
+            if (!$slug) {
+                continue;
+            }
+            $label = intersoccer_attr_order_meta_label($slug);
+            if ($label === '') {
+                continue;
+            }
+            $has_label_in_updates = array_key_exists($label, $updates)
+                && $updates[$label] !== null
+                && $updates[$label] !== '';
+            $has_label_on_item = (string) $item->get_meta($label, true) !== '';
+            if ($has_label_in_updates || $has_label_on_item) {
+                unset($updates[$key]);
+            }
+        }
+    }
 
     if ($mode === 'checkout') {
         $existing_keys = [];
@@ -712,11 +740,81 @@ function intersoccer_collapse_duplicate_order_meta_keys($item) {
 }
 
 /**
+ * Remove pa_* / attribute_pa_* twins when the human order_meta_label is present.
+ *
+ * WooCommerce formats attribute_pa_* and pa_* with the same display label as the
+ * human key (e.g. all three show as "Age Group"), so keeping all three looks like
+ * duplicate metadata in admin.
+ *
+ * @param WC_Order_Item_Product $item
+ * @return bool Whether any change was made.
+ */
+function intersoccer_prune_taxonomy_attribute_twins($item) {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+    if (!function_exists('intersoccer_attr_registry')) {
+        return false;
+    }
+
+    $existing = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $existing[(string) $meta->key] = $meta->value;
+    }
+
+    $changed = false;
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        if (!is_array($def)) {
+            continue;
+        }
+        $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+        $taxonomy = function_exists('intersoccer_attr_taxonomy')
+            ? (string) intersoccer_attr_taxonomy($slug)
+            : '';
+        if ($taxonomy === '' || strpos($taxonomy, 'pa_') !== 0) {
+            continue;
+        }
+        $attr_key = function_exists('intersoccer_attr_resolve_meta_key')
+            ? (string) intersoccer_attr_resolve_meta_key($slug)
+            : ('attribute_' . $taxonomy);
+
+        $has_label = $label !== ''
+            && array_key_exists($label, $existing)
+            && $existing[$label] !== null
+            && $existing[$label] !== '';
+
+        if ($has_label) {
+            if (array_key_exists($taxonomy, $existing)) {
+                $item->delete_meta_data($taxonomy);
+                unset($existing[$taxonomy]);
+                $changed = true;
+            }
+            if (array_key_exists($attr_key, $existing)) {
+                $item->delete_meta_data($attr_key);
+                unset($existing[$attr_key]);
+                $changed = true;
+            }
+            continue;
+        }
+
+        // No human label: keep attribute_pa_*, drop redundant raw pa_*.
+        if (array_key_exists($attr_key, $existing) && array_key_exists($taxonomy, $existing)) {
+            $item->delete_meta_data($taxonomy);
+            unset($existing[$taxonomy]);
+            $changed = true;
+        }
+    }
+
+    return $changed;
+}
+
+/**
  * Aggressively remove legacy label twins when the EN canonical key is present.
  *
  * Unlike intersoccer_normalize_legacy_order_meta_keys(), this deletes reverse-map
  * legacy keys even when the canonical key already has a value (A–C twins).
- * Does not touch pa_* / attribute_pa_* / underscore camp twins (D).
+ * Also removes pa_* / attribute_pa_* when the human order_meta_label is present.
+ * Does not touch underscore camp date twins.
  *
  * @param WC_Order_Item_Product $item
  * @return bool Whether any change was made.
@@ -764,6 +862,7 @@ function intersoccer_prune_legacy_order_meta_twins($item) {
         $changed = true;
     }
 
+    $changed = intersoccer_prune_taxonomy_attribute_twins($item) || $changed;
     $changed = intersoccer_collapse_duplicate_order_meta_keys($item) || $changed;
 
     return $changed;

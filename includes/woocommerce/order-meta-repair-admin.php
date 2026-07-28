@@ -51,3 +51,33 @@ function intersoccer_redirect_legacy_order_meta_repair_pages() {
     }
     exit;
 }
+
+/**
+ * Collect order IDs from a Scan preview result set by risk level.
+ *
+ * @param array<int,array<string,mixed>> $all_items Rows from InterSoccer_Order_Preview_Table::$all_items.
+ * @param string                         $risk      low|medium|high
+ * @return int[]
+ */
+function intersoccer_collect_order_ids_by_risk(array $all_items, $risk) {
+    $risk = function_exists('sanitize_key') ? sanitize_key((string) $risk) : strtolower(preg_replace('/[^a-z0-9_\-]/i', '', (string) $risk));
+    if (!in_array($risk, ['low', 'medium', 'high'], true)) {
+        return [];
+    }
+
+    $ids = [];
+    foreach ($all_items as $order_data) {
+        if (!is_array($order_data)) {
+            continue;
+        }
+        if (($order_data['risk_level'] ?? '') !== $risk) {
+            continue;
+        }
+        $order_id = isset($order_data['order_id']) ? (int) $order_data['order_id'] : 0;
+        if ($order_id > 0) {
+            $ids[] = $order_id;
+        }
+    }
+
+    return array_values(array_unique($ids));
+}
