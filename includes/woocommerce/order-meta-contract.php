@@ -669,6 +669,107 @@ function intersoccer_write_order_line_meta($item, array $context) {
 }
 
 /**
+ * Collapse multiple meta rows that share the same key into a single unique row.
+ * Keeps the last non-empty value (or last value if all empty).
+ *
+ * @param WC_Order_Item_Product $item
+ * @return bool Whether any change was made.
+ */
+function intersoccer_collapse_duplicate_order_meta_keys($item) {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+
+    $by_key = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $key = (string) $meta->key;
+        if (!isset($by_key[$key])) {
+            $by_key[$key] = [];
+        }
+        $by_key[$key][] = $meta->value;
+    }
+
+    $changed = false;
+    foreach ($by_key as $key => $values) {
+        if (count($values) < 2) {
+            continue;
+        }
+        $kept = '';
+        foreach ($values as $value) {
+            if ($value !== null && $value !== '') {
+                $kept = $value;
+            }
+        }
+        if ($kept === '' && $values !== []) {
+            $kept = $values[count($values) - 1];
+        }
+        $item->delete_meta_data($key);
+        $item->add_meta_data($key, $kept, true);
+        $changed = true;
+    }
+
+    return $changed;
+}
+
+/**
+ * Aggressively remove legacy label twins when the EN canonical key is present.
+ *
+ * Unlike intersoccer_normalize_legacy_order_meta_keys(), this deletes reverse-map
+ * legacy keys even when the canonical key already has a value (A–C twins).
+ * Does not touch pa_* / attribute_pa_* / underscore camp twins (D).
+ *
+ * @param WC_Order_Item_Product $item
+ * @return bool Whether any change was made.
+ */
+function intersoccer_prune_legacy_order_meta_twins($item) {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+
+    if (!function_exists('intersoccer_attr_legacy_order_meta_label_reverse_map')) {
+        return false;
+    }
+
+    $reverse = intersoccer_attr_legacy_order_meta_label_reverse_map();
+    if (empty($reverse)) {
+        return false;
+    }
+
+    $existing = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $existing[(string) $meta->key] = $meta->value;
+    }
+
+    $changed = intersoccer_normalize_legacy_order_meta_keys($item);
+
+    // Refresh after soft migrate.
+    $existing = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $existing[(string) $meta->key] = $meta->value;
+    }
+
+    foreach ($existing as $raw_key => $value) {
+        if (!isset($reverse[$raw_key])) {
+            continue;
+        }
+        $canonical = (string) $reverse[$raw_key];
+        if ($canonical === $raw_key) {
+            continue;
+        }
+        if (!array_key_exists($canonical, $existing)) {
+            continue;
+        }
+        $item->delete_meta_data($raw_key);
+        unset($existing[$raw_key]);
+        $changed = true;
+    }
+
+    $changed = intersoccer_collapse_duplicate_order_meta_keys($item) || $changed;
+
+    return $changed;
+}
+
+/**
  * Strip deprecated keys from an order line item when assigned_player is present.
  *
  * @param WC_Order_Item_Product $item

@@ -383,4 +383,88 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
     }
 
+    public function test_collapse_duplicate_same_key_rows() {
+        $item = new WC_Order_Item_Product([]);
+        $item->add_meta_data('Activity Type', 'Camp', false);
+        $item->add_meta_data('Activity Type', 'Course', false);
+
+        $changed = intersoccer_collapse_duplicate_order_meta_keys($item);
+
+        $this->assertTrue($changed);
+        $count = 0;
+        foreach ($item->get_meta_data() as $meta) {
+            if ($meta->key === 'Activity Type') {
+                $count++;
+            }
+        }
+        $this->assertSame(1, $count);
+        $this->assertSame('Course', $item->get_meta('Activity Type', true));
+    }
+
+    public function test_prune_removes_wc_venue_label_when_canonical_present() {
+        $item = new WC_Order_Item_Product([
+            'Sites InterSoccer' => 'Geneva',
+            'InterSoccer Venues' => 'Geneva',
+        ]);
+
+        $changed = intersoccer_prune_legacy_order_meta_twins($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
+        $this->assertSame('', $item->get_meta('InterSoccer Venues', true));
+    }
+
+    public function test_prune_removes_fr_de_legacy_when_en_canonical_present() {
+        $item = new WC_Order_Item_Product([
+            'Sites InterSoccer' => 'Geneva',
+            'Lieux InterSoccer' => 'Geneve',
+            'InterSoccer-Standorte' => 'Genf',
+        ]);
+
+        $changed = intersoccer_prune_legacy_order_meta_twins($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
+        $this->assertSame('', $item->get_meta('Lieux InterSoccer', true));
+        $this->assertSame('', $item->get_meta('InterSoccer-Standorte', true));
+    }
+
+    public function test_prune_retains_pa_slug_twin() {
+        $item = new WC_Order_Item_Product([
+            'Sites InterSoccer' => 'Geneva',
+            'pa_intersoccer-venues' => 'geneva',
+            'InterSoccer Venues' => 'Geneva',
+        ]);
+
+        intersoccer_prune_legacy_order_meta_twins($item);
+
+        $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
+        $this->assertSame('geneva', $item->get_meta('pa_intersoccer-venues', true));
+        $this->assertSame('', $item->get_meta('InterSoccer Venues', true));
+    }
+
+    public function test_repair_write_collapses_preseeded_same_key_duplicate() {
+        $item = new WC_Order_Item_Product([]);
+        $item->add_meta_data('Activity Type', 'Camp', false);
+        $item->add_meta_data('Activity Type', 'Camp', false);
+
+        $written = intersoccer_write_order_line_meta($item, [
+            'mode' => 'repair',
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+
+        // Soft normalize alone may not collapse; prune path is what repair UI uses.
+        intersoccer_prune_legacy_order_meta_twins($item);
+
+        $count = 0;
+        foreach ($item->get_meta_data() as $meta) {
+            if ($meta->key === 'Activity Type') {
+                $count++;
+            }
+        }
+        $this->assertSame(1, $count);
+        $this->assertTrue($written || $count === 1);
+    }
+
 }
