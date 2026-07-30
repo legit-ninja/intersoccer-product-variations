@@ -1519,6 +1519,10 @@ class InterSoccer_Program_Manager {
 
 		wc_delete_product_transients($variation->get_parent_id());
 
+		if (function_exists('intersoccer_sync_variation_prices_to_translations')) {
+			intersoccer_sync_variation_prices_to_translations($variation_id, $price, $price);
+		}
+
 		wp_send_json_success(['variation_id' => $variation_id, 'price' => $price]);
 	}
 
@@ -1570,6 +1574,10 @@ class InterSoccer_Program_Manager {
 			wp_set_object_terms($variation_id, $venue_slug, 'pa_intersoccer-venues');
 		} else {
 			wp_set_object_terms($variation_id, [], 'pa_intersoccer-venues');
+		}
+
+		if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
+			intersoccer_sync_variation_taxonomy_attribute_to_translations($variation_id, 'pa_intersoccer-venues', $venue_slug);
 		}
 
 		wc_delete_product_transients($parent_id);
@@ -1626,6 +1634,10 @@ class InterSoccer_Program_Manager {
 			wp_set_object_terms($variation_id, $time_slug, 'pa_course-times');
 		} else {
 			wp_set_object_terms($variation_id, [], 'pa_course-times');
+		}
+
+		if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
+			intersoccer_sync_variation_taxonomy_attribute_to_translations($variation_id, 'pa_course-times', $time_slug);
 		}
 
 		wc_delete_product_transients($parent_id);
@@ -1806,6 +1818,9 @@ class InterSoccer_Program_Manager {
 			$attrs['pa_camp-times'] = $proposed;
 			$variation->set_attributes($attrs);
 			$variation->save();
+			if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
+				intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_camp-times', $proposed);
+			}
 			$updated++;
 			$rows[] = [
 				'variation_id' => $var_id,
@@ -2549,10 +2564,16 @@ class InterSoccer_Program_Manager {
 				if (!empty($attrs['pa_camp-terms'])) {
 					update_post_meta($var_id, 'attribute_pa_camp-terms', $attrs['pa_camp-terms']);
 					wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
+						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_camp-terms', (string) $attrs['pa_camp-terms']);
+					}
 				}
 				if (!empty($attrs['pa_intersoccer-venues'])) {
 					update_post_meta($var_id, 'attribute_pa_intersoccer-venues', $attrs['pa_intersoccer-venues']);
 					wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
+						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_intersoccer-venues', (string) $attrs['pa_intersoccer-venues']);
+					}
 				}
 				$persisted = wc_get_product($var_id);
 				$pa = $persisted ? $persisted->get_attributes() : [];
@@ -2622,6 +2643,21 @@ class InterSoccer_Program_Manager {
 					$value = (string) max(0, (int) $value);
 				}
 				update_post_meta($var_id, $meta_key, $value);
+			}
+			if (function_exists('intersoccer_sync_course_metadata_to_translations')) {
+				$start = (string) get_post_meta($var_id, '_course_start_date', true);
+				$weeks = (int) get_post_meta($var_id, '_course_total_weeks', true);
+				$holidays = get_post_meta($var_id, '_course_holiday_dates', true);
+				$discount = get_post_meta($var_id, '_course_weekly_discount', true);
+				$end = (string) get_post_meta($var_id, '_end_date', true);
+				intersoccer_sync_course_metadata_to_translations(
+					$var_id,
+					$start,
+					$weeks,
+					is_array($holidays) ? $holidays : [],
+					is_numeric($discount) ? (float) $discount : 0.0,
+					$end
+				);
 			}
 		}
 

@@ -331,6 +331,123 @@ function intersoccer_get_discount_message_safe($rule_id, $message_type = 'cart_m
 }
 
 /**
+ * Variation IDs that are WPML translations of the given variation (excludes source).
+ *
+ * @param int $variation_id Source product_variation ID.
+ * @return int[]
+ */
+function intersoccer_foreach_translated_product_variations($variation_id) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0) {
+        return [];
+    }
+    if (!defined('ICL_SITEPRESS_VERSION') && !function_exists('icl_get_current_language')) {
+        return [];
+    }
+
+    $languages = apply_filters('wpml_active_languages', null);
+    if (!$languages || !is_array($languages)) {
+        return [];
+    }
+
+    $original_lang = apply_filters('wpml_element_language_code', null, [
+        'element_id'   => $variation_id,
+        'element_type' => 'post_product_variation',
+    ]);
+    if (!$original_lang) {
+        $original_lang = apply_filters('wpml_current_language', null);
+    }
+
+    $ids = [];
+    foreach (array_keys($languages) as $lang_code) {
+        if ($lang_code === $original_lang) {
+            continue;
+        }
+        $tid = (int) apply_filters('wpml_object_id', $variation_id, 'product_variation', false, $lang_code);
+        if ($tid > 0 && $tid !== $variation_id) {
+            $ids[] = $tid;
+        }
+    }
+
+    return array_values(array_unique($ids));
+}
+
+/**
+ * Copy a taxonomy attribute slug to WPML-translated variations (meta + WC attrs when possible).
+ *
+ * @param int    $variation_id Source variation ID.
+ * @param string $taxonomy     e.g. pa_intersoccer-venues.
+ * @param string $slug         Attribute term slug (may be empty to clear).
+ * @return void
+ */
+function intersoccer_sync_variation_taxonomy_attribute_to_translations($variation_id, $taxonomy, $slug) {
+    $variation_id = (int) $variation_id;
+    $taxonomy     = sanitize_title((string) $taxonomy);
+    $slug         = sanitize_text_field((string) $slug);
+    if ($variation_id <= 0 || $taxonomy === '') {
+        return;
+    }
+
+    $meta_key = 'attribute_' . $taxonomy;
+    foreach (intersoccer_foreach_translated_product_variations($variation_id) as $tid) {
+        if (function_exists('wc_get_product')) {
+            $variation = wc_get_product($tid);
+            if ($variation && is_a($variation, 'WC_Product_Variation')) {
+                $attrs              = $variation->get_attributes();
+                $attrs[$taxonomy]   = $slug;
+                $variation->set_attributes($attrs);
+                $variation->save();
+            }
+        }
+        update_post_meta($tid, $meta_key, $slug);
+        if (function_exists('wp_set_object_terms')) {
+            if ($slug !== '') {
+                wp_set_object_terms($tid, $slug, $taxonomy);
+            } else {
+                wp_set_object_terms($tid, [], $taxonomy);
+            }
+        }
+        if (function_exists('wc_delete_product_transients')) {
+            wc_delete_product_transients($tid);
+        }
+    }
+}
+
+/**
+ * Copy regular/price to WPML-translated variations.
+ *
+ * @param int         $variation_id Source variation.
+ * @param string      $regular_price Regular price string.
+ * @param string|null $price         Active price (defaults to regular).
+ * @return void
+ */
+function intersoccer_sync_variation_prices_to_translations($variation_id, $regular_price, $price = null) {
+    $variation_id  = (int) $variation_id;
+    $regular_price = (string) $regular_price;
+    $price         = $price !== null ? (string) $price : $regular_price;
+    if ($variation_id <= 0 || !function_exists('wc_get_product')) {
+        return;
+    }
+
+    foreach (intersoccer_foreach_translated_product_variations($variation_id) as $tid) {
+        $variation = wc_get_product($tid);
+        if (!$variation || !is_a($variation, 'WC_Product_Variation')) {
+            continue;
+        }
+        $variation->set_regular_price($regular_price);
+        $variation->set_price($price);
+        $variation->save();
+        if (function_exists('wc_delete_product_transients')) {
+            $parent = (int) $variation->get_parent_id();
+            if ($parent > 0) {
+                wc_delete_product_transients($parent);
+            }
+            wc_delete_product_transients($tid);
+        }
+    }
+}
+
+/**
  * Initialize language functions and validate dependencies
  * Call this during plugin activation or admin_init
  */

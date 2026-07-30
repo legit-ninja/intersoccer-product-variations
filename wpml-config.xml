@@ -8,6 +8,11 @@
     <custom-field action="copy">_course_weekly_discount</custom-field>
     <custom-field action="copy">_end_date</custom-field>
 
+    <!-- Camp schedule (Program Manager / SoT dates) -->
+    <custom-field action="copy">_camp_start_date</custom-field>
+    <custom-field action="copy">_camp_end_date</custom-field>
+    <custom-field action="copy">_camp_week_index</custom-field>
+
     <!-- Camp/course display helpers -->
     <custom-field action="copy">_camp_times</custom-field>
 
