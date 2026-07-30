@@ -379,7 +379,7 @@ function intersoccer_render_discounts_page() {
                             <?php _e('Count children from previous orders when applying sibling/multi-child discounts.', 'intersoccer-product-variations'); ?>
                         </label>
                         <p class="description">
-                            <?php _e('When enabled, camp and course sibling discounts use children booked in previous orders within the lookback period (not only children in the current cart). Tournament and birthday sibling discounts apply in the current cart only. Discounts apply only to the current cart.', 'intersoccer-product-variations'); ?>
+                            <?php _e('When enabled, camp and course sibling discounts use children booked in previous orders within the lookback period (not only children in the current cart). Tournament sibling discounts apply in the current cart only. Birthday products are not eligible for InterSoccer sibling or progressive discounts. Discounts apply only to the current cart.', 'intersoccer-product-variations'); ?>
                         </p>
                     </td>
                 </tr>

@@ -282,13 +282,14 @@ class InterSoccer_Product_Types {
     /**
      * True when the product is structured as a birthday package (not a camp/course).
      *
-     * Used to correct stale `_intersoccer_product_type` meta (e.g. camp) on birthday products.
+     * Used to correct stale `_intersoccer_product_type` meta (e.g. camp) on birthday products
+     * and to exclude birthday lines from camp sibling prior-order extract.
      *
      * @param int             $product_id
      * @param WC_Product|null $product
      * @return bool
      */
-    private static function product_has_birthday_signals($product_id, $product = null) {
+    public static function product_has_birthday_signals($product_id, $product = null) {
         $product_id = (int) $product_id;
         if ($product_id <= 0) {
             return false;
@@ -417,6 +418,20 @@ function intersoccer_is_course($product_id) {
  */
 function intersoccer_is_birthday($product_id) {
     return intersoccer_get_product_type($product_id) === 'birthday';
+}
+
+/**
+ * Birthday-signal detection without requiring resolved type meta (discount extract defense-in-depth).
+ *
+ * @param int             $product_id
+ * @param WC_Product|null $product
+ * @return bool
+ */
+function intersoccer_product_has_birthday_signals($product_id, $product = null) {
+    if (!class_exists('InterSoccer_Product_Types')) {
+        return false;
+    }
+    return InterSoccer_Product_Types::product_has_birthday_signals($product_id, $product);
 }
 
 /**
