@@ -11,6 +11,12 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 
 Camp variations store `_camp_start_date`, `_camp_end_date`, and `_camp_week_index`. Program Manager can edit/pre-fill these and seed them from camp-terms via `wp intersoccer migrate-camp-dates`. Parsing dates from `pa_camp-terms` remains a **deprecated fallback** during migration — see `scratch/BACKLOG-remove-camp-terms-date-parse.md` and `.cursor/rules/camp-date-meta.mdc`.
 
+## Program Manager + WPML (EN source of truth)
+
+Edit the catalogue in the **default language (EN)**. Program Manager create/duplicate does **not** auto-create FR/DE product or variation translations — staff translate via WPML/WCML.
+
+When FR/DE variation siblings already exist, saving camp schedule, venue, course time, camp times, price, facet repair, or course meta from Program Manager (or camp schedule writers) copies those values onto the translated variations. New translations also receive camp schedule keys on `wpml_pro_translation_completed`. Empty schedule reads on a translation fall back to default-language meta via `intersoccer_get_camp_schedule()` (raw `intersoccer_get_camp_schedule_meta()` stays local-only for the PM editor).
+
 ## Features
 
 ### Product Types & Variations
