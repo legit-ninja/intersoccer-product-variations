@@ -429,6 +429,40 @@ function intersoccer_extract_course_items_from_order($order) {
 }
 
 /**
+ * Whether a product should be excluded from camp sibling prior-order baselines.
+ *
+ * Birthday products (typed or birthday-signal) never seed camp sibling/progressive ranking.
+ * Optional $product_type / $has_birthday_signals allow unit tests without WC bootstrap.
+ *
+ * @param int         $product_id
+ * @param string|null $product_type           Pre-resolved type or null to call intersoccer_get_product_type.
+ * @param bool|null   $has_birthday_signals   Pre-resolved signals or null to detect.
+ * @return bool True = skip (not a camp sibling baseline contributor).
+ */
+function intersoccer_discount_exclude_product_from_camp_sibling_baseline($product_id, $product_type = null, $has_birthday_signals = null) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return true;
+    }
+
+    if ($has_birthday_signals === null) {
+        $has_birthday_signals = function_exists('intersoccer_product_has_birthday_signals')
+            && intersoccer_product_has_birthday_signals($product_id);
+    }
+    if ($has_birthday_signals) {
+        return true;
+    }
+
+    if ($product_type === null) {
+        $product_type = function_exists('intersoccer_get_product_type')
+            ? intersoccer_get_product_type($product_id)
+            : null;
+    }
+
+    return $product_type === 'birthday' || $product_type !== 'camp';
+}
+
+/**
  * Extract camp items from an order
  * 
  * @param WC_Order $order Order object
@@ -441,9 +475,9 @@ function intersoccer_extract_camp_items_from_order($order) {
         $product_id = $item->get_product_id();
         $variation_id = $item->get_variation_id();
         
-        // Check if it's a camp
-        $product_type = intersoccer_get_product_type($variation_id ?: $product_id);
-        if ($product_type !== 'camp') {
+        // Camps only — never seed sibling baselines from birthday (incl. mis-typed camp meta).
+        $resolve_id = $variation_id ?: $product_id;
+        if (intersoccer_discount_exclude_product_from_camp_sibling_baseline($resolve_id)) {
             continue;
         }
         
