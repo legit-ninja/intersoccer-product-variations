@@ -609,6 +609,35 @@
 	// Duplicate program
 	// =========================================================================
 
+	function rewriteTitleForYear(name, year) {
+		year = String(year || '').trim();
+		if (!/^(20\d{2})$/.test(year)) {
+			return name;
+		}
+		name = String(name || '').replace(/\s*\(Copy\)\s*$/i, '').trim();
+		if (/\b20\d{2}\b/.test(name)) {
+			return name.replace(/\b20\d{2}\b/, year);
+		}
+		return name ? (name + ' ' + year) : year;
+	}
+
+	function resolveDupYear() {
+		var custom = ($('#pm-dup-year-custom').val() || '').trim();
+		if (/^(20\d{2})$/.test(custom)) {
+			return custom;
+		}
+		return ($('#pm-dup-year').val() || '').trim();
+	}
+
+	$(document).on('change', '#pm-dup-year, #pm-dup-year-custom', function() {
+		var $name = $('#pm-dup-name');
+		if (!$name.length) return;
+		var year = resolveDupYear();
+		if (!year) return;
+		var source = $name.data('source-name') || $name.val();
+		$name.val(rewriteTitleForYear(source, year));
+	});
+
 	$(document).on('click', '#intersoccer-pm-duplicate-btn', function() {
 		var $btn = $(this);
 		if ($btn.prop('disabled')) return;
@@ -618,6 +647,7 @@
 		var sourceId = $btn.data('source-id');
 		var newName = $('#pm-dup-name').val().trim();
 		var newSeason = $('#pm-dup-season').val();
+		var newYear = resolveDupYear();
 
 		if (!newName) {
 			alert(PM.i18n.enter_name);
@@ -631,7 +661,8 @@
 			nonce: PM.nonce,
 			source_id: sourceId,
 			name: newName,
-			season: newSeason
+			season: newSeason,
+			year: newYear
 		}).done(function(response) {
 			if (response.success) {
 				$('#intersoccer-pm-duplicate-result')
@@ -652,6 +683,93 @@
 				.html('<div class="notice notice-error"><p>Request failed.</p></div>');
 			$btn.prop('disabled', false).text('Duplicate as Draft');
 		});
+	});
+
+	// =========================================================================
+	// Bulk Duplicate to year — beside Bulk Actions; only when that action is selected
+	// =========================================================================
+
+	function pmBulkActionValue($form) {
+		var action = $form.find('select[name="action"]').val();
+		if (!action || action === '-1') {
+			action = $form.find('select[name="action2"]').val();
+		}
+		return action || '-1';
+	}
+
+	function pmSyncBulkActionSelects($form, value) {
+		$form.find('select[name="action"], select[name="action2"]').each(function() {
+			if ($(this).find('option[value="' + value + '"]').length) {
+				$(this).val(value);
+			}
+		});
+	}
+
+	function pmToggleBulkYearRoll($form) {
+		var $roll = $('#intersoccer-pm-bulk-year-roll');
+		if (!$roll.length || !$form.length) {
+			return;
+		}
+		var show = pmBulkActionValue($form) === 'duplicate_to_year';
+		$roll.prop('hidden', !show);
+		if (show) {
+			$roll.css({ display: 'inline-block', marginLeft: '8px', verticalAlign: 'middle' });
+		} else {
+			$roll.css('display', 'none');
+		}
+	}
+
+	function pmPlaceBulkYearRoll() {
+		var $form = $('#intersoccer-pm-bulk-form');
+		var $roll = $('#intersoccer-pm-bulk-year-roll');
+		if (!$form.length || !$roll.length) {
+			return;
+		}
+		var $actions = $form.find('.tablenav.top .alignleft.actions').first();
+		if ($actions.length) {
+			var $doaction = $actions.find('#doaction');
+			if ($doaction.length) {
+				$roll.insertBefore($doaction);
+			} else {
+				$actions.append($roll);
+			}
+		}
+		pmToggleBulkYearRoll($form);
+	}
+
+	pmPlaceBulkYearRoll();
+
+	$(document).on('change', '#intersoccer-pm-bulk-form select[name="action"], #intersoccer-pm-bulk-form select[name="action2"]', function() {
+		var $form = $('#intersoccer-pm-bulk-form');
+		var value = $(this).val();
+		if (value && value !== '-1') {
+			pmSyncBulkActionSelects($form, value);
+		}
+		pmToggleBulkYearRoll($form);
+	});
+
+	$(document).on('submit', '#intersoccer-pm-bulk-form', function(e) {
+		var $form = $(this);
+		var action = pmBulkActionValue($form);
+		if (action !== 'duplicate_to_year') {
+			return;
+		}
+		if (!$form.find('input[name="product_ids[]"]:checked').length) {
+			e.preventDefault();
+			alert(PM.i18n.select_programs || 'Select one or more programs in the list before applying Duplicate to year.');
+			return false;
+		}
+		var year = ($('#pm_target_year').val() || '').trim();
+		var custom = ($('#pm_target_year_custom').val() || '').trim();
+		if (!/^(20\d{2})$/.test(year) && !/^(20\d{2})$/.test(custom)) {
+			e.preventDefault();
+			alert(PM.i18n.select_target_year || 'Select or enter a target program year before applying Duplicate to year.');
+			return false;
+		}
+		// Prefer custom typed year when select empty
+		if (!/^(20\d{2})$/.test(year) && /^(20\d{2})$/.test(custom)) {
+			$('#pm_target_year').append($('<option>', { value: custom, text: custom, selected: true }));
+		}
 	});
 
 	// =========================================================================

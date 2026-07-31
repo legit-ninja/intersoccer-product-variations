@@ -17,6 +17,13 @@ Edit the catalogue in the **default language (EN)**. Program Manager create/dupl
 
 When FR/DE variation siblings already exist, saving camp schedule, venue, course time, camp times, price, facet repair, or course meta from Program Manager (or camp schedule writers) copies those values onto the translated variations. New translations also receive camp schedule keys on `wpml_pro_translation_completed`. Empty schedule reads on a translation fall back to default-language meta via `intersoccer_get_camp_schedule()` (raw `intersoccer_get_camp_schedule_meta()` stays local-only for the PM editor).
 
+## Catalogue year-roll (Bulk Duplicate)
+
+- Seasons stay **evergreen** (`pa_program-season`: Autumn/Winter/Spring/Summer). Year lives on **`pa_program-year`** and in product titles — do **not** create `Autumn 2027`-style season terms.
+- Select rows → Bulk Actions **Duplicate to year…** → year/season fields appear beside the dropdown → Apply. Creates **Draft** clones (checked rows only) with year/season/title updates. Prices and camp/course dates are **not** copied — edit those, then WPML Sync, then Publish.
+- Lifecycle: **Publish** = live; **Private** = retired sold years (orders still resolve); **Draft** = WIP. No auto-close of products/variations; roster close remains Reports/Rosters-only.
+- Ops note: Obsidian `Fixing Products — Program Manager`.
+
 ## Features
 
 ### Product Types & Variations
