@@ -22,6 +22,8 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 - Seasons stay **evergreen** (`pa_program-season`: Autumn/Winter/Spring/Summer). Year lives on **`pa_program-year`** and in product titles — do **not** create `Autumn 2027`-style season terms.
 - Select rows → Bulk Actions **Duplicate to year…** → year/season fields appear beside the dropdown → Apply. Creates **Draft** clones (checked rows only) with year/season/title updates. Prices and camp/course dates are **not** copied — edit those, then WPML Sync, then Publish.
 - Lifecycle: **Publish** = live; **Private** = retired sold years (orders still resolve); **Draft** = WIP. No auto-close of products/variations; roster close remains Reports/Rosters-only.
+- Same-season course discounts and sibling season filters key on **`season|pa_program-year`** so evergreen Autumn does not cross-discount across years.
+- Program Manager status quick-edit fans out **draft / publish / private** to FR/DE product translations when they exist.
 - Ops note: Obsidian `Fixing Products — Program Manager`.
 
 ## Features

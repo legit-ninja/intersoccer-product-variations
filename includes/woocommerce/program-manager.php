@@ -2098,6 +2098,10 @@ class InterSoccer_Program_Manager {
 		$product->save();
 		wc_delete_product_transients($product_id);
 
+		if ($allowed_status && function_exists('intersoccer_sync_product_status_to_translations')) {
+			intersoccer_sync_product_status_to_translations($product_id, $status);
+		}
+
 		wp_send_json_success([
 			'product_id' => $product_id,
 			'name'       => $product->get_name(),

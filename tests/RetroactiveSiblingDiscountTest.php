@@ -228,6 +228,34 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertEquals(100.0, $totals['a']);
     }
 
+    public function testCourseSeasonFilterIsolatesEvergreenYears() {
+        $season_filter = ['autumn|2026'];
+        $prior_items = [
+            ['season' => 'autumn|2026', 'assigned_player_id' => 'a', 'line_total' => 100],
+            ['season' => 'autumn|2027', 'assigned_player_id' => 'b', 'line_total' => 200],
+        ];
+
+        $totals = [];
+        foreach ($prior_items as $item) {
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            if ($key === null) {
+                continue;
+            }
+            if (!isset($totals[$key])) {
+                $totals[$key] = 0;
+            }
+            $totals[$key] += floatval($item['line_total']);
+        }
+
+        $this->assertArrayHasKey('a', $totals);
+        $this->assertArrayNotHasKey('b', $totals);
+        $this->assertEquals(100.0, $totals['a']);
+    }
+
     public function testMaxSiblingVsProgressiveKeepsHigher() {
         $sibling = 0.25;
         $progressive = 0.10;
