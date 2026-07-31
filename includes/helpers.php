@@ -354,3 +354,61 @@ function intersoccer_pm_build_course_matrix_rows($day_slugs = [], $age_slugs = [
 function intersoccer_pm_is_allowed_product_status($status) {
     return in_array((string) $status, ['draft', 'publish', 'private'], true);
 }
+
+/**
+ * Normalize a program-year value to a bare calendar year (e.g. 2027).
+ *
+ * @param string $year Raw year (name or slug).
+ * @return string Empty string if invalid.
+ */
+function intersoccer_pm_normalize_program_year($year) {
+    $year = sanitize_text_field((string) $year);
+    if (preg_match('/^(20\d{2})$/', $year, $m)) {
+        return $m[1];
+    }
+    if (preg_match('/\b(20\d{2})\b/', $year, $m)) {
+        return $m[1];
+    }
+    return '';
+}
+
+/**
+ * Rewrite a program title for a target year (strip "(Copy)", replace or append year).
+ *
+ * @param string $name Source or draft title.
+ * @param string $year Target year (normalized internally).
+ * @return string
+ */
+function intersoccer_pm_rewrite_program_title_for_year($name, $year) {
+    $year = intersoccer_pm_normalize_program_year($year);
+    $name = trim((string) $name);
+    if ($year === '' || $name === '') {
+        return $name;
+    }
+    $name = preg_replace('/\s*\(Copy\)\s*$/i', '', $name);
+    $name = trim($name);
+    if (preg_match('/\b20\d{2}\b/', $name)) {
+        return preg_replace('/\b20\d{2}\b/', $year, $name, 1);
+    }
+    return $name . ' ' . $year;
+}
+
+/**
+ * True when a season label looks year-qualified (e.g. "Autumn 2027") — forbidden for new terms.
+ *
+ * @param string $label Season term name or slug.
+ * @return bool
+ */
+function intersoccer_pm_is_year_qualified_season_label($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return false;
+    }
+    // Bare year alone is a program-year, not a season label.
+    if (preg_match('/^(20\d{2})$/', $label)) {
+        return false;
+    }
+    // Match "Autumn 2027", "autumn-2027", etc.
+    return (bool) preg_match('/20\d{2}/', $label);
+}
+
