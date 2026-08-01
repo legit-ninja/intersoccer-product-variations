@@ -21,6 +21,31 @@ class ProgramManagerDuplicateTest extends TestCase {
 		$this->assertSame('2027', intersoccer_pm_normalize_program_year('Autumn 2027'));
 	}
 
+	public function test_discount_compose_season_key_isolates_evergreen_years() {
+		$key_2026 = intersoccer_discount_compose_season_key('Autumn', '2026');
+		$key_2027 = intersoccer_discount_compose_season_key('Autumn', '2027');
+		$this->assertSame('autumn|2026', $key_2026);
+		$this->assertSame('autumn|2027', $key_2027);
+		$this->assertNotSame($key_2026, $key_2027);
+	}
+
+	public function test_discount_compose_season_key_legacy_year_qualified() {
+		// Without pa_program-year, legacy labels stay unique as-is.
+		$this->assertSame('Autumn 2026', intersoccer_discount_compose_season_key('Autumn 2026', ''));
+		$this->assertSame('Autumn 2027', intersoccer_discount_compose_season_key('Autumn 2027', ''));
+		$this->assertNotSame(
+			intersoccer_discount_compose_season_key('Autumn 2026', ''),
+			intersoccer_discount_compose_season_key('Autumn 2027', '')
+		);
+	}
+
+	public function test_discount_compose_season_key_with_year_on_legacy_label() {
+		$this->assertSame(
+			'autumn 2026|2026',
+			intersoccer_discount_compose_season_key('Autumn 2026', '2026')
+		);
+	}
+
 	public function test_rewrite_title_replaces_year() {
 		$this->assertSame(
 			'Camp Autumn Geneva 2027',

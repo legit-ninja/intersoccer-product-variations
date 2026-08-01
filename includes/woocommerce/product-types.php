@@ -473,6 +473,39 @@ function intersoccer_get_product_season($product_id) {
 }
 
 /**
+ * Get product program year (pa_program-year term name).
+ *
+ * @param int $product_id Parent or variation ID.
+ * @return string|null
+ */
+function intersoccer_get_product_program_year($product_id) {
+    return intersoccer_get_product_term_name($product_id, 'program-year');
+}
+
+/**
+ * Season key for same-season / course sibling discount grouping.
+ *
+ * Prefer pa_program-year over digits embedded in season labels.
+ *
+ * @param int $product_id Parent or variation ID.
+ * @return string
+ */
+function intersoccer_discount_season_key($product_id) {
+    $season = (string) (intersoccer_get_product_season($product_id) ?: '');
+    $year   = (string) (intersoccer_get_product_program_year($product_id) ?: '');
+    if (function_exists('intersoccer_discount_compose_season_key')) {
+        return intersoccer_discount_compose_season_key($season, $year);
+    }
+    $year_norm = function_exists('intersoccer_pm_normalize_program_year')
+        ? intersoccer_pm_normalize_program_year($year)
+        : $year;
+    if ($year_norm !== '') {
+        return strtolower(trim($season)) . '|' . $year_norm;
+    }
+    return $season;
+}
+
+/**
  * Get product age group
  * @param int $product_id
  * @return string|null

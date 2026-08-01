@@ -412,3 +412,23 @@ function intersoccer_pm_is_year_qualified_season_label($label) {
     return (bool) preg_match('/20\d{2}/', $label);
 }
 
+/**
+ * Compose a same-season discount key from season label + optional program year.
+ *
+ * When year is known (pa_program-year), returns "season|YYYY" so evergreen seasons
+ * (Autumn) do not cross-discount across years. When year is empty, returns the season
+ * string unchanged so legacy year-qualified labels (Autumn 2026) stay unique.
+ *
+ * @param string $season       Season term name or empty.
+ * @param string $program_year Raw year (normalized internally).
+ * @return string
+ */
+function intersoccer_discount_compose_season_key($season, $program_year = '') {
+    $season = trim((string) $season);
+    $year   = intersoccer_pm_normalize_program_year((string) $program_year);
+    if ($year !== '') {
+        return strtolower($season) . '|' . $year;
+    }
+    return $season;
+}
+

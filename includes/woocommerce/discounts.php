@@ -405,9 +405,12 @@ function intersoccer_extract_course_items_from_order($order) {
             }
         }
 
-        $season = function_exists('intersoccer_get_product_season')
-            ? intersoccer_get_product_season($variation_id ?: $product_id)
-            : '';
+        $season_product_id = $variation_id ?: $product_id;
+        $season = function_exists('intersoccer_discount_season_key')
+            ? intersoccer_discount_season_key($season_product_id)
+            : (function_exists('intersoccer_get_product_season')
+                ? intersoccer_get_product_season($season_product_id)
+                : '');
         
         $course_items[] = [
             'order_id' => $order->get_id(),
@@ -1048,7 +1051,9 @@ function intersoccer_build_cart_context($cart_items) {
                     $context['camps_by_child'][$player_key][] = $item_data;
                 }
             } elseif ($product_type === 'course') {
-                $season = intersoccer_get_product_season($product_id);
+                $season = function_exists('intersoccer_discount_season_key')
+                    ? intersoccer_discount_season_key($product_id)
+                    : intersoccer_get_product_season($product_id);
                 $item_data['season'] = $season;
                 
                 if (!isset($context['courses_by_child'][$player_key])) {
@@ -1056,7 +1061,7 @@ function intersoccer_build_cart_context($cart_items) {
                 }
                 $context['courses_by_child'][$player_key][] = $item_data;
                 
-                // Group by season for same-season discounts
+                // Group by season|year for same-season discounts (evergreen-safe)
                 if (!isset($context['courses_by_season_child'][$season][$player_key])) {
                     $context['courses_by_season_child'][$season][$player_key] = array();
                 }
@@ -1540,6 +1545,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 foreach ($items as $item) {
                     if (!empty($item['season'])) {
                         $season_filter[] = (string) $item['season'];
+                    } elseif (!empty($item['product_id']) && function_exists('intersoccer_discount_season_key')) {
+                        $season_filter[] = (string) intersoccer_discount_season_key($item['product_id']);
                     } elseif (!empty($item['product_id']) && function_exists('intersoccer_get_product_season')) {
                         $season_filter[] = (string) intersoccer_get_product_season($item['product_id']);
                     }
@@ -1864,9 +1871,15 @@ function intersoccer_attach_same_season_discount_note($cart) {
         }
 
         $variation_id = $cart_item['variation_id'] ?: $cart_item['product_id'];
-        $season = get_post_meta($variation_id, 'attribute_pa_program-season', true) ?: 'unknown';
+        $season_product_id = !empty($cart_item['product_id']) ? (int) $cart_item['product_id'] : (int) $variation_id;
+        $season = function_exists('intersoccer_discount_season_key')
+            ? intersoccer_discount_season_key($season_product_id)
+            : (get_post_meta($variation_id, 'attribute_pa_program-season', true) ?: 'unknown');
+        if ($season === '' || $season === null) {
+            $season = 'unknown';
+        }
         
-        // Group by season AND attendee
+        // Group by season|year AND attendee
         $group_key = $season . '_' . $assigned_player;
         if (!isset($season_attendee_groups[$group_key])) {
             $season_attendee_groups[$group_key] = [

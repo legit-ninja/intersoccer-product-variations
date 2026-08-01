@@ -373,6 +373,106 @@ function intersoccer_foreach_translated_product_variations($variation_id) {
 }
 
 /**
+ * Parent product IDs that are WPML translations of the given product (excludes source).
+ *
+ * @param int $product_id Source product ID.
+ * @return int[]
+ */
+function intersoccer_foreach_translated_products($product_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return [];
+    }
+    if (!defined('ICL_SITEPRESS_VERSION') && !function_exists('icl_get_current_language')) {
+        return [];
+    }
+
+    $languages = apply_filters('wpml_active_languages', null);
+    if (!$languages || !is_array($languages)) {
+        return [];
+    }
+
+    $original_lang = apply_filters('wpml_element_language_code', null, [
+        'element_id'   => $product_id,
+        'element_type' => 'post_product',
+    ]);
+    if (!$original_lang) {
+        $original_lang = apply_filters('wpml_current_language', null);
+    }
+
+    $ids = [];
+    foreach (array_keys($languages) as $lang_code) {
+        if ($lang_code === $original_lang) {
+            continue;
+        }
+        $tid = (int) apply_filters('wpml_object_id', $product_id, 'product', false, $lang_code);
+        if ($tid <= 0) {
+            $tid = (int) apply_filters('wpml_object_id', $product_id, 'post_product', false, $lang_code);
+        }
+        if ($tid > 0 && $tid !== $product_id) {
+            $ids[] = $tid;
+        }
+    }
+
+    return array_values(array_unique($ids));
+}
+
+/**
+ * Fan out parent product post_status to WPML translation siblings.
+ *
+ * @param int    $product_id Source (usually EN) product ID.
+ * @param string $status     Allowlisted status: draft|publish|private.
+ * @return int[] Translated product IDs that were updated.
+ */
+function intersoccer_sync_product_status_to_translations($product_id, $status) {
+    $product_id = (int) $product_id;
+    $status     = sanitize_key((string) $status);
+    $allowed    = function_exists('intersoccer_pm_is_allowed_product_status')
+        ? intersoccer_pm_is_allowed_product_status($status)
+        : in_array($status, ['draft', 'publish', 'private'], true);
+    if ($product_id <= 0 || !$allowed) {
+        return [];
+    }
+
+    static $syncing = [];
+    if (isset($syncing[$product_id])) {
+        return [];
+    }
+    $syncing[$product_id] = true;
+
+    $updated = [];
+    try {
+        foreach (intersoccer_foreach_translated_products($product_id) as $tid) {
+            if (function_exists('wc_get_product')) {
+                $sibling = wc_get_product($tid);
+                if ($sibling && is_a($sibling, 'WC_Product') && method_exists($sibling, 'set_status') && method_exists($sibling, 'save')) {
+                    $sibling->set_status($status);
+                    $sibling->save();
+                    if (function_exists('wc_delete_product_transients')) {
+                        wc_delete_product_transients($tid);
+                    }
+                    $updated[] = $tid;
+                    continue;
+                }
+            }
+            if (function_exists('wp_update_post')) {
+                $result = wp_update_post([
+                    'ID'          => $tid,
+                    'post_status' => $status,
+                ], true);
+                if (!is_wp_error($result) && $result) {
+                    $updated[] = $tid;
+                }
+            }
+        }
+    } finally {
+        unset($syncing[$product_id]);
+    }
+
+    return $updated;
+}
+
+/**
  * Copy a taxonomy attribute slug to WPML-translated variations (meta + WC attrs when possible).
  *
  * @param int    $variation_id Source variation ID.
