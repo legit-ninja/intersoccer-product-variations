@@ -748,28 +748,294 @@
 		pmToggleBulkYearRoll($form);
 	});
 
+	var PM_BULK_ACTIONS = {
+		refresh_attrs: 'bulk_title_refresh',
+		scaffold_variations: 'bulk_title_scaffold',
+		duplicate_to_year: 'bulk_title_duplicate',
+		sync_wpml_languages: 'bulk_title_wpml'
+	};
+
+	var pmBulkRun = {
+		active: false,
+		cancel: false,
+		queue: [],
+		index: 0,
+		action: '',
+		opts: {},
+		tallies: { processed: 0, skipped: 0, failed: 0 },
+		messages: []
+	};
+
+	function pmBulkI18n(key, fallback) {
+		return (PM.i18n && PM.i18n[key]) ? PM.i18n[key] : fallback;
+	}
+
+	function pmBulkSprintf(template) {
+		var args = Array.prototype.slice.call(arguments, 1);
+		var i = 0;
+		return String(template).replace(/%(\d+)\$[sd]|%[sd]/g, function(match, num) {
+			if (num) {
+				return args[parseInt(num, 10) - 1];
+			}
+			return args[i++];
+		});
+	}
+
+	function pmEnsureBulkProgressModal() {
+		var $modal = $('#intersoccer-pm-bulk-progress');
+		if ($modal.length) {
+			return $modal;
+		}
+		$modal = $(
+			'<div id="intersoccer-pm-bulk-progress" class="intersoccer-pm-bulk-progress" hidden>' +
+				'<div class="intersoccer-pm-bulk-progress__dialog" role="dialog" aria-modal="true" aria-labelledby="intersoccer-pm-bulk-progress-title">' +
+					'<h2 id="intersoccer-pm-bulk-progress-title" class="intersoccer-pm-bulk-progress__title"></h2>' +
+					'<p class="intersoccer-pm-bulk-progress__status"></p>' +
+					'<div class="intersoccer-pm-bulk-progress__bar-wrap">' +
+						'<div class="intersoccer-pm-bulk-progress__bar" style="width:0%"></div>' +
+					'</div>' +
+					'<p class="intersoccer-pm-bulk-progress__tallies"></p>' +
+					'<ul class="intersoccer-pm-bulk-progress__log"></ul>' +
+					'<p class="intersoccer-pm-bulk-progress__summary" hidden></p>' +
+					'<div class="intersoccer-pm-bulk-progress__actions">' +
+						'<button type="button" class="button" id="intersoccer-pm-bulk-progress-cancel"></button>' +
+					'</div>' +
+				'</div>' +
+			'</div>'
+		);
+		$('body').append($modal);
+		$modal.find('#intersoccer-pm-bulk-progress-cancel').text(pmBulkI18n('bulk_cancel', 'Cancel'));
+		return $modal;
+	}
+
+	function pmUpdateBulkProgressUI(currentName) {
+		var $modal = pmEnsureBulkProgressModal();
+		var total = pmBulkRun.queue.length;
+		var done = pmBulkRun.index;
+		var pct = total ? Math.round((done / total) * 100) : 0;
+		var statusTpl = pmBulkI18n('bulk_progress_of', 'Processing %1$d of %2$d: %3$s');
+		var talliesTpl = pmBulkI18n('bulk_tallies', 'Processed: %1$d · Skipped: %2$d · Failed: %3$d');
+		var label = currentName || ('#' + (pmBulkRun.queue[done] || ''));
+		var n = Math.min(done + 1, total);
+		$modal.find('.intersoccer-pm-bulk-progress__status').text(
+			pmBulkSprintf(statusTpl, n, total, label)
+		);
+		$modal.find('.intersoccer-pm-bulk-progress__bar').css('width', pct + '%');
+		$modal.find('.intersoccer-pm-bulk-progress__tallies').text(
+			pmBulkSprintf(
+				talliesTpl,
+				pmBulkRun.tallies.processed,
+				pmBulkRun.tallies.skipped,
+				pmBulkRun.tallies.failed
+			)
+		);
+	}
+
+	function pmBulkActionTitle(action) {
+		var key = PM_BULK_ACTIONS[action];
+		var fallbacks = {
+			refresh_attrs: 'Refresh Variation Attributes',
+			scaffold_variations: 'Auto-scaffold Missing Variations',
+			duplicate_to_year: 'Duplicate to year…',
+			sync_wpml_languages: 'Sync all languages (WPML)'
+		};
+		return key ? pmBulkI18n(key, fallbacks[action] || action) : action;
+	}
+
+	function pmFinishBulkProgress(stopped) {
+		var $modal = pmEnsureBulkProgressModal();
+		var total = pmBulkRun.queue.length;
+		$modal.find('.intersoccer-pm-bulk-progress__bar').css('width', '100%');
+		$modal.find('.intersoccer-pm-bulk-progress__status').text(
+			stopped
+				? pmBulkI18n('bulk_cancelled', 'Bulk action stopped.')
+				: pmBulkI18n('bulk_complete', 'Bulk action complete.')
+		);
+		var summaryParts = [
+			pmBulkSprintf(
+				pmBulkI18n('bulk_tallies', 'Processed: %1$d · Skipped: %2$d · Failed: %3$d'),
+				pmBulkRun.tallies.processed,
+				pmBulkRun.tallies.skipped,
+				pmBulkRun.tallies.failed
+			)
+		];
+		if (pmBulkRun.action === 'duplicate_to_year' && pmBulkRun.opts.year) {
+			summaryParts.push(
+				pmBulkSprintf(
+					'Duplicated %1$d programs to Draft (year %2$s).',
+					pmBulkRun.tallies.processed,
+					pmBulkRun.opts.year
+				)
+			);
+		}
+		$modal.find('.intersoccer-pm-bulk-progress__summary')
+			.text(summaryParts.join(' '))
+			.prop('hidden', false);
+		$modal.find('#intersoccer-pm-bulk-progress-cancel')
+			.prop('disabled', true)
+			.text(pmBulkI18n('bulk_reloading', 'Reloading…'));
+		pmBulkRun.active = false;
+		setTimeout(function() {
+			window.location.reload();
+		}, 1200);
+	}
+
+	function pmProcessNextBulkItem() {
+		if (pmBulkRun.cancel) {
+			pmFinishBulkProgress(true);
+			return;
+		}
+		if (pmBulkRun.index >= pmBulkRun.queue.length) {
+			pmFinishBulkProgress(false);
+			return;
+		}
+
+		var productId = pmBulkRun.queue[pmBulkRun.index];
+		var $row = $('input[name="product_ids[]"][value="' + productId + '"]').closest('tr');
+		var name = $row.find('.row-title, .column-title a, strong a').first().text().trim() || ('#' + productId);
+		pmUpdateBulkProgressUI(name);
+
+		var payload = {
+			action: 'intersoccer_pm_bulk_process_one',
+			nonce: PM.nonce,
+			bulk_action: pmBulkRun.action,
+			product_id: productId
+		};
+		if (pmBulkRun.action === 'duplicate_to_year') {
+			payload.pm_target_year = pmBulkRun.opts.year || '';
+			payload.pm_target_year_custom = pmBulkRun.opts.yearCustom || '';
+			payload.pm_target_season = pmBulkRun.opts.season || '';
+		}
+
+		$.post(PM.ajax_url, payload)
+			.done(function(response) {
+				var data = (response && response.data) ? response.data : {};
+				var outcome = data.outcome || (response && response.success ? 'processed' : 'failed');
+				if (outcome === 'skipped') {
+					pmBulkRun.tallies.skipped++;
+				} else if (outcome === 'failed' || (response && response.success === false)) {
+					pmBulkRun.tallies.failed++;
+				} else {
+					pmBulkRun.tallies.processed++;
+				}
+				if (data.message) {
+					pmBulkRun.messages.push(data.message);
+					var $log = $('#intersoccer-pm-bulk-progress .intersoccer-pm-bulk-progress__log');
+					$log.append($('<li></li>').text(data.message));
+					if ($log.children().length > 12) {
+						$log.children().first().remove();
+					}
+				}
+				pmBulkRun.index++;
+				$('#intersoccer-pm-bulk-progress .intersoccer-pm-bulk-progress__tallies').text(
+					pmBulkSprintf(
+						pmBulkI18n('bulk_tallies', 'Processed: %1$d · Skipped: %2$d · Failed: %3$d'),
+						pmBulkRun.tallies.processed,
+						pmBulkRun.tallies.skipped,
+						pmBulkRun.tallies.failed
+					)
+				);
+				var total = pmBulkRun.queue.length;
+				var pct = total ? Math.round((pmBulkRun.index / total) * 100) : 0;
+				$('#intersoccer-pm-bulk-progress .intersoccer-pm-bulk-progress__bar').css('width', pct + '%');
+				pmProcessNextBulkItem();
+			})
+			.fail(function() {
+				pmBulkRun.tallies.failed++;
+				pmBulkRun.messages.push(pmBulkI18n('error', 'Error') + ' #' + productId);
+				pmBulkRun.index++;
+				pmProcessNextBulkItem();
+			});
+	}
+
+	function pmStartBulkProgress(action, ids, opts) {
+		var $modal = pmEnsureBulkProgressModal();
+		pmBulkRun.active = true;
+		pmBulkRun.cancel = false;
+		pmBulkRun.queue = ids.slice();
+		pmBulkRun.index = 0;
+		pmBulkRun.action = action;
+		pmBulkRun.opts = opts || {};
+		pmBulkRun.tallies = { processed: 0, skipped: 0, failed: 0 };
+		pmBulkRun.messages = [];
+
+		$modal.find('.intersoccer-pm-bulk-progress__title').text(pmBulkActionTitle(action));
+		$modal.find('.intersoccer-pm-bulk-progress__summary').prop('hidden', true).text('');
+		$modal.find('.intersoccer-pm-bulk-progress__log').empty();
+		$modal.find('.intersoccer-pm-bulk-progress__bar').css('width', '0%');
+		$modal.find('#intersoccer-pm-bulk-progress-cancel')
+			.prop('disabled', false)
+			.text(pmBulkI18n('bulk_cancel', 'Cancel'));
+		$modal.prop('hidden', false);
+		$('#intersoccer-pm-bulk-form').find('#doaction, #doaction2').prop('disabled', true);
+		pmUpdateBulkProgressUI('');
+		pmProcessNextBulkItem();
+	}
+
+	$(document).on('click', '#intersoccer-pm-bulk-progress-cancel', function() {
+		if (!pmBulkRun.active || pmBulkRun.cancel) {
+			return;
+		}
+		pmBulkRun.cancel = true;
+		$(this).prop('disabled', true).text(pmBulkI18n('bulk_stopping', 'Stopping after current…'));
+	});
+
 	$(document).on('submit', '#intersoccer-pm-bulk-form', function(e) {
 		var $form = $(this);
 		var action = pmBulkActionValue($form);
-		if (action !== 'duplicate_to_year') {
+
+		if (!PM_BULK_ACTIONS[action]) {
 			return;
 		}
-		if (!$form.find('input[name="product_ids[]"]:checked').length) {
-			e.preventDefault();
-			alert(PM.i18n.select_programs || 'Select one or more programs in the list before applying Duplicate to year.');
+
+		e.preventDefault();
+
+		if (pmBulkRun.active) {
 			return false;
 		}
-		var year = ($('#pm_target_year').val() || '').trim();
-		var custom = ($('#pm_target_year_custom').val() || '').trim();
-		if (!/^(20\d{2})$/.test(year) && !/^(20\d{2})$/.test(custom)) {
-			e.preventDefault();
-			alert(PM.i18n.select_target_year || 'Select or enter a target program year before applying Duplicate to year.');
+
+		var ids = [];
+		$form.find('input[name="product_ids[]"]:checked').each(function() {
+			var id = parseInt($(this).val(), 10);
+			if (id) {
+				ids.push(id);
+			}
+		});
+		if (!ids.length) {
+			alert(
+				action === 'duplicate_to_year'
+					? (PM.i18n.select_programs || 'Select one or more programs in the list before applying Duplicate to year.')
+					: pmBulkI18n('bulk_select_items', 'Select one or more programs before applying a bulk action.')
+			);
 			return false;
 		}
-		// Prefer custom typed year when select empty
-		if (!/^(20\d{2})$/.test(year) && /^(20\d{2})$/.test(custom)) {
-			$('#pm_target_year').append($('<option>', { value: custom, text: custom, selected: true }));
+
+		var opts = {};
+		if (action === 'duplicate_to_year') {
+			var year = ($('#pm_target_year').val() || '').trim();
+			var custom = ($('#pm_target_year_custom').val() || '').trim();
+			if (!/^(20\d{2})$/.test(year) && !/^(20\d{2})$/.test(custom)) {
+				alert(PM.i18n.select_target_year || 'Select or enter a target program year before applying Duplicate to year.');
+				return false;
+			}
+			if (!/^(20\d{2})$/.test(year) && /^(20\d{2})$/.test(custom)) {
+				$('#pm_target_year').append($('<option>', { value: custom, text: custom, selected: true }));
+				year = custom;
+			}
+			opts.year = year || custom;
+			opts.yearCustom = custom;
+			opts.season = ($('#pm_target_season').val() || '').trim();
 		}
+
+		if (action === 'sync_wpml_languages') {
+			var confirmMsg = pmBulkI18n('confirm_sync_wpml', 'Sync all languages (WPML)?');
+			if (!window.confirm(confirmMsg)) {
+				return false;
+			}
+		}
+
+		pmStartBulkProgress(action, ids, opts);
+		return false;
 	});
 
 	// =========================================================================
