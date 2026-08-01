@@ -445,7 +445,7 @@ function intersoccer_sync_product_status_to_translations($product_id, $status) {
         foreach (intersoccer_foreach_translated_products($product_id) as $tid) {
             if (function_exists('wc_get_product')) {
                 $sibling = wc_get_product($tid);
-                if ($sibling && is_a($sibling, 'WC_Product')) {
+                if ($sibling && is_a($sibling, 'WC_Product') && method_exists($sibling, 'set_status') && method_exists($sibling, 'save')) {
                     $sibling->set_status($status);
                     $sibling->save();
                     if (function_exists('wc_delete_product_transients')) {
