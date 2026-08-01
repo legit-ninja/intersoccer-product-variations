@@ -42,6 +42,7 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_propose_camp_times', [__CLASS__, 'ajax_propose_camp_times']);
 		add_action('wp_ajax_intersoccer_pm_repair_camp_facets', [__CLASS__, 'ajax_repair_camp_facets']);
 		add_action('wp_ajax_intersoccer_pm_sync_wpml_languages', [__CLASS__, 'ajax_sync_wpml_languages']);
+		add_action('wp_ajax_intersoccer_pm_bulk_process_one', [__CLASS__, 'ajax_bulk_process_one']);
 		add_action('wp_ajax_intersoccer_pm_quick_edit', [__CLASS__, 'ajax_quick_edit']);
 		add_action('wp_ajax_intersoccer_pm_duplicate_program', [__CLASS__, 'ajax_duplicate_program']);
 		add_action('wp_ajax_intersoccer_pm_save_parent_attrs', [__CLASS__, 'ajax_save_parent_attrs']);
@@ -67,11 +68,18 @@ class InterSoccer_Program_Manager {
 
 		wp_enqueue_style('wp-components');
 
+		wp_enqueue_style(
+			'intersoccer-program-manager',
+			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/program-manager.css',
+			[],
+			'2.7.31.3'
+		);
+
 		wp_enqueue_script(
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.7.31.2',
+			'2.7.31.3',
 			true
 		);
 
@@ -96,6 +104,18 @@ class InterSoccer_Program_Manager {
 				'enter_name'        => __('Please enter a program name.', 'intersoccer-product-variations'),
 				'select_target_year'=> __('Select or enter a target program year before applying Duplicate to year.', 'intersoccer-product-variations'),
 				'select_programs'   => __('Select one or more programs in the list before applying Duplicate to year.', 'intersoccer-product-variations'),
+				'bulk_progress_of'  => __('Processing %1$d of %2$d: %3$s', 'intersoccer-product-variations'),
+				'bulk_tallies'      => __('Processed: %1$d · Skipped: %2$d · Failed: %3$d', 'intersoccer-product-variations'),
+				'bulk_cancel'       => __('Cancel', 'intersoccer-product-variations'),
+				'bulk_stopping'     => __('Stopping after current…', 'intersoccer-product-variations'),
+				'bulk_complete'     => __('Bulk action complete.', 'intersoccer-product-variations'),
+				'bulk_cancelled'    => __('Bulk action stopped.', 'intersoccer-product-variations'),
+				'bulk_reloading'    => __('Reloading…', 'intersoccer-product-variations'),
+				'bulk_select_items' => __('Select one or more programs before applying a bulk action.', 'intersoccer-product-variations'),
+				'bulk_title_refresh'=> __('Refresh Variation Attributes', 'intersoccer-product-variations'),
+				'bulk_title_scaffold'=> __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
+				'bulk_title_duplicate'=> __('Duplicate to year…', 'intersoccer-product-variations'),
+				'bulk_title_wpml'   => __('Sync all languages (WPML)', 'intersoccer-product-variations'),
 			],
 		]);
 	}
@@ -315,51 +335,18 @@ class InterSoccer_Program_Manager {
 
 				if ($action === 'refresh_attrs') {
 					foreach ($product_ids as $pid) {
-						$product = wc_get_product($pid);
-						if (!$product || !$product->is_type('variable')) {
-							continue;
+						$result = self::process_bulk_item('refresh_attrs', $pid);
+						if (($result['outcome'] ?? '') === 'processed') {
+							$processed++;
 						}
-						$type = class_exists('InterSoccer_Product_Types')
-							? InterSoccer_Product_Types::get_product_type($pid)
-							: '';
-						if ($type === 'camp') {
-							// Promote Venue/Camp Term/Camp Time and backfill — do not wipe attributes.
-							self::repair_camp_variation_facets($pid);
-						} else {
-							foreach ($product->get_children() as $var_id) {
-								$variation = wc_get_product($var_id);
-								if (!$variation) {
-									continue;
-								}
-								$parent_attrs = $product->get_attributes();
-								$var_attrs    = [];
-								foreach ($parent_attrs as $attr) {
-									if ($attr->get_variation()) {
-										$var_attrs[$attr->get_name()] = '';
-									}
-								}
-								$variation->set_attributes($var_attrs);
-								$variation->save();
-							}
-						}
-						$processed++;
 					}
 					echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('%d products processed — variation attributes refreshed.', 'intersoccer-product-variations'), $processed) . '</p></div>';
 				} elseif ($action === 'scaffold_variations') {
 					foreach ($product_ids as $pid) {
-						$product = wc_get_product($pid);
-						if (!$product || !$product->is_type('variable')) {
-							continue;
+						$result = self::process_bulk_item('scaffold_variations', $pid);
+						if (($result['outcome'] ?? '') === 'processed') {
+							$processed++;
 						}
-						if (count($product->get_children()) > 0) {
-							continue;
-						}
-						$type   = InterSoccer_Product_Types::get_product_type($pid);
-						$matrix = self::get_default_matrix($type, $pid);
-						foreach ($matrix as $row) {
-							self::create_single_variation($pid, $type, $row);
-						}
-						$processed++;
 					}
 					echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('%d products processed — variations scaffolded.', 'intersoccer-product-variations'), $processed) . '</p></div>';
 				} elseif ($action === 'duplicate_to_year') {
@@ -382,38 +369,18 @@ class InterSoccer_Program_Manager {
 							$created = [];
 							$errors  = [];
 							foreach ($product_ids as $pid) {
-								$source = wc_get_product($pid);
-								if (!$source || !$source->is_type('variable')) {
-									continue;
-								}
-								$type = class_exists('InterSoccer_Product_Types')
-									? InterSoccer_Product_Types::get_product_type($pid)
-									: '';
-								if (!$type) {
-									$errors[] = sprintf(
-										/* translators: %d: product ID */
-										__('Skipped #%d (unknown program type).', 'intersoccer-product-variations'),
-										$pid
-									);
-									continue;
-								}
-
-								$new_id = self::duplicate_program($pid, $source->get_name(), [
-									'year'          => $target_year,
-									'season'        => $target_season,
-									'rewrite_title' => true,
+								$result = self::process_bulk_item('duplicate_to_year', $pid, [
+									'year'   => $target_year,
+									'season' => $target_season,
 								]);
-								if (is_wp_error($new_id)) {
-									$errors[] = sprintf(
-										/* translators: 1: product ID, 2: error message */
-										__('#%1$d: %2$s', 'intersoccer-product-variations'),
-										$pid,
-										$new_id->get_error_message()
-									);
-									continue;
+								if (($result['outcome'] ?? '') === 'processed' && !empty($result['new_product_id'])) {
+									$created[] = (int) $result['new_product_id'];
+									$processed++;
+								} elseif (($result['outcome'] ?? '') === 'skipped' && !empty($result['message'])) {
+									$errors[] = $result['message'];
+								} elseif (($result['outcome'] ?? '') === 'failed' && !empty($result['message'])) {
+									$errors[] = $result['message'];
 								}
-								$created[] = $new_id;
-								$processed++;
 							}
 
 							if ($processed > 0) {
@@ -458,19 +425,20 @@ class InterSoccer_Program_Manager {
 					$failed   = 0;
 					$messages = [];
 					foreach ($product_ids as $pid) {
-						if (!function_exists('intersoccer_pm_sync_product_translations')) {
+						$result = self::process_bulk_item('sync_wpml_languages', $pid);
+						if (($result['outcome'] ?? '') === 'failed' && empty($result['wpml'])) {
 							$failed++;
 							continue;
 						}
-						$result = intersoccer_pm_sync_product_translations($pid);
 						$processed++;
-						$created += count($result['parents_created'] ?? []);
-						$synced  += count($result['parents_synced'] ?? []);
-						if (empty($result['ok']) && !empty($result['errors'])) {
+						$wpml = is_array($result['wpml'] ?? null) ? $result['wpml'] : [];
+						$created += count($wpml['parents_created'] ?? []);
+						$synced  += count($wpml['parents_synced'] ?? []);
+						if (($result['outcome'] ?? '') === 'failed') {
 							$failed++;
 						}
 						if (!empty($result['message'])) {
-							$messages[] = sprintf('#%d: %s', (int) ($result['source_product_id'] ?? $pid), $result['message']);
+							$messages[] = sprintf('#%d: %s', (int) ($result['product_id'] ?? $pid), $result['message']);
 						}
 					}
 					$summary = sprintf(
@@ -2122,6 +2090,241 @@ class InterSoccer_Program_Manager {
 			'completeness' => self::get_product_completeness($source_id),
 			'message'      => $result['message'] ?? __('WPML sync complete.', 'intersoccer-product-variations'),
 		]);
+	}
+
+	/**
+	 * AJAX: process one list-bulk item (progress UI chunk).
+	 */
+	public static function ajax_bulk_process_one() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		@set_time_limit(0);
+
+		$action     = isset($_POST['bulk_action']) ? sanitize_key(wp_unslash($_POST['bulk_action'])) : '';
+		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
+		$opts       = [];
+
+		if ($action === 'duplicate_to_year') {
+			$target_year   = isset($_POST['pm_target_year']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year'])) : '';
+			$target_custom = isset($_POST['pm_target_year_custom']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year_custom'])) : '';
+			$target_season = isset($_POST['pm_target_season']) ? sanitize_text_field(wp_unslash($_POST['pm_target_season'])) : '';
+			if (self::normalize_program_year($target_year) === '' && $target_custom !== '') {
+				$target_year = $target_custom;
+			}
+			$target_year = self::normalize_program_year($target_year);
+			if ($target_year === '') {
+				wp_send_json_error([
+					'message' => __('Bulk Duplicate requires a target program year (e.g. 2027).', 'intersoccer-product-variations'),
+				]);
+			}
+			$year_term = self::ensure_program_year_term($target_year);
+			if (is_wp_error($year_term)) {
+				wp_send_json_error(['message' => $year_term->get_error_message()]);
+			}
+			$opts['year']   = $target_year;
+			$opts['season'] = $target_season;
+		}
+
+		$result = self::process_bulk_item($action, $product_id, $opts);
+		if (empty($result['ok']) && ($result['outcome'] ?? '') === 'failed' && empty($result['wpml']) && $action !== 'sync_wpml_languages') {
+			wp_send_json_error($result);
+		}
+
+		wp_send_json_success($result);
+	}
+
+	/**
+	 * Process a single Program Manager list bulk action against one product.
+	 *
+	 * @param string $action     refresh_attrs|scaffold_variations|duplicate_to_year|sync_wpml_languages
+	 * @param int    $product_id Product ID.
+	 * @param array  $opts       Optional. year/season for duplicate_to_year.
+	 * @return array{ok:bool,outcome:string,product_id:int,product_name:string,message:string,new_product_id:?int,wpml:?array}
+	 */
+	public static function process_bulk_item($action, $product_id, $opts = []) {
+		$product_id = absint($product_id);
+		$action     = sanitize_key((string) $action);
+		$product    = apply_filters('intersoccer_pm_bulk_get_product', null, $product_id);
+		if ($product === null) {
+			$product = $product_id ? wc_get_product($product_id) : false;
+		}
+		$name = ($product && method_exists($product, 'get_name')) ? (string) $product->get_name() : '';
+
+		$base = [
+			'ok'             => true,
+			'outcome'        => 'processed',
+			'product_id'     => $product_id,
+			'product_name'   => $name,
+			'message'        => '',
+			'new_product_id' => null,
+			'wpml'           => null,
+		];
+
+		$allowed = ['refresh_attrs', 'scaffold_variations', 'duplicate_to_year', 'sync_wpml_languages'];
+		if (!in_array($action, $allowed, true)) {
+			return array_merge($base, [
+				'ok'      => false,
+				'outcome' => 'failed',
+				'message' => __('Unknown bulk action.', 'intersoccer-product-variations'),
+			]);
+		}
+
+		if (!$product || !method_exists($product, 'is_type') || !$product->is_type('variable')) {
+			return array_merge($base, [
+				'ok'      => true,
+				'outcome' => 'skipped',
+				'message' => sprintf(
+					/* translators: %d: product ID */
+					__('Skipped #%d (not a variable product).', 'intersoccer-product-variations'),
+					$product_id
+				),
+			]);
+		}
+
+		if ($action === 'refresh_attrs') {
+			$type = class_exists('InterSoccer_Product_Types')
+				? InterSoccer_Product_Types::get_product_type($product_id)
+				: '';
+			if ($type === 'camp') {
+				self::repair_camp_variation_facets($product_id);
+			} else {
+				foreach ($product->get_children() as $var_id) {
+					$variation = wc_get_product($var_id);
+					if (!$variation) {
+						continue;
+					}
+					$parent_attrs = $product->get_attributes();
+					$var_attrs    = [];
+					foreach ($parent_attrs as $attr) {
+						if ($attr->get_variation()) {
+							$var_attrs[$attr->get_name()] = '';
+						}
+					}
+					$variation->set_attributes($var_attrs);
+					$variation->save();
+				}
+			}
+			return array_merge($base, [
+				'message' => __('Variation attributes refreshed.', 'intersoccer-product-variations'),
+			]);
+		}
+
+		if ($action === 'scaffold_variations') {
+			if (count($product->get_children()) > 0) {
+				return array_merge($base, [
+					'outcome' => 'skipped',
+					'message' => sprintf(
+						/* translators: %d: product ID */
+						__('Skipped #%d (variations already exist).', 'intersoccer-product-variations'),
+						$product_id
+					),
+				]);
+			}
+			$type = class_exists('InterSoccer_Product_Types')
+				? InterSoccer_Product_Types::get_product_type($product_id)
+				: '';
+			if (!$type) {
+				return array_merge($base, [
+					'outcome' => 'skipped',
+					'message' => sprintf(
+						/* translators: %d: product ID */
+						__('Skipped #%d (unknown program type).', 'intersoccer-product-variations'),
+						$product_id
+					),
+				]);
+			}
+			$matrix = self::get_default_matrix($type, $product_id);
+			foreach ($matrix as $row) {
+				self::create_single_variation($product_id, $type, $row);
+			}
+			return array_merge($base, [
+				'message' => __('Variations scaffolded.', 'intersoccer-product-variations'),
+			]);
+		}
+
+		if ($action === 'duplicate_to_year') {
+			$target_year   = self::normalize_program_year($opts['year'] ?? '');
+			$target_season = isset($opts['season']) ? sanitize_text_field((string) $opts['season']) : '';
+			if ($target_year === '') {
+				return array_merge($base, [
+					'ok'      => false,
+					'outcome' => 'failed',
+					'message' => __('Bulk Duplicate requires a target program year (e.g. 2027).', 'intersoccer-product-variations'),
+				]);
+			}
+			$type = class_exists('InterSoccer_Product_Types')
+				? InterSoccer_Product_Types::get_product_type($product_id)
+				: '';
+			if (!$type) {
+				return array_merge($base, [
+					'outcome' => 'skipped',
+					'message' => sprintf(
+						/* translators: %d: product ID */
+						__('Skipped #%d (unknown program type).', 'intersoccer-product-variations'),
+						$product_id
+					),
+				]);
+			}
+
+			$new_id = self::duplicate_program($product_id, $product->get_name(), [
+				'year'          => $target_year,
+				'season'        => $target_season,
+				'rewrite_title' => true,
+			]);
+			if (is_wp_error($new_id)) {
+				return array_merge($base, [
+					'ok'      => false,
+					'outcome' => 'failed',
+					'message' => sprintf(
+						/* translators: 1: product ID, 2: error message */
+						__('#%1$d: %2$s', 'intersoccer-product-variations'),
+						$product_id,
+						$new_id->get_error_message()
+					),
+				]);
+			}
+
+			return array_merge($base, [
+				'new_product_id' => (int) $new_id,
+				'message'        => sprintf(
+					/* translators: 1: source product ID, 2: new product ID, 3: year */
+					__('Duplicated #%1$d → #%2$d (year %3$s).', 'intersoccer-product-variations'),
+					$product_id,
+					(int) $new_id,
+					$target_year
+				),
+			]);
+		}
+
+		// sync_wpml_languages
+		if (!function_exists('intersoccer_pm_sync_product_translations')) {
+			return array_merge($base, [
+				'ok'      => false,
+				'outcome' => 'failed',
+				'message' => __('WPML sync is not available.', 'intersoccer-product-variations'),
+			]);
+		}
+
+		$wpml = intersoccer_pm_sync_product_translations($product_id);
+		$ok   = !empty($wpml['ok']);
+		$failed = !$ok && !empty($wpml['errors']);
+		$source_id = (int) ($wpml['source_product_id'] ?? $product_id);
+		$source    = wc_get_product($source_id);
+		$source_name = ($source && method_exists($source, 'get_name')) ? (string) $source->get_name() : $name;
+
+		return [
+			'ok'             => $ok || !$failed,
+			'outcome'        => $failed ? 'failed' : 'processed',
+			'product_id'     => $source_id,
+			'product_name'   => $source_name,
+			'message'        => (string) ($wpml['message'] ?? ''),
+			'new_product_id' => null,
+			'wpml'           => $wpml,
+		];
 	}
 
 	public static function ajax_quick_edit() {
