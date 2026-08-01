@@ -1134,6 +1134,40 @@
 	});
 
 	// =========================================================================
+	// Detail view: Sync all languages (WPML)
+	// =========================================================================
+
+	$(document).on('click', '#intersoccer-pm-sync-wpml-btn', function() {
+		var $btn = $(this);
+		var productId = $btn.data('product-id');
+		var $status = $('#intersoccer-pm-sync-wpml-status');
+		var confirmMsg = (PM.i18n && PM.i18n.confirm_sync_wpml)
+			? PM.i18n.confirm_sync_wpml
+			: 'Sync all languages (WPML)?';
+		if (!window.confirm(confirmMsg)) {
+			return;
+		}
+		$status.text((PM.i18n && PM.i18n.syncing_wpml) || 'Syncing…').css('color', '#666');
+		$btn.prop('disabled', true);
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_sync_wpml_languages',
+			nonce: PM.nonce,
+			product_id: productId
+		}).done(function(response) {
+			$btn.prop('disabled', false);
+			if (!response.success) {
+				$status.text(response.data && response.data.message ? response.data.message : PM.i18n.error).css('color', 'red');
+				return;
+			}
+			$status.text(response.data.message || 'Synced').css('color', 'green');
+			setTimeout(function() { window.location.reload(); }, 1200);
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	// =========================================================================
 	// Detail view: product status (draft / publish / private)
 	// =========================================================================
 
