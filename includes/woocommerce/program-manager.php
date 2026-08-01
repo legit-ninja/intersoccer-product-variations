@@ -41,6 +41,7 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_apply_parsed_camp_dates', [__CLASS__, 'ajax_apply_parsed_camp_dates']);
 		add_action('wp_ajax_intersoccer_pm_propose_camp_times', [__CLASS__, 'ajax_propose_camp_times']);
 		add_action('wp_ajax_intersoccer_pm_repair_camp_facets', [__CLASS__, 'ajax_repair_camp_facets']);
+		add_action('wp_ajax_intersoccer_pm_sync_wpml_languages', [__CLASS__, 'ajax_sync_wpml_languages']);
 		add_action('wp_ajax_intersoccer_pm_quick_edit', [__CLASS__, 'ajax_quick_edit']);
 		add_action('wp_ajax_intersoccer_pm_duplicate_program', [__CLASS__, 'ajax_duplicate_program']);
 		add_action('wp_ajax_intersoccer_pm_save_parent_attrs', [__CLASS__, 'ajax_save_parent_attrs']);
@@ -70,7 +71,7 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.7.31.1',
+			'2.7.31.2',
 			true
 		);
 
@@ -84,11 +85,13 @@ class InterSoccer_Program_Manager {
 				'confirm_create'    => __('Create this program as a Draft product?', 'intersoccer-product-variations'),
 				'confirm_duplicate' => __('Duplicate this program? A new Draft product will be created.', 'intersoccer-product-variations'),
 				'confirm_refresh'   => __('Refresh attributes on all unhealthy variations? This applies default values for missing fields.', 'intersoccer-product-variations'),
+				'confirm_sync_wpml' => __('Sync all languages (WPML)? This creates or refreshes FR/DE product and variation translations from English, copying shared attribute slugs, schedule, prices, and course meta.', 'intersoccer-product-variations'),
 				'saving'            => __('Saving…', 'intersoccer-product-variations'),
 				'saved'             => __('Saved', 'intersoccer-product-variations'),
 				'error'             => __('Error', 'intersoccer-product-variations'),
 				'creating'          => __('Creating program…', 'intersoccer-product-variations'),
 				'refreshing'        => __('Refreshing…', 'intersoccer-product-variations'),
+				'syncing_wpml'      => __('Syncing WPML languages…', 'intersoccer-product-variations'),
 				'select_type'       => __('Please select a program type.', 'intersoccer-product-variations'),
 				'enter_name'        => __('Please enter a program name.', 'intersoccer-product-variations'),
 				'select_target_year'=> __('Select or enter a target program year before applying Duplicate to year.', 'intersoccer-product-variations'),
@@ -448,6 +451,46 @@ class InterSoccer_Program_Manager {
 							}
 						}
 					}
+				} elseif ($action === 'sync_wpml_languages') {
+					@set_time_limit(0);
+					$created  = 0;
+					$synced   = 0;
+					$failed   = 0;
+					$messages = [];
+					foreach ($product_ids as $pid) {
+						if (!function_exists('intersoccer_pm_sync_product_translations')) {
+							$failed++;
+							continue;
+						}
+						$result = intersoccer_pm_sync_product_translations($pid);
+						$processed++;
+						$created += count($result['parents_created'] ?? []);
+						$synced  += count($result['parents_synced'] ?? []);
+						if (empty($result['ok']) && !empty($result['errors'])) {
+							$failed++;
+						}
+						if (!empty($result['message'])) {
+							$messages[] = sprintf('#%d: %s', (int) ($result['source_product_id'] ?? $pid), $result['message']);
+						}
+					}
+					$summary = sprintf(
+						/* translators: 1: products processed, 2: languages created, 3: languages refreshed, 4: failures */
+						__('%1$d products processed — WPML: %2$d language(s) created, %3$d refreshed, %4$d with errors.', 'intersoccer-product-variations'),
+						$processed,
+						$created,
+						$synced,
+						$failed
+					);
+					$class = $failed > 0 ? 'notice-warning' : 'notice-success';
+					echo '<div class="notice ' . esc_attr($class) . ' is-dismissible"><p>' . esc_html($summary) . '</p>';
+					if ($messages !== []) {
+						echo '<ul style="margin-left:1.5em;list-style:disc;">';
+						foreach (array_slice($messages, 0, 20) as $msg) {
+							echo '<li>' . esc_html($msg) . '</li>';
+						}
+						echo '</ul>';
+					}
+					echo '</div>';
 				}
 			} else {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Bulk action could not be verified (security check failed). Please reload the Program Manager page and try again.', 'intersoccer-product-variations') . '</p></div>';
@@ -644,6 +687,16 @@ class InterSoccer_Program_Manager {
 				&nbsp;|&nbsp;
 				<a href="<?php echo esc_url($duplicate_url); ?>"><?php esc_html_e('Duplicate Program', 'intersoccer-product-variations'); ?></a>
 			</p>
+			<?php if (function_exists('intersoccer_pm_wpml_available') && intersoccer_pm_wpml_available()) : ?>
+			<p class="intersoccer-pm-wpml-sync-row" style="margin:8px 0 16px;">
+				<button type="button" class="button button-secondary" id="intersoccer-pm-sync-wpml-btn" data-product-id="<?php echo esc_attr((string) $product_id); ?>">
+					<?php esc_html_e('Sync all languages (WPML)', 'intersoccer-product-variations'); ?>
+				</button>
+				<span id="intersoccer-pm-sync-wpml-status" style="margin-left:8px;"></span>
+				<br />
+				<span class="description"><?php esc_html_e('Creates or refreshes FR/DE translations from the default language (EN), copying shared attribute slugs, camp schedule, prices, and course meta. Edit the catalogue in English first.', 'intersoccer-product-variations'); ?></span>
+			</p>
+			<?php endif; ?>
 			<p class="intersoccer-pm-detail-status-row" style="margin:12px 0 20px;">
 				<label for="intersoccer-pm-detail-status" style="font-weight:600;margin-right:8px;">
 					<?php esc_html_e('Status', 'intersoccer-product-variations'); ?>
@@ -2036,6 +2089,41 @@ class InterSoccer_Program_Manager {
 		]);
 	}
 
+	/**
+	 * AJAX: create/link FR/DE translations via WPML/WCML and fan out EN catalogue data.
+	 */
+	public static function ajax_sync_wpml_languages() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		if (!function_exists('intersoccer_pm_sync_product_translations')) {
+			wp_send_json_error(['message' => __('WPML sync is not available.', 'intersoccer-product-variations')]);
+		}
+
+		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
+		$result     = intersoccer_pm_sync_product_translations($product_id);
+
+		if (empty($result['ok']) && in_array('invalid_product', $result['errors'] ?? [], true)) {
+			wp_send_json_error(['message' => $result['message'] ?: __('Invalid product.', 'intersoccer-product-variations'), 'result' => $result]);
+		}
+		if (empty($result['ok']) && in_array('wpml_unavailable', $result['errors'] ?? [], true)) {
+			wp_send_json_error(['message' => $result['message'] ?: __('WPML is not available.', 'intersoccer-product-variations'), 'result' => $result]);
+		}
+		if (empty($result['ok']) && in_array('not_variable', $result['errors'] ?? [], true)) {
+			wp_send_json_error(['message' => $result['message'] ?: __('Invalid product.', 'intersoccer-product-variations'), 'result' => $result]);
+		}
+
+		$source_id = (int) ($result['source_product_id'] ?? $product_id);
+		wp_send_json_success([
+			'result'       => $result,
+			'completeness' => self::get_product_completeness($source_id),
+			'message'      => $result['message'] ?? __('WPML sync complete.', 'intersoccer-product-variations'),
+		]);
+	}
+
 	public static function ajax_quick_edit() {
 		check_ajax_referer(self::NONCE_ACTION, 'nonce');
 
@@ -3050,11 +3138,15 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 	}
 
 	public function get_bulk_actions() {
-		return [
+		$actions = [
 			'refresh_attrs'       => __('Refresh Variation Attributes', 'intersoccer-product-variations'),
 			'scaffold_variations' => __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
 			'duplicate_to_year'   => __('Duplicate to year…', 'intersoccer-product-variations'),
 		];
+		if (function_exists('intersoccer_pm_wpml_available') && intersoccer_pm_wpml_available()) {
+			$actions['sync_wpml_languages'] = __('Sync all languages (WPML)', 'intersoccer-product-variations');
+		}
+		return $actions;
 	}
 
 	public function prepare_items() {
