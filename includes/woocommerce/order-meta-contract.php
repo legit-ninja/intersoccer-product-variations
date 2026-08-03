@@ -439,21 +439,20 @@ function intersoccer_build_order_line_meta($args) {
                 $updates['Late Pickup Cost'] = wc_price($cart_values['late_pickup_cost']);
             }
         }
-        // Stamp structured camp schedule onto the order item when variation meta exists.
+        // Stamp structured camp schedule as localized human keys (variation SoT stays _camp_*).
         $vid = $variation_id ?: $product_id;
         if (function_exists('intersoccer_get_camp_schedule_meta')) {
             $schedule = intersoccer_get_camp_schedule_meta($vid);
+            $lang = intersoccer_order_activity_type_detect_language($existing_activity_type);
+            $labels = intersoccer_camp_schedule_order_meta_labels_for_language($lang);
             if ($schedule['start'] !== '') {
-                $updates['Camp Start Date'] = $schedule['start'];
-                $updates['_camp_start_date'] = $schedule['start'];
+                $updates[$labels['start']] = $schedule['start'];
             }
             if ($schedule['end'] !== '') {
-                $updates['Camp End Date'] = $schedule['end'];
-                $updates['_camp_end_date'] = $schedule['end'];
+                $updates[$labels['end']] = $schedule['end'];
             }
             if ($schedule['week'] !== null) {
-                $updates['Camp Week Index'] = (string) $schedule['week'];
-                $updates['_camp_week_index'] = (string) $schedule['week'];
+                $updates[$labels['week']] = (string) $schedule['week'];
             }
         }
     } elseif ($product_type === 'course') {
@@ -809,12 +808,212 @@ function intersoccer_prune_taxonomy_attribute_twins($item) {
 }
 
 /**
+ * English camp schedule order-item meta labels (canonical).
+ *
+ * @return array{start:string,end:string,week:string}
+ */
+function intersoccer_camp_schedule_order_meta_labels_en() {
+    return [
+        'start' => 'Camp Start Date',
+        'end'   => 'Camp End Date',
+        'week'  => 'Camp Week Index',
+    ];
+}
+
+/**
+ * Static FR/DE fallbacks for camp schedule order-item meta keys.
+ *
+ * @return array<string,array{start:string,end:string,week:string}>
+ */
+function intersoccer_camp_schedule_order_meta_labels_i18n_map() {
+    return [
+        'en' => intersoccer_camp_schedule_order_meta_labels_en(),
+        'fr' => [
+            'start' => 'Date de début du camp',
+            'end'   => 'Date de fin du camp',
+            'week'  => 'Index de semaine du camp',
+        ],
+        'de' => [
+            'start' => 'Camp-Startdatum',
+            'end'   => 'Camp-Enddatum',
+            'week'  => 'Camp-Wochenindex',
+        ],
+    ];
+}
+
+/**
+ * Localized camp schedule order-item meta labels for a language.
+ *
+ * Prefers icl_t() on the English string when available; otherwise static FR/DE map.
+ *
+ * @param string $language en|fr|de
+ * @return array{start:string,end:string,week:string}
+ */
+function intersoccer_camp_schedule_order_meta_labels_for_language($language = 'en') {
+    $language = in_array($language, ['en', 'fr', 'de'], true) ? $language : 'en';
+    $en = intersoccer_camp_schedule_order_meta_labels_en();
+    $map = intersoccer_camp_schedule_order_meta_labels_i18n_map();
+    $fallback = $map[$language] ?? $en;
+
+    $out = [];
+    foreach (['start', 'end', 'week'] as $field) {
+        $english = $en[$field];
+        if (function_exists('icl_t')) {
+            $translated = icl_t('intersoccer-product-variations', $english, $english);
+            // When WPML has no translation, icl_t returns the English source — use static map for fr/de.
+            if ($language !== 'en' && ($translated === '' || $translated === $english)) {
+                $out[$field] = $fallback[$field];
+            } else {
+                $out[$field] = $translated !== '' ? $translated : $fallback[$field];
+            }
+        } else {
+            $out[$field] = $fallback[$field];
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * All known human label variants (EN/FR/DE) keyed by schedule field.
+ *
+ * @return array{start:array<int,string>,end:array<int,string>,week:array<int,string>}
+ */
+function intersoccer_camp_schedule_order_meta_label_variants() {
+    $by_field = [
+        'start' => [],
+        'end'   => [],
+        'week'  => [],
+    ];
+    foreach (intersoccer_camp_schedule_order_meta_labels_i18n_map() as $labels) {
+        foreach (['start', 'end', 'week'] as $field) {
+            $by_field[$field][] = $labels[$field];
+        }
+    }
+    foreach ($by_field as $field => $labels) {
+        $by_field[$field] = array_values(array_unique($labels));
+    }
+    return $by_field;
+}
+
+/**
+ * Underscore keys still used on variations (and legacy order items).
+ *
+ * @return array{start:string,end:string,week:string}
+ */
+function intersoccer_camp_schedule_order_meta_underscore_keys() {
+    return [
+        'start' => '_camp_start_date',
+        'end'   => '_camp_end_date',
+        'week'  => '_camp_week_index',
+    ];
+}
+
+/**
+ * Whether a raw camp schedule meta value is usable for a field.
+ *
+ * @param string $field start|end|week
+ * @param mixed  $value
+ * @return bool
+ */
+function intersoccer_camp_schedule_order_meta_value_usable($field, $value) {
+    $raw = is_scalar($value) ? trim((string) $value) : '';
+    if ($raw === '') {
+        return false;
+    }
+    if ($field === 'week') {
+        return is_numeric($raw);
+    }
+    return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw);
+}
+
+/**
+ * Keep human camp schedule labels; strip/migrate legacy `_camp_*` order-item keys.
+ *
+ * - If any EN/FR/DE label has a usable value → delete the matching `_camp_*` twin.
+ * - If only `_camp_*` has a usable value → copy onto the order-language label, then delete underscore.
+ *
+ * @param WC_Order_Item_Product $item
+ * @param string                $language en|fr|de hint when migrating underscore-only rows
+ * @return bool Whether any change was made.
+ */
+function intersoccer_prune_camp_schedule_order_meta_twins($item, $language = '') {
+    if (!($item instanceof WC_Order_Item_Product)) {
+        return false;
+    }
+
+    if ($language === '') {
+        $activity = (string) $item->get_meta('Activity Type', true);
+        if ($activity === '') {
+            // FR/DE Activity Type keys may be localized on the item.
+            foreach (['Type d\'activité', 'Type d’activité', 'Aktivitätstyp'] as $alt) {
+                $activity = (string) $item->get_meta($alt, true);
+                if ($activity !== '') {
+                    break;
+                }
+            }
+        }
+        $language = intersoccer_order_activity_type_detect_language($activity);
+    }
+
+    $existing = [];
+    foreach ($item->get_meta_data() as $meta) {
+        $existing[(string) $meta->key] = $meta->value;
+    }
+
+    $underscores = intersoccer_camp_schedule_order_meta_underscore_keys();
+    $variants    = intersoccer_camp_schedule_order_meta_label_variants();
+    $target      = intersoccer_camp_schedule_order_meta_labels_for_language($language);
+    $changed     = false;
+
+    foreach (['start', 'end', 'week'] as $field) {
+        $underscore = $underscores[$field];
+        $has_underscore = array_key_exists($underscore, $existing)
+            && intersoccer_camp_schedule_order_meta_value_usable($field, $existing[$underscore]);
+
+        $label_key = null;
+        $label_value = null;
+        foreach ($variants[$field] as $candidate) {
+            if (!array_key_exists($candidate, $existing)) {
+                continue;
+            }
+            if (!intersoccer_camp_schedule_order_meta_value_usable($field, $existing[$candidate])) {
+                continue;
+            }
+            $label_key = $candidate;
+            break;
+        }
+
+        if ($label_key !== null) {
+            if ($has_underscore || array_key_exists($underscore, $existing)) {
+                $item->delete_meta_data($underscore);
+                unset($existing[$underscore]);
+                $changed = true;
+            }
+            continue;
+        }
+
+        if ($has_underscore) {
+            $raw = is_scalar($existing[$underscore]) ? trim((string) $existing[$underscore]) : '';
+            $dest = $target[$field];
+            $item->update_meta_data($dest, $raw);
+            $existing[$dest] = $raw;
+            $item->delete_meta_data($underscore);
+            unset($existing[$underscore]);
+            $changed = true;
+        }
+    }
+
+    return $changed;
+}
+
+/**
  * Aggressively remove legacy label twins when the EN canonical key is present.
  *
  * Unlike intersoccer_normalize_legacy_order_meta_keys(), this deletes reverse-map
  * legacy keys even when the canonical key already has a value (A–C twins).
  * Also removes pa_* / attribute_pa_* when the human order_meta_label is present.
- * Does not touch underscore camp date twins.
+ * Migrates/prunes legacy `_camp_*` order-item keys onto human Camp Start/End/Week labels.
  *
  * @param WC_Order_Item_Product $item
  * @return bool Whether any change was made.
@@ -824,13 +1023,15 @@ function intersoccer_prune_legacy_order_meta_twins($item) {
         return false;
     }
 
+    $changed = intersoccer_prune_camp_schedule_order_meta_twins($item);
+
     if (!function_exists('intersoccer_attr_legacy_order_meta_label_reverse_map')) {
-        return false;
+        return $changed;
     }
 
     $reverse = intersoccer_attr_legacy_order_meta_label_reverse_map();
     if (empty($reverse)) {
-        return false;
+        return $changed;
     }
 
     $existing = [];
@@ -838,7 +1039,7 @@ function intersoccer_prune_legacy_order_meta_twins($item) {
         $existing[(string) $meta->key] = $meta->value;
     }
 
-    $changed = intersoccer_normalize_legacy_order_meta_keys($item);
+    $changed = intersoccer_normalize_legacy_order_meta_keys($item) || $changed;
 
     // Refresh after soft migrate.
     $existing = [];
