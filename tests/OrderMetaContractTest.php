@@ -490,4 +490,68 @@ class OrderMetaContractTest extends TestCase {
         $this->assertTrue($written || $count === 1);
     }
 
+    public function test_build_camp_schedule_writes_human_labels_only() {
+        require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::reset();
+        }
+
+        $vid = 88001;
+        intersoccer_update_camp_schedule($vid, '2026-07-27', '2026-07-31', 6, true);
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 88000,
+            'variation_id' => $vid,
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+
+        $updates = $built['updates'];
+        $this->assertSame('2026-07-27', $updates['Camp Start Date'] ?? null);
+        $this->assertSame('2026-07-31', $updates['Camp End Date'] ?? null);
+        $this->assertSame('6', $updates['Camp Week Index'] ?? null);
+        $this->assertArrayNotHasKey('_camp_start_date', $updates);
+        $this->assertArrayNotHasKey('_camp_end_date', $updates);
+        $this->assertArrayNotHasKey('_camp_week_index', $updates);
+    }
+
+    public function test_prune_camp_schedule_keeps_human_labels_strips_underscore() {
+        $item = new WC_Order_Item_Product([
+            '_camp_start_date' => '2026-07-27',
+            'Camp Start Date' => '2026-07-27',
+            '_camp_end_date' => '2026-07-31',
+            'Camp End Date' => '2026-07-31',
+            '_camp_week_index' => '6',
+            'Camp Week Index' => '6',
+        ]);
+
+        $changed = intersoccer_prune_camp_schedule_order_meta_twins($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('2026-07-27', $item->get_meta('Camp Start Date', true));
+        $this->assertSame('2026-07-31', $item->get_meta('Camp End Date', true));
+        $this->assertSame('6', $item->get_meta('Camp Week Index', true));
+        $this->assertSame('', $item->get_meta('_camp_start_date', true));
+        $this->assertSame('', $item->get_meta('_camp_end_date', true));
+        $this->assertSame('', $item->get_meta('_camp_week_index', true));
+    }
+
+    public function test_prune_camp_schedule_migrates_underscore_only_to_human_label() {
+        $item = new WC_Order_Item_Product([
+            '_camp_start_date' => '2026-07-27',
+            '_camp_end_date' => '2026-07-31',
+            '_camp_week_index' => '6',
+        ]);
+
+        $changed = intersoccer_prune_camp_schedule_order_meta_twins($item);
+
+        $this->assertTrue($changed);
+        $this->assertSame('2026-07-27', $item->get_meta('Camp Start Date', true));
+        $this->assertSame('2026-07-31', $item->get_meta('Camp End Date', true));
+        $this->assertSame('6', $item->get_meta('Camp Week Index', true));
+        $this->assertSame('', $item->get_meta('_camp_start_date', true));
+        $this->assertSame('', $item->get_meta('_camp_end_date', true));
+        $this->assertSame('', $item->get_meta('_camp_week_index', true));
+    }
+
 }

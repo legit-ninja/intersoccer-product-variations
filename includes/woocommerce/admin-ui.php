@@ -2001,6 +2001,13 @@ function intersoccer_update_order_metadata($order, $fix_activity_type_only = fal
             'mode' => 'repair',
         ]);
 
+        // Always keep human Camp Start/End/Week labels and strip legacy `_camp_*` twins
+        // (even when the optional prune-legacy-twins checkbox is off).
+        if (function_exists('intersoccer_prune_camp_schedule_order_meta_twins')
+            && intersoccer_prune_camp_schedule_order_meta_twins($item)) {
+            $item_updated = true;
+        }
+
         if ($prune_legacy_twins && function_exists('intersoccer_prune_legacy_order_meta_twins')) {
             if (intersoccer_prune_legacy_order_meta_twins($item)) {
                 $item_updated = true;
