@@ -552,6 +552,136 @@
 	});
 
 	// =========================================================================
+	// Variation Enabled / Disabled (publish | private)
+	// =========================================================================
+
+	function pmRowCampEnded($row) {
+		var raw = $row.attr('data-camp-ended');
+		return raw === '1' || raw === 1 || raw === true;
+	}
+
+	function pmUpdateVariationEnabledUi($row, enabled) {
+		var campEnded = pmRowCampEnded($row);
+		var needsAction = campEnded && !!enabled;
+		$row.toggleClass('intersoccer-pm-variation-disabled', !enabled);
+		$row.toggleClass('intersoccer-pm-variation-ended', needsAction);
+		var $badge = $row.find('.intersoccer-pm-ended-badge');
+		if ($badge.length) {
+			$badge.prop('hidden', !needsAction);
+		}
+	}
+
+	function pmShowEnabledSaving($row) {
+		$row.find('.intersoccer-pm-ended-badge').prop('hidden', true);
+		$row.find('.intersoccer-pm-enabled-status').text(PM.i18n.saving).css('color', '#666');
+	}
+
+	function pmShowEnabledSaved($row, enabled) {
+		var $status = $row.find('.intersoccer-pm-enabled-status');
+		pmUpdateVariationEnabledUi($row, enabled);
+		// Keep badge hidden while "Saved" is visible so the two alternate in the same slot.
+		$row.find('.intersoccer-pm-ended-badge').prop('hidden', true);
+		$status.text(PM.i18n.saved).css('color', 'green');
+		setTimeout(function() {
+			$status.text('');
+			pmUpdateVariationEnabledUi($row, enabled);
+		}, 2000);
+	}
+
+	$(document).on('change', '.intersoccer-pm-enabled-toggle', function() {
+		var $toggle = $(this);
+		var variationId = $toggle.data('variation-id');
+		var enabled = $toggle.is(':checked') ? 1 : 0;
+		var $row = $toggle.closest('tr');
+		var $status = $row.find('.intersoccer-pm-enabled-status');
+
+		pmShowEnabledSaving($row);
+		$toggle.prop('disabled', true);
+
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_save_variation_enabled',
+			nonce: PM.nonce,
+			variation_id: variationId,
+			enabled: enabled
+		}).done(function(response) {
+			$toggle.prop('disabled', false);
+			if (response.success) {
+				var isEnabled = !!(response.data && response.data.enabled);
+				$toggle.prop('checked', isEnabled);
+				pmShowEnabledSaved($row, isEnabled);
+			} else {
+				$toggle.prop('checked', !enabled);
+				pmUpdateVariationEnabledUi($row, !enabled);
+				$status.text(PM.i18n.error + ': ' + ((response.data && response.data.message) || '')).css('color', 'red');
+			}
+		}).fail(function() {
+			$toggle.prop('disabled', false);
+			$toggle.prop('checked', !enabled);
+			pmUpdateVariationEnabledUi($row, !enabled);
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	$(document).on('change', '#intersoccer-pm-select-all-variations', function() {
+		var checked = $(this).is(':checked');
+		$('.intersoccer-pm-variations-table .intersoccer-pm-variation-select').prop('checked', checked);
+	});
+
+	$(document).on('click', '#intersoccer-pm-bulk-disable-variations-btn', function() {
+		var ids = [];
+		$('.intersoccer-pm-variations-table .intersoccer-pm-variation-select:checked').each(function() {
+			ids.push($(this).val());
+		});
+		if (!ids.length) {
+			window.alert(PM.i18n.select_variations || 'Select one or more variations first.');
+			return;
+		}
+		if (!window.confirm(PM.i18n.confirm_disable_selected || 'Disable the selected variations?')) {
+			return;
+		}
+
+		var $btn = $(this);
+		var $status = $('#intersoccer-pm-bulk-disable-status');
+		$btn.prop('disabled', true);
+		$status.text(PM.i18n.saving).css('color', '#666');
+		ids.forEach(function(id) {
+			pmShowEnabledSaving($('.intersoccer-pm-variations-table tr[data-variation-id="' + id + '"]'));
+		});
+
+		$.post(PM.ajax_url, {
+			action: 'intersoccer_pm_bulk_disable_variations',
+			nonce: PM.nonce,
+			variation_ids: JSON.stringify(ids)
+		}).done(function(response) {
+			$btn.prop('disabled', false);
+			if (response.success) {
+				var count = (response.data && response.data.disabled) || 0;
+				ids.forEach(function(id) {
+					var $row = $('.intersoccer-pm-variations-table tr[data-variation-id="' + id + '"]');
+					$row.find('.intersoccer-pm-enabled-toggle').prop('checked', false);
+					pmShowEnabledSaved($row, false);
+				});
+				$status.text((PM.i18n.disabled_count || 'Disabled %d variation(s).').replace('%d', String(count))).css('color', 'green');
+			} else {
+				ids.forEach(function(id) {
+					var $row = $('.intersoccer-pm-variations-table tr[data-variation-id="' + id + '"]');
+					var stillEnabled = $row.find('.intersoccer-pm-enabled-toggle').is(':checked');
+					pmUpdateVariationEnabledUi($row, stillEnabled);
+				});
+				$status.text(PM.i18n.error).css('color', 'red');
+			}
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			ids.forEach(function(id) {
+				var $row = $('.intersoccer-pm-variations-table tr[data-variation-id="' + id + '"]');
+				var stillEnabled = $row.find('.intersoccer-pm-enabled-toggle').is(':checked');
+				pmUpdateVariationEnabledUi($row, stillEnabled);
+			});
+			$status.text(PM.i18n.error).css('color', 'red');
+		});
+	});
+
+	// =========================================================================
 	// Camp variation venue assignment (detail view)
 	// =========================================================================
 
