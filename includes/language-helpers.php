@@ -548,6 +548,40 @@ function intersoccer_sync_variation_prices_to_translations($variation_id, $regul
 }
 
 /**
+ * Sync variation Enabled/Disabled (publish|private) to WPML-linked variations.
+ *
+ * @param int    $variation_id Source variation ID.
+ * @param string $status       publish|private.
+ * @return void
+ */
+function intersoccer_sync_variation_status_to_translations($variation_id, $status) {
+    $variation_id = (int) $variation_id;
+    $status       = (string) $status;
+    if ($variation_id <= 0 || !in_array($status, ['publish', 'private'], true) || !function_exists('wc_get_product')) {
+        return;
+    }
+    if (!function_exists('intersoccer_foreach_translated_product_variations')) {
+        return;
+    }
+
+    foreach (intersoccer_foreach_translated_product_variations($variation_id) as $tid) {
+        $variation = wc_get_product($tid);
+        if (!$variation || !is_a($variation, 'WC_Product_Variation')) {
+            continue;
+        }
+        $variation->set_status($status);
+        $variation->save();
+        if (function_exists('wc_delete_product_transients')) {
+            $parent = (int) $variation->get_parent_id();
+            if ($parent > 0) {
+                wc_delete_product_transients($parent);
+            }
+            wc_delete_product_transients($tid);
+        }
+    }
+}
+
+/**
  * Initialize language functions and validate dependencies
  * Call this during plugin activation or admin_init
  */

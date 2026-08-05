@@ -356,6 +356,61 @@ function intersoccer_pm_is_allowed_product_status($status) {
 }
 
 /**
+ * Whether a variation post status means Enabled in WooCommerce.
+ *
+ * @param string $status Variation status (publish|private|…).
+ * @return bool
+ */
+function intersoccer_pm_variation_is_enabled($status) {
+    return (string) $status === 'publish';
+}
+
+/**
+ * Map Enabled checkbox to WooCommerce variation post status.
+ *
+ * @param bool $enabled
+ * @return string publish|private
+ */
+function intersoccer_pm_variation_enabled_status($enabled) {
+    return $enabled ? 'publish' : 'private';
+}
+
+/**
+ * True when a camp end date (Y-m-d) is strictly before today.
+ *
+ * @param string      $end_ymd   Camp end date.
+ * @param string|null $today_ymd Override today (Y-m-d); null uses site timezone via current_time.
+ * @return bool
+ */
+function intersoccer_pm_camp_end_is_past($end_ymd, $today_ymd = null) {
+    $end_ymd = trim((string) $end_ymd);
+    if ($end_ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_ymd)) {
+        return false;
+    }
+    if ($today_ymd === null || $today_ymd === '') {
+        $today_ymd = function_exists('current_time') ? current_time('Y-m-d') : gmdate('Y-m-d');
+    }
+    $today_ymd = trim((string) $today_ymd);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $today_ymd)) {
+        return false;
+    }
+    return $end_ymd < $today_ymd;
+}
+
+/**
+ * True when a camp variation is past end and still Enabled (publish) — needs disable.
+ *
+ * @param string      $end_ymd   Camp end date (Y-m-d).
+ * @param string      $status    Variation post status.
+ * @param string|null $today_ymd Override today (Y-m-d); null uses site timezone.
+ * @return bool
+ */
+function intersoccer_pm_variation_ended_needs_action($end_ymd, $status, $today_ymd = null) {
+    return intersoccer_pm_camp_end_is_past($end_ymd, $today_ymd)
+        && intersoccer_pm_variation_is_enabled($status);
+}
+
+/**
  * Normalize a program-year value to a bare calendar year (e.g. 2027).
  *
  * @param string $year Raw year (name or slug).

@@ -66,3 +66,46 @@
 	margin-top: 8px;
 	text-align: right;
 }
+
+/* Variation enable / past-end flagging */
+.intersoccer-pm-variations-table tr.intersoccer-pm-variation-ended {
+	background: #fcf0f1 !important;
+}
+
+.intersoccer-pm-variations-table tr.intersoccer-pm-variation-ended td,
+.intersoccer-pm-variations-table tr.intersoccer-pm-variation-ended th {
+	border-top-color: #d63638;
+}
+
+.intersoccer-pm-ended-badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 1px 6px;
+	border-radius: 3px;
+	background: #d63638;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.6;
+	vertical-align: middle;
+}
+
+.intersoccer-pm-ended-badge[hidden] {
+	display: none;
+}
+
+.intersoccer-pm-variations-table tr.intersoccer-pm-variation-disabled {
+	opacity: 0.72;
+}
+
+.intersoccer-pm-enabled-label {
+	white-space: nowrap;
+}
+
+.intersoccer-pm-enabled-status {
+	display: inline-block;
+	min-width: 4.5em;
+	font-size: 11px;
+	margin-left: 4px;
+	vertical-align: middle;
+}

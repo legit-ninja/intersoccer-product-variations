@@ -36,6 +36,8 @@ class InterSoccer_Program_Manager {
 		add_action('wp_ajax_intersoccer_pm_save_variation_price', [__CLASS__, 'ajax_save_variation_price']);
 		add_action('wp_ajax_intersoccer_pm_save_variation_venue', [__CLASS__, 'ajax_save_variation_venue']);
 		add_action('wp_ajax_intersoccer_pm_save_variation_course_time', [__CLASS__, 'ajax_save_variation_course_time']);
+		add_action('wp_ajax_intersoccer_pm_save_variation_enabled', [__CLASS__, 'ajax_save_variation_enabled']);
+		add_action('wp_ajax_intersoccer_pm_bulk_disable_variations', [__CLASS__, 'ajax_bulk_disable_variations']);
 		add_action('wp_ajax_intersoccer_pm_save_camp_schedule', [__CLASS__, 'ajax_save_camp_schedule']);
 		add_action('wp_ajax_intersoccer_pm_prefill_camp_schedules', [__CLASS__, 'ajax_prefill_camp_schedules']);
 		add_action('wp_ajax_intersoccer_pm_apply_parsed_camp_dates', [__CLASS__, 'ajax_apply_parsed_camp_dates']);
@@ -72,14 +74,14 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/program-manager.css',
 			[],
-			'2.7.31.3'
+			'2.8.3.3'
 		);
 
 		wp_enqueue_script(
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.7.31.3',
+			'2.8.3.3',
 			true
 		);
 
@@ -116,6 +118,9 @@ class InterSoccer_Program_Manager {
 				'bulk_title_scaffold'=> __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
 				'bulk_title_duplicate'=> __('Duplicate to year…', 'intersoccer-product-variations'),
 				'bulk_title_wpml'   => __('Sync all languages (WPML)', 'intersoccer-product-variations'),
+				'confirm_disable_selected' => __('Disable the selected variations? They will no longer be purchasable on the storefront.', 'intersoccer-product-variations'),
+				'select_variations' => __('Select one or more variations first.', 'intersoccer-product-variations'),
+				'disabled_count'    => __('Disabled %d variation(s).', 'intersoccer-product-variations'),
 			],
 		]);
 	}
@@ -207,10 +212,11 @@ class InterSoccer_Program_Manager {
 			}
 		}
 
-		$children           = $product->get_children();
-		$variations_total   = count($children);
-		$variations_healthy = 0;
-		$variations_issues  = [];
+		$children             = $product->get_children();
+		$variations_total     = count($children);
+		$variations_healthy   = 0;
+		$variations_issues    = [];
+		$ended_enabled_count  = 0;
 
 		foreach ($children as $var_id) {
 			$var_result = self::get_variation_completeness($var_id, $type);
@@ -218,6 +224,17 @@ class InterSoccer_Program_Manager {
 				$variations_healthy++;
 			} else {
 				$variations_issues[$var_id] = $var_result['missing'];
+			}
+
+			if ($type === 'camp'
+				&& function_exists('intersoccer_pm_variation_ended_needs_action')
+				&& function_exists('intersoccer_get_camp_schedule_meta')
+			) {
+				$sched  = intersoccer_get_camp_schedule_meta($var_id);
+				$status = (string) get_post_status($var_id);
+				if (intersoccer_pm_variation_ended_needs_action((string) ($sched['end'] ?? ''), $status)) {
+					$ended_enabled_count++;
+				}
 			}
 		}
 
@@ -227,14 +244,15 @@ class InterSoccer_Program_Manager {
 		$percentage   = $total_checks > 0 ? (int) round(($passed / $total_checks) * 100) : 0;
 
 		return [
-			'type'               => $type,
-			'parent_total'       => $parent_total,
-			'parent_complete'    => $parent_complete,
-			'parent_missing'     => $parent_missing,
-			'variations_total'   => $variations_total,
-			'variations_healthy' => $variations_healthy,
-			'variations_issues'  => $variations_issues,
-			'percentage'         => $percentage,
+			'type'                 => $type,
+			'parent_total'         => $parent_total,
+			'parent_complete'      => $parent_complete,
+			'parent_missing'       => $parent_missing,
+			'variations_total'     => $variations_total,
+			'variations_healthy'   => $variations_healthy,
+			'variations_issues'    => $variations_issues,
+			'ended_enabled_count'  => $ended_enabled_count,
+			'percentage'           => $percentage,
 		];
 	}
 
@@ -299,14 +317,15 @@ class InterSoccer_Program_Manager {
 
 	private static function empty_completeness() {
 		return [
-			'type'               => null,
-			'parent_total'       => 0,
-			'parent_complete'    => 0,
-			'parent_missing'     => [],
-			'variations_total'   => 0,
-			'variations_healthy' => 0,
-			'variations_issues'  => [],
-			'percentage'         => 0,
+			'type'                => null,
+			'parent_total'        => 0,
+			'parent_complete'     => 0,
+			'parent_missing'      => [],
+			'variations_total'    => 0,
+			'variations_healthy'  => 0,
+			'variations_issues'   => [],
+			'ended_enabled_count' => 0,
+			'percentage'          => 0,
 		];
 	}
 
@@ -828,10 +847,20 @@ class InterSoccer_Program_Manager {
 			</div>
 			<?php endif; ?>
 
+			<p class="intersoccer-pm-variation-bulk-bar" style="margin: 12px 0;">
+				<button type="button" class="button" id="intersoccer-pm-bulk-disable-variations-btn">
+					<?php esc_html_e('Disable selected', 'intersoccer-product-variations'); ?>
+				</button>
+				<span id="intersoccer-pm-bulk-disable-status" style="margin-left:8px;"></span>
+				<span class="description" style="margin-left:12px;"><?php esc_html_e('Camps past their end date stay Enabled until you disable them. Select rows then use Disable selected.', 'intersoccer-product-variations'); ?></span>
+			</p>
+
 			<table class="widefat striped intersoccer-pm-variations-table">
 				<thead>
 					<tr>
+						<th class="check-column"><input type="checkbox" id="intersoccer-pm-select-all-variations" title="<?php esc_attr_e('Select all', 'intersoccer-product-variations'); ?>" /></th>
 						<th><?php esc_html_e('ID', 'intersoccer-product-variations'); ?></th>
+						<th><?php esc_html_e('Enabled', 'intersoccer-product-variations'); ?></th>
 						<th><?php esc_html_e('Attributes', 'intersoccer-product-variations'); ?></th>
 						<?php if (in_array($type, ['camp', 'course'], true)) : ?>
 							<th><?php esc_html_e('Venue', 'intersoccer-product-variations'); ?></th>
@@ -845,7 +874,7 @@ class InterSoccer_Program_Manager {
 							<th><?php esc_html_e('Start', 'intersoccer-product-variations'); ?></th>
 							<th><?php esc_html_e('End', 'intersoccer-product-variations'); ?></th>
 						<?php endif; ?>
-						<th><?php esc_html_e('Status', 'intersoccer-product-variations'); ?></th>
+						<th><?php esc_html_e('Health', 'intersoccer-product-variations'); ?></th>
 						<th><?php esc_html_e('Issues', 'intersoccer-product-variations'); ?></th>
 					</tr>
 				</thead>
@@ -898,9 +927,38 @@ class InterSoccer_Program_Manager {
 							$current_course_time = (string) get_post_meta($var_id, 'attribute_pa_course-times', true);
 						}
 						$issue_labels = array_map([__CLASS__, 'format_missing_key_label'], $var_result['missing']);
+						$var_status   = $variation->get_status();
+						$var_enabled  = function_exists('intersoccer_pm_variation_is_enabled')
+							? intersoccer_pm_variation_is_enabled($var_status)
+							: ($var_status === 'publish');
+						$camp_ended = false;
+						if ($type === 'camp' && function_exists('intersoccer_pm_camp_end_is_past')) {
+							$camp_ended = intersoccer_pm_camp_end_is_past((string) ($sched['end'] ?? ''));
+						}
+						$ended_needs_action = $camp_ended && $var_enabled;
+						$row_classes = [];
+						if ($ended_needs_action) {
+							$row_classes[] = 'intersoccer-pm-variation-ended';
+						}
+						if (!$var_enabled) {
+							$row_classes[] = 'intersoccer-pm-variation-disabled';
+						}
 					?>
-					<tr data-variation-id="<?php echo esc_attr($var_id); ?>">
+					<tr data-variation-id="<?php echo esc_attr($var_id); ?>" data-camp-ended="<?php echo $camp_ended ? '1' : '0'; ?>" class="<?php echo esc_attr(implode(' ', $row_classes)); ?>">
+						<th scope="row" class="check-column">
+							<input type="checkbox" class="intersoccer-pm-variation-select" value="<?php echo esc_attr((string) $var_id); ?>" />
+						</th>
 						<td><?php echo esc_html($var_id); ?></td>
+						<td>
+							<label class="intersoccer-pm-enabled-label">
+								<input type="checkbox" class="intersoccer-pm-enabled-toggle" data-variation-id="<?php echo esc_attr($var_id); ?>" <?php checked($var_enabled); ?> />
+								<?php esc_html_e('Enabled', 'intersoccer-product-variations'); ?>
+							</label>
+							<?php if ($camp_ended) : ?>
+								<span class="intersoccer-pm-ended-badge"<?php echo $var_enabled ? '' : ' hidden'; ?>><?php esc_html_e('Ended', 'intersoccer-product-variations'); ?></span>
+							<?php endif; ?>
+							<span class="intersoccer-pm-enabled-status"></span>
+						</td>
 						<td><?php echo esc_html(implode(' | ', $attr_display) ?: '—'); ?></td>
 						<?php if (in_array($type, ['camp', 'course'], true)) : ?>
 							<td>
@@ -1706,6 +1764,103 @@ class InterSoccer_Program_Manager {
 		}
 
 		wp_send_json_success(['variation_id' => $variation_id, 'price' => $price]);
+	}
+
+	/**
+	 * Set a variation Enabled (publish) or Disabled (private).
+	 *
+	 * @param int  $variation_id
+	 * @param bool $enabled
+	 * @return array{variation_id:int,enabled:bool,status:string}|\WP_Error
+	 */
+	public static function save_variation_enabled_status($variation_id, $enabled) {
+		$variation_id = absint($variation_id);
+		if (!$variation_id) {
+			return new WP_Error('missing_variation', __('Missing variation ID.', 'intersoccer-product-variations'));
+		}
+
+		$variation = apply_filters('intersoccer_pm_get_variation_for_enabled', null, $variation_id);
+		if ($variation === null) {
+			$variation = wc_get_product($variation_id);
+		}
+		if (!$variation || !($variation instanceof WC_Product_Variation)) {
+			return new WP_Error('invalid_variation', __('Invalid variation.', 'intersoccer-product-variations'));
+		}
+
+		if (!function_exists('intersoccer_pm_variation_enabled_status')) {
+			require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/helpers.php';
+		}
+
+		$status = intersoccer_pm_variation_enabled_status((bool) $enabled);
+		$variation->set_status($status);
+		$variation->save();
+
+		$parent_id = (int) $variation->get_parent_id();
+		if ($parent_id > 0) {
+			wc_delete_product_transients($parent_id);
+		}
+		wc_delete_product_transients($variation_id);
+
+		if (function_exists('intersoccer_sync_variation_status_to_translations')) {
+			intersoccer_sync_variation_status_to_translations($variation_id, $status);
+		}
+
+		return [
+			'variation_id' => $variation_id,
+			'enabled'      => intersoccer_pm_variation_is_enabled($status),
+			'status'       => $status,
+		];
+	}
+
+	public static function ajax_save_variation_enabled() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		$variation_id = isset($_POST['variation_id']) ? absint($_POST['variation_id']) : 0;
+		$enabled      = !empty($_POST['enabled']) && (string) wp_unslash($_POST['enabled']) !== '0';
+
+		$result = self::save_variation_enabled_status($variation_id, $enabled);
+		if (is_wp_error($result)) {
+			wp_send_json_error(['message' => $result->get_error_message()]);
+		}
+
+		wp_send_json_success($result);
+	}
+
+	public static function ajax_bulk_disable_variations() {
+		check_ajax_referer(self::NONCE_ACTION, 'nonce');
+
+		if (!current_user_can(self::CAPABILITY)) {
+			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		}
+
+		$raw_ids = isset($_POST['variation_ids']) ? wp_unslash($_POST['variation_ids']) : [];
+		if (is_string($raw_ids)) {
+			$decoded = json_decode($raw_ids, true);
+			$raw_ids = is_array($decoded) ? $decoded : preg_split('/\s*,\s*/', $raw_ids);
+		}
+		if (!is_array($raw_ids)) {
+			$raw_ids = [];
+		}
+
+		$disabled = 0;
+		$failed   = 0;
+		foreach ($raw_ids as $vid) {
+			$result = self::save_variation_enabled_status(absint($vid), false);
+			if (is_wp_error($result)) {
+				$failed++;
+			} else {
+				$disabled++;
+			}
+		}
+
+		wp_send_json_success([
+			'disabled' => $disabled,
+			'failed'   => $failed,
+		]);
 	}
 
 	public static function ajax_save_variation_venue() {
@@ -3442,6 +3597,16 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 					$badge = ' <span class="post-state">' . esc_html__('Draft', 'intersoccer-product-variations') . '</span>';
 				} elseif ($item['status'] === 'private') {
 					$badge = ' <span class="post-state">' . esc_html__('Private', 'intersoccer-product-variations') . '</span>';
+				}
+				$ended_n = (int) ($item['completeness']['ended_enabled_count'] ?? 0);
+				if ($ended_n > 0) {
+					$badge .= ' <span class="intersoccer-pm-ended-badge">' . esc_html(
+						sprintf(
+							/* translators: %d: number of enabled camp variations past end date */
+							__('Ended (%d)', 'intersoccer-product-variations'),
+							$ended_n
+						)
+					) . '</span>';
 				}
 				return '<a href="' . esc_url($detail_url) . '"><strong>' . esc_html($item['name']) . '</strong></a>' . $badge;
 
