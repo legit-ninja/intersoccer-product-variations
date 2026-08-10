@@ -66,7 +66,7 @@ class AgeGroupVerificationTest extends TestCase {
         parent::tearDown();
     }
 
-    private function graceSettings($below = 2, $above = 1, $enabled = true, $halfDayAbove = 24) {
+    private function graceSettings($below = 2, $above = 1, $enabled = true, $halfDayAbove = 96) {
         return [
             'grace_enabled' => $enabled,
             'below_min_months' => $below,
@@ -306,7 +306,40 @@ class AgeGroupVerificationTest extends TestCase {
         $this->assertTrue($settings['grace_enabled']);
         $this->assertSame(2, $settings['below_min_months']);
         $this->assertSame(1, $settings['above_max_months']);
-        $this->assertSame(24, $settings['half_day_above_max_months']);
+        $this->assertSame(96, $settings['half_day_above_max_months']);
+    }
+
+    public function test_sanitize_half_day_above_max_allows_96_and_caps_at_120() {
+        $ok = intersoccer_sanitize_age_restriction_settings([
+            'grace_enabled' => 1,
+            'below_min_months' => 2,
+            'above_max_months' => 1,
+            'half_day_above_max_months' => 96,
+        ]);
+        $this->assertSame(96, $ok['half_day_above_max_months']);
+
+        $capped = intersoccer_sanitize_age_restriction_settings([
+            'grace_enabled' => 1,
+            'below_min_months' => 2,
+            'above_max_months' => 1,
+            'half_day_above_max_months' => 200,
+        ]);
+        $this->assertSame(120, $capped['half_day_above_max_months']);
+    }
+
+    public function test_get_age_restriction_settings_remaps_legacy_24_to_96() {
+        global $intersoccer_test_options;
+        $intersoccer_test_options = [
+            'intersoccer_age_restriction_settings' => [
+                'grace_enabled' => true,
+                'below_min_months' => 2,
+                'above_max_months' => 1,
+                'half_day_above_max_months' => 24,
+                'strict_missing_reference_date' => false,
+            ],
+        ];
+        $settings = intersoccer_get_age_restriction_settings();
+        $this->assertSame(96, $settings['half_day_above_max_months']);
     }
 
     public function test_parse_age_group_bounds_half_day_label() {
@@ -317,12 +350,14 @@ class AgeGroupVerificationTest extends TestCase {
     }
 
     public function test_half_day_uses_extended_above_max_months() {
-        $settings = $this->graceSettings(2, 1, true, 24);
+        $settings = $this->graceSettings(2, 1, true, 96);
         $bounds = ['min' => 3, 'max' => 5];
-        $pass = intersoccer_player_age_within_bounds('2018-04-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 24]));
+        // Age 13.0 on start: 5y max + 96 months grace.
+        $pass = intersoccer_player_age_within_bounds('2012-03-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 96]));
         $this->assertTrue($pass['matches']);
 
-        $fail = intersoccer_player_age_within_bounds('2017-01-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 24]));
+        // One month older than 13.0 → outside grace.
+        $fail = intersoccer_player_age_within_bounds('2012-02-01', '2025-03-01', $bounds, array_merge($settings, ['above_max_months' => 96]));
         $this->assertFalse($fail['matches']);
     }
 }

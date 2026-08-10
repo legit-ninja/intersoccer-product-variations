@@ -117,8 +117,8 @@ function intersoccer_age_restriction_settings_page() {
                         <label for="half_day_above_max_months"><?php esc_html_e('Half-day months above maximum', 'intersoccer-product-variations'); ?></label>
                     </th>
                     <td>
-                        <input type="number" name="half_day_above_max_months" id="half_day_above_max_months" value="<?php echo esc_attr((int) ($settings['half_day_above_max_months'] ?? 24)); ?>" min="0" max="36" step="1" class="small-text">
-                        <p class="description"><?php esc_html_e('Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 24 months allows a child up to 7 years on the program start date.', 'intersoccer-product-variations'); ?></p>
+                        <input type="number" name="half_day_above_max_months" id="half_day_above_max_months" value="<?php echo esc_attr((int) ($settings['half_day_above_max_months'] ?? 96)); ?>" min="0" max="120" step="1" class="small-text">
+                        <p class="description"><?php esc_html_e('Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 96 months allows a child up to 13 years on the program start date.', 'intersoccer-product-variations'); ?></p>
                     </td>
                 </tr>
                 <tr>
@@ -158,7 +158,7 @@ function intersoccer_register_age_restriction_settings_strings() {
         'Months below minimum',
         'Months above maximum',
         'Half-day months above maximum',
-        'Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 24 months allows a child up to 7 years on the program start date.',
+        'Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 96 months allows a child up to 13 years on the program start date.',
         'Strict missing start date',
         'Block checkout when the program start date cannot be determined',
         'By default, bookings proceed when start date metadata is missing. Enable this to reject those bookings.',
