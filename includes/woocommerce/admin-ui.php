@@ -412,6 +412,12 @@ function intersoccer_render_discounts_page() {
             </p>
         </form>
 
+        <?php
+        if (function_exists('intersoccer_render_campaign_offers_section')) {
+            intersoccer_render_campaign_offers_section();
+        }
+        ?>
+
         <h2><?php _e('Discount Rules', 'intersoccer-product-variations'); ?></h2>
         <div id="intersoccer-discount-app" class="intersoccer-discount-app">
             <p class="intersoccer-discount-loading"><?php esc_html_e('Loading discount rules…', 'intersoccer-product-variations'); ?></p>

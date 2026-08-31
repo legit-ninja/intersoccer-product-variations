@@ -53,6 +53,8 @@ function intersoccer_order_meta_checkout_extras() {
         'Holidays',
         'Discount',
         'Discount Amount',
+        'Campaign Code',
+        'Campaign Discount %',
         'Girls Only',
         'assigned_player',
         'assigned_player_id',
@@ -473,9 +475,10 @@ function intersoccer_build_order_line_meta($args) {
                 }, $holidays));
             }
         }
-        if (!empty($cart_values['discount_note'])) {
-            $updates['Discount'] = sanitize_text_field($cart_values['discount_note']);
-        }
+    }
+
+    if (!empty($cart_values['discount_note'])) {
+        $updates['Discount'] = sanitize_text_field($cart_values['discount_note']);
     }
 
     if (isset($cart_values['discount_amount']) && $cart_values['discount_amount'] > 0) {

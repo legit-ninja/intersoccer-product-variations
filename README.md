@@ -4,8 +4,8 @@
 This plugin enhances the WooCommerce booking system for InterSoccer Switzerland by managing complex product variations, dynamic pricing calculations, and sophisticated sibling discount systems. It supports three main product types: Camps (full-week and single-day), Courses (seasonal with prorated pricing), and Birthdays, with comprehensive admin interfaces and multilingual support.
 
 ## Version
-- **Version: 2.8.11**
-- Release Date: August 8, 2026
+- **Version: 2.8.31**
+- Release Date: August 31, 2026
 
 ## Camp schedule meta (2.7.18+)
 
@@ -60,6 +60,7 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 - **Precise Allocation**: Context-aware discount application with cart validation
 - **Order Metadata**: Discount details stored in order item metadata
 - **Configurable**: All rates and features configurable via Admin UI
+- **Campaign Offers**: Admin-configured time-boxed WooCommerce percent coupons (e.g. AUTUMN15 / TOGETHER20). Discount is the native coupon amount and may stack with sibling `set_price`. Group offers collect joining name and guardian email at classic checkout. WooCommerce → InterSoccer Discounts → Campaign Offers. Single coupon code across EN/FR/DE.
 
 ### Late Pickup System
 - **Camp Add-on**: Optional late pickup service (18:00) with configurable pricing

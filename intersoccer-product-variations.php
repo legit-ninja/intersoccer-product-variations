@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.8.11
+ * Version: 2.8.31
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -145,6 +145,16 @@ add_action('init', function () {
             '%d%% Sibling Course Discount',
             '%d%% Multi-Child Course Discount',
             '50%% Same Season Course Discount (%s)',
+            '%d%% Campaign Discount (%s)',
+            'Campaign Offers',
+            'Who is your child joining?',
+            'Friend or sibling name',
+            'Please enter who your child is joining.',
+            'Guardian\'s email',
+            'parent@example.com',
+            'Please enter the other guardian\'s email address.',
+            'Joining With',
+            'Guardian email',
             'Manage Discounts',
             'InterSoccer Discounts',
             'Scan Orders missing data',
@@ -333,6 +343,9 @@ $includes = [
     'includes/woocommerce/product-camp.php',
     'includes/woocommerce/camp-schedule.php',
     'includes/woocommerce/camp-schedule-migrate.php',
+    'includes/woocommerce/campaign-offers.php',
+    'includes/woocommerce/campaign-offers-admin.php',
+    'includes/woocommerce/campaign-checkout-field.php',
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
@@ -395,6 +408,21 @@ add_action('wp_enqueue_scripts', function () {
         [],
         '1.4.63' // Bumped to match JS version
     );
+
+    if (function_exists('is_checkout') && is_checkout()) {
+        wp_enqueue_script(
+            'intersoccer-campaign-checkout',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/campaign-checkout.js',
+            ['jquery'],
+            '2.8.31',
+            true
+        );
+        wp_localize_script('intersoccer-campaign-checkout', 'intersoccerCampaignCheckout', [
+            'groupCodes' => function_exists('intersoccer_campaign_group_codes_requiring_field')
+                ? intersoccer_campaign_group_codes_requiring_field()
+                : [],
+        ]);
+    }
 });
 
 // Register activation hook
