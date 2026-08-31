@@ -57,6 +57,7 @@
     <!-- Admin-entered discount messaging + rules (stored as arrays in wp_options) -->
     <key name="intersoccer_discount_messages" />
     <key name="intersoccer_discount_rules" />
+    <key name="intersoccer_campaign_offers" />
   </admin-texts>
 
   <shortcodes>

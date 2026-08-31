@@ -1356,19 +1356,23 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             $cart->cart_contents[$cart_item_key]['discount_note'] = '';
             $cart->cart_contents[$cart_item_key]['discount_amount'] = 0;
             unset($cart->cart_contents[$cart_item_key]['intersoccer_sibling_percent']);
+            unset($cart->cart_contents[$cart_item_key]['intersoccer_campaign_percent']);
+            unset($cart->cart_contents[$cart_item_key]['intersoccer_campaign_code']);
         }
     }
 
-    // Check if sibling discounts should be disabled when coupons are applied
+    // Check if sibling discounts should be disabled when coupons are applied.
+    // Campaign offer codes are PV sources (max+cap), not a reason to skip InterSoccer discounts.
     $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
     $has_coupons = false;
     
     if ($disable_with_coupons && $cart instanceof WC_Cart) {
-        $applied_coupons = $cart->get_applied_coupons();
-        $has_coupons = !empty($applied_coupons);
+        $has_coupons = function_exists('intersoccer_cart_has_non_campaign_coupons')
+            ? intersoccer_cart_has_non_campaign_coupons($cart)
+            : !empty($cart->get_applied_coupons());
         
         if ($has_coupons && defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Sibling discounts disabled - coupons detected: ' . implode(', ', $applied_coupons));
+            intersoccer_debug('InterSoccer: Sibling discounts disabled - non-campaign coupons detected');
         }
     }
 
@@ -1847,10 +1851,12 @@ function intersoccer_attach_same_season_discount_note($cart) {
     // Check if same-season discount should be disabled when coupons are applied
     $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
     if ($disable_with_coupons) {
-        $applied_coupons = $cart->get_applied_coupons();
-        if (!empty($applied_coupons)) {
+        $has_foreign = function_exists('intersoccer_cart_has_non_campaign_coupons')
+            ? intersoccer_cart_has_non_campaign_coupons($cart)
+            : !empty($cart->get_applied_coupons());
+        if ($has_foreign) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Same-season discount note disabled - coupons detected: ' . implode(', ', $applied_coupons));
+                intersoccer_debug('InterSoccer: Same-season discount note disabled - non-campaign coupons detected');
             }
             return;
         }
