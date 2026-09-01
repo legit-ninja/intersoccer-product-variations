@@ -162,6 +162,9 @@ function intersoccer_render_campaign_offers_section() {
         ?>
     </script>
     <?php
+    if (function_exists('intersoccer_render_campaign_leads_section')) {
+        intersoccer_render_campaign_leads_section();
+    }
 }
 
 /**
