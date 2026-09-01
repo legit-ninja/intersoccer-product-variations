@@ -196,6 +196,10 @@ if (!function_exists('wp_cache_set')) {
 
 if (!function_exists('get_user_by')) {
     function get_user_by($field, $value) {
+        if ($field === 'email' && isset($GLOBALS['intersoccer_test_users_by_email']) && is_array($GLOBALS['intersoccer_test_users_by_email'])) {
+            $key = strtolower(trim((string) $value));
+            return $GLOBALS['intersoccer_test_users_by_email'][$key] ?? false;
+        }
         return false;
     }
 }

@@ -732,6 +732,13 @@ function intersoccer_campaign_register_wpml_strings() {
         'Campaign Offers' => 'Campaign Offers',
         'Joining With' => 'Joining With',
         'Guardian email' => 'Guardian email',
+        'Campaign leads' => 'Campaign leads',
+        'Child name' => 'Child name',
+        'Source order' => 'Source order',
+        'Existing customer' => 'Existing customer',
+        'Converted' => 'Converted',
+        'Download CSV' => 'Download CSV',
+        'No campaign leads yet.' => 'No campaign leads yet.',
     ] as $name => $value) {
         icl_register_string('intersoccer-product-variations', $name, $value);
     }

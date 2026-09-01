@@ -100,6 +100,27 @@ if (!function_exists('intersoccer_campaign_add_checkout_error')) {
     }
 }
 
+if (!function_exists('intersoccer_campaign_strip_optional_label')) {
+    /**
+     * Drop WooCommerce “(optional)” on campaign joining fields. Keep required false
+     * so hidden AUTUMN15 fields do not HTML5-block checkout.
+     *
+     * @param string $field
+     * @param string $key
+     * @param array  $args
+     * @param mixed  $value
+     * @return string
+     */
+    function intersoccer_campaign_strip_optional_label($field, $key, $args = [], $value = null) {
+        unset($args, $value);
+        if (!in_array((string) $key, ['intersoccer_campaign_joining', 'intersoccer_campaign_joining_email'], true)) {
+            return $field;
+        }
+        return (string) preg_replace('/(?:&nbsp;|\s)*<span class="optional">.*?<\/span>/s', '', (string) $field);
+    }
+}
+
+add_filter('woocommerce_form_field', 'intersoccer_campaign_strip_optional_label', 10, 4);
 add_filter('woocommerce_checkout_fields', 'intersoccer_campaign_checkout_fields');
 function intersoccer_campaign_checkout_fields($fields) {
     $offers = intersoccer_get_campaign_offers();
@@ -213,6 +234,9 @@ function intersoccer_campaign_save_joining_meta($order_id) {
                 $order->update_meta_data(intersoccer_campaign_joining_email_meta_key(), $email);
             }
             $order->save();
+            if (function_exists('intersoccer_campaign_link_joining_user')) {
+                intersoccer_campaign_link_joining_user($order);
+            }
             return;
         }
     }
@@ -223,6 +247,12 @@ function intersoccer_campaign_save_joining_meta($order_id) {
         }
         if ($email !== '') {
             update_post_meta((int) $order_id, intersoccer_campaign_joining_email_meta_key(), $email);
+        }
+    }
+    if (function_exists('wc_get_order') && function_exists('intersoccer_campaign_link_joining_user')) {
+        $linked = wc_get_order($order_id);
+        if ($linked) {
+            intersoccer_campaign_link_joining_user($linked);
         }
     }
 }

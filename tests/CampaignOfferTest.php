@@ -1,6 +1,6 @@
 <?php
 /**
- * Campaign Offers: cap helpers, window, eligibility, exclusivity, joining + guardian email validation.
+ * Campaign Offers: cap helpers, window, eligibility, joining email, lead match-by-email.
  */
 
 use PHPUnit\Framework\TestCase;
@@ -33,8 +33,10 @@ class CampaignOfferTest extends TestCase {
                 return filter_var((string) $email, FILTER_VALIDATE_EMAIL) !== false;
             }
         }
+        $GLOBALS['intersoccer_test_users_by_email'] = [];
         require_once dirname(__DIR__) . '/includes/woocommerce/campaign-offers.php';
         require_once dirname(__DIR__) . '/includes/woocommerce/campaign-checkout-field.php';
+        require_once dirname(__DIR__) . '/includes/woocommerce/campaign-leads.php';
     }
 
     /**
@@ -251,6 +253,42 @@ class CampaignOfferTest extends TestCase {
     public function test_export_meta_key(): void {
         $this->assertSame('_intersoccer_campaign_joining', intersoccer_campaign_joining_meta_key());
         $this->assertSame('_intersoccer_campaign_joining_email', intersoccer_campaign_joining_email_meta_key());
+        $this->assertSame('_intersoccer_campaign_joining_user_id', intersoccer_campaign_joining_user_meta_key());
+    }
+
+    public function test_lookup_user_id_by_email_existing_or_zero(): void {
+        $GLOBALS['intersoccer_test_users_by_email'] = [
+            'alex.parent@example.com' => (object) ['ID' => 42],
+        ];
+        $this->assertSame(42, intersoccer_campaign_lookup_user_id_by_email('alex.parent@example.com'));
+        $this->assertSame(42, intersoccer_campaign_lookup_user_id_by_email('  Alex.Parent@example.com  '));
+        $this->assertSame(0, intersoccer_campaign_lookup_user_id_by_email('unknown@example.com'));
+        $this->assertSame(0, intersoccer_campaign_lookup_user_id_by_email(''));
+        $this->assertSame(0, intersoccer_campaign_lookup_user_id_by_email('not-an-email'));
+    }
+
+    public function test_lead_converted_only_for_later_paid_same_email(): void {
+        $email = 'friend.parent@example.com';
+        $later = [
+            'id' => 200,
+            'billing_email' => $email,
+            'status' => 'completed',
+            'date_created' => '2026-10-02 12:00:00',
+        ];
+        $this->assertTrue(intersoccer_campaign_lead_is_converted($email, 100, '2026-10-01 12:00:00', [$later]));
+        $this->assertFalse(intersoccer_campaign_lead_is_converted($email, 200, '2026-10-02 12:00:00', [$later]));
+        $this->assertFalse(intersoccer_campaign_lead_is_converted($email, 100, '2026-10-03 12:00:00', [$later]));
+        $this->assertFalse(intersoccer_campaign_lead_is_converted('other@example.com', 100, '2026-10-01 12:00:00', [$later]));
+        $pending = $later;
+        $pending['status'] = 'pending';
+        $this->assertFalse(intersoccer_campaign_lead_is_converted($email, 100, '2026-10-01 12:00:00', [$pending]));
+        $same_time_higher_id = [
+            'id' => 101,
+            'billing_email' => $email,
+            'status' => 'processing',
+            'date_created' => '2026-10-01 12:00:00',
+        ];
+        $this->assertTrue(intersoccer_campaign_lead_is_converted($email, 100, '2026-10-01 12:00:00', [$same_time_higher_id]));
     }
 
     public function test_joining_email_validation_required_when_empty_or_invalid(): void {
@@ -265,5 +303,19 @@ class CampaignOfferTest extends TestCase {
         $offer = $this->sampleOffer(['requires_group_field' => false]);
         $this->assertFalse(intersoccer_campaign_joining_email_fails_validation($offer, ''));
         $this->assertFalse(intersoccer_campaign_joining_email_fails_validation($offer, 'not-an-email'));
+    }
+
+    public function test_strip_optional_label_only_on_campaign_fields(): void {
+        $html = '<label>Guardian\'s email&nbsp;<span class="optional">(optional)</span></label>';
+        $stripped = intersoccer_campaign_strip_optional_label($html, 'intersoccer_campaign_joining_email');
+        $this->assertStringNotContainsString('optional', $stripped);
+        $this->assertStringContainsString('Guardian', $stripped);
+        $name_html = '<label>Who is your child joining? <span class="optional">(optional)</span></label>';
+        $this->assertStringNotContainsString(
+            'class="optional"',
+            intersoccer_campaign_strip_optional_label($name_html, 'intersoccer_campaign_joining')
+        );
+        $billing = '<label>Email&nbsp;<span class="optional">(optional)</span></label>';
+        $this->assertSame($billing, intersoccer_campaign_strip_optional_label($billing, 'billing_email'));
     }
 }

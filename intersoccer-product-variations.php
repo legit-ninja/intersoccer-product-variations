@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.8.31
+ * Version: 2.9.1
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -155,6 +155,13 @@ add_action('init', function () {
             'Please enter the other guardian\'s email address.',
             'Joining With',
             'Guardian email',
+            'Campaign leads',
+            'Child name',
+            'Source order',
+            'Existing customer',
+            'Converted',
+            'Download CSV',
+            'No campaign leads yet.',
             'Manage Discounts',
             'InterSoccer Discounts',
             'Scan Orders missing data',
@@ -346,6 +353,7 @@ $includes = [
     'includes/woocommerce/campaign-offers.php',
     'includes/woocommerce/campaign-offers-admin.php',
     'includes/woocommerce/campaign-checkout-field.php',
+    'includes/woocommerce/campaign-leads.php',
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/checkout-calculations.php',
