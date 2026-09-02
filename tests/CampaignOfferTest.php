@@ -318,4 +318,83 @@ class CampaignOfferTest extends TestCase {
         $billing = '<label>Email&nbsp;<span class="optional">(optional)</span></label>';
         $this->assertSame($billing, intersoccer_campaign_strip_optional_label($billing, 'billing_email'));
     }
+
+    public function test_sanitize_joining_pair_trims_name_and_email(): void {
+        $pair = intersoccer_campaign_sanitize_joining_pair('  Alex Friend  ', '  alex.parent@example.com  ');
+        $this->assertSame('Alex Friend', $pair['joining']);
+        $this->assertSame('alex.parent@example.com', $pair['email']);
+    }
+
+    public function test_session_get_set_with_fake_session(): void {
+        $session = $this->fakeCampaignSession();
+        intersoccer_campaign_set_joining_session('Alex Friend', 'alex.parent@example.com', $session);
+        $got = intersoccer_campaign_get_joining_session($session);
+        $this->assertSame('Alex Friend', $got['joining']);
+        $this->assertSame('alex.parent@example.com', $got['email']);
+    }
+
+    public function test_persist_joining_from_request_writes_session(): void {
+        $session = $this->fakeCampaignSession();
+        $written = intersoccer_campaign_persist_joining_from_request([
+            'intersoccer_campaign_joining' => 'Alex Friend',
+            'intersoccer_campaign_joining_email' => 'alex.parent@example.com',
+        ], $session);
+        $this->assertSame('Alex Friend', $written['joining']);
+        $this->assertSame('alex.parent@example.com', intersoccer_campaign_get_joining_session($session)['email']);
+        $this->assertNull(intersoccer_campaign_persist_joining_from_request(['billing_email' => 'x@y.com'], $session));
+    }
+
+    public function test_checkout_get_value_falls_back_to_session_when_empty(): void {
+        $session = $this->fakeCampaignSession([
+            'intersoccer_campaign_joining' => 'Alex Friend',
+            'intersoccer_campaign_joining_email' => 'alex.parent@example.com',
+        ]);
+        $this->assertSame(
+            'Alex Friend',
+            intersoccer_campaign_checkout_get_value('', 'intersoccer_campaign_joining', $session)
+        );
+        $this->assertSame(
+            'keep',
+            intersoccer_campaign_checkout_get_value('keep', 'intersoccer_campaign_joining', $session)
+        );
+        $this->assertSame(
+            'other',
+            intersoccer_campaign_checkout_get_value('other', 'billing_email', $session)
+        );
+        $this->assertSame(
+            'alex.parent@example.com',
+            intersoccer_campaign_checkout_get_value(null, 'intersoccer_campaign_joining_email', $session)
+        );
+    }
+
+    public function test_joining_field_args_required_false(): void {
+        $args = intersoccer_campaign_joining_field_args();
+        $this->assertFalse($args['intersoccer_campaign_joining']['required']);
+        $this->assertFalse($args['intersoccer_campaign_joining_email']['required']);
+        $this->assertContains('intersoccer-campaign-joining', $args['intersoccer_campaign_joining']['class']);
+        $this->assertContains('intersoccer-campaign-joining', $args['intersoccer_campaign_joining_email']['class']);
+    }
+
+    /**
+     * @param array<string,string> $data
+     * @return object
+     */
+    private function fakeCampaignSession(array $data = []) {
+        return new class($data) {
+            /** @var array<string,string> */
+            public $data;
+
+            public function __construct(array $data) {
+                $this->data = $data;
+            }
+
+            public function set($key, $value) {
+                $this->data[$key] = $value;
+            }
+
+            public function get($key, $default = '') {
+                return $this->data[$key] ?? $default;
+            }
+        };
+    }
 }
