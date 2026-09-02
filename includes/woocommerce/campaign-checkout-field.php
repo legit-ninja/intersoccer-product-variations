@@ -1,8 +1,9 @@
 <?php
 /**
- * Classic checkout “who is your child joining?” + guardian email for campaign offers.
+ * Classic cart/checkout “who is your child joining?” + guardian email for campaign offers.
  *
- * Server-side validation is authoritative. JS only shows/hides the fields.
+ * Server-side checkout validation is authoritative. JS only shows/hides the fields.
+ * Cart values persist in the Woo session so Proceed to checkout can prefill.
  *
  * @package InterSoccer_Product_Variations
  */
@@ -120,56 +121,269 @@ if (!function_exists('intersoccer_campaign_strip_optional_label')) {
     }
 }
 
+if (!function_exists('intersoccer_campaign_sanitize_joining_pair')) {
+    /**
+     * @param mixed $joining
+     * @param mixed $email
+     * @return array{joining:string,email:string}
+     */
+    function intersoccer_campaign_sanitize_joining_pair($joining, $email) {
+        $joining = function_exists('sanitize_text_field')
+            ? sanitize_text_field((string) $joining)
+            : trim((string) $joining);
+        $email = function_exists('sanitize_email')
+            ? sanitize_email((string) $email)
+            : trim((string) $email);
+
+        return [
+            'joining' => $joining,
+            'email' => $email,
+        ];
+    }
+}
+
+if (!function_exists('intersoccer_campaign_joining_session')) {
+    /**
+     * @param object|null $session
+     * @return object|null
+     */
+    function intersoccer_campaign_joining_session($session = null) {
+        if ($session !== null) {
+            return $session;
+        }
+        if (!function_exists('WC')) {
+            return null;
+        }
+        $wc = WC();
+        if (!$wc || !isset($wc->session) || !is_object($wc->session)) {
+            return null;
+        }
+        return $wc->session;
+    }
+}
+
+if (!function_exists('intersoccer_campaign_set_joining_session')) {
+    /**
+     * @param mixed       $joining
+     * @param mixed       $email
+     * @param object|null $session
+     * @return array{joining:string,email:string}
+     */
+    function intersoccer_campaign_set_joining_session($joining, $email, $session = null) {
+        $pair = intersoccer_campaign_sanitize_joining_pair($joining, $email);
+        $store = intersoccer_campaign_joining_session($session);
+        if ($store && method_exists($store, 'set')) {
+            $store->set('intersoccer_campaign_joining', $pair['joining']);
+            $store->set('intersoccer_campaign_joining_email', $pair['email']);
+        }
+        return $pair;
+    }
+}
+
+if (!function_exists('intersoccer_campaign_get_joining_session')) {
+    /**
+     * @param object|null $session
+     * @return array{joining:string,email:string}
+     */
+    function intersoccer_campaign_get_joining_session($session = null) {
+        $store = intersoccer_campaign_joining_session($session);
+        $joining = '';
+        $email = '';
+        if ($store && method_exists($store, 'get')) {
+            $joining = (string) $store->get('intersoccer_campaign_joining', '');
+            $email = (string) $store->get('intersoccer_campaign_joining_email', '');
+        }
+        return [
+            'joining' => $joining,
+            'email' => $email,
+        ];
+    }
+}
+
+if (!function_exists('intersoccer_campaign_persist_joining_from_request')) {
+    /**
+     * @param array<string,mixed>|null $source
+     * @param object|null              $session
+     * @return array{joining:string,email:string}|null
+     */
+    function intersoccer_campaign_persist_joining_from_request($source = null, $session = null) {
+        if ($source === null) {
+            $source = $_POST;
+        }
+        if (!is_array($source)) {
+            return null;
+        }
+        if (!isset($source['intersoccer_campaign_joining']) && !isset($source['intersoccer_campaign_joining_email'])) {
+            return null;
+        }
+
+        $joining = isset($source['intersoccer_campaign_joining']) ? $source['intersoccer_campaign_joining'] : '';
+        $email = isset($source['intersoccer_campaign_joining_email']) ? $source['intersoccer_campaign_joining_email'] : '';
+        if (function_exists('wp_unslash')) {
+            $joining = wp_unslash($joining);
+            $email = wp_unslash($email);
+        }
+
+        return intersoccer_campaign_set_joining_session($joining, $email, $session);
+    }
+}
+
+if (!function_exists('intersoccer_campaign_joining_field_args')) {
+    /**
+     * Shared cart/checkout field args. required stays false so hidden AUTUMN15
+     * inputs do not HTML5-block submit.
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    function intersoccer_campaign_joining_field_args() {
+        $offers = function_exists('intersoccer_get_campaign_offers')
+            ? intersoccer_get_campaign_offers()
+            : [];
+        $label = __('Who is your child joining?', 'intersoccer-product-variations');
+        $placeholder = __('Friend or sibling name', 'intersoccer-product-variations');
+        $email_label = intersoccer_campaign_translate('Guardian\'s email', __('Guardian\'s email', 'intersoccer-product-variations'));
+        $email_placeholder = intersoccer_campaign_translate('parent@example.com', __('parent@example.com', 'intersoccer-product-variations'));
+        $group_offer = intersoccer_campaign_active_group_offer();
+        if ($group_offer) {
+            $label = intersoccer_campaign_translate($group_offer['id'] . '_group_field_label', $group_offer['group_field_label'] ?: $label);
+            $placeholder = intersoccer_campaign_translate($group_offer['id'] . '_group_field_placeholder', $group_offer['group_field_placeholder'] ?: $placeholder);
+        } else {
+            foreach ($offers as $offer) {
+                if (!empty($offer['requires_group_field']) && !empty($offer['group_field_label'])) {
+                    $label = intersoccer_campaign_translate($offer['id'] . '_group_field_label', $offer['group_field_label']);
+                    $placeholder = intersoccer_campaign_translate($offer['id'] . '_group_field_placeholder', $offer['group_field_placeholder']);
+                    break;
+                }
+            }
+            $label = intersoccer_campaign_translate('Who is your child joining?', $label);
+            $placeholder = intersoccer_campaign_translate('Friend or sibling name', $placeholder);
+        }
+
+        return [
+            'intersoccer_campaign_joining' => [
+                'type' => 'text',
+                'label' => $label,
+                'placeholder' => $placeholder,
+                'required' => false,
+                'class' => ['form-row-wide', 'intersoccer-campaign-joining'],
+                'priority' => 120,
+                'custom_attributes' => [
+                    'autocomplete' => 'off',
+                ],
+            ],
+            'intersoccer_campaign_joining_email' => [
+                'type' => 'email',
+                'label' => $email_label,
+                'placeholder' => $email_placeholder,
+                'required' => false,
+                'class' => ['form-row-wide', 'intersoccer-campaign-joining'],
+                'priority' => 121,
+                'custom_attributes' => [
+                    'autocomplete' => 'off',
+                ],
+            ],
+        ];
+    }
+}
+
+if (!function_exists('intersoccer_campaign_checkout_get_value')) {
+    /**
+     * Prefill checkout from session when the posted/stored value is empty.
+     *
+     * @param mixed       $value
+     * @param string      $input
+     * @param object|null $session
+     * @return mixed
+     */
+    function intersoccer_campaign_checkout_get_value($value, $input, $session = null) {
+        if (!in_array((string) $input, ['intersoccer_campaign_joining', 'intersoccer_campaign_joining_email'], true)) {
+            return $value;
+        }
+        if ($value !== null && trim((string) $value) !== '') {
+            return $value;
+        }
+        $stored = intersoccer_campaign_get_joining_session($session);
+        if ((string) $input === 'intersoccer_campaign_joining_email') {
+            return $stored['email'];
+        }
+        return $stored['joining'];
+    }
+}
+
 add_filter('woocommerce_form_field', 'intersoccer_campaign_strip_optional_label', 10, 4);
+add_filter('woocommerce_checkout_get_value', 'intersoccer_campaign_checkout_get_value', 10, 2);
 add_filter('woocommerce_checkout_fields', 'intersoccer_campaign_checkout_fields');
 function intersoccer_campaign_checkout_fields($fields) {
-    $offers = intersoccer_get_campaign_offers();
-    $label = __('Who is your child joining?', 'intersoccer-product-variations');
-    $placeholder = __('Friend or sibling name', 'intersoccer-product-variations');
-    $email_label = intersoccer_campaign_translate('Guardian\'s email', __('Guardian\'s email', 'intersoccer-product-variations'));
-    $email_placeholder = intersoccer_campaign_translate('parent@example.com', __('parent@example.com', 'intersoccer-product-variations'));
-    $group_offer = intersoccer_campaign_active_group_offer();
-    if ($group_offer) {
-        $label = intersoccer_campaign_translate($group_offer['id'] . '_group_field_label', $group_offer['group_field_label'] ?: $label);
-        $placeholder = intersoccer_campaign_translate($group_offer['id'] . '_group_field_placeholder', $group_offer['group_field_placeholder'] ?: $placeholder);
-    } else {
-        foreach ($offers as $offer) {
-            if (!empty($offer['requires_group_field']) && !empty($offer['group_field_label'])) {
-                $label = intersoccer_campaign_translate($offer['id'] . '_group_field_label', $offer['group_field_label']);
-                $placeholder = intersoccer_campaign_translate($offer['id'] . '_group_field_placeholder', $offer['group_field_placeholder']);
-                break;
-            }
-        }
-        $label = intersoccer_campaign_translate('Who is your child joining?', $label);
-        $placeholder = intersoccer_campaign_translate('Friend or sibling name', $placeholder);
-    }
-
-    $fields['order']['intersoccer_campaign_joining'] = [
-        'type' => 'text',
-        'label' => $label,
-        'placeholder' => $placeholder,
-        'required' => false,
-        'class' => ['form-row-wide', 'intersoccer-campaign-joining'],
-        'priority' => 120,
-        'custom_attributes' => [
-            'autocomplete' => 'off',
-        ],
-    ];
-
-    $fields['order']['intersoccer_campaign_joining_email'] = [
-        'type' => 'email',
-        'label' => $email_label,
-        'placeholder' => $email_placeholder,
-        'required' => false,
-        'class' => ['form-row-wide', 'intersoccer-campaign-joining'],
-        'priority' => 121,
-        'custom_attributes' => [
-            'autocomplete' => 'off',
-        ],
-    ];
+    $args = intersoccer_campaign_joining_field_args();
+    $fields['order']['intersoccer_campaign_joining'] = $args['intersoccer_campaign_joining'];
+    $fields['order']['intersoccer_campaign_joining_email'] = $args['intersoccer_campaign_joining_email'];
 
     return $fields;
 }
+
+if (!function_exists('intersoccer_campaign_render_cart_joining_fields')) {
+    /**
+     * Always output the two fields on classic cart; JS shows them for group coupons.
+     */
+    function intersoccer_campaign_render_cart_joining_fields() {
+        if (!function_exists('woocommerce_form_field')) {
+            return;
+        }
+        $args = intersoccer_campaign_joining_field_args();
+        $session = intersoccer_campaign_get_joining_session();
+        echo '<div class="intersoccer-campaign-joining-fields">';
+        woocommerce_form_field(
+            'intersoccer_campaign_joining',
+            $args['intersoccer_campaign_joining'],
+            $session['joining']
+        );
+        woocommerce_form_field(
+            'intersoccer_campaign_joining_email',
+            $args['intersoccer_campaign_joining_email'],
+            $session['email']
+        );
+        echo '</div>';
+    }
+}
+add_action('woocommerce_after_cart_table', 'intersoccer_campaign_render_cart_joining_fields');
+
+if (!function_exists('intersoccer_campaign_persist_joining_from_cart_update')) {
+    /**
+     * @param mixed $updated
+     */
+    function intersoccer_campaign_persist_joining_from_cart_update($updated) {
+        unset($updated);
+        intersoccer_campaign_persist_joining_from_request();
+    }
+}
+add_action('woocommerce_update_cart_action_cart_updated', 'intersoccer_campaign_persist_joining_from_cart_update');
+
+if (!function_exists('intersoccer_campaign_ajax_save_joining')) {
+    /**
+     * Guest-safe cart persist. Nonce only; do not create a WP user.
+     */
+    function intersoccer_campaign_ajax_save_joining() {
+        $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : '';
+        if (function_exists('check_ajax_referer')) {
+            check_ajax_referer('intersoccer_campaign_joining', 'nonce');
+        } elseif (!function_exists('wp_verify_nonce') || !wp_verify_nonce($nonce, 'intersoccer_campaign_joining')) {
+            if (function_exists('wp_send_json_error')) {
+                wp_send_json_error(['message' => 'Invalid nonce'], 403);
+            }
+            return;
+        }
+
+        $pair = intersoccer_campaign_persist_joining_from_request();
+        if ($pair === null) {
+            $pair = intersoccer_campaign_get_joining_session();
+        }
+        if (function_exists('wp_send_json_success')) {
+            wp_send_json_success($pair);
+        }
+    }
+}
+add_action('wp_ajax_intersoccer_save_campaign_joining', 'intersoccer_campaign_ajax_save_joining');
+add_action('wp_ajax_nopriv_intersoccer_save_campaign_joining', 'intersoccer_campaign_ajax_save_joining');
 
 add_action('woocommerce_after_checkout_validation', 'intersoccer_campaign_validate_joining_field', 10, 2);
 function intersoccer_campaign_validate_joining_field($data, $errors) {
@@ -211,14 +425,20 @@ add_action('woocommerce_checkout_update_order_meta', 'intersoccer_campaign_save_
 function intersoccer_campaign_save_joining_meta($order_id) {
     $joining = '';
     if (isset($_POST['intersoccer_campaign_joining'])) {
-        $joining = sanitize_text_field(wp_unslash($_POST['intersoccer_campaign_joining']));
+        $joining = wp_unslash($_POST['intersoccer_campaign_joining']);
     }
 
     $email = '';
     if (isset($_POST['intersoccer_campaign_joining_email'])) {
-        $raw = wp_unslash($_POST['intersoccer_campaign_joining_email']);
-        $email = function_exists('sanitize_email') ? sanitize_email($raw) : trim((string) $raw);
+        $email = wp_unslash($_POST['intersoccer_campaign_joining_email']);
     }
+
+    $pair = intersoccer_campaign_sanitize_joining_pair($joining, $email);
+    if (isset($_POST['intersoccer_campaign_joining']) || isset($_POST['intersoccer_campaign_joining_email'])) {
+        intersoccer_campaign_set_joining_session($pair['joining'], $pair['email']);
+    }
+    $joining = $pair['joining'];
+    $email = $pair['email'];
 
     if ($joining === '' && $email === '') {
         return;
