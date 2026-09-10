@@ -1502,6 +1502,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     
                     if ($percent > 0) {
                         $cart_key = $item['cart_key'];
+                        if (!isset($cart->cart_contents[$cart_key]['base_price'])) {
+                            continue;
+                        }
                         $sibling_percent = floatval($cart->cart_contents[$cart_key]['intersoccer_sibling_percent'] ?? 0);
                         if ($percent <= $sibling_percent) {
                             // Keep sibling discount (higher or equal)
@@ -1629,6 +1632,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         $percent = $same_season_rate;  // Use rate from active rule
                         $item = $items[1];  // Second item
                         $cart_key = $item['cart_key'];
+                        if (!isset($cart->cart_contents[$cart_key]['base_price'])) {
+                            continue;
+                        }
                         $base_price = $cart->cart_contents[$cart_key]['base_price'];
                         $discounted_price = $base_price * (1 - $percent);
                         $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
@@ -1685,6 +1691,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         if ($has_different_day_course) {
                             $percent = $same_season_rate;
                             $cart_key = $item['cart_key'];
+                            if (!isset($cart->cart_contents[$cart_key]['base_price'])) {
+                                continue;
+                            }
                             $base_price = $cart->cart_contents[$cart_key]['base_price'];
                             $discounted_price = $base_price * (1 - $percent);
                             $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
@@ -1799,6 +1808,9 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         if ($day_position >= 2) {
                             $percent = $tournament_same_child_rate;
                             $cart_key = $item['cart_key'];
+                            if (!isset($cart->cart_contents[$cart_key]['base_price'])) {
+                                continue;
+                            }
                             $base_price = $cart->cart_contents[$cart_key]['base_price'];
                             $discounted_price = $base_price * (1 - $percent);
 
