@@ -60,6 +60,7 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 - **Precise Allocation**: Context-aware discount application with cart validation
 - **Order Metadata**: Discount details stored in order item metadata
 - **Configurable**: All rates and features configurable via Admin UI
+- **Defensive Pricing**: Discount calculations skip items missing `base_price` to prevent silent pricing errors
 - **Campaign Offers**: Admin-configured time-boxed WooCommerce percent coupons (e.g. AUTUMN15 / TOGETHER20). Discount is the native coupon amount and may stack with sibling `set_price`. Group offers collect joining name and guardian email at classic checkout. WooCommerce → InterSoccer Discounts → Campaign Offers. Single coupon code across EN/FR/DE.
 
 ### Late Pickup System
@@ -116,7 +117,6 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 
 ## Future Enhancements
 - Weekly discount integration for multiple Summer Camps
-- Google Sheets/Office365 export integration
 - Advanced reporting and analytics
 - API integrations for external booking systems
 
