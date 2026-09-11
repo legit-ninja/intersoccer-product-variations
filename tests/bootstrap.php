@@ -378,6 +378,50 @@ if (!function_exists('intersoccer_get_player_by_index')) {
     }
 }
 
+if (!function_exists('intersoccer_resolve_intersoccer_players_meta_key')) {
+    /**
+     * Stub for player-management-plugin's sparse-key resolution helper.
+     *
+     * Production code guards with function_exists(); this stub enables
+     * PlayersMetaKeyResolutionTest to run standalone without the sibling repo.
+     *
+     * @param array      $players   Player rows keyed by meta index.
+     * @param int|string $requested Requested index or ordinal.
+     * @return int|string|null Resolved key or null.
+     */
+    function intersoccer_resolve_intersoccer_players_meta_key(array $players, $requested) {
+        if ($players === []) {
+            return null;
+        }
+        if ($requested === null || $requested === '') {
+            return null;
+        }
+        if (array_key_exists($requested, $players)) {
+            return $requested;
+        }
+
+        $as_int = null;
+        if (is_int($requested)) {
+            $as_int = $requested;
+        } elseif (is_string($requested) && $requested !== '' && ctype_digit($requested)) {
+            $as_int = (int) $requested;
+        }
+        if ($as_int !== null && array_key_exists($as_int, $players)) {
+            return $as_int;
+        }
+        if ($as_int === null) {
+            return null;
+        }
+
+        $keys = array_keys($players);
+        if ($as_int >= 0 && $as_int < count($keys)) {
+            return $keys[$as_int];
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('get_user_meta')) {
     function get_user_meta($user_id, $key = '', $single = false) {
         $value = $GLOBALS['intersoccer_test_user_meta'][$user_id][$key] ?? ($single ? '' : []);

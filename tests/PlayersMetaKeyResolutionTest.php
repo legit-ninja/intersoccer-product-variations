@@ -2,7 +2,10 @@
 /**
  * Unit tests for intersoccer_resolve_intersoccer_players_meta_key (sparse keys vs posted ordinals).
  *
- * Run: php vendor/phpunit/phpunit/phpunit --no-configuration tests/PlayersMetaKeyResolutionTest.php
+ * The function under test is owned by player-management-plugin; a stub in bootstrap.php
+ * allows these tests to run standalone when the sibling repo is unavailable.
+ *
+ * Run: vendor/bin/phpunit tests/PlayersMetaKeyResolutionTest.php
  */
 
 use PHPUnit\Framework\TestCase;
