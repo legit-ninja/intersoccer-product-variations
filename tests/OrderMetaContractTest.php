@@ -536,6 +536,110 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('', $item->get_meta('_camp_week_index', true));
     }
 
+    public function test_canonical_keys_list_matches_contract() {
+        $keys = intersoccer_canonical_order_meta_keys();
+        $this->assertContains('_intersoccer_canonical_activity_type', $keys);
+        $this->assertContains('_intersoccer_canonical_girls_only', $keys);
+        $this->assertContains('_intersoccer_canonical_booking_type', $keys);
+        $this->assertContains('_intersoccer_canonical_venue', $keys);
+        $this->assertContains('_intersoccer_canonical_canton', $keys);
+        $this->assertContains('_intersoccer_canonical_age_group', $keys);
+        $this->assertContains('_intersoccer_canonical_camp_terms', $keys);
+        foreach (intersoccer_order_meta_correctable_keys() as $key) {
+            if (strpos($key, '_intersoccer_canonical_') === 0) {
+                $this->assertContains($key, $keys);
+            }
+        }
+    }
+
+    public function test_canonical_activity_type_is_slug_not_girls_only_composite() {
+        $this->assertSame('camp', intersoccer_normalize_canonical_activity_type('camp'));
+        $this->assertSame('birthday', intersoccer_normalize_canonical_activity_type('birthday-party'));
+        $this->assertSame('other', intersoccer_normalize_canonical_activity_type('Camp, Girls Only'));
+        $this->assertSame('1', intersoccer_normalize_canonical_girls_only_flag(true));
+        $this->assertSame('0', intersoccer_normalize_canonical_girls_only_flag(false));
+    }
+
+    public function test_canonical_booking_type_is_slug_not_display_label() {
+        $this->assertSame('full-week', intersoccer_normalize_canonical_booking_type('Full Week'));
+        $this->assertSame('single-days', intersoccer_normalize_canonical_booking_type('Single Day(s)'));
+        $this->assertSame('full-term', intersoccer_normalize_canonical_booking_type('full-term'));
+        $this->assertSame('buyclub', intersoccer_normalize_canonical_booking_type('Buy Club'));
+        $this->assertSame('other', intersoccer_normalize_canonical_booking_type('Saison'));
+    }
+
+    public function test_build_canonical_omits_camp_terms_when_week_index_present() {
+        $with_week = intersoccer_build_canonical_order_line_meta([
+            'product_type' => 'camp',
+            'girls_only' => false,
+            'booking_type' => 'full-week',
+            'venue' => 'geneva-centre',
+            'canton' => 'ge',
+            'age_group' => '5-13y-full-day',
+            'camp_terms' => 'week-6',
+            'camp_week_index' => 6,
+        ]);
+        $this->assertSame('camp', $with_week['_intersoccer_canonical_activity_type']);
+        $this->assertSame('0', $with_week['_intersoccer_canonical_girls_only']);
+        $this->assertSame('full-week', $with_week['_intersoccer_canonical_booking_type']);
+        $this->assertSame('geneva-centre', $with_week['_intersoccer_canonical_venue']);
+        $this->assertSame('ge', $with_week['_intersoccer_canonical_canton']);
+        $this->assertSame('5-13y-full-day', $with_week['_intersoccer_canonical_age_group']);
+        $this->assertArrayNotHasKey('_intersoccer_canonical_camp_terms', $with_week);
+
+        $without_week = intersoccer_build_canonical_order_line_meta([
+            'product_type' => 'camp',
+            'girls_only' => true,
+            'camp_terms' => 'Week 6',
+        ]);
+        $this->assertSame('1', $without_week['_intersoccer_canonical_girls_only']);
+        $this->assertSame('week-6', $without_week['_intersoccer_canonical_camp_terms']);
+        $this->assertSame('camp', $without_week['_intersoccer_canonical_activity_type']);
+    }
+
+    public function test_checkout_write_emits_canonical_slugs_not_translated_labels() {
+        MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static function () {
+            return true;
+        };
+
+        $item = new WC_Order_Item_Product([]);
+        $written = intersoccer_write_order_line_meta($item, [
+            'mode' => 'checkout',
+            'product_type' => 'camp',
+            'product_id' => 100,
+            'variation_id' => 200,
+            'cart_values' => [],
+        ]);
+
+        $this->assertTrue($written);
+        $this->assertSame('camp', $item->get_meta('_intersoccer_canonical_activity_type', true));
+        $this->assertSame('1', $item->get_meta('_intersoccer_canonical_girls_only', true));
+        $this->assertNotSame('Camp, Girls Only', $item->get_meta('_intersoccer_canonical_activity_type', true));
+        $this->assertStringContainsString('Girls Only', $item->get_meta('Activity Type', true));
+    }
+
+    public function test_repair_write_fills_empty_canonical_keys() {
+        MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static function () {
+            return false;
+        };
+
+        $item = new WC_Order_Item_Product([
+            'Activity Type' => 'Camp',
+        ]);
+
+        $written = intersoccer_write_order_line_meta($item, [
+            'mode' => 'repair',
+            'product_type' => 'camp',
+            'product_id' => 100,
+            'variation_id' => 200,
+            'cart_values' => [],
+        ]);
+
+        $this->assertTrue($written);
+        $this->assertSame('camp', $item->get_meta('_intersoccer_canonical_activity_type', true));
+        $this->assertSame('0', $item->get_meta('_intersoccer_canonical_girls_only', true));
+    }
+
     public function test_prune_camp_schedule_migrates_underscore_only_to_human_label() {
         $item = new WC_Order_Item_Product([
             '_camp_start_date' => '2026-07-27',

@@ -24,7 +24,7 @@ function intersoccer_register_campaign_offer_settings() {
 
 add_action('admin_init', 'intersoccer_handle_campaign_offers_save');
 function intersoccer_handle_campaign_offers_save() {
-    if (!isset($_POST['intersoccer_campaign_offers_submit'])) {
+    if (!isset($_POST['intersoccer_campaign_offers_submit']) && !isset($_POST['intersoccer_campaign_offers_refresh'])) {
         return;
     }
     if (!isset($_POST['intersoccer_campaign_offers_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['intersoccer_campaign_offers_nonce'])), 'intersoccer_save_campaign_offers')) {
@@ -41,17 +41,62 @@ function intersoccer_handle_campaign_offers_save() {
         ? wp_unslash($_POST['intersoccer_campaign_offers'])
         : [];
 
+    $refresh_index = isset($_POST['intersoccer_campaign_offers_refresh'])
+        ? sanitize_text_field(wp_unslash($_POST['intersoccer_campaign_offers_refresh']))
+        : '';
+
+    $existing = intersoccer_get_campaign_offers();
     $offers = [];
+    $index = 0;
+    $rr_missing_notice = false;
     foreach ($posted as $row) {
         if (!is_array($row)) {
+            $index++;
             continue;
         }
         $normalized = intersoccer_normalize_campaign_offer($row);
         if ($normalized === null) {
+            $index++;
             continue;
         }
+
+        $prior = $existing[$normalized['id']] ?? [];
+        $should_refresh = ((string) $refresh_index === (string) $index)
+            || (
+                !empty($normalized['restrict_to_distressed'])
+                && empty($normalized['distressed_variation_ids'])
+                && empty($prior['distressed_variation_ids'])
+            );
+
+        if ($should_refresh && !empty($normalized['restrict_to_distressed'])) {
+            $snap = intersoccer_campaign_snapshot_distressed_events(
+                $normalized['distressed_season'],
+                $normalized['distressed_program_year']
+            );
+            $normalized['distressed_variation_ids'] = $snap['variation_ids'];
+            $normalized['distressed_product_ids'] = $snap['product_ids'];
+            $normalized['distressed_refreshed_at'] = function_exists('current_time')
+                ? current_time('mysql')
+                : gmdate('Y-m-d H:i:s');
+            if (empty($snap['available'])) {
+                $rr_missing_notice = true;
+            }
+        } elseif (empty($normalized['restrict_to_distressed'])) {
+            $normalized['distressed_variation_ids'] = [];
+            $normalized['distressed_product_ids'] = [];
+            $normalized['distressed_refreshed_at'] = '';
+        } else {
+            // Keep the posted snapshot — do not auto-mutate as counts rise.
+            if ($normalized['distressed_variation_ids'] === [] && !empty($prior['distressed_variation_ids'])) {
+                $normalized['distressed_variation_ids'] = $prior['distressed_variation_ids'];
+                $normalized['distressed_product_ids'] = $prior['distressed_product_ids'] ?? [];
+                $normalized['distressed_refreshed_at'] = $prior['distressed_refreshed_at'] ?? '';
+            }
+        }
+
         $normalized = intersoccer_campaign_sync_coupon($normalized);
         $offers[$normalized['id']] = $normalized;
+        $index++;
     }
 
     update_option('intersoccer_campaign_offers', $offers);
@@ -62,6 +107,21 @@ function intersoccer_handle_campaign_offers_save() {
         __('Campaign offers saved.', 'intersoccer-product-variations'),
         'updated'
     );
+
+    if ($rr_missing_notice || (
+        array_filter($offers, static function ($offer) {
+            return !empty($offer['restrict_to_distressed'])
+                && empty($offer['distressed_variation_ids'])
+                && !intersoccer_campaign_distressed_api_available();
+        })
+    )) {
+        add_settings_error(
+            'intersoccer_campaign_offers',
+            'distressed_api_missing',
+            __('Reports & Rosters distressed API is not available (intersoccer_reports_distressed_variation_ids). The distressed snapshot stays empty, so restricted offers will not apply until Reports & Rosters is updated and you refresh the list.', 'intersoccer-product-variations'),
+            'error'
+        );
+    }
 }
 
 add_action('admin_enqueue_scripts', 'intersoccer_enqueue_campaign_offers_admin_assets');
@@ -73,7 +133,7 @@ function intersoccer_enqueue_campaign_offers_admin_assets($hook) {
         'intersoccer-admin-campaign-offers',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/admin-campaign-offers.js',
         ['jquery'],
-        '2.8.31',
+        '2.9.2',
         true
     );
 }
@@ -158,6 +218,12 @@ function intersoccer_render_campaign_offers_section() {
             'group_field_error' => __('Please enter who your child is joining.', 'intersoccer-product-variations'),
             'exclusive_with' => [],
             'coupon_id' => 0,
+            'restrict_to_distressed' => false,
+            'distressed_season' => 'autumn',
+            'distressed_program_year' => '2026',
+            'distressed_variation_ids' => [],
+            'distressed_product_ids' => [],
+            'distressed_refreshed_at' => '',
         ], '__INDEX__', $exclusive_keys, $exclusive_labels);
         ?>
     </script>
@@ -217,6 +283,52 @@ function intersoccer_render_campaign_offer_card(array $offer, $index, array $exc
                 <th><?php esc_html_e('Eligible product IDs', 'intersoccer-product-variations'); ?></th>
                 <td>
                     <input type="text" class="large-text" name="<?php echo esc_attr($prefix); ?>[product_ids]" value="<?php echo esc_attr(implode(',', $offer['product_ids'])); ?>" placeholder="<?php esc_attr_e('Comma-separated; blank = all', 'intersoccer-product-variations'); ?>" />
+                    <p class="description"><?php esc_html_e('Blank still means all products unless Restrict to distressed events is on.', 'intersoccer-product-variations'); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th><?php esc_html_e('Distressed events', 'intersoccer-product-variations'); ?></th>
+                <td>
+                    <label>
+                        <input type="checkbox" name="<?php echo esc_attr($prefix); ?>[restrict_to_distressed]" value="1" <?php checked(!empty($offer['restrict_to_distressed'])); ?> />
+                        <?php esc_html_e('Restrict to distressed events', 'intersoccer-product-variations'); ?>
+                    </label>
+                    <p class="description"><?php esc_html_e('Uses Final Numbers Critical/Low variation IDs from Reports & Rosters. Snapshot is frozen until you refresh — counts rising later do not yank the discount.', 'intersoccer-product-variations'); ?></p>
+                    <p>
+                        <label><?php esc_html_e('Season', 'intersoccer-product-variations'); ?>
+                            <input type="text" name="<?php echo esc_attr($prefix); ?>[distressed_season]" value="<?php echo esc_attr((string) ($offer['distressed_season'] ?? '')); ?>" placeholder="autumn" class="regular-text" />
+                        </label>
+                        <label style="margin-left:12px;"><?php esc_html_e('Program year', 'intersoccer-product-variations'); ?>
+                            <input type="text" name="<?php echo esc_attr($prefix); ?>[distressed_program_year]" value="<?php echo esc_attr((string) ($offer['distressed_program_year'] ?? '')); ?>" placeholder="2026" class="small-text" />
+                        </label>
+                    </p>
+                    <input type="hidden" name="<?php echo esc_attr($prefix); ?>[distressed_variation_ids]" value="<?php echo esc_attr(implode(',', $offer['distressed_variation_ids'] ?? [])); ?>" />
+                    <input type="hidden" name="<?php echo esc_attr($prefix); ?>[distressed_product_ids]" value="<?php echo esc_attr(implode(',', $offer['distressed_product_ids'] ?? [])); ?>" />
+                    <input type="hidden" name="<?php echo esc_attr($prefix); ?>[distressed_refreshed_at]" value="<?php echo esc_attr((string) ($offer['distressed_refreshed_at'] ?? '')); ?>" />
+                    <p>
+                        <button type="submit" class="button" name="intersoccer_campaign_offers_refresh" value="<?php echo esc_attr((string) $index); ?>">
+                            <?php esc_html_e('Refresh list', 'intersoccer-product-variations'); ?>
+                        </button>
+                        <?php
+                        $snap_count = count($offer['distressed_variation_ids'] ?? []);
+                        $refreshed = (string) ($offer['distressed_refreshed_at'] ?? '');
+                        if ($snap_count > 0) {
+                            printf(
+                                /* translators: 1: variation count, 2: timestamp */
+                                esc_html__('Snapshot: %1$d variation IDs%2$s.', 'intersoccer-product-variations'),
+                                (int) $snap_count,
+                                $refreshed !== '' ? ' (' . esc_html($refreshed) . ')' : ''
+                            );
+                        } else {
+                            esc_html_e('Snapshot is empty.', 'intersoccer-product-variations');
+                        }
+                        ?>
+                    </p>
+                    <?php if (!empty($offer['restrict_to_distressed']) && !intersoccer_campaign_distressed_api_available()) : ?>
+                        <div class="notice notice-error inline"><p>
+                            <?php esc_html_e('Reports & Rosters distressed API is not available. Snapshot stays empty until intersoccer_reports_distressed_variation_ids() is present, then refresh.', 'intersoccer-product-variations'); ?>
+                        </p></div>
+                    <?php endif; ?>
                 </td>
             </tr>
             <tr>

@@ -63,6 +63,12 @@ class CampaignOfferTest extends TestCase {
             'group_field_error' => 'Please enter who your child is joining.',
             'exclusive_with' => [],
             'coupon_id' => 0,
+            'restrict_to_distressed' => false,
+            'distressed_season' => 'autumn',
+            'distressed_program_year' => '2026',
+            'distressed_variation_ids' => [],
+            'distressed_product_ids' => [],
+            'distressed_refreshed_at' => '',
         ];
         return array_merge($base, $overrides);
     }
@@ -155,6 +161,84 @@ class CampaignOfferTest extends TestCase {
         $offer = $this->sampleOffer(['excluded_product_ids' => [9]]);
         $this->assertTrue(intersoccer_campaign_product_is_eligible($offer, 1));
         $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 9));
+    }
+
+    public function test_empty_allowlist_does_not_mean_all_when_distressed_restrict_on(): void {
+        $offer = $this->sampleOffer([
+            'restrict_to_distressed' => true,
+            'distressed_variation_ids' => [],
+            'distressed_product_ids' => [],
+        ]);
+        $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 100, [], [], 501));
+        $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 100));
+    }
+
+    public function test_distressed_eligibility_uses_variation_ids(): void {
+        $offer = $this->sampleOffer([
+            'restrict_to_distressed' => true,
+            'distressed_variation_ids' => [501, 502],
+            'distressed_product_ids' => [100],
+        ]);
+        $this->assertTrue(intersoccer_campaign_product_is_eligible($offer, 100, [], [], 501));
+        $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 100, [], [], 503));
+        $this->assertTrue(intersoccer_campaign_product_is_eligible($offer, 100));
+        $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 200));
+    }
+
+    public function test_distressed_plus_product_allowlist(): void {
+        $offer = $this->sampleOffer([
+            'restrict_to_distressed' => true,
+            'product_ids' => [100],
+            'distressed_variation_ids' => [501],
+            'distressed_product_ids' => [100, 200],
+        ]);
+        $this->assertTrue(intersoccer_campaign_product_is_eligible($offer, 100, [], [], 501));
+        $this->assertFalse(intersoccer_campaign_product_is_eligible($offer, 200, [], [], 501));
+    }
+
+    public function test_normalize_persists_distressed_snapshot(): void {
+        $row = intersoccer_normalize_campaign_offer([
+            'id' => 'autumn15',
+            'code' => 'AUTUMN15',
+            'name' => 'Autumn',
+            'restrict_to_distressed' => '1',
+            'distressed_season' => 'Autumn',
+            'distressed_program_year' => '2026',
+            'distressed_variation_ids' => '11, 22',
+            'distressed_product_ids' => '100',
+        ]);
+        $this->assertNotNull($row);
+        $this->assertTrue($row['restrict_to_distressed']);
+        $this->assertSame('autumn', $row['distressed_season']);
+        $this->assertSame('2026', $row['distressed_program_year']);
+        $this->assertSame([11, 22], $row['distressed_variation_ids']);
+        $this->assertSame([100], $row['distressed_product_ids']);
+    }
+
+    public function test_snapshot_empty_when_rr_api_missing(): void {
+        $this->assertFalse(function_exists('intersoccer_reports_distressed_variation_ids'));
+        $snap = intersoccer_campaign_snapshot_distressed_events('autumn', '2026');
+        $this->assertSame([], $snap['variation_ids']);
+        $this->assertSame([], $snap['product_ids']);
+        $this->assertFalse($snap['available']);
+    }
+
+    public function test_coupon_invalid_when_distressed_snapshot_empty(): void {
+        $offer = $this->sampleOffer([
+            'enabled' => true,
+            'starts_at' => '',
+            'ends_at' => '',
+            'restrict_to_distressed' => true,
+            'distressed_variation_ids' => [],
+        ]);
+        update_option('intersoccer_campaign_offers', ['together20' => $offer]);
+        update_option('intersoccer_campaign_offers_enabled', true);
+        $coupon = new class {
+            public function get_code() {
+                return 'TOGETHER20';
+            }
+        };
+        $this->assertFalse(intersoccer_campaign_coupon_is_valid(true, $coupon));
     }
 
     public function test_joining_validation_required_when_empty(): void {

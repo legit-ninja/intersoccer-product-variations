@@ -5,6 +5,14 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.2] - 2026-09-16
+
+### Added
+- Program Manager and catalog term-shape gates: reject year-qualified seasons, non-bare years, and activity-type / girls-only / weekday / booking-type / camp-times terms outside registry defaults. Venues and cities stay free-form with EN slugs.
+- Required parent facets from `intersoccer_attr_required($type, 'parent')` now block publish (drafts may stay incomplete).
+- Checkout/repair dual-write of language-neutral `_intersoccer_canonical_*` order-line keys (activity type, girls only 0/1, booking type, venue, canton, age group, camp terms) plus existing `_camp_*`.
+- Campaign Offers: Restrict to distressed events + Refresh list. Snapshots Critical/Low variation IDs from Reports & Rosters; eligibility accepts variation IDs. Empty product allowlist still means all products unless the restrict flag is on.
+
 ## [2.7.27] - 2026-07-27
 
 ### Added

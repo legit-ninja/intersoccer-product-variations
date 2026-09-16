@@ -3,8 +3,10 @@
 ## Overview
 This plugin enhances the WooCommerce booking system for InterSoccer Switzerland by managing complex product variations, dynamic pricing calculations, and sophisticated sibling discount systems. It supports three main product types: Camps (full-week and single-day), Courses (seasonal with prorated pricing), and Birthdays, with comprehensive admin interfaces and multilingual support.
 
+Taxonomy standard (attributes, term shapes, order-meta keys, distressed bands): InterSoccer Project Context — `docs/taxonomy-standard.md`.
+
 ## Version
-- **Version: 2.9.1.1**
+- **Version: 2.9.2**
 - Release Date: September 1, 2026
 
 ## Camp schedule meta (2.7.18+)

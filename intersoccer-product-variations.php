@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.9.1.1
+ * Version: 2.9.2
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -424,7 +424,7 @@ add_action('wp_enqueue_scripts', function () {
             'intersoccer-campaign-checkout',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/campaign-checkout.js',
             ['jquery'],
-            '2.9.1.1',
+            '2.9.2',
             true
         );
         wp_localize_script('intersoccer-campaign-checkout', 'intersoccerCampaignCheckout', [
