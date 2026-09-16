@@ -406,6 +406,19 @@ function intersoccer_build_order_line_meta($args) {
         : 'Activity Type';
     $updates[$activity_type_key] = $activity_type;
 
+    $forced_girls_only = apply_filters('intersoccer_order_activity_type_is_girls_only', null, $product_id, $variation_id, $product_type);
+    if ($forced_girls_only !== null) {
+        $is_girls_only = (bool) $forced_girls_only;
+    } else {
+        $is_girls_only = function_exists('intersoccer_line_is_girls_only_program')
+            && intersoccer_line_is_girls_only_program((int) $product_id, (int) $variation_id);
+    }
+
+    $canonical = intersoccer_build_canonical_order_line_meta(
+        intersoccer_collect_canonical_order_facets($product_id, $variation_id, $product_type, $is_girls_only)
+    );
+    $updates = array_merge($updates, $canonical);
+
     if ($fix_activity_type_only) {
         return ['updates' => $updates, 'strip' => $strip];
     }
@@ -516,13 +529,241 @@ function intersoccer_build_order_line_meta($args) {
  * @return array<int,string>
  */
 function intersoccer_order_meta_correctable_keys() {
+    return array_merge(
+        [
+            'Activity Type',
+            'Attendee DOB',
+            'Attendee Gender',
+            'Medical Conditions',
+            'assigned_player_id',
+        ],
+        intersoccer_canonical_order_meta_keys()
+    );
+}
+
+/**
+ * Language-neutral order-line keys from the taxonomy / order-meta contract.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_canonical_order_meta_keys() {
     return [
-        'Activity Type',
-        'Attendee DOB',
-        'Attendee Gender',
-        'Medical Conditions',
-        'assigned_player_id',
+        '_intersoccer_canonical_activity_type',
+        '_intersoccer_canonical_girls_only',
+        '_intersoccer_canonical_booking_type',
+        '_intersoccer_canonical_venue',
+        '_intersoccer_canonical_canton',
+        '_intersoccer_canonical_age_group',
+        '_intersoccer_canonical_camp_terms',
     ];
+}
+
+/**
+ * @param string $product_type camp|course|birthday|tournament|…
+ * @return string camp|course|tournament|birthday|event|other
+ */
+function intersoccer_normalize_canonical_activity_type($product_type) {
+    $type = strtolower(trim((string) $product_type));
+    $map = [
+        'camp' => 'camp',
+        'course' => 'course',
+        'tournament' => 'tournament',
+        'birthday' => 'birthday',
+        'birthday-party' => 'birthday',
+        'event' => 'event',
+    ];
+    return $map[$type] ?? 'other';
+}
+
+/**
+ * @param mixed $raw Slug or display label.
+ * @return string full-week|single-days|full-term|buyclub|other|''
+ */
+function intersoccer_normalize_canonical_booking_type($raw) {
+    $raw = strtolower(trim((string) $raw));
+    if ($raw === '') {
+        return '';
+    }
+    $compact = preg_replace('/[\s_]+/', '-', $raw);
+    $compact = str_replace(['(', ')'], '', (string) $compact);
+    $aliases = [
+        'full-week' => 'full-week',
+        'fullweek' => 'full-week',
+        'single-days' => 'single-days',
+        'single-day' => 'single-days',
+        'full-term' => 'full-term',
+        'fullterm' => 'full-term',
+        'buyclub' => 'buyclub',
+        'buy-club' => 'buyclub',
+        'other' => 'other',
+    ];
+    if (isset($aliases[$compact])) {
+        return $aliases[$compact];
+    }
+    if (strpos($raw, 'full') !== false && strpos($raw, 'week') !== false) {
+        return 'full-week';
+    }
+    if (strpos($raw, 'single') !== false) {
+        return 'single-days';
+    }
+    if (strpos($raw, 'term') !== false) {
+        return 'full-term';
+    }
+    if (strpos($raw, 'buy') !== false && strpos($raw, 'club') !== false) {
+        return 'buyclub';
+    }
+    return 'other';
+}
+
+/**
+ * @param bool $is_girls_only
+ * @return string 0|1
+ */
+function intersoccer_normalize_canonical_girls_only_flag($is_girls_only) {
+    return $is_girls_only ? '1' : '0';
+}
+
+/**
+ * Build language-neutral order-line keys from resolved facets.
+ *
+ * Values are EN slugs / fixed enums — never translated display labels.
+ * Girls Only is 0/1 and is never folded into activity_type.
+ * Camp terms are omitted when a camp week index is present.
+ *
+ * @param array<string,mixed> $facets {
+ *   @type string     $product_type
+ *   @type bool       $girls_only
+ *   @type string     $booking_type
+ *   @type string     $venue
+ *   @type string     $canton
+ *   @type string     $age_group
+ *   @type string     $camp_terms
+ *   @type int|string $camp_week_index
+ * }
+ * @return array<string,string>
+ */
+function intersoccer_build_canonical_order_line_meta(array $facets) {
+    $meta = [
+        '_intersoccer_canonical_activity_type' => intersoccer_normalize_canonical_activity_type($facets['product_type'] ?? ''),
+        '_intersoccer_canonical_girls_only' => intersoccer_normalize_canonical_girls_only_flag(!empty($facets['girls_only'])),
+    ];
+
+    $booking = intersoccer_normalize_canonical_booking_type($facets['booking_type'] ?? '');
+    if ($booking !== '') {
+        $meta['_intersoccer_canonical_booking_type'] = $booking;
+    }
+
+    foreach ([
+        'venue' => '_intersoccer_canonical_venue',
+        'canton' => '_intersoccer_canonical_canton',
+        'age_group' => '_intersoccer_canonical_age_group',
+    ] as $facet => $key) {
+        $slug = intersoccer_canonical_term_slug_value($facets[$facet] ?? '');
+        if ($slug !== '') {
+            $meta[$key] = $slug;
+        }
+    }
+
+    $has_week = isset($facets['camp_week_index'])
+        && $facets['camp_week_index'] !== null
+        && $facets['camp_week_index'] !== '';
+    if (!$has_week) {
+        $camp_terms = intersoccer_canonical_term_slug_value($facets['camp_terms'] ?? '');
+        if ($camp_terms !== '') {
+            $meta['_intersoccer_canonical_camp_terms'] = $camp_terms;
+        }
+    }
+
+    return $meta;
+}
+
+/**
+ * Persistable EN slug: never HTML entities or display labels with spaces/commas.
+ *
+ * @param mixed $raw
+ * @return string
+ */
+function intersoccer_canonical_term_slug_value($raw) {
+    $raw = html_entity_decode(trim((string) $raw), ENT_QUOTES, 'UTF-8');
+    if ($raw === '') {
+        return '';
+    }
+    if (function_exists('remove_accents')) {
+        $raw = remove_accents($raw);
+    }
+    return sanitize_title($raw);
+}
+
+/**
+ * Resolve a line's term slug from variation meta, then parent terms.
+ *
+ * @param int    $product_id
+ * @param int    $variation_id
+ * @param string $attr_slug Bare registry slug.
+ * @return string
+ */
+function intersoccer_resolve_line_term_slug($product_id, $variation_id, $attr_slug) {
+    $attr_slug = (string) $attr_slug;
+    $variation_id = (int) $variation_id;
+    $product_id = (int) $product_id;
+
+    if ($variation_id > 0 && function_exists('intersoccer_attr_get_variation_value')) {
+        $from_var = intersoccer_attr_get_variation_value($variation_id, $attr_slug);
+        if (is_string($from_var) && $from_var !== '') {
+            return intersoccer_canonical_term_slug_value($from_var);
+        }
+    }
+
+    $taxonomy = function_exists('intersoccer_attr_taxonomy')
+        ? intersoccer_attr_taxonomy($attr_slug)
+        : ('pa_' . $attr_slug);
+
+    foreach ([$variation_id, $product_id] as $id) {
+        if ($id <= 0 || !function_exists('wc_get_product_terms')) {
+            continue;
+        }
+        $terms = wc_get_product_terms($id, $taxonomy, ['fields' => 'slugs']);
+        if (!empty($terms) && !is_wp_error($terms)) {
+            $first = reset($terms);
+            if (is_string($first) && $first !== '') {
+                return intersoccer_canonical_term_slug_value($first);
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Collect canonical facets for a product line (catalog slugs, not display labels).
+ *
+ * @param int    $product_id
+ * @param int    $variation_id
+ * @param string $product_type
+ * @param bool   $girls_only
+ * @return array<string,mixed>
+ */
+function intersoccer_collect_canonical_order_facets($product_id, $variation_id, $product_type, $girls_only = false) {
+    $facets = [
+        'product_type' => $product_type,
+        'girls_only' => (bool) $girls_only,
+        'booking_type' => intersoccer_resolve_line_term_slug($product_id, $variation_id, 'booking-type'),
+        'venue' => intersoccer_resolve_line_term_slug($product_id, $variation_id, 'intersoccer-venues'),
+        'canton' => intersoccer_resolve_line_term_slug($product_id, $variation_id, 'canton-region'),
+        'age_group' => intersoccer_resolve_line_term_slug($product_id, $variation_id, 'age-group'),
+        'camp_terms' => intersoccer_resolve_line_term_slug($product_id, $variation_id, 'camp-terms'),
+        'camp_week_index' => null,
+    ];
+
+    $vid = (int) $variation_id > 0 ? (int) $variation_id : (int) $product_id;
+    if ($vid > 0 && function_exists('intersoccer_get_camp_schedule_meta')) {
+        $schedule = intersoccer_get_camp_schedule_meta($vid);
+        if (isset($schedule['week']) && $schedule['week'] !== null && $schedule['week'] !== '') {
+            $facets['camp_week_index'] = $schedule['week'];
+        }
+    }
+
+    return $facets;
 }
 
 /**
@@ -629,6 +870,21 @@ function intersoccer_write_order_line_meta($item, array $context) {
 
     $variation_tax_meta = intersoccer_collect_variation_taxonomy_meta($variation_id);
     $updates = array_merge($built['updates'], $variation_tax_meta);
+
+    // Dual-write existing _camp_* keys alongside human Camp Start/End/Week labels.
+    if (!$fix_activity_type_only && strtolower($product_type) === 'camp' && function_exists('intersoccer_get_camp_schedule_meta')) {
+        $vid = $variation_id ?: $product_id;
+        $schedule = intersoccer_get_camp_schedule_meta($vid);
+        if (!empty($schedule['start'])) {
+            $updates['_camp_start_date'] = $schedule['start'];
+        }
+        if (!empty($schedule['end'])) {
+            $updates['_camp_end_date'] = $schedule['end'];
+        }
+        if (isset($schedule['week']) && $schedule['week'] !== null && $schedule['week'] !== '') {
+            $updates['_camp_week_index'] = (string) $schedule['week'];
+        }
+    }
 
     // Prefer human order_meta_label over attribute_pa_* when either is already present
     // or about to be written — avoids repair re-adding attribute twins that prune removes.

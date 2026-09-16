@@ -72,6 +72,12 @@ if (!function_exists('intersoccer_get_default_campaign_offers')) {
                 'group_field_error' => $joining_error,
                 'exclusive_with' => [],
                 'coupon_id' => 0,
+                'restrict_to_distressed' => false,
+                'distressed_season' => 'autumn',
+                'distressed_program_year' => '2026',
+                'distressed_variation_ids' => [],
+                'distressed_product_ids' => [],
+                'distressed_refreshed_at' => '',
             ],
             'together20' => [
                 'id' => 'together20',
@@ -93,6 +99,12 @@ if (!function_exists('intersoccer_get_default_campaign_offers')) {
                 'group_field_error' => $joining_error,
                 'exclusive_with' => [],
                 'coupon_id' => 0,
+                'restrict_to_distressed' => false,
+                'distressed_season' => 'autumn',
+                'distressed_program_year' => '2026',
+                'distressed_variation_ids' => [],
+                'distressed_product_ids' => [],
+                'distressed_refreshed_at' => '',
             ],
         ];
     }
@@ -200,6 +212,14 @@ if (!function_exists('intersoccer_normalize_campaign_offer')) {
             'group_field_error' => sanitize_text_field($offer['group_field_error'] ?? ''),
             'exclusive_with' => $exclusive,
             'coupon_id' => absint($offer['coupon_id'] ?? 0),
+            'restrict_to_distressed' => !empty($offer['restrict_to_distressed']),
+            'distressed_season' => sanitize_title((string) ($offer['distressed_season'] ?? '')),
+            'distressed_program_year' => function_exists('intersoccer_pm_normalize_program_year')
+                ? intersoccer_pm_normalize_program_year($offer['distressed_program_year'] ?? '')
+                : preg_replace('/\D+/', '', (string) ($offer['distressed_program_year'] ?? '')),
+            'distressed_variation_ids' => intersoccer_campaign_parse_id_list($offer['distressed_variation_ids'] ?? []),
+            'distressed_product_ids' => intersoccer_campaign_parse_id_list($offer['distressed_product_ids'] ?? []),
+            'distressed_refreshed_at' => sanitize_text_field((string) ($offer['distressed_refreshed_at'] ?? '')),
         ];
     }
 }
@@ -340,30 +360,119 @@ if (!function_exists('intersoccer_campaign_offer_in_window')) {
     }
 }
 
-if (!function_exists('intersoccer_campaign_product_is_eligible')) {
+if (!function_exists('intersoccer_campaign_resolve_line_ids')) {
     /**
-     * Empty allowlists mean all products except exclusions.
+     * Split a product/variation ID pair for eligibility.
      *
-     * @param array $offer
-     * @param int   $product_id Parent product ID
-     * @param array<int,int> $category_ids
-     * @param array<int,int> $tag_ids
+     * @param int $product_id
+     * @param int $variation_id
+     * @return array{product_id:int,variation_id:int}
+     */
+    function intersoccer_campaign_resolve_line_ids($product_id, $variation_id = 0) {
+        $product_id = (int) $product_id;
+        $variation_id = (int) $variation_id;
+
+        if ($variation_id <= 0 && $product_id > 0 && function_exists('wc_get_product')) {
+            $product = wc_get_product($product_id);
+            if ($product && method_exists($product, 'is_type') && $product->is_type('variation')) {
+                $variation_id = $product_id;
+                $product_id = method_exists($product, 'get_parent_id') ? (int) $product->get_parent_id() : 0;
+            }
+        }
+
+        return [
+            'product_id' => $product_id,
+            'variation_id' => $variation_id,
+        ];
+    }
+}
+
+if (!function_exists('intersoccer_campaign_snapshot_distressed_events')) {
+    /**
+     * Consume RR Final Numbers Critical/Low variation IDs. Does not invent bands.
+     *
+     * @param string $season
+     * @param string $program_year
+     * @return array{variation_ids:array<int,int>,product_ids:array<int,int>,available:bool}
+     */
+    function intersoccer_campaign_snapshot_distressed_events($season, $program_year) {
+        $empty = [
+            'variation_ids' => [],
+            'product_ids' => [],
+            'available' => false,
+        ];
+        if (!function_exists('intersoccer_reports_distressed_variation_ids')) {
+            return $empty;
+        }
+        $result = intersoccer_reports_distressed_variation_ids($season, $program_year);
+        if (!is_array($result)) {
+            return $empty;
+        }
+        return [
+            'variation_ids' => intersoccer_campaign_parse_id_list($result['variation_ids'] ?? []),
+            'product_ids' => intersoccer_campaign_parse_id_list($result['product_ids'] ?? []),
+            'available' => true,
+        ];
+    }
+}
+
+if (!function_exists('intersoccer_campaign_distressed_api_available')) {
+    /**
      * @return bool
      */
-    function intersoccer_campaign_product_is_eligible(array $offer, $product_id, array $category_ids = [], array $tag_ids = []) {
-        $product_id = (int) $product_id;
-        if ($product_id <= 0) {
+    function intersoccer_campaign_distressed_api_available() {
+        return function_exists('intersoccer_reports_distressed_variation_ids');
+    }
+}
+
+if (!function_exists('intersoccer_campaign_product_is_eligible')) {
+    /**
+     * Empty product allowlist means all products except exclusions, unless
+     * Restrict to distressed events is on (then the snapshot is required).
+     *
+     * Accepts a variation ID so venue/week SKUs can be targeted.
+     *
+     * @param array          $offer
+     * @param int            $product_id   Parent product ID, or a variation ID when $variation_id is 0.
+     * @param array<int,int> $category_ids
+     * @param array<int,int> $tag_ids
+     * @param int            $variation_id Variation ID (venue/week SKU).
+     * @return bool
+     */
+    function intersoccer_campaign_product_is_eligible(array $offer, $product_id, array $category_ids = [], array $tag_ids = [], $variation_id = 0) {
+        $ids = intersoccer_campaign_resolve_line_ids($product_id, $variation_id);
+        $product_id = $ids['product_id'];
+        $variation_id = $ids['variation_id'];
+        if ($product_id <= 0 && $variation_id <= 0) {
             return false;
         }
 
         $excluded_ids = array_map('intval', $offer['excluded_product_ids'] ?? []);
-        if (in_array($product_id, $excluded_ids, true)) {
+        if ($product_id > 0 && in_array($product_id, $excluded_ids, true)) {
+            return false;
+        }
+        if ($variation_id > 0 && in_array($variation_id, $excluded_ids, true)) {
             return false;
         }
 
         $excluded_cats = array_map('intval', $offer['excluded_product_categories'] ?? []);
         if ($excluded_cats && array_intersect($category_ids, $excluded_cats)) {
             return false;
+        }
+
+        if (!empty($offer['restrict_to_distressed'])) {
+            $snap_vars = array_map('intval', $offer['distressed_variation_ids'] ?? []);
+            $snap_prods = array_map('intval', $offer['distressed_product_ids'] ?? []);
+            if ($snap_vars === [] && $snap_prods === []) {
+                return false;
+            }
+            if ($variation_id > 0) {
+                if (!in_array($variation_id, $snap_vars, true)) {
+                    return false;
+                }
+            } elseif ($product_id <= 0 || !in_array($product_id, $snap_prods, true)) {
+                return false;
+            }
         }
 
         $allow_ids = array_map('intval', $offer['product_ids'] ?? []);
@@ -374,7 +483,10 @@ if (!function_exists('intersoccer_campaign_product_is_eligible')) {
             return true;
         }
 
-        if ($allow_ids && in_array($product_id, $allow_ids, true)) {
+        if ($allow_ids && $product_id > 0 && in_array($product_id, $allow_ids, true)) {
+            return true;
+        }
+        if ($allow_ids && $variation_id > 0 && in_array($variation_id, $allow_ids, true)) {
             return true;
         }
         if ($allow_cats && array_intersect($category_ids, $allow_cats)) {
@@ -631,7 +743,11 @@ if (!function_exists('intersoccer_campaign_sync_coupon')) {
         $coupon->set_discount_type('percent');
         $coupon->set_amount(floatval($offer['percent']));
         $coupon->set_individual_use(false);
-        $coupon->set_product_ids($offer['product_ids']);
+        $coupon_product_ids = $offer['product_ids'];
+        if (!empty($offer['restrict_to_distressed'])) {
+            $coupon_product_ids = array_map('intval', $offer['distressed_variation_ids'] ?? []);
+        }
+        $coupon->set_product_ids($coupon_product_ids);
         $coupon->set_excluded_product_ids($offer['excluded_product_ids']);
         $coupon->set_product_categories($offer['product_categories']);
         $coupon->set_excluded_product_categories($offer['excluded_product_categories']);
@@ -675,7 +791,63 @@ if (!function_exists('intersoccer_campaign_coupon_is_valid')) {
         if (!intersoccer_campaign_offer_in_window($offer)) {
             return false;
         }
+        if (!empty($offer['restrict_to_distressed'])) {
+            $snap_vars = array_map('intval', $offer['distressed_variation_ids'] ?? []);
+            $snap_prods = array_map('intval', $offer['distressed_product_ids'] ?? []);
+            if ($snap_vars === [] && $snap_prods === []) {
+                return false;
+            }
+        }
         return $valid;
+    }
+}
+
+if (!function_exists('intersoccer_campaign_coupon_is_valid_for_product')) {
+    /**
+     * Restrict campaign coupons to snapshot variation IDs when distressed is on.
+     *
+     * @param bool        $valid
+     * @param WC_Product  $product
+     * @param WC_Coupon   $coupon
+     * @param array|null  $values
+     * @return bool
+     */
+    function intersoccer_campaign_coupon_is_valid_for_product($valid, $product, $coupon = null, $values = null) {
+        if (!$valid) {
+            return $valid;
+        }
+        $code = (is_object($coupon) && method_exists($coupon, 'get_code')) ? $coupon->get_code() : '';
+        if (!intersoccer_is_campaign_coupon_code($code)) {
+            return $valid;
+        }
+        $offer = intersoccer_find_campaign_offer_by_code($code);
+        if (!$offer) {
+            return $valid;
+        }
+
+        $product_id = 0;
+        $variation_id = 0;
+        if (is_object($product) && method_exists($product, 'get_id')) {
+            if (method_exists($product, 'is_type') && $product->is_type('variation')) {
+                $variation_id = (int) $product->get_id();
+                $product_id = method_exists($product, 'get_parent_id') ? (int) $product->get_parent_id() : 0;
+            } else {
+                $product_id = (int) $product->get_id();
+            }
+        }
+        if (is_array($values)) {
+            if ($product_id <= 0 && !empty($values['product_id'])) {
+                $product_id = (int) $values['product_id'];
+            }
+            if ($variation_id <= 0 && !empty($values['variation_id'])) {
+                $variation_id = (int) $values['variation_id'];
+            }
+        }
+
+        $category_ids = $product_id > 0 ? intersoccer_campaign_term_ids_for_product($product_id, 'product_cat') : [];
+        $tag_ids = $product_id > 0 ? intersoccer_campaign_term_ids_for_product($product_id, 'product_tag') : [];
+
+        return intersoccer_campaign_product_is_eligible($offer, $product_id, $category_ids, $tag_ids, $variation_id);
     }
 }
 
@@ -712,6 +884,7 @@ if (!function_exists('intersoccer_campaign_translate')) {
 }
 
 add_filter('woocommerce_coupon_is_valid', 'intersoccer_campaign_coupon_is_valid', 10, 3);
+add_filter('woocommerce_coupon_is_valid_for_product', 'intersoccer_campaign_coupon_is_valid_for_product', 10, 4);
 add_filter('intersoccer_referral_first_order_discount_percent', 'intersoccer_campaign_filter_first_order_percent', 10, 2);
 
 add_action('init', 'intersoccer_campaign_register_wpml_strings', 20);

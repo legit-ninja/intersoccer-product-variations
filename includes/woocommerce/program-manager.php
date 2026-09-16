@@ -2505,9 +2505,6 @@ class InterSoccer_Program_Manager {
 		$allowed_status = function_exists('intersoccer_pm_is_allowed_product_status')
 			? intersoccer_pm_is_allowed_product_status($status)
 			: in_array((string) $status, ['draft', 'publish', 'private'], true);
-		if ($allowed_status) {
-			$product->set_status($status);
-		}
 
 		$existing_attributes = $product->get_attributes();
 		foreach ($attrs_raw as $taxonomy => $slugs) {
@@ -2543,6 +2540,37 @@ class InterSoccer_Program_Manager {
 		$product->set_attributes($existing_attributes);
 		$product->save();
 		wc_delete_product_transients($product_id);
+
+		if ($allowed_status && $status === 'publish') {
+			$completeness = self::get_product_completeness($product_id);
+			$missing = is_array($completeness['parent_missing'] ?? null) ? $completeness['parent_missing'] : [];
+			if (!empty($missing)) {
+				wp_send_json_error([
+					'message' => sprintf(
+						/* translators: %s: comma-separated attribute slugs */
+						__('Publish blocked. Required parent attributes are missing: %s. Drafts may be incomplete.', 'intersoccer-product-variations'),
+						implode(', ', $missing)
+					),
+					'parent_missing' => $missing,
+					'status' => $product->get_status(),
+				]);
+			}
+			$shape_errors = function_exists('intersoccer_attr_product_term_shape_violations')
+				? intersoccer_attr_product_term_shape_violations($product)
+				: [];
+			if (!empty($shape_errors)) {
+				wp_send_json_error([
+					'message' => __('Publish blocked. Assigned terms violate the taxonomy standard.', 'intersoccer-product-variations'),
+					'term_shape_errors' => $shape_errors,
+					'status' => $product->get_status(),
+				]);
+			}
+		}
+
+		if ($allowed_status) {
+			$product->set_status($status);
+			$product->save();
+		}
 
 		if ($allowed_status && function_exists('intersoccer_sync_product_status_to_translations')) {
 			intersoccer_sync_product_status_to_translations($product_id, $status);
@@ -2914,7 +2942,29 @@ class InterSoccer_Program_Manager {
 			wp_send_json_error(['message' => __('Term name is required.', 'intersoccer-product-variations')]);
 		}
 
-		$result = wp_insert_term($term_name, $taxonomy);
+		$validated = function_exists('intersoccer_attr_validate_new_term')
+			? intersoccer_attr_validate_new_term($taxonomy, $term_name)
+			: true;
+		if (is_wp_error($validated)) {
+			wp_send_json_error(['message' => $validated->get_error_message()]);
+		}
+
+		$insert_args = [];
+		if (function_exists('intersoccer_attr_english_term_slug')) {
+			$en_slug = intersoccer_attr_english_term_slug($term_name);
+			if ($en_slug !== '') {
+				$insert_args['slug'] = $en_slug;
+			}
+		}
+		if ($taxonomy === 'pa_program-year' && function_exists('intersoccer_pm_normalize_program_year')) {
+			$bare_year = intersoccer_pm_normalize_program_year($term_name);
+			if ($bare_year !== '' && preg_match('/^20\d{2}$/', $term_name)) {
+				$term_name = $bare_year;
+				$insert_args['slug'] = $bare_year;
+			}
+		}
+
+		$result = wp_insert_term($term_name, $taxonomy, $insert_args);
 		if (is_wp_error($result)) {
 			wp_send_json_error(['message' => $result->get_error_message()]);
 		}

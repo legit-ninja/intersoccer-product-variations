@@ -101,7 +101,7 @@ Display labels (`Activity Type`, `Booking Type`, …) remain for humans and may 
 | `_camp_end_date` / `Camp End Date` | `Y-m-d` |
 | `_camp_week_index` / `Camp Week Index` | 1-based integer, product/season-scoped |
 
-**Writer status:** Readers in reports-rosters (`intersoccer_get_canonical_order_meta_field_map()`, RosterBuilder, Campaign `FacetNormalizer`) are ready. Product Variations must dual-write these keys at checkout/repair; until then RR normalizes display labels in one place only.
+**Writer status:** Product Variations dual-writes these keys at checkout/repair via `intersoccer_write_order_line_meta()`. Readers in reports-rosters (`intersoccer_get_canonical_order_meta_field_map()`, RosterBuilder, Campaign `FacetNormalizer`) prefer them and keep display-label aliases for old orders.
 
 **Contract rules:**
 
