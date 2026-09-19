@@ -312,6 +312,10 @@ function intersoccer_resolve_order_assigned_player($user_id, array $cart_values,
 /**
  * Apply attendee snapshot fields to order meta updates.
  *
+ * Dual-writes underscore-prefixed keys (`_assigned_player`, `_assigned_player_id`)
+ * alongside bare keys for new orders. RR readers can migrate to underscore keys
+ * while bare keys remain for backward compatibility.
+ *
  * @param array<string,mixed> $updates     Meta updates (by reference).
  * @param array<string,mixed> $cart_values Cart values.
  * @param array<string,mixed> $resolved    From intersoccer_resolve_order_assigned_player().
@@ -324,9 +328,11 @@ function intersoccer_apply_assigned_player_order_meta(array &$updates, array $ca
         }
         if ($resolved['index'] !== null) {
             $updates['assigned_player'] = $resolved['index'];
+            $updates['_assigned_player'] = $resolved['index'];
         }
         if ($resolved['player_id'] !== '') {
             $updates['assigned_player_id'] = $resolved['player_id'];
+            $updates['_assigned_player_id'] = $resolved['player_id'];
         }
         return;
     }
@@ -339,9 +345,11 @@ function intersoccer_apply_assigned_player_order_meta(array &$updates, array $ca
 
     if ($resolved['index'] !== null) {
         $updates['assigned_player'] = $resolved['index'];
+        $updates['_assigned_player'] = $resolved['index'];
     }
     if ($resolved['player_id'] !== '') {
         $updates['assigned_player_id'] = $resolved['player_id'];
+        $updates['_assigned_player_id'] = $resolved['player_id'];
     }
 
     $updates['Attendee DOB'] = $details['dob'] !== '' ? $details['dob'] : null;
@@ -1471,3 +1479,103 @@ function intersoccer_normalize_legacy_order_meta_keys($item) {
 
     return $changed;
 }
+
+/**
+ * Meta keys that must be hidden from customer-facing order surfaces.
+ *
+ * These include internal player identifiers, taxonomy attribute keys,
+ * and legacy PM keys that should only be visible to admin/reports.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_order_meta_hidden_customer_keys() {
+    static $keys = null;
+    if ($keys !== null) {
+        return $keys;
+    }
+
+    $keys = [
+        'assigned_player',
+        'assigned_player_id',
+        'Player Index',
+        'intersoccer_player_index',
+    ];
+
+    return apply_filters('intersoccer_order_meta_hidden_customer_keys', $keys);
+}
+
+/**
+ * Patterns for meta keys to hide from customer-facing display.
+ *
+ * Matches attribute_pa_* and optionally bare pa_* taxonomy keys.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_order_meta_hidden_customer_patterns() {
+    return [
+        '/^attribute_pa_/',
+        '/^pa_[a-z]/',
+    ];
+}
+
+/**
+ * Check if a meta key should be hidden from customer-facing order display.
+ *
+ * @param string $key Meta key to check.
+ * @return bool
+ */
+function intersoccer_is_hidden_customer_order_meta_key($key) {
+    $key = (string) $key;
+
+    $hidden_keys = intersoccer_order_meta_hidden_customer_keys();
+    if (in_array($key, $hidden_keys, true)) {
+        return true;
+    }
+
+    foreach (intersoccer_order_meta_hidden_customer_patterns() as $pattern) {
+        if (preg_match($pattern, $key)) {
+            return true;
+        }
+    }
+
+    if (strpos($key, '_') === 0) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Filter order item formatted meta for customer-facing surfaces.
+ *
+ * Hides internal keys (assigned_player*, attribute_pa_*, underscore-prefixed)
+ * from thank-you page, order emails, and My Account order views.
+ *
+ * Does NOT affect admin order views or reports-rosters raw meta reads.
+ *
+ * @param array<int,object> $formatted_meta Array of formatted meta objects.
+ * @param WC_Order_Item     $item           Order item.
+ * @return array<int,object>
+ */
+function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+
+    if (is_admin() && !wp_doing_ajax()) {
+        return $formatted_meta;
+    }
+
+    $filtered = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        if ($key === '' || intersoccer_is_hidden_customer_order_meta_key($key)) {
+            continue;
+        }
+        $filtered[] = $meta;
+    }
+
+    return $filtered;
+}
+
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);

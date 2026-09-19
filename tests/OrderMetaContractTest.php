@@ -70,6 +70,18 @@ if (!function_exists('absint')) {
     }
 }
 
+if (!function_exists('is_admin')) {
+    function is_admin() {
+        return !empty($GLOBALS['intersoccer_test_is_admin']);
+    }
+}
+
+if (!function_exists('wp_doing_ajax')) {
+    function wp_doing_ajax() {
+        return !empty($GLOBALS['intersoccer_test_doing_ajax']);
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
@@ -656,6 +668,179 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('', $item->get_meta('_camp_start_date', true));
         $this->assertSame('', $item->get_meta('_camp_end_date', true));
         $this->assertSame('', $item->get_meta('_camp_week_index', true));
+    }
+
+    public function test_hidden_customer_keys_includes_player_and_legacy_pm_keys() {
+        $keys = intersoccer_order_meta_hidden_customer_keys();
+        $this->assertContains('assigned_player', $keys);
+        $this->assertContains('assigned_player_id', $keys);
+        $this->assertContains('Player Index', $keys);
+        $this->assertContains('intersoccer_player_index', $keys);
+    }
+
+    public function test_is_hidden_customer_meta_detects_assigned_player_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('assigned_player'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('assigned_player_id'));
+    }
+
+    public function test_is_hidden_customer_meta_detects_attribute_pa_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('attribute_pa_age-group'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('attribute_pa_intersoccer-venues'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('attribute_pa_booking-type'));
+    }
+
+    public function test_is_hidden_customer_meta_detects_bare_pa_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('pa_age-group'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('pa_intersoccer-venues'));
+    }
+
+    public function test_is_hidden_customer_meta_detects_underscore_prefixed_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('_camp_start_date'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('_intersoccer_canonical_activity_type'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('_assigned_player'));
+    }
+
+    public function test_is_hidden_customer_meta_detects_legacy_pm_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Player Index'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('intersoccer_player_index'));
+    }
+
+    public function test_is_hidden_customer_meta_allows_human_display_keys() {
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Activity Type'));
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Assigned Attendee'));
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Attendee DOB'));
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Sites InterSoccer'));
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Camp Start Date'));
+        $this->assertFalse(intersoccer_is_hidden_customer_order_meta_key('Booking Type'));
+    }
+
+    public function test_filter_customer_order_item_meta_hides_internal_keys() {
+        $formatted_meta = [
+            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Test Child'],
+            (object) ['key' => 'assigned_player', 'display_key' => 'assigned_player', 'value' => '1'],
+            (object) ['key' => 'assigned_player_id', 'display_key' => 'assigned_player_id', 'value' => 'uuid-123'],
+            (object) ['key' => 'attribute_pa_age-group', 'display_key' => 'Age Group', 'value' => '5-13y'],
+            (object) ['key' => 'pa_intersoccer-venues', 'display_key' => 'Venues', 'value' => 'geneva'],
+            (object) ['key' => '_camp_start_date', 'display_key' => 'Camp Start', 'value' => '2026-07-27'],
+            (object) ['key' => 'Sites InterSoccer', 'display_key' => 'Sites InterSoccer', 'value' => 'Geneva'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_customer_order_item_meta($formatted_meta, $item);
+
+        $visible_keys = array_map(fn($m) => $m->key, $filtered);
+
+        $this->assertContains('Activity Type', $visible_keys);
+        $this->assertContains('Assigned Attendee', $visible_keys);
+        $this->assertContains('Sites InterSoccer', $visible_keys);
+
+        $this->assertNotContains('assigned_player', $visible_keys);
+        $this->assertNotContains('assigned_player_id', $visible_keys);
+        $this->assertNotContains('attribute_pa_age-group', $visible_keys);
+        $this->assertNotContains('pa_intersoccer-venues', $visible_keys);
+        $this->assertNotContains('_camp_start_date', $visible_keys);
+    }
+
+    public function test_filter_customer_order_item_meta_preserves_order() {
+        $formatted_meta = [
+            (object) ['key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => 'assigned_player', 'value' => '1'],
+            (object) ['key' => 'Assigned Attendee', 'value' => 'Child'],
+            (object) ['key' => 'attribute_pa_age-group', 'value' => '5-13y'],
+            (object) ['key' => 'Camp Start Date', 'value' => '2026-07-27'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_customer_order_item_meta($formatted_meta, $item);
+
+        $this->assertCount(3, $filtered);
+        $this->assertSame('Activity Type', $filtered[0]->key);
+        $this->assertSame('Assigned Attendee', $filtered[1]->key);
+        $this->assertSame('Camp Start Date', $filtered[2]->key);
+    }
+
+    public function test_apply_assigned_player_dual_writes_underscore_keys() {
+        $updates = [];
+        $cart_values = [
+            'assigned_attendee' => 'Test Child',
+        ];
+        $resolved = [
+            'index' => 2,
+            'player_id' => 'uuid-dual-write-test',
+            'details' => [
+                'name' => 'Test Child',
+                'dob' => '2015-03-10',
+                'gender' => 'Male',
+                'medical_conditions' => 'None',
+            ],
+        ];
+
+        intersoccer_apply_assigned_player_order_meta($updates, $cart_values, $resolved);
+
+        $this->assertArrayHasKey('assigned_player', $updates);
+        $this->assertArrayHasKey('_assigned_player', $updates);
+        $this->assertSame(2, $updates['assigned_player']);
+        $this->assertSame(2, $updates['_assigned_player']);
+
+        $this->assertArrayHasKey('assigned_player_id', $updates);
+        $this->assertArrayHasKey('_assigned_player_id', $updates);
+        $this->assertSame('uuid-dual-write-test', $updates['assigned_player_id']);
+        $this->assertSame('uuid-dual-write-test', $updates['_assigned_player_id']);
+    }
+
+    public function test_apply_assigned_player_dual_writes_without_details() {
+        $updates = [];
+        $cart_values = [];
+        $resolved = [
+            'index' => 1,
+            'player_id' => 'uuid-no-details',
+            'details' => null,
+        ];
+
+        intersoccer_apply_assigned_player_order_meta($updates, $cart_values, $resolved);
+
+        $this->assertArrayHasKey('assigned_player', $updates);
+        $this->assertArrayHasKey('_assigned_player', $updates);
+        $this->assertSame(1, $updates['assigned_player']);
+        $this->assertSame(1, $updates['_assigned_player']);
+
+        $this->assertArrayHasKey('assigned_player_id', $updates);
+        $this->assertArrayHasKey('_assigned_player_id', $updates);
+        $this->assertSame('uuid-no-details', $updates['assigned_player_id']);
+        $this->assertSame('uuid-no-details', $updates['_assigned_player_id']);
+    }
+
+    public function test_underscore_assigned_player_keys_hidden_from_customer() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('_assigned_player'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('_assigned_player_id'));
+    }
+
+    public function test_checkout_write_includes_dual_underscore_player_keys() {
+        $GLOBALS['intersoccer_test_player_details'] = [
+            'name' => 'Dual Write Child',
+            'dob' => '2016-05-20',
+            'gender' => 'Female',
+            'medical_conditions' => '',
+            'player_id' => 'pid-dual-checkout',
+        ];
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'assigned_player' => 1,
+            ],
+            'order' => new WC_Order(42),
+        ]);
+
+        $updates = $built['updates'];
+        $this->assertArrayHasKey('assigned_player', $updates);
+        $this->assertArrayHasKey('_assigned_player', $updates);
+        $this->assertSame($updates['assigned_player'], $updates['_assigned_player']);
+
+        unset($GLOBALS['intersoccer_test_player_details']);
     }
 
 }
