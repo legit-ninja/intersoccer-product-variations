@@ -74,14 +74,14 @@ class InterSoccer_Program_Manager {
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/program-manager.css',
 			[],
-			'2.8.3.3'
+			'2.8.4.0'
 		);
 
 		wp_enqueue_script(
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
 			['jquery'],
-			'2.8.3.3',
+			'2.8.4.0',
 			true
 		);
 
@@ -121,6 +121,19 @@ class InterSoccer_Program_Manager {
 				'confirm_disable_selected' => __('Disable the selected variations? They will no longer be purchasable on the storefront.', 'intersoccer-product-variations'),
 				'select_variations' => __('Select one or more variations first.', 'intersoccer-product-variations'),
 				'disabled_count'    => __('Disabled %d variation(s).', 'intersoccer-product-variations'),
+				'bulk_duplicate_next_steps' => __('Next steps for your Drafts:', 'intersoccer-product-variations'),
+				'bulk_duplicate_step_edit'  => __('Edit dates &amp; prices', 'intersoccer-product-variations'),
+				'bulk_duplicate_step_wpml'  => __('Sync WPML', 'intersoccer-product-variations'),
+				'bulk_duplicate_step_publish' => __('Publish', 'intersoccer-product-variations'),
+				'bulk_duplicate_drafts_created' => __('Drafts created:', 'intersoccer-product-variations'),
+				'bulk_duplicate_drafts_count' => __('%1$d Drafts created.', 'intersoccer-product-variations'),
+				'bulk_duplicate_reload'     => __('Reload list', 'intersoccer-product-variations'),
+				'bulk_duplicate_open_first' => __('Open first Draft', 'intersoccer-product-variations'),
+				'bulk_duplicate_variations_missing' => __('%1$d variation(s) missing', 'intersoccer-product-variations'),
+				'bulk_duplicate_scaffold_cta' => __('Scaffold?', 'intersoccer-product-variations'),
+				'bulk_scaffolding'          => __('Scaffolding…', 'intersoccer-product-variations'),
+				'bulk_scaffolding_progress' => __('Scaffolding %1$d of %2$d…', 'intersoccer-product-variations'),
+				'bulk_scaffold_done'        => __('Scaffolded %1$d of %2$d', 'intersoccer-product-variations'),
 			],
 		]);
 	}
@@ -613,11 +626,14 @@ class InterSoccer_Program_Manager {
 							<?php if (!is_wp_error($season_terms)) : foreach ($season_terms as $term) : ?>
 								<option value="<?php echo esc_attr($term->slug); ?>"><?php echo esc_html($term->name); ?></option>
 							<?php endforeach; endif; ?>
-						</select>
-					</label>
-				</div>
+					</select>
+				</label>
+				<span class="intersoccer-pm-bulk-year-roll-helper description" data-testid="pm-bulk-duplicate-helper" style="display: block; margin-top: 6px; color: #646970;">
+					<?php esc_html_e('Creates Draft clones. Then edit dates & prices, Sync WPML, Publish.', 'intersoccer-product-variations'); ?>
+				</span>
+			</div>
 
-				<?php $table->display(); ?>
+			<?php $table->display(); ?>
 			</form>
 		</div>
 		<?php
@@ -698,6 +714,19 @@ class InterSoccer_Program_Manager {
 				</button>
 				<span id="intersoccer-pm-status-save-msg" style="margin-left:8px;"></span>
 			</p>
+
+			<?php if ($post_status === 'draft') : ?>
+			<div class="intersoccer-pm-draft-lifecycle-banner notice notice-info inline" data-testid="pm-draft-lifecycle-banner" style="margin: 0 0 20px; padding: 12px 16px; border-left-color: #2271b1;">
+				<p style="margin: 0; font-size: 13px; color: #1d2327;">
+					<strong><?php esc_html_e('Year-roll lifecycle:', 'intersoccer-product-variations'); ?></strong>
+					<span style="margin-left: 8px;">
+						<span class="intersoccer-pm-lifecycle-step" style="margin-right: 12px;">1&#xFE0F;&#x20E3; <?php esc_html_e('Edit schedule/prices', 'intersoccer-product-variations'); ?></span>
+						<span class="intersoccer-pm-lifecycle-step" style="margin-right: 12px;">2&#xFE0F;&#x20E3; <?php esc_html_e('Sync WPML', 'intersoccer-product-variations'); ?></span>
+						<span class="intersoccer-pm-lifecycle-step">3&#xFE0F;&#x20E3; <?php esc_html_e('Publish', 'intersoccer-product-variations'); ?></span>
+					</span>
+				</p>
+			</div>
+			<?php endif; ?>
 
 			<h2><?php esc_html_e('Parent Attributes', 'intersoccer-product-variations'); ?></h2>
 			<?php
@@ -2443,9 +2472,21 @@ class InterSoccer_Program_Manager {
 				]);
 			}
 
+			$new_product = wc_get_product((int) $new_id);
+			$new_product_name = ($new_product && method_exists($new_product, 'get_name')) ? $new_product->get_name() : '';
+			$new_product_detail_url = add_query_arg([
+				'post_type'  => 'product',
+				'page'       => self::PAGE_SLUG,
+				'product_id' => (int) $new_id,
+			], admin_url('edit.php'));
+			$new_variations_count = ($new_product && method_exists($new_product, 'get_children')) ? count($new_product->get_children()) : 0;
+
 			return array_merge($base, [
-				'new_product_id' => (int) $new_id,
-				'message'        => sprintf(
+				'new_product_id'         => (int) $new_id,
+				'new_product_name'       => $new_product_name,
+				'new_product_detail_url' => $new_product_detail_url,
+				'variations_missing'     => $new_variations_count === 0,
+				'message'                => sprintf(
 					/* translators: 1: source product ID, 2: new product ID, 3: year */
 					__('Duplicated #%1$d → #%2$d (year %3$s).', 'intersoccer-product-variations'),
 					$product_id,
