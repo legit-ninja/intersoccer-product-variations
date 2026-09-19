@@ -14,6 +14,26 @@ Canonical order item metadata for InterSoccer bookings. **Writer:** `intersoccer
 
 Deprecated keys (strip on repair): `Variation ID`, `Base Price`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`.
 
+## Hidden from customer surfaces
+
+The `woocommerce_order_item_get_formatted_meta_data` filter hides internal keys from thank-you page, order emails, and My Account order views. Admin order views and reports-rosters raw meta reads are **not** affected.
+
+### Hidden key list
+
+| Key / pattern | Reason |
+|---------------|--------|
+| `assigned_player` | Legacy player index — internal reference |
+| `assigned_player_id` | Player UUID — internal reference |
+| `_assigned_player` | Underscore dual-write of legacy index |
+| `_assigned_player_id` | Underscore dual-write of UUID |
+| `Player Index` | Soft-STAMP PM legacy key |
+| `intersoccer_player_index` | Soft-STAMP PM legacy key |
+| `attribute_pa_*` | WooCommerce taxonomy keys (duplicate human labels) |
+| `pa_*` | Bare taxonomy keys |
+| `_*` (any underscore-prefixed) | Internal/canonical keys |
+
+Filter function: `intersoccer_filter_customer_order_item_meta()`. Extensible via `intersoccer_order_meta_hidden_customer_keys` filter.
+
 ## Write path
 
 1. Checkout: `intersoccer_write_order_line_meta()` with `mode => checkout`
@@ -48,7 +68,14 @@ Legacy admin URLs `intersoccer-update-orders` and `intersoccer-automated-updates
 2. **Product Variations → WooCommerce → Order Meta Repair** — Scan & preview or Automated batch (prune ON); resolves `assigned_player_id` from live PM data when only legacy `assigned_player` index exists.
 3. **Reports & Rosters → Reconcile Rosters** — refresh roster DB for affected date range (separate post-step; RR code unchanged).
 
-Dual-write during transition: new checkouts write both `assigned_player_id` and legacy `assigned_player`. Readers (RR `PlayerMatcher`) prefer UUID, then index fallback.
+Dual-write during transition: new checkouts write both `assigned_player_id` and legacy `assigned_player`, plus underscore-prefixed twins (`_assigned_player`, `_assigned_player_id`). Readers (RR `PlayerMatcher`) prefer UUID, then index fallback. Underscore keys are hidden from customer display and can become the primary keys once RR readers migrate.
+
+### Player key migration path
+
+1. **Current (dual-write):** Checkout writes `assigned_player`, `_assigned_player`, `assigned_player_id`, `_assigned_player_id`.
+2. **Customer display filter:** Hides bare `assigned_player*` and underscore `_assigned_player*` from thank-you/emails/My Account.
+3. **RR migration:** Update RR readers to prefer `_assigned_player*` keys.
+4. **Full cutover:** Stop writing bare `assigned_player*` keys; underscore keys become sole source of truth.
 
 ## Tool responsibilities
 
