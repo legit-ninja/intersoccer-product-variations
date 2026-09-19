@@ -7,6 +7,7 @@
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
+ * Update URI: https://plugins.underdogunlimited.com
  */
 
 // Prevent direct access
