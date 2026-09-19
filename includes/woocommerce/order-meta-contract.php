@@ -1471,3 +1471,102 @@ function intersoccer_normalize_legacy_order_meta_keys($item) {
 
     return $changed;
 }
+
+/**
+ * Meta keys hidden from customer-facing displays (thank-you, emails, My Account).
+ *
+ * These are internal tracking keys or PII that should not appear on customer surfaces.
+ * Reports and roster tools can still read raw meta directly.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_hidden_customer_meta_keys() {
+    static $keys = null;
+    if ($keys !== null) {
+        return $keys;
+    }
+
+    $keys = [
+        'assigned_player',
+        'assigned_player_id',
+        '_assigned_player',
+        '_assigned_player_id',
+        'Player Index',
+        'intersoccer_player_index',
+    ];
+
+    return apply_filters('intersoccer_hidden_customer_meta_keys', $keys);
+}
+
+/**
+ * Meta key patterns hidden from customer-facing displays.
+ *
+ * Uses preg_match patterns. These cover attribute_pa_*, pa_*, and underscore-prefixed
+ * internal keys that should not be shown to customers.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_hidden_customer_meta_patterns() {
+    static $patterns = null;
+    if ($patterns !== null) {
+        return $patterns;
+    }
+
+    $patterns = [
+        '/^attribute_pa_/',
+        '/^pa_/',
+        '/^_intersoccer_/',
+        '/^_camp_/',
+    ];
+
+    return apply_filters('intersoccer_hidden_customer_meta_patterns', $patterns);
+}
+
+/**
+ * Whether a meta key should be hidden from customer-facing displays.
+ *
+ * @param string $key Meta key to check.
+ * @return bool True if the key should be hidden.
+ */
+function intersoccer_is_hidden_customer_meta_key($key) {
+    $key = (string) $key;
+
+    if (in_array($key, intersoccer_hidden_customer_meta_keys(), true)) {
+        return true;
+    }
+
+    foreach (intersoccer_hidden_customer_meta_patterns() as $pattern) {
+        if (preg_match($pattern, $key)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Filter formatted order item meta to hide internal/PII keys from customers.
+ *
+ * Hooks into woocommerce_order_item_get_formatted_meta_data to remove keys that
+ * should not appear on thank-you pages, order emails, or My Account order views.
+ *
+ * @param array<int,object> $formatted_meta Array of meta objects with display_key, display_value, value.
+ * @param WC_Order_Item     $item           The order item.
+ * @return array<int,object>
+ */
+function intersoccer_filter_order_item_formatted_meta($formatted_meta, $item) {
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+
+    $filtered = [];
+    foreach ($formatted_meta as $meta_id => $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        if ($key === '' || !intersoccer_is_hidden_customer_meta_key($key)) {
+            $filtered[$meta_id] = $meta;
+        }
+    }
+
+    return $filtered;
+}
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_order_item_formatted_meta', 10, 2);

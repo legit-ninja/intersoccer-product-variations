@@ -658,4 +658,170 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('', $item->get_meta('_camp_week_index', true));
     }
 
+    public function test_hidden_customer_meta_keys_include_assigned_player_keys() {
+        $keys = intersoccer_hidden_customer_meta_keys();
+        $this->assertContains('assigned_player', $keys);
+        $this->assertContains('assigned_player_id', $keys);
+        $this->assertContains('_assigned_player', $keys);
+        $this->assertContains('_assigned_player_id', $keys);
+        $this->assertContains('Player Index', $keys);
+        $this->assertContains('intersoccer_player_index', $keys);
+    }
+
+    public function test_hidden_customer_meta_patterns_cover_internal_prefixes() {
+        $patterns = intersoccer_hidden_customer_meta_patterns();
+        $this->assertNotEmpty($patterns);
+
+        $matched_attribute = false;
+        $matched_pa = false;
+        $matched_intersoccer = false;
+        $matched_camp = false;
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, 'attribute_pa_booking-type')) {
+                $matched_attribute = true;
+            }
+            if (preg_match($pattern, 'pa_intersoccer-venues')) {
+                $matched_pa = true;
+            }
+            if (preg_match($pattern, '_intersoccer_canonical_activity_type')) {
+                $matched_intersoccer = true;
+            }
+            if (preg_match($pattern, '_camp_start_date')) {
+                $matched_camp = true;
+            }
+        }
+
+        $this->assertTrue($matched_attribute, 'Pattern should match attribute_pa_* keys');
+        $this->assertTrue($matched_pa, 'Pattern should match pa_* keys');
+        $this->assertTrue($matched_intersoccer, 'Pattern should match _intersoccer_* keys');
+        $this->assertTrue($matched_camp, 'Pattern should match _camp_* keys');
+    }
+
+    public function test_is_hidden_customer_meta_key_returns_true_for_exact_keys() {
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('assigned_player'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('assigned_player_id'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('_assigned_player'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('Player Index'));
+    }
+
+    public function test_is_hidden_customer_meta_key_returns_true_for_pattern_matches() {
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('attribute_pa_age-group'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('attribute_pa_booking-type'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('pa_intersoccer-venues'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('pa_camp-terms'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('_intersoccer_canonical_venue'));
+        $this->assertTrue(intersoccer_is_hidden_customer_meta_key('_camp_week_index'));
+    }
+
+    public function test_is_hidden_customer_meta_key_returns_false_for_display_keys() {
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Activity Type'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Assigned Attendee'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Booking Type'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Sites InterSoccer'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Camp Start Date'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Attendee DOB'));
+        $this->assertFalse(intersoccer_is_hidden_customer_meta_key('Attendee Gender'));
+    }
+
+    public function test_filter_order_item_formatted_meta_hides_internal_keys() {
+        $formatted_meta = [
+            1 => (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp', 'display_value' => 'Camp'],
+            2 => (object) ['key' => 'assigned_player', 'display_key' => 'assigned_player', 'value' => '0', 'display_value' => '0'],
+            3 => (object) ['key' => 'assigned_player_id', 'display_key' => 'assigned_player_id', 'value' => 'uuid-123', 'display_value' => 'uuid-123'],
+            4 => (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'John Doe', 'display_value' => 'John Doe'],
+            5 => (object) ['key' => 'attribute_pa_age-group', 'display_key' => 'Age Group', 'value' => '5-8y', 'display_value' => '5-8y'],
+            6 => (object) ['key' => '_intersoccer_canonical_activity_type', 'display_key' => '_intersoccer_canonical_activity_type', 'value' => 'camp', 'display_value' => 'camp'],
+            7 => (object) ['key' => 'Booking Type', 'display_key' => 'Booking Type', 'value' => 'Full Week', 'display_value' => 'Full Week'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta($formatted_meta, $item);
+
+        $this->assertArrayHasKey(1, $filtered, 'Activity Type should be kept');
+        $this->assertArrayNotHasKey(2, $filtered, 'assigned_player should be hidden');
+        $this->assertArrayNotHasKey(3, $filtered, 'assigned_player_id should be hidden');
+        $this->assertArrayHasKey(4, $filtered, 'Assigned Attendee should be kept');
+        $this->assertArrayNotHasKey(5, $filtered, 'attribute_pa_age-group should be hidden');
+        $this->assertArrayNotHasKey(6, $filtered, '_intersoccer_canonical_activity_type should be hidden');
+        $this->assertArrayHasKey(7, $filtered, 'Booking Type should be kept');
+
+        $this->assertCount(3, $filtered);
+    }
+
+    public function test_filter_order_item_formatted_meta_preserves_meta_ids() {
+        $formatted_meta = [
+            42 => (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp', 'display_value' => 'Camp'],
+            99 => (object) ['key' => 'Booking Type', 'display_key' => 'Booking Type', 'value' => 'Full Week', 'display_value' => 'Full Week'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta($formatted_meta, $item);
+
+        $this->assertArrayHasKey(42, $filtered);
+        $this->assertArrayHasKey(99, $filtered);
+    }
+
+    public function test_filter_order_item_formatted_meta_handles_empty_array() {
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta([], $item);
+
+        $this->assertIsArray($filtered);
+        $this->assertEmpty($filtered);
+    }
+
+    public function test_filter_order_item_formatted_meta_handles_non_array_input() {
+        $item = new WC_Order_Item_Product([]);
+        $result = intersoccer_filter_order_item_formatted_meta(null, $item);
+
+        $this->assertNull($result);
+    }
+
+    public function test_filter_hides_underscore_prefixed_assigned_player_keys() {
+        $formatted_meta = [
+            1 => (object) ['key' => '_assigned_player', 'display_key' => '_assigned_player', 'value' => '1', 'display_value' => '1'],
+            2 => (object) ['key' => '_assigned_player_id', 'display_key' => '_assigned_player_id', 'value' => 'uuid', 'display_value' => 'uuid'],
+            3 => (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Jane', 'display_value' => 'Jane'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta($formatted_meta, $item);
+
+        $this->assertArrayNotHasKey(1, $filtered, '_assigned_player should be hidden');
+        $this->assertArrayNotHasKey(2, $filtered, '_assigned_player_id should be hidden');
+        $this->assertArrayHasKey(3, $filtered, 'Assigned Attendee should be kept');
+    }
+
+    public function test_filter_hides_player_index_and_intersoccer_player_index() {
+        $formatted_meta = [
+            1 => (object) ['key' => 'Player Index', 'display_key' => 'Player Index', 'value' => '2', 'display_value' => '2'],
+            2 => (object) ['key' => 'intersoccer_player_index', 'display_key' => 'intersoccer_player_index', 'value' => '2', 'display_value' => '2'],
+            3 => (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Test', 'display_value' => 'Test'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta($formatted_meta, $item);
+
+        $this->assertArrayNotHasKey(1, $filtered, 'Player Index should be hidden');
+        $this->assertArrayNotHasKey(2, $filtered, 'intersoccer_player_index should be hidden');
+        $this->assertArrayHasKey(3, $filtered);
+    }
+
+    public function test_filter_hides_camp_underscore_keys() {
+        $formatted_meta = [
+            1 => (object) ['key' => '_camp_start_date', 'display_key' => '_camp_start_date', 'value' => '2026-07-27', 'display_value' => '2026-07-27'],
+            2 => (object) ['key' => '_camp_end_date', 'display_key' => '_camp_end_date', 'value' => '2026-07-31', 'display_value' => '2026-07-31'],
+            3 => (object) ['key' => '_camp_week_index', 'display_key' => '_camp_week_index', 'value' => '6', 'display_value' => '6'],
+            4 => (object) ['key' => 'Camp Start Date', 'display_key' => 'Camp Start Date', 'value' => '2026-07-27', 'display_value' => 'July 27, 2026'],
+        ];
+
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_order_item_formatted_meta($formatted_meta, $item);
+
+        $this->assertArrayNotHasKey(1, $filtered, '_camp_start_date should be hidden');
+        $this->assertArrayNotHasKey(2, $filtered, '_camp_end_date should be hidden');
+        $this->assertArrayNotHasKey(3, $filtered, '_camp_week_index should be hidden');
+        $this->assertArrayHasKey(4, $filtered, 'Camp Start Date (human label) should be kept');
+    }
+
 }

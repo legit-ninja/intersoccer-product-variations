@@ -14,6 +14,34 @@ Canonical order item metadata for InterSoccer bookings. **Writer:** `intersoccer
 
 Deprecated keys (strip on repair): `Variation ID`, `Base Price`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`.
 
+## Hidden from customer surfaces
+
+The following meta keys are **hidden from customer-facing displays** (thank-you page, order emails, My Account) via the `woocommerce_order_item_get_formatted_meta_data` filter. Reports and roster tools can still read raw meta directly.
+
+**Exact keys hidden:**
+
+| Key | Reason |
+|-----|--------|
+| `assigned_player` | Internal player index (legacy) |
+| `assigned_player_id` | Internal UUID reference |
+| `_assigned_player` | Underscore alias (dual-write) |
+| `_assigned_player_id` | Underscore alias (dual-write) |
+| `Player Index` | Deprecated legacy key |
+| `intersoccer_player_index` | Deprecated legacy key |
+
+**Pattern-matched keys hidden:**
+
+| Pattern | Examples |
+|---------|----------|
+| `attribute_pa_*` | `attribute_pa_age-group`, `attribute_pa_booking-type` |
+| `pa_*` | `pa_intersoccer-venues`, `pa_camp-terms` |
+| `_intersoccer_*` | `_intersoccer_canonical_activity_type`, `_intersoccer_canonical_venue` |
+| `_camp_*` | `_camp_start_date`, `_camp_end_date`, `_camp_week_index` |
+
+Customer-visible display comes from human-readable keys like `Assigned Attendee`, `Activity Type`, `Booking Type`, etc.
+
+Extend via filters: `intersoccer_hidden_customer_meta_keys` (exact keys) and `intersoccer_hidden_customer_meta_patterns` (regex patterns).
+
 ## Write path
 
 1. Checkout: `intersoccer_write_order_line_meta()` with `mode => checkout`
