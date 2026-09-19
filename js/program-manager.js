@@ -893,7 +893,8 @@
 		action: '',
 		opts: {},
 		tallies: { processed: 0, skipped: 0, failed: 0 },
-		messages: []
+		messages: [],
+		createdDrafts: []
 	};
 
 	function pmBulkI18n(key, fallback) {
@@ -1001,14 +1002,160 @@
 		$modal.find('.intersoccer-pm-bulk-progress__summary')
 			.text(summaryParts.join(' '))
 			.prop('hidden', false);
-		$modal.find('#intersoccer-pm-bulk-progress-cancel')
-			.prop('disabled', true)
-			.text(pmBulkI18n('bulk_reloading', 'Reloading…'));
 		pmBulkRun.active = false;
-		setTimeout(function() {
-			window.location.reload();
-		}, 1200);
+
+		var isDuplicateWithDrafts = pmBulkRun.action === 'duplicate_to_year' && pmBulkRun.createdDrafts.length > 0 && !stopped;
+
+		if (isDuplicateWithDrafts) {
+			pmRenderDuplicateNextSteps($modal);
+		} else {
+			$modal.find('#intersoccer-pm-bulk-progress-cancel')
+				.prop('disabled', true)
+				.text(pmBulkI18n('bulk_reloading', 'Reloading…'));
+			setTimeout(function() {
+				window.location.reload();
+			}, 1200);
+		}
 	}
+
+	function pmRenderDuplicateNextSteps($modal) {
+		var $actions = $modal.find('.intersoccer-pm-bulk-progress__actions');
+		$actions.empty();
+
+		var missingVariationsCount = 0;
+		for (var j = 0; j < pmBulkRun.createdDrafts.length; j++) {
+			if (pmBulkRun.createdDrafts[j].variationsMissing) {
+				missingVariationsCount++;
+			}
+		}
+
+		var nextStepsHtml = '<div class="intersoccer-pm-duplicate-next-steps" data-testid="pm-duplicate-next-steps" style="text-align: left; margin: 12px 0;">' +
+			'<p style="margin: 0 0 8px; font-weight: 600;">' + pmBulkI18n('bulk_duplicate_next_steps', 'Next steps for your Drafts:') + '</p>' +
+			'<ol style="margin: 0 0 12px; padding-left: 1.25em; color: #50575e;">' +
+				'<li>' + pmBulkI18n('bulk_duplicate_step_edit', 'Edit dates &amp; prices') + '</li>' +
+				'<li>' + pmBulkI18n('bulk_duplicate_step_wpml', 'Sync WPML') + '</li>' +
+				'<li>' + pmBulkI18n('bulk_duplicate_step_publish', 'Publish') + '</li>' +
+			'</ol>';
+
+		if (missingVariationsCount > 0) {
+			nextStepsHtml += '<div class="intersoccer-pm-scaffold-cta notice notice-warning inline" data-testid="pm-scaffold-cta" style="margin: 0 0 12px; padding: 8px 12px; border-left-color: #dba617;">' +
+				'<p style="margin: 0;">' +
+					pmBulkSprintf(
+						pmBulkI18n('bulk_duplicate_variations_missing', '%1$d variation(s) missing'),
+						missingVariationsCount
+					) +
+					' — <a href="#" id="intersoccer-pm-bulk-scaffold-cta" data-testid="pm-scaffold-cta-link">' +
+					pmBulkI18n('bulk_duplicate_scaffold_cta', 'Scaffold?') +
+					'</a>' +
+				'</p>' +
+			'</div>';
+		}
+
+		if (pmBulkRun.createdDrafts.length > 0 && pmBulkRun.createdDrafts.length <= 10) {
+			nextStepsHtml += '<p style="margin: 0 0 8px;"><strong>' + pmBulkI18n('bulk_duplicate_drafts_created', 'Drafts created:') + '</strong></p>';
+			nextStepsHtml += '<ul class="intersoccer-pm-draft-links" data-testid="pm-draft-links" style="margin: 0 0 12px; padding-left: 1.25em; list-style: disc;">';
+			for (var i = 0; i < pmBulkRun.createdDrafts.length; i++) {
+				var draft = pmBulkRun.createdDrafts[i];
+				if (draft.url) {
+					nextStepsHtml += '<li><a href="' + escHtml(draft.url) + '">' + escHtml(draft.name) + '</a></li>';
+				} else {
+					nextStepsHtml += '<li>' + escHtml(draft.name) + ' (#' + draft.id + ')</li>';
+				}
+			}
+			nextStepsHtml += '</ul>';
+		} else if (pmBulkRun.createdDrafts.length > 10) {
+			nextStepsHtml += '<p style="margin: 0 0 12px; color: #50575e;">' +
+				pmBulkSprintf(pmBulkI18n('bulk_duplicate_drafts_count', '%1$d Drafts created.'), pmBulkRun.createdDrafts.length) +
+				'</p>';
+		}
+		nextStepsHtml += '</div>';
+
+		$actions.append(nextStepsHtml);
+
+		var buttonsHtml = '<div class="intersoccer-pm-duplicate-buttons" style="text-align: right; margin-top: 12px;">' +
+			'<button type="button" class="button" id="intersoccer-pm-bulk-reload" data-testid="pm-bulk-reload-btn">' +
+				pmBulkI18n('bulk_duplicate_reload', 'Reload list') +
+			'</button>';
+
+		if (pmBulkRun.createdDrafts.length > 0 && pmBulkRun.createdDrafts[0].url) {
+			buttonsHtml += ' <a href="' + escHtml(pmBulkRun.createdDrafts[0].url) + '" class="button button-primary" id="intersoccer-pm-bulk-open-first" data-testid="pm-bulk-open-first-btn">' +
+				pmBulkI18n('bulk_duplicate_open_first', 'Open first Draft') +
+			'</a>';
+		}
+		buttonsHtml += '</div>';
+
+		$actions.append(buttonsHtml);
+	}
+
+	$(document).on('click', '#intersoccer-pm-bulk-reload', function() {
+		window.location.reload();
+	});
+
+	$(document).on('click', '#intersoccer-pm-bulk-scaffold-cta', function(e) {
+		e.preventDefault();
+		var $link = $(this);
+		if ($link.hasClass('disabled')) {
+			return;
+		}
+
+		var idsToScaffold = [];
+		for (var i = 0; i < pmBulkRun.createdDrafts.length; i++) {
+			if (pmBulkRun.createdDrafts[i].variationsMissing) {
+				idsToScaffold.push(pmBulkRun.createdDrafts[i].id);
+			}
+		}
+
+		if (idsToScaffold.length === 0) {
+			return;
+		}
+
+		$link.addClass('disabled').css('pointer-events', 'none').text(pmBulkI18n('bulk_scaffolding', 'Scaffolding…'));
+
+		var scaffoldIndex = 0;
+		var scaffoldSuccess = 0;
+		var scaffoldFailed = 0;
+
+		function scaffoldNext() {
+			if (scaffoldIndex >= idsToScaffold.length) {
+				$link.text(pmBulkSprintf(
+					pmBulkI18n('bulk_scaffold_done', 'Scaffolded %1$d of %2$d'),
+					scaffoldSuccess,
+					idsToScaffold.length
+				));
+				for (var k = 0; k < pmBulkRun.createdDrafts.length; k++) {
+					pmBulkRun.createdDrafts[k].variationsMissing = false;
+				}
+				return;
+			}
+
+			var productId = idsToScaffold[scaffoldIndex];
+			$.post(PM.ajax_url, {
+				action: 'intersoccer_pm_bulk_process_one',
+				nonce: PM.nonce,
+				bulk_action: 'scaffold_variations',
+				product_id: productId
+			}).done(function(response) {
+				if (response && response.success && response.data && response.data.outcome !== 'failed') {
+					scaffoldSuccess++;
+				} else {
+					scaffoldFailed++;
+				}
+				scaffoldIndex++;
+				$link.text(pmBulkSprintf(
+					pmBulkI18n('bulk_scaffolding_progress', 'Scaffolding %1$d of %2$d…'),
+					scaffoldIndex,
+					idsToScaffold.length
+				));
+				scaffoldNext();
+			}).fail(function() {
+				scaffoldFailed++;
+				scaffoldIndex++;
+				scaffoldNext();
+			});
+		}
+
+		scaffoldNext();
+	});
 
 	function pmProcessNextBulkItem() {
 		if (pmBulkRun.cancel) {
@@ -1047,6 +1194,14 @@
 					pmBulkRun.tallies.failed++;
 				} else {
 					pmBulkRun.tallies.processed++;
+					if (pmBulkRun.action === 'duplicate_to_year' && data.new_product_id) {
+						pmBulkRun.createdDrafts.push({
+							id: data.new_product_id,
+							name: data.new_product_name || ('#' + data.new_product_id),
+							url: data.new_product_detail_url || '',
+							variationsMissing: !!data.variations_missing
+						});
+					}
 				}
 				if (data.message) {
 					pmBulkRun.messages.push(data.message);
@@ -1088,6 +1243,7 @@
 		pmBulkRun.opts = opts || {};
 		pmBulkRun.tallies = { processed: 0, skipped: 0, failed: 0 };
 		pmBulkRun.messages = [];
+		pmBulkRun.createdDrafts = [];
 
 		$modal.find('.intersoccer-pm-bulk-progress__title').text(pmBulkActionTitle(action));
 		$modal.find('.intersoccer-pm-bulk-progress__summary').prop('hidden', true).text('');
