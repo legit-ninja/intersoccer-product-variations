@@ -22,7 +22,6 @@ function intersoccer_order_meta_deprecated_keys() {
 
     $keys = [
         'Variation ID',
-        'Base Price',
         'Remaining Sessions',
         'Player Index',
         'intersoccer_player_index',

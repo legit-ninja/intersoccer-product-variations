@@ -1322,7 +1322,7 @@ function intersoccer_render_update_orders_page($embedded = false) {
                             <?php _e('Strip Deprecated Metadata', 'intersoccer-product-variations'); ?>
                         </label>
                         <p class="description">
-                            <?php _e('Removes Variation ID, Base Price, Remaining Sessions, and Player Index keys when assigned_player is present.', 'intersoccer-product-variations'); ?>
+                            <?php _e('Removes Variation ID, Remaining Sessions, and Player Index keys when assigned_player is present. Base Price is retained for historical/reporting.', 'intersoccer-product-variations'); ?>
                         </p>
                         <label>
                             <input type="checkbox" name="prune_legacy_twins" value="1" <?php checked($prune_legacy_twins_checked); ?>>

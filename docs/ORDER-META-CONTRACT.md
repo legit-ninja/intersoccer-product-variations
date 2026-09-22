@@ -12,7 +12,7 @@ Canonical order item metadata for InterSoccer bookings. **Writer:** `intersoccer
 | Player display | — | **Assigned Attendee** |
 | Player PII | — | **Attendee DOB**, **Attendee Gender**, **Medical Conditions** |
 
-Deprecated keys (strip on repair): `Variation ID`, `Base Price`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`.
+Deprecated keys (strip on repair): `Variation ID`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`. Note: `Base Price` was removed from this list to retain historical pricing data for reporting.
 
 ## Hidden from customer surfaces
 

@@ -268,8 +268,8 @@ class OrderMetaContractTest extends TestCase {
         $keys = intersoccer_order_meta_deprecated_keys();
         $this->assertContains('Player Index', $keys);
         $this->assertContains('Variation ID', $keys);
-        $this->assertContains('Base Price', $keys);
         $this->assertContains('Remaining Sessions', $keys);
+        $this->assertNotContains('Base Price', $keys, 'Base Price retained for historical/reporting per Jeremy request');
     }
 
     public function test_allowed_keys_include_girls_only_for_camp() {
