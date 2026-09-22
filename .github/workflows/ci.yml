@@ -11,3 +11,5 @@ permissions:
 jobs:
   ci:
     uses: legit-ninja/intersoccer-ci/.github/workflows/php-plugin-ci.yml@main
+    with:
+      php_version: '8.4'
