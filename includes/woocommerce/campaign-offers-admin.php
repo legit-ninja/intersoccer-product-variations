@@ -133,7 +133,7 @@ function intersoccer_enqueue_campaign_offers_admin_assets($hook) {
         'intersoccer-admin-campaign-offers',
         INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/admin-campaign-offers.js',
         ['jquery'],
-        '2.9.2',
+        '2.9.3',
         true
     );
 }
