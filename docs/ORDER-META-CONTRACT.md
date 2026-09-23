@@ -28,6 +28,7 @@ The `woocommerce_order_item_get_formatted_meta_data` filter hides internal keys 
 | `_assigned_player_id` | Underscore dual-write of UUID |
 | `Player Index` | Soft-STAMP PM legacy key |
 | `intersoccer_player_index` | Soft-STAMP PM legacy key |
+| `Camp Week Index` | Internal scheduling data — admin/reports only |
 | `attribute_pa_*` | WooCommerce taxonomy keys (duplicate human labels) |
 | `pa_*` | Bare taxonomy keys |
 | `_*` (any underscore-prefixed) | Internal/canonical keys |
