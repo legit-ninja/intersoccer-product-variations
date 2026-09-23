@@ -12,7 +12,7 @@ Canonical order item metadata for InterSoccer bookings. **Writer:** `intersoccer
 | Player display | — | **Assigned Attendee** |
 | Player PII | — | **Attendee DOB**, **Attendee Gender**, **Medical Conditions** |
 
-Deprecated keys (strip on repair): `Variation ID`, `Base Price`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`.
+Deprecated keys (strip on repair): `Variation ID`, `Remaining Sessions`, `Player Index`, `intersoccer_player_index`. Note: `Base Price` was removed from this list to retain historical pricing data for reporting.
 
 ## Hidden from customer surfaces
 
@@ -28,6 +28,7 @@ The `woocommerce_order_item_get_formatted_meta_data` filter hides internal keys 
 | `_assigned_player_id` | Underscore dual-write of UUID |
 | `Player Index` | Soft-STAMP PM legacy key |
 | `intersoccer_player_index` | Soft-STAMP PM legacy key |
+| `Camp Week Index` | Internal scheduling data — admin/reports only |
 | `attribute_pa_*` | WooCommerce taxonomy keys (duplicate human labels) |
 | `pa_*` | Bare taxonomy keys |
 | `_*` (any underscore-prefixed) | Internal/canonical keys |

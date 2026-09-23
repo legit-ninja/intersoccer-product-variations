@@ -22,7 +22,6 @@ function intersoccer_order_meta_deprecated_keys() {
 
     $keys = [
         'Variation ID',
-        'Base Price',
         'Remaining Sessions',
         'Player Index',
         'intersoccer_player_index',
@@ -1499,6 +1498,7 @@ function intersoccer_order_meta_hidden_customer_keys() {
         'assigned_player_id',
         'Player Index',
         'intersoccer_player_index',
+        'Camp Week Index',
     ];
 
     return apply_filters('intersoccer_order_meta_hidden_customer_keys', $keys);

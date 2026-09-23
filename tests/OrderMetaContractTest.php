@@ -268,8 +268,8 @@ class OrderMetaContractTest extends TestCase {
         $keys = intersoccer_order_meta_deprecated_keys();
         $this->assertContains('Player Index', $keys);
         $this->assertContains('Variation ID', $keys);
-        $this->assertContains('Base Price', $keys);
         $this->assertContains('Remaining Sessions', $keys);
+        $this->assertNotContains('Base Price', $keys, 'Base Price retained for historical/reporting per Jeremy request');
     }
 
     public function test_allowed_keys_include_girls_only_for_camp() {
@@ -676,6 +676,7 @@ class OrderMetaContractTest extends TestCase {
         $this->assertContains('assigned_player_id', $keys);
         $this->assertContains('Player Index', $keys);
         $this->assertContains('intersoccer_player_index', $keys);
+        $this->assertContains('Camp Week Index', $keys, 'Camp Week Index hidden from customers per Jeremy request');
     }
 
     public function test_is_hidden_customer_meta_detects_assigned_player_keys() {
@@ -703,6 +704,18 @@ class OrderMetaContractTest extends TestCase {
     public function test_is_hidden_customer_meta_detects_legacy_pm_keys() {
         $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Player Index'));
         $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('intersoccer_player_index'));
+    }
+
+    public function test_camp_week_index_hidden_from_customers_but_not_deprecated() {
+        $this->assertTrue(
+            intersoccer_is_hidden_customer_order_meta_key('Camp Week Index'),
+            'Camp Week Index should be hidden from customer-facing order surfaces'
+        );
+        $this->assertNotContains(
+            'Camp Week Index',
+            intersoccer_order_meta_deprecated_keys(),
+            'Camp Week Index should NOT be in deprecated keys — data must remain stored for admin/reports'
+        );
     }
 
     public function test_is_hidden_customer_meta_allows_human_display_keys() {
