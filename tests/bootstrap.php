@@ -4,6 +4,11 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', dirname(__DIR__) . '/');
 }
 
+// WordPress constants used by some functions
+if (!defined('OBJECT')) {
+    define('OBJECT', 'OBJECT');
+}
+
 // Load Composer autoloader.
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -597,6 +602,9 @@ if (!function_exists('wc_get_product')) {
         if (isset($GLOBALS['intersoccer_test_products'][$product_id])) {
             return $GLOBALS['intersoccer_test_products'][$product_id];
         }
+        if (isset($GLOBALS['intersoccer_wc_get_product_callback']) && is_callable($GLOBALS['intersoccer_wc_get_product_callback'])) {
+            return call_user_func($GLOBALS['intersoccer_wc_get_product_callback'], $product_id);
+        }
         return new class($product_id) {
             private $id;
             private $price = 100.00;
@@ -607,6 +615,8 @@ if (!function_exists('wc_get_product')) {
             public function get_attributes() { return []; }
             public function get_price() { return $this->price; }
             public function is_type($type) { return $type === 'simple'; }
+            public function get_parent_id() { return 0; }
+            public function get_attribute($name) { return ''; }
         };
     }
 }
