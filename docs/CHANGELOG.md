@@ -5,6 +5,11 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.28] - 2026-09-28
+
+### Changed
+- Calendar version cut covering merged work from #46 (ATC harden / earlier-assign) and #47 (redeclare hotfix).
+
 ## [2.9.4] - 2026-09-23
 
 ### Fixed
