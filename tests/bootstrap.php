@@ -599,11 +599,14 @@ if (!function_exists('wc_get_product')) {
         }
         return new class($product_id) {
             private $id;
+            private $price = 100.00;
             public function __construct($id) { $this->id = (int) $id; }
             public function get_id() { return $this->id; }
             public function get_name() { return $GLOBALS['intersoccer_test_product_name'] ?? ''; }
             public function get_slug() { return sanitize_title($GLOBALS['intersoccer_test_product_name'] ?? ''); }
             public function get_attributes() { return []; }
+            public function get_price() { return $this->price; }
+            public function is_type($type) { return $type === 'simple'; }
         };
     }
 }

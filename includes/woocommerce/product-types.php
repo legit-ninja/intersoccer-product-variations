@@ -416,8 +416,10 @@ function intersoccer_is_course($product_id) {
  * @param int $product_id
  * @return bool
  */
+if (!function_exists('intersoccer_is_birthday')) {
 function intersoccer_is_birthday($product_id) {
     return intersoccer_get_product_type($product_id) === 'birthday';
+}
 }
 
 /**
@@ -427,11 +429,13 @@ function intersoccer_is_birthday($product_id) {
  * @param WC_Product|null $product
  * @return bool
  */
+if (!function_exists('intersoccer_product_has_birthday_signals')) {
 function intersoccer_product_has_birthday_signals($product_id, $product = null) {
     if (!class_exists('InterSoccer_Product_Types')) {
         return false;
     }
     return InterSoccer_Product_Types::product_has_birthday_signals($product_id, $product);
+}
 }
 
 /**
@@ -439,8 +443,10 @@ function intersoccer_product_has_birthday_signals($product_id, $product = null) 
  * @param int $product_id
  * @return bool
  */
+if (!function_exists('intersoccer_is_tournament')) {
 function intersoccer_is_tournament($product_id) {
     return intersoccer_get_product_type($product_id) === 'tournament';
+}
 }
 
 /**
