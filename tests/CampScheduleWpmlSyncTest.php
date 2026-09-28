@@ -122,11 +122,12 @@ class CampScheduleWpmlSyncTest extends TestCase {
 		update_post_meta($this->en_id, '_camp_end_date', '2026-10-09');
 		update_post_meta($this->en_id, '_camp_week_index', 5);
 
-		if (!function_exists('intersoccer_is_camp')) {
-			function intersoccer_is_camp($product_id) {
-				return true;
-			}
+		$parent_id = 9999;
+		if (class_exists('TestProductTypeRegistry')) {
+			TestProductTypeRegistry::set($parent_id, 'camp');
 		}
+		$GLOBALS['intersoccer_test_product_type'] = 'camp';
+
 		if (!function_exists('get_post_type')) {
 			function get_post_type($post_id) {
 				return 'product_variation';
