@@ -94,6 +94,13 @@ class CoursePriceCalculationTest extends TestCase {
                 return date($format);
             }
         }
+
+        $GLOBALS['mock_wc_get_product'] = null;
+    }
+
+    protected function tearDown(): void {
+        $GLOBALS['mock_wc_get_product'] = null;
+        parent::tearDown();
     }
 
     public function testFullPriceCourse() {

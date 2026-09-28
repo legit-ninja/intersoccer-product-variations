@@ -572,6 +572,9 @@ if (!function_exists('get_term_by')) {
 
 if (!function_exists('intersoccer_get_product_type')) {
     function intersoccer_get_product_type($product_id) {
+        if (class_exists('TestProductTypeRegistry') && TestProductTypeRegistry::get($product_id) !== null) {
+            return TestProductTypeRegistry::get($product_id);
+        }
         if (isset($GLOBALS['intersoccer_test_product_type'])) {
             return $GLOBALS['intersoccer_test_product_type'];
         }
@@ -605,6 +608,9 @@ if (!function_exists('wc_get_product')) {
         if (isset($GLOBALS['intersoccer_wc_get_product_callback']) && is_callable($GLOBALS['intersoccer_wc_get_product_callback'])) {
             return call_user_func($GLOBALS['intersoccer_wc_get_product_callback'], $product_id);
         }
+        if (isset($GLOBALS['mock_wc_get_product']) && is_callable($GLOBALS['mock_wc_get_product'])) {
+            return call_user_func($GLOBALS['mock_wc_get_product'], $product_id);
+        }
         return new class($product_id) {
             private $id;
             private $price = 100.00;
@@ -623,6 +629,12 @@ if (!function_exists('wc_get_product')) {
 
 if (!function_exists('wc_get_product_terms')) {
     function wc_get_product_terms($product_id, $taxonomy, $args = []) {
+        return [];
+    }
+}
+
+if (!function_exists('wc_get_orders')) {
+    function wc_get_orders($args = []) {
         return [];
     }
 }
