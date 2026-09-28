@@ -90,86 +90,90 @@ function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, 
     return null;
 }
 
-/**
- * Determine if a product requires an attendee (player) assignment at add-to-cart.
- *
- * The rule: camp, course, and birthday products all require attendee selection.
- * Also matches:
- * - Product attribute intersoccer-requires-attendee = yes
- * - Product category contains camp/course/birthday (term name or slug)
- * - Product name/slug contains camp/course
- *
- * @param int $product_id Parent product ID.
- * @return bool True when an attendee must be assigned.
- */
-function intersoccer_product_requires_attendee($product_id) {
-    $product_id = (int) $product_id;
-    if ($product_id <= 0) {
-        return false;
-    }
+if (!function_exists('intersoccer_product_requires_attendee')) {
+    /**
+     * Determine if a product requires an attendee (player) assignment at add-to-cart.
+     *
+     * The rule: camp, course, and birthday products all require attendee selection.
+     * Also matches:
+     * - Product attribute intersoccer-requires-attendee = yes
+     * - Product category contains camp/course/birthday (term name or slug)
+     * - Product name/slug contains camp/course
+     *
+     * @param int $product_id Parent product ID.
+     * @return bool True when an attendee must be assigned.
+     */
+    function intersoccer_product_requires_attendee($product_id) {
+        $product_id = (int) $product_id;
+        if ($product_id <= 0) {
+            return false;
+        }
 
-    $product_type = intersoccer_get_product_type($product_id);
-    if (in_array($product_type, ['camp', 'course', 'birthday'], true)) {
-        return true;
-    }
+        $product_type = intersoccer_get_product_type($product_id);
+        if (in_array($product_type, ['camp', 'course', 'birthday'], true)) {
+            return true;
+        }
 
-    $product = wc_get_product($product_id);
-    if (!$product) {
-        return false;
-    }
+        $product = wc_get_product($product_id);
+        if (!$product) {
+            return false;
+        }
 
-    $attributes = $product->get_attributes();
-    if (isset($attributes['pa_intersoccer-requires-attendee'])) {
-        $attr = $attributes['pa_intersoccer-requires-attendee'];
-        if ($attr instanceof WC_Product_Attribute) {
-            $options = $attr->get_options();
-            $term_ids = is_array($options) ? $options : [];
-            foreach ($term_ids as $term_id) {
-                $term = get_term($term_id, 'pa_intersoccer-requires-attendee');
-                if ($term && !is_wp_error($term)) {
-                    $slug = strtolower($term->slug);
-                    if ($slug === 'yes' || $slug === 'oui' || $slug === 'ja' || $slug === '1' || $slug === 'true') {
-                        return true;
+        $attributes = $product->get_attributes();
+        if (isset($attributes['pa_intersoccer-requires-attendee'])) {
+            $attr = $attributes['pa_intersoccer-requires-attendee'];
+            if ($attr instanceof WC_Product_Attribute) {
+                $options = $attr->get_options();
+                $term_ids = is_array($options) ? $options : [];
+                foreach ($term_ids as $term_id) {
+                    $term = get_term($term_id, 'pa_intersoccer-requires-attendee');
+                    if ($term && !is_wp_error($term)) {
+                        $slug = strtolower($term->slug);
+                        if ($slug === 'yes' || $slug === 'oui' || $slug === 'ja' || $slug === '1' || $slug === 'true') {
+                            return true;
+                        }
                     }
                 }
             }
         }
-    }
 
-    $categories = wp_get_post_terms($product_id, 'product_cat', ['fields' => 'all']);
-    if (!is_wp_error($categories) && is_array($categories)) {
-        foreach ($categories as $cat) {
-            $hay = strtolower(($cat->slug ?? '') . ' ' . ($cat->name ?? ''));
-            if (preg_match('/\b(camp|course|birthday)\b/i', $hay)) {
-                return true;
+        $categories = wp_get_post_terms($product_id, 'product_cat', ['fields' => 'all']);
+        if (!is_wp_error($categories) && is_array($categories)) {
+            foreach ($categories as $cat) {
+                $hay = strtolower(($cat->slug ?? '') . ' ' . ($cat->name ?? ''));
+                if (preg_match('/\b(camp|course|birthday)\b/i', $hay)) {
+                    return true;
+                }
             }
         }
-    }
 
-    $title = strtolower($product->get_name());
-    $slug = strtolower($product->get_slug());
-    if (preg_match('/\b(camp|course)\b/i', $title) || preg_match('/\b(camp|course)\b/i', $slug)) {
-        return true;
-    }
+        $title = strtolower($product->get_name());
+        $slug = strtolower($product->get_slug());
+        if (preg_match('/\b(camp|course)\b/i', $title) || preg_match('/\b(camp|course)\b/i', $slug)) {
+            return true;
+        }
 
-    return (bool) apply_filters('intersoccer_product_requires_attendee', false, $product_id);
+        return (bool) apply_filters('intersoccer_product_requires_attendee', false, $product_id);
+    }
 }
 
-/**
- * Check if a valid player assignment was posted in the current add-to-cart request.
- *
- * @return bool True when a non-empty player index or ID was posted.
- */
-function intersoccer_has_posted_player_assignment() {
-    foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
-        if (isset($_POST[$field])) {
-            $val = trim((string) wp_unslash($_POST[$field]));
-            if ($val !== '' && $val !== '0') {
-                return true;
+if (!function_exists('intersoccer_has_posted_player_assignment')) {
+    /**
+     * Check if a valid player assignment was posted in the current add-to-cart request.
+     *
+     * @return bool True when a non-empty player index or ID was posted.
+     */
+    function intersoccer_has_posted_player_assignment() {
+        foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
+            if (isset($_POST[$field])) {
+                $val = trim((string) wp_unslash($_POST[$field]));
+                if ($val !== '' && $val !== '0') {
+                    return true;
+                }
             }
         }
+        return false;
     }
-    return false;
 }
 
 /**
