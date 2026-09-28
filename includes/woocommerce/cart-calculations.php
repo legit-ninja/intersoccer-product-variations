@@ -91,6 +91,88 @@ function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, 
 }
 
 /**
+ * Determine if a product requires an attendee (player) assignment at add-to-cart.
+ *
+ * The rule: camp, course, and birthday products all require attendee selection.
+ * Also matches:
+ * - Product attribute intersoccer-requires-attendee = yes
+ * - Product category contains camp/course/birthday (term name or slug)
+ * - Product name/slug contains camp/course
+ *
+ * @param int $product_id Parent product ID.
+ * @return bool True when an attendee must be assigned.
+ */
+function intersoccer_product_requires_attendee($product_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return false;
+    }
+
+    $product_type = intersoccer_get_product_type($product_id);
+    if (in_array($product_type, ['camp', 'course', 'birthday'], true)) {
+        return true;
+    }
+
+    $product = wc_get_product($product_id);
+    if (!$product) {
+        return false;
+    }
+
+    $attributes = $product->get_attributes();
+    if (isset($attributes['pa_intersoccer-requires-attendee'])) {
+        $attr = $attributes['pa_intersoccer-requires-attendee'];
+        if ($attr instanceof WC_Product_Attribute) {
+            $options = $attr->get_options();
+            $term_ids = is_array($options) ? $options : [];
+            foreach ($term_ids as $term_id) {
+                $term = get_term($term_id, 'pa_intersoccer-requires-attendee');
+                if ($term && !is_wp_error($term)) {
+                    $slug = strtolower($term->slug);
+                    if ($slug === 'yes' || $slug === 'oui' || $slug === 'ja' || $slug === '1' || $slug === 'true') {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    $categories = wp_get_post_terms($product_id, 'product_cat', ['fields' => 'all']);
+    if (!is_wp_error($categories) && is_array($categories)) {
+        foreach ($categories as $cat) {
+            $hay = strtolower(($cat->slug ?? '') . ' ' . ($cat->name ?? ''));
+            if (preg_match('/\b(camp|course|birthday)\b/i', $hay)) {
+                return true;
+            }
+        }
+    }
+
+    $title = strtolower($product->get_name());
+    $slug = strtolower($product->get_slug());
+    if (preg_match('/\b(camp|course)\b/i', $title) || preg_match('/\b(camp|course)\b/i', $slug)) {
+        return true;
+    }
+
+    return (bool) apply_filters('intersoccer_product_requires_attendee', false, $product_id);
+}
+
+/**
+ * Check if a valid player assignment was posted in the current add-to-cart request.
+ *
+ * @return bool True when a non-empty player index or ID was posted.
+ */
+function intersoccer_has_posted_player_assignment() {
+    foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
+        if (isset($_POST[$field])) {
+            $val = trim((string) wp_unslash($_POST[$field]));
+            if ($val !== '' && $val !== '0') {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Player index from the add-to-cart request (intersoccer_players array key).
  * Elementor uses player_assignment; variation-details.js syncs assigned_attendee (index or display name).
  *
@@ -268,17 +350,44 @@ function intersoccer_track_add_to_cart($cart_item_key, $product_id, $quantity, $
 }
 
 /**
- * Validate cart item before adding to cart
+ * Validate cart item before adding to cart.
+ *
+ * Server-side hard gate for:
+ * 1. Attendee-required products: guests must log in; logged-in users must select a player.
+ * 2. Single-day camps: at least one day must be selected.
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_cart_item', 10, 6);
 function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variation_id = null, $variations = null, $cart_item_data = null) {
     $product_type = intersoccer_get_product_type($product_id);
-    
-    // Note: Course player assignment validation removed - using default player assignment logic
-    // The cart data handler (intersoccer_add_custom_cart_item_data) processes player_assignment for all products
-    // This matches how camps work - no explicit validation, just let the default handler process it
-    
-    // Check if this is a camp product
+    $requires_attendee = intersoccer_product_requires_attendee($product_id);
+
+    if ($requires_attendee) {
+        $user_id = (int) get_current_user_id();
+
+        if ($user_id <= 0) {
+            $login_url = function_exists('wc_get_account_endpoint_url')
+                ? wc_get_account_endpoint_url('dashboard')
+                : wp_login_url();
+            wc_add_notice(
+                sprintf(
+                    /* translators: %s: login/register URL */
+                    __('Please <a href="%s">log in or register</a> to book this product.', 'intersoccer-product-variations'),
+                    esc_url($login_url)
+                ),
+                'error'
+            );
+            $passed = false;
+            intersoccer_warning('Cart validation failed: guest attempted ATC on attendee-required product ' . $product_id);
+        } elseif (!intersoccer_has_posted_player_assignment()) {
+            wc_add_notice(
+                __('Please select an attendee before adding to cart.', 'intersoccer-product-variations'),
+                'error'
+            );
+            $passed = false;
+            intersoccer_warning('Cart validation failed: no player selected for attendee-required product ' . $product_id);
+        }
+    }
+
     if (!intersoccer_is_camp($product_id)) {
         return $passed;
     }
@@ -305,7 +414,6 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
         ? intersoccer_is_single_day_booking_type($booking_type)
         : false;
 
-    // For single-day camps, require at least one day to be selected
     if ($is_single_day) {
         $camp_days = intersoccer_get_posted_camp_days();
 

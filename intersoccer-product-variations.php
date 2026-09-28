@@ -105,6 +105,8 @@ add_action('init', function () {
             'Select PDF Document',
             'Use this file',
             'Please select at least one day for this single-day camp.',
+            'Please <a href="%s">log in or register</a> to book this product.',
+            'Please select an attendee before adding to cart.',
             'This booking requires a variation; age could not be verified.',
             'The age group for this program could not be read. Please contact us or choose another session.',
             'The program start date could not be determined, so age cannot be verified. Please contact us or try another option.',

@@ -338,6 +338,9 @@ if (!function_exists('is_user_logged_in')) {
 
 if (!function_exists('get_current_user_id')) {
     function get_current_user_id() {
+        if (isset($GLOBALS['intersoccer_test_user_id'])) {
+            return (int) $GLOBALS['intersoccer_test_user_id'];
+        }
         return 1;
     }
 }
@@ -501,6 +504,112 @@ if (!function_exists('get_the_terms')) {
 
 if (!function_exists('wp_list_pluck')) {
     function wp_list_pluck($list, $field, $index_key = null) {
+        return [];
+    }
+}
+
+if (!function_exists('wc_add_notice')) {
+    function wc_add_notice($message, $notice_type = 'success', $data = []) {
+        if (!isset($GLOBALS['wc_notices'])) {
+            $GLOBALS['wc_notices'] = [];
+        }
+        $GLOBALS['wc_notices'][] = [
+            'message' => $message,
+            'type' => $notice_type,
+            'data' => $data,
+        ];
+    }
+}
+
+if (!function_exists('wc_get_account_endpoint_url')) {
+    function wc_get_account_endpoint_url($endpoint) {
+        return 'http://example.com/my-account/' . $endpoint . '/';
+    }
+}
+
+if (!function_exists('wp_login_url')) {
+    function wp_login_url($redirect = '', $force_reauth = false) {
+        return 'http://example.com/wp-login.php';
+    }
+}
+
+if (!function_exists('esc_url')) {
+    function esc_url($url, $protocols = null, $_context = 'display') {
+        return htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash($value) {
+        return is_array($value)
+            ? array_map('wp_unslash', $value)
+            : stripslashes((string) $value);
+    }
+}
+
+if (!function_exists('taxonomy_exists')) {
+    function taxonomy_exists($taxonomy) {
+        return true;
+    }
+}
+
+if (!function_exists('get_term')) {
+    function get_term($term, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        return null;
+    }
+}
+
+if (!function_exists('get_term_by')) {
+    function get_term_by($field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        return false;
+    }
+}
+
+if (!function_exists('intersoccer_get_product_type')) {
+    function intersoccer_get_product_type($product_id) {
+        if (isset($GLOBALS['intersoccer_test_product_type'])) {
+            return $GLOBALS['intersoccer_test_product_type'];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('intersoccer_is_camp')) {
+    function intersoccer_is_camp($product_id) {
+        return intersoccer_get_product_type($product_id) === 'camp';
+    }
+}
+
+if (!function_exists('intersoccer_is_course')) {
+    function intersoccer_is_course($product_id) {
+        return intersoccer_get_product_type($product_id) === 'course';
+    }
+}
+
+if (!function_exists('intersoccer_is_birthday')) {
+    function intersoccer_is_birthday($product_id) {
+        return intersoccer_get_product_type($product_id) === 'birthday';
+    }
+}
+
+if (!function_exists('wc_get_product')) {
+    function wc_get_product($product_id) {
+        if (isset($GLOBALS['intersoccer_test_products'][$product_id])) {
+            return $GLOBALS['intersoccer_test_products'][$product_id];
+        }
+        return new class($product_id) {
+            private $id;
+            public function __construct($id) { $this->id = (int) $id; }
+            public function get_id() { return $this->id; }
+            public function get_name() { return $GLOBALS['intersoccer_test_product_name'] ?? ''; }
+            public function get_slug() { return sanitize_title($GLOBALS['intersoccer_test_product_name'] ?? ''); }
+            public function get_attributes() { return []; }
+        };
+    }
+}
+
+if (!function_exists('wc_get_product_terms')) {
+    function wc_get_product_terms($product_id, $taxonomy, $args = []) {
         return [];
     }
 }
