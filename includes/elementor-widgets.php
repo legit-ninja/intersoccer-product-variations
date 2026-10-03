@@ -657,6 +657,165 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
             }
 
+            /**
+             * Late pickup hidden fields are written onto the primary form, but a sticky or
+             * Elementor duplicate form.cart may be the one that actually submits.
+             * Copy late_pickup_type, late_pickup_cost, and late_pickup_days[] onto that form.
+             */
+            function intersoccerLatePickupProductForms() {
+                var $forms = $('form:not(.search_form)').filter(function () {
+                    return intersoccerPvFormIsForThisProduct($(this));
+                });
+                if ($form && $form.length && (!$forms.length || !$forms.is($form))) {
+                    $forms = $forms.add($form);
+                }
+                return $forms;
+            }
+
+            function intersoccerReadLatePickupRadios($scope) {
+                if (!$scope || !$scope.length) {
+                    return null;
+                }
+                var $radio = $scope.find('input[name="late_pickup_option"]:checked').first();
+                if (!$radio.length) {
+                    return null;
+                }
+                return {
+                    option: String($radio.val() || ''),
+                    days: $scope.find('input[name="late_pickup_single_days[]"]:checked, input.intersoccer-late-pickup-day-checkbox:checked').map(function () {
+                        return $(this).val();
+                    }).get()
+                };
+            }
+
+            function intersoccerResolveLatePickupSelection($preferredForm) {
+                var preferred = intersoccerReadLatePickupRadios($preferredForm);
+                if (preferred && preferred.option && preferred.option !== 'none') {
+                    return preferred;
+                }
+                var fromOther = null;
+                intersoccerLatePickupProductForms().each(function () {
+                    if ($preferredForm && $preferredForm.length && this === $preferredForm[0]) {
+                        return;
+                    }
+                    var read = intersoccerReadLatePickupRadios($(this));
+                    if (read && read.option && read.option !== 'none') {
+                        fromOther = read;
+                        return false;
+                    }
+                });
+                if (fromOther) {
+                    return fromOther;
+                }
+                if (typeof selectedLatePickupOption !== 'undefined' && selectedLatePickupOption) {
+                    return {
+                        option: String(selectedLatePickupOption),
+                        days: (typeof selectedLatePickupDays !== 'undefined' && selectedLatePickupDays) ? selectedLatePickupDays.slice() : []
+                    };
+                }
+                var hidden = null;
+                intersoccerLatePickupProductForms().each(function () {
+                    var type = $(this).find('input[name="late_pickup_type"]').val();
+                    if (type && type !== 'none') {
+                        hidden = {
+                            option: String(type),
+                            days: $(this).find('input[name="late_pickup_days[]"]').map(function () { return $(this).val(); }).get()
+                        };
+                        return false;
+                    }
+                });
+                return hidden || { option: 'none', days: [] };
+            }
+
+            function intersoccerWriteLatePickupFields($targetForm, option, cost, days) {
+                if (!$targetForm || !$targetForm.length) {
+                    return;
+                }
+                $targetForm.find('input[name="late_pickup_type"]').remove();
+                $targetForm.find('input[name="late_pickup_cost"]').remove();
+                $targetForm.find('input[name="late_pickup_days[]"]').remove();
+                if (!option || option === 'none') {
+                    return;
+                }
+                $targetForm.append($('<input>', { type: 'hidden', name: 'late_pickup_type', value: String(option) }));
+                $targetForm.append($('<input>', { type: 'hidden', name: 'late_pickup_cost', value: String(cost) }));
+                (days || []).forEach(function (day) {
+                    $targetForm.append($('<input>', { type: 'hidden', name: 'late_pickup_days[]', value: String(day) }));
+                });
+            }
+
+            function intersoccerLatePickupPayload(selection, settings) {
+                var option = selection && selection.option ? selection.option : 'none';
+                var daysToSend = [];
+                var cost = 0;
+                if (option === 'none') {
+                    return { option: 'none', cost: 0, days: [] };
+                }
+                if (option === 'full-week') {
+                    cost = settings && settings.full_week_cost != null ? settings.full_week_cost : 0;
+                    daysToSend = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                } else if (option === 'single-days') {
+                    daysToSend = (selection.days && selection.days.length) ? selection.days.slice() : [];
+                    if (!daysToSend.length) {
+                        return { option: 'none', cost: 0, days: [] };
+                    }
+                    if (daysToSend.length === 5) {
+                        cost = settings && settings.full_week_cost != null ? settings.full_week_cost : 0;
+                    } else {
+                        cost = settings && settings.per_day_cost != null ? daysToSend.length * settings.per_day_cost : 0;
+                    }
+                } else {
+                    return { option: 'none', cost: 0, days: [] };
+                }
+                return { option: option, cost: cost, days: daysToSend };
+            }
+
+            function intersoccerEnsureLatePickupOnForm($targetForm) {
+                if (!$targetForm || !$targetForm.length) {
+                    return;
+                }
+                if ('<?php echo esc_js($product_type); ?>' !== 'camp') {
+                    return;
+                }
+                var selection = intersoccerResolveLatePickupSelection($targetForm);
+                var variationId = String($targetForm.find('input[name="variation_id"]').val() || '').trim();
+                if (!variationId || variationId === '0') {
+                    variationId = ($form && $form.length) ? String($form.find('input[name="variation_id"]').val() || '').trim() : '';
+                }
+                var settings = (typeof getLatePickupSettings === 'function') ? getLatePickupSettings(variationId) : null;
+                if (!settings && $form && $form.length) {
+                    var primaryVid = String($form.find('input[name="variation_id"]').val() || '').trim();
+                    if (primaryVid && primaryVid !== '0' && typeof getLatePickupSettings === 'function') {
+                        settings = getLatePickupSettings(primaryVid);
+                    }
+                }
+                var payload = intersoccerLatePickupPayload(selection, settings);
+                if (!settings && payload.option !== 'none') {
+                    intersoccerLatePickupProductForms().each(function () {
+                        var $src = $(this);
+                        if (this === $targetForm[0]) {
+                            return;
+                        }
+                        if (String($src.find('input[name="late_pickup_type"]').val() || '') !== payload.option) {
+                            return;
+                        }
+                        var existingCost = $src.find('input[name="late_pickup_cost"]').val();
+                        if (existingCost !== undefined && existingCost !== null && existingCost !== '') {
+                            payload.cost = existingCost;
+                        }
+                        var existingDays = $src.find('input[name="late_pickup_days[]"]').map(function () { return $(this).val(); }).get();
+                        if (existingDays.length) {
+                            payload.days = existingDays;
+                        }
+                        return false;
+                    });
+                }
+                intersoccerWriteLatePickupFields($targetForm, payload.option, payload.cost, payload.days);
+                if (payload.option !== 'none') {
+                    debug('InterSoccer: intersoccerEnsureLatePickupOnForm attached', payload.option, 'cost', payload.cost, 'days', payload.days);
+                }
+            }
+
             function intersoccerEnsureVariationIdOnForm($targetForm) {
                 if (!$targetForm || !$targetForm.length) {
                     return;
@@ -1653,58 +1812,28 @@ $intersoccer_elementor_product_page_cb = function () {
             }
             
             function updateLatePickupFormData(settings) {
-                // Remove any existing late pickup hidden inputs
-                $form.find('input[name="late_pickup_type"]').remove();
-                $form.find('input[name="late_pickup_cost"]').remove();
-                $form.find('input[name="late_pickup_days[]"]').remove();
-                
-                // If "none" is selected, don't add any form data
-                if (selectedLatePickupOption === 'none') {
-                    debug('InterSoccer Late Pickup: No option selected, not adding form data');
-                    return;
-                }
-                
-                // Calculate cost based on selection
-                var cost;
-                var daysToSend = [];
-                
-                if (selectedLatePickupOption === 'full-week') {
-                    cost = settings.full_week_cost;
-                    daysToSend = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-                } else if (selectedLatePickupOption === 'single-days') {
-                    // Use selected days from checkboxes
-                    var dayCount = selectedLatePickupDays.length;
-                    
-                    if (dayCount === 0) {
-                        debug('InterSoccer Late Pickup: Single days selected but no days checked, not adding form data');
-                        return;
-                    }
-                    
-                    // Use full week price if 5 days selected
-                    if (dayCount === 5) {
-                        cost = settings.full_week_cost;
-                    } else {
-                        cost = dayCount * settings.per_day_cost;
-                    }
-                    
-                    daysToSend = selectedLatePickupDays;
-                } else {
+                var selection = {
+                    option: selectedLatePickupOption,
+                    days: selectedLatePickupDays
+                };
+                var payload = intersoccerLatePickupPayload(selection, settings);
+                if (payload.option === 'none' && selectedLatePickupOption === 'single-days') {
+                    debug('InterSoccer Late Pickup: Single days selected but no days checked, not adding form data');
+                } else if (payload.option === 'none' && selectedLatePickupOption !== 'none' && selectedLatePickupOption !== 'single-days') {
                     debug('InterSoccer Late Pickup: Invalid option, not adding form data');
-                    return;
+                } else if (payload.option === 'none') {
+                    debug('InterSoccer Late Pickup: No option selected, not adding form data');
                 }
-                
-                // Add hidden input for late pickup type (CRITICAL - server needs this to process late pickup)
-                $form.append('<input type="hidden" name="late_pickup_type" value="' + selectedLatePickupOption + '">');
-                
-                // Add hidden input for cost
-                $form.append('<input type="hidden" name="late_pickup_cost" value="' + cost + '">');
-                
-                // Add hidden inputs for each day
-                daysToSend.forEach(function(day) {
-                    $form.append('<input type="hidden" name="late_pickup_days[]" value="' + day + '">');
+                var $targets = intersoccerLatePickupProductForms();
+                if (!$targets.length) {
+                    $targets = $form;
+                }
+                $targets.each(function () {
+                    intersoccerWriteLatePickupFields($(this), payload.option, payload.cost, payload.days);
                 });
-                
-                debug('InterSoccer Late Pickup: Added form data - type:', selectedLatePickupOption, 'cost:', cost, 'days:', daysToSend);
+                if (payload.option !== 'none') {
+                    debug('InterSoccer Late Pickup: Added form data - type:', payload.option, 'cost:', payload.cost, 'days:', payload.days, 'forms:', $targets.length);
+                }
             }
 
             // Button state update handler - ensures player selection is required for ALL products (body: syncs with product-enhancer triggers)
@@ -1884,6 +2013,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 intersoccerEnsurePlayerIndexOnForm($productForm);
                 intersoccerEnsureCampDaysOnForm($productForm);
+                intersoccerEnsureLatePickupOnForm($productForm);
                 intersoccerEnsureVariationIdOnForm($productForm);
                 intersoccerEnsureVariationAttributesOnForm($productForm);
 
@@ -2121,6 +2251,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 intersoccerEnsurePlayerIndexOnForm($productForm);
                 intersoccerEnsureCampDaysOnForm($productForm);
+                intersoccerEnsureLatePickupOnForm($productForm);
                 intersoccerEnsureVariationIdOnForm($productForm);
                 intersoccerEnsureVariationAttributesOnForm($productForm);
 
