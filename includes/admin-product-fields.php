@@ -151,12 +151,27 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
  * @param array  $holiday_dates
  * @return string Y-m-d, or empty when the date cannot be calculated.
  */
+function intersoccer_validated_course_start_date($start_date) {
+    if (!is_string($start_date)) {
+        return '';
+    }
+    $start_date = trim($start_date);
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) && strtotime($start_date)) {
+        return $start_date;
+    }
+    return '';
+}
+
 function intersoccer_end_date_for_course_variation($variation_id, $parent_id, $start_date, $total_weeks, $holiday_dates) {
     if (!class_exists('InterSoccer_Course_Schedule_Calculator') || !class_exists('InterSoccer_Course_Context')) {
         return '';
     }
     if (!is_array($holiday_dates)) {
         $holiday_dates = [];
+    }
+    $start_date = intersoccer_validated_course_start_date($start_date);
+    if ($start_date === '') {
+        return '';
     }
     $context = new InterSoccer_Course_Context(
         (int) $parent_id,
@@ -165,11 +180,89 @@ function intersoccer_end_date_for_course_variation($variation_id, $parent_id, $s
         0.0,
         max(0, (int) $total_weeks),
         0.0,
-        $start_date ? (string) $start_date : null,
+        $start_date,
         array_values($holiday_dates)
     );
     $end_date = (new InterSoccer_Course_Schedule_Calculator())->calculate_end_date($context);
     return $end_date ? (string) $end_date : '';
+}
+
+/**
+ * Keep a previously stored end date when the calculator cannot produce one.
+ * Does not rewrite orders.
+ *
+ * @param int    $variation_id
+ * @param string $calculated
+ * @return string
+ */
+function intersoccer_course_end_date_to_store($variation_id, $calculated) {
+    if (is_string($calculated) && $calculated !== '') {
+        return $calculated;
+    }
+    $existing = get_post_meta($variation_id, '_end_date', true);
+    if (function_exists('intersoccer_warning')) {
+        intersoccer_warning('Course end date could not be calculated for variation ' . (int) $variation_id . '. Keeping the existing end date.');
+    }
+    return is_string($existing) ? $existing : '';
+}
+
+/**
+ * Sessions from the start date through the end date, using the variation course day.
+ *
+ * @param int    $variation_id
+ * @param int    $parent_id
+ * @param string $start_date
+ * @param array  $holiday_dates
+ * @param string $end_date
+ * @return int|null Null when the span cannot be counted.
+ */
+function intersoccer_count_course_sessions_through($variation_id, $parent_id, $start_date, $holiday_dates, $end_date) {
+    if (!class_exists('InterSoccer_Course_Schedule_Calculator') || !class_exists('InterSoccer_Course_Context')) {
+        return null;
+    }
+    if (!is_array($holiday_dates)) {
+        $holiday_dates = [];
+    }
+    $start_date = intersoccer_validated_course_start_date($start_date);
+    $end_date = intersoccer_validated_course_start_date($end_date);
+    if ($start_date === '' || $end_date === '') {
+        return null;
+    }
+    $context = new InterSoccer_Course_Context(
+        (int) $parent_id,
+        (int) $variation_id,
+        (int) $variation_id,
+        0.0,
+        1,
+        0.0,
+        $start_date,
+        array_values($holiday_dates)
+    );
+    $course_day = (new InterSoccer_Course_Schedule_Calculator())->get_course_day($context);
+    if (!$course_day) {
+        return null;
+    }
+    $holiday_set = array_flip($holiday_dates);
+    try {
+        $current = new DateTime($start_date);
+        $end = new DateTime($end_date);
+    } catch (Exception $e) {
+        return null;
+    }
+    if ($end < $current) {
+        return 0;
+    }
+    $sessions = 0;
+    $guard = 0;
+    while ($current <= $end && $guard < 4000) {
+        $day = $current->format('Y-m-d');
+        if ((int) $current->format('N') === (int) $course_day && !isset($holiday_set[$day])) {
+            $sessions++;
+        }
+        $current->add(new DateInterval('P1D'));
+        $guard++;
+    }
+    return $sessions;
 }
 
 // Save custom fields
@@ -207,9 +300,11 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
         return;
     }
 
+    $start_date = intersoccer_validated_course_start_date((string) get_post_meta($variation_id, '_course_start_date', true));
     if (isset($_POST['_course_start_date'][$loop])) {
-        $start_date = sanitize_text_field($_POST['_course_start_date'][$loop]);
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) && strtotime($start_date)) {
+        $posted_start = intersoccer_validated_course_start_date(sanitize_text_field($_POST['_course_start_date'][$loop]));
+        if ($posted_start !== '') {
+            $start_date = $posted_start;
             update_post_meta($variation_id, '_course_start_date', $start_date);
         }
     }
@@ -238,9 +333,16 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
     // Use this variation's course day and include the start date. Parent day terms and
     // calculate_course_end_date() skip the start day and can pick the wrong weekday.
     $parent_id = (int) wp_get_post_parent_id($variation_id);
-    $start_for_end = isset($start_date) ? $start_date : get_post_meta($variation_id, '_course_start_date', true);
+    $start_for_end = intersoccer_validated_course_start_date(isset($start_date) ? $start_date : '');
     $weeks_for_end = isset($total_weeks) ? (int) $total_weeks : (int) get_post_meta($variation_id, '_course_total_weeks', true);
-    $end_date = intersoccer_end_date_for_course_variation($variation_id, $parent_id, $start_for_end, $weeks_for_end, $holiday_dates);
+    $calculated_end = intersoccer_end_date_for_course_variation($variation_id, $parent_id, $start_for_end, $weeks_for_end, $holiday_dates);
+    $end_date = intersoccer_course_end_date_to_store($variation_id, $calculated_end);
+    if ($calculated_end !== '' && $weeks_for_end > 0) {
+        $sessions_covered = intersoccer_count_course_sessions_through($variation_id, $parent_id, $start_for_end, $holiday_dates, $calculated_end);
+        if ($sessions_covered !== null && $sessions_covered < $weeks_for_end && function_exists('intersoccer_warning')) {
+            intersoccer_warning('Course end date for variation ' . (int) $variation_id . ' covers ' . $sessions_covered . ' of ' . $weeks_for_end . ' sessions. The schedule search stopped before every session was counted.');
+        }
+    }
     update_post_meta($variation_id, '_end_date', $end_date);
 
     // IMPORTANT: We do NOT automatically set the Regular Price here

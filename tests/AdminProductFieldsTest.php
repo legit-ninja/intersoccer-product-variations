@@ -324,4 +324,40 @@ class AdminProductFieldsTest extends TestCase {
         $this->assertSame('2026-02-04', $wednesday_with_holiday, 'A holiday on a course day extends the end date');
     }
 
+
+    public function testMalformedStartDateIsNotPassedToTheCalculator() {
+        require_once dirname(__DIR__) . '/includes/admin-product-fields.php';
+
+        $this->assertSame('', intersoccer_validated_course_start_date('13/01/2026'));
+        $this->assertSame('', intersoccer_validated_course_start_date('not-a-date'));
+        $this->assertSame('2026-01-05', intersoccer_validated_course_start_date('2026-01-05'));
+        $this->assertSame(
+            '',
+            intersoccer_end_date_for_course_variation(9102, 9100, '13/01/2026', 4, [])
+        );
+    }
+
+    public function testEmptyCalculationKeepsTheStoredEndDate() {
+        require_once dirname(__DIR__) . '/includes/admin-product-fields.php';
+
+        $variation_id = 9103;
+        update_post_meta($variation_id, '_end_date', '2026-06-01');
+
+        $this->assertSame('2026-06-01', intersoccer_course_end_date_to_store($variation_id, ''));
+        $this->assertSame('2026-01-26', intersoccer_course_end_date_to_store($variation_id, '2026-01-26'));
+    }
+
+    public function testShortScheduleIsDetectedWhenHolidaysExceedTheSearchWindow() {
+        require_once dirname(__DIR__) . '/includes/admin-product-fields.php';
+
+        $variation_id = 9104;
+        update_post_meta($variation_id, 'attribute_pa_course-day', 'wednesday');
+        $holidays = ['2026-01-14', '2026-01-21', '2026-01-28'];
+        $end = intersoccer_end_date_for_course_variation($variation_id, 9100, '2026-01-05', 2, $holidays);
+        $this->assertNotSame('', $end);
+        $covered = intersoccer_count_course_sessions_through($variation_id, 9100, '2026-01-05', $holidays, $end);
+        $this->assertNotNull($covered);
+        $this->assertLessThan(2, $covered, 'The search window should stop before both sessions are counted');
+    }
+
 }
