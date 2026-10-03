@@ -138,6 +138,40 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
     <?php
 }
 
+
+/**
+ * Course end date for one variation.
+ * Reads attribute_pa_course-day on the variation and counts the start date as a session.
+ * Does not update orders.
+ *
+ * @param int    $variation_id
+ * @param int    $parent_id
+ * @param string $start_date
+ * @param int    $total_weeks
+ * @param array  $holiday_dates
+ * @return string Y-m-d, or empty when the date cannot be calculated.
+ */
+function intersoccer_end_date_for_course_variation($variation_id, $parent_id, $start_date, $total_weeks, $holiday_dates) {
+    if (!class_exists('InterSoccer_Course_Schedule_Calculator') || !class_exists('InterSoccer_Course_Context')) {
+        return '';
+    }
+    if (!is_array($holiday_dates)) {
+        $holiday_dates = [];
+    }
+    $context = new InterSoccer_Course_Context(
+        (int) $parent_id,
+        (int) $variation_id,
+        (int) $variation_id,
+        0.0,
+        max(0, (int) $total_weeks),
+        0.0,
+        $start_date ? (string) $start_date : null,
+        array_values($holiday_dates)
+    );
+    $end_date = (new InterSoccer_Course_Schedule_Calculator())->calculate_end_date($context);
+    return $end_date ? (string) $end_date : '';
+}
+
 // Save custom fields
 add_action('woocommerce_save_product_variation', 'intersoccer_save_course_variation_fields', 10, 2);
 function intersoccer_save_course_variation_fields($variation_id, $loop)
@@ -201,30 +235,12 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
     }
     update_post_meta($variation_id, '_course_holiday_dates', array_unique($holiday_dates)); // Unique to avoid duplicates
 
-    // Get course days (from pa_days-of-week or pa_course-day)
-    $parent_id = wp_get_post_parent_id($variation_id);
-    $course_days = [];
-    // Prefer canonical slugs for deterministic ordering so behavior is language-agnostic.
-    $day_slugs = wc_get_product_terms($parent_id, 'pa_days-of-week', ['fields' => 'slugs']);
-    if (!empty($day_slugs)) {
-        $canonical = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        $ordered_slugs = array_values(array_intersect($canonical, $day_slugs));
-        foreach ($ordered_slugs as $slug) {
-            $term = get_term_by('slug', $slug, 'pa_days-of-week');
-            if ($term && !is_wp_error($term)) {
-                $course_days[] = $term->name;
-            }
-        }
-    } else {
-        $names = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'names']);
-        if (!empty($names)) {
-            $course_days = $names;
-        } else {
-            $course_days = ['Monday']; // Fallback
-        }
-    }
-
-    $end_date = calculate_course_end_date($variation_id, $start_date, $total_weeks, $holiday_dates, $course_days);
+    // Use this variation's course day and include the start date. Parent day terms and
+    // calculate_course_end_date() skip the start day and can pick the wrong weekday.
+    $parent_id = (int) wp_get_post_parent_id($variation_id);
+    $start_for_end = isset($start_date) ? $start_date : get_post_meta($variation_id, '_course_start_date', true);
+    $weeks_for_end = isset($total_weeks) ? (int) $total_weeks : (int) get_post_meta($variation_id, '_course_total_weeks', true);
+    $end_date = intersoccer_end_date_for_course_variation($variation_id, $parent_id, $start_for_end, $weeks_for_end, $holiday_dates);
     update_post_meta($variation_id, '_end_date', $end_date);
 
     // IMPORTANT: We do NOT automatically set the Regular Price here

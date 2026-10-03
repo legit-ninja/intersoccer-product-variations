@@ -293,5 +293,35 @@ class AdminProductFieldsTest extends TestCase {
             $this->assertTrue((bool)$is_valid, "{$date} should be valid format");
         }
     }
-}
 
+    /**
+     * Admin save must use the variation course day and count the start date.
+     * Monday 2026-01-05, four Monday sessions, ends 2026-01-26 (not 2026-02-02).
+     * The same start with a Wednesday variation ends 2026-01-28.
+     * A holiday on the second Wednesday pushes four sessions out to 2026-02-04.
+     */
+    public function testSavedCourseEndDateUsesVariationDayAndIncludesStart() {
+        require_once dirname(__DIR__) . '/includes/admin-product-fields.php';
+
+        $parent_id = 9100;
+        $monday_variation = 9101;
+        $wednesday_variation = 9102;
+        update_post_meta($monday_variation, 'attribute_pa_course-day', 'monday');
+        update_post_meta($wednesday_variation, 'attribute_pa_course-day', 'wednesday');
+
+        $monday_end = intersoccer_end_date_for_course_variation($monday_variation, $parent_id, '2026-01-05', 4, []);
+        $wednesday_end = intersoccer_end_date_for_course_variation($wednesday_variation, $parent_id, '2026-01-05', 4, []);
+        $wednesday_with_holiday = intersoccer_end_date_for_course_variation(
+            $wednesday_variation,
+            $parent_id,
+            '2026-01-05',
+            4,
+            ['2026-01-14']
+        );
+
+        $this->assertSame('2026-01-26', $monday_end, 'Four Monday sessions starting Monday include the start date');
+        $this->assertSame('2026-01-28', $wednesday_end, 'End date follows the variation course day, not the parent product days');
+        $this->assertSame('2026-02-04', $wednesday_with_holiday, 'A holiday on a course day extends the end date');
+    }
+
+}
