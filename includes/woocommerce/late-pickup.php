@@ -42,22 +42,15 @@ function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variati
     }
 
     intersoccer_debug('InterSoccer Late Pickup: Late pickup IS enabled for this variation');
-    intersoccer_debug('InterSoccer Late Pickup: POST data - late_pickup_cost: ' . (isset($_POST['late_pickup_cost']) ? $_POST['late_pickup_cost'] : 'NOT SET'));
     intersoccer_debug('InterSoccer Late Pickup: POST data - late_pickup_days: ' . (isset($_POST['late_pickup_days']) ? json_encode($_POST['late_pickup_days']) : 'NOT SET'));
 
-    if (isset($_POST['late_pickup_cost'])) {
-        $cart_item_data['late_pickup_cost'] = floatval($_POST['late_pickup_cost']);
-        intersoccer_debug('InterSoccer Late Pickup: Added cost to cart data: ' . $cart_item_data['late_pickup_cost']);
-    }
+    // Cost and base price are computed in cart-calculations.php. Do not trust the request.
     if (isset($_POST['late_pickup_type'])) {
         $cart_item_data['late_pickup_type'] = sanitize_text_field($_POST['late_pickup_type']);
     }
     if (isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days'])) {
         $cart_item_data['late_pickup_days'] = array_map('sanitize_text_field', $_POST['late_pickup_days']);
         intersoccer_debug('InterSoccer Late Pickup: Added days to cart data: ' . json_encode($cart_item_data['late_pickup_days']));
-    }
-    if (isset($_POST['base_price'])) {
-        $cart_item_data['base_price'] = floatval($_POST['base_price']);
     }
     return $cart_item_data;
 }

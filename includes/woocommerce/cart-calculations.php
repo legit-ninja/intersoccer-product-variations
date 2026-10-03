@@ -315,10 +315,20 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         } else {
             $cart_item_data['late_pickup_days'] = [];
         }
-        // Validate late pickup cost server-side
+        // Price is computed here, never from posted late_pickup_cost or base_price.
+        // Five single days use the full-week rate, matching the product page.
         $per_day_cost = floatval(get_option('intersoccer_late_pickup_per_day', 25));
         $full_week_cost = floatval(get_option('intersoccer_late_pickup_full_week', 90));
-        $late_pickup_cost = ($cart_item_data['late_pickup_type'] === 'full-week') ? $full_week_cost : ($cart_item_data['late_pickup_type'] === 'single-days' ? count($cart_item_data['late_pickup_days']) * $per_day_cost : 0);
+        $late_pickup_day_count = count($cart_item_data['late_pickup_days']);
+        if ($cart_item_data['late_pickup_type'] === 'full-week') {
+            $late_pickup_cost = $full_week_cost;
+        } elseif ($cart_item_data['late_pickup_type'] === 'single-days' && $late_pickup_day_count === 5) {
+            $late_pickup_cost = $full_week_cost;
+        } elseif ($cart_item_data['late_pickup_type'] === 'single-days') {
+            $late_pickup_cost = $late_pickup_day_count * $per_day_cost;
+        } else {
+            $late_pickup_cost = 0;
+        }
         $cart_item_data['late_pickup_cost'] = $late_pickup_cost;
     }
 
