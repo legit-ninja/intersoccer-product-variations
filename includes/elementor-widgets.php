@@ -689,8 +689,16 @@ $intersoccer_elementor_product_page_cb = function () {
             }
 
             function intersoccerResolveLatePickupSelection($preferredForm) {
+                // The page's current choice wins, including "none". A stale radio on
+                // another copy of the form must not override an explicit none.
+                if (typeof selectedLatePickupOption !== 'undefined' && selectedLatePickupOption) {
+                    return {
+                        option: String(selectedLatePickupOption),
+                        days: (typeof selectedLatePickupDays !== 'undefined' && selectedLatePickupDays) ? selectedLatePickupDays.slice() : []
+                    };
+                }
                 var preferred = intersoccerReadLatePickupRadios($preferredForm);
-                if (preferred && preferred.option && preferred.option !== 'none') {
+                if (preferred && preferred.option) {
                     return preferred;
                 }
                 var fromOther = null;
@@ -699,7 +707,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         return;
                     }
                     var read = intersoccerReadLatePickupRadios($(this));
-                    if (read && read.option && read.option !== 'none') {
+                    if (read && read.option) {
                         fromOther = read;
                         return false;
                     }
@@ -707,24 +715,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (fromOther) {
                     return fromOther;
                 }
-                if (typeof selectedLatePickupOption !== 'undefined' && selectedLatePickupOption) {
-                    return {
-                        option: String(selectedLatePickupOption),
-                        days: (typeof selectedLatePickupDays !== 'undefined' && selectedLatePickupDays) ? selectedLatePickupDays.slice() : []
-                    };
-                }
-                var hidden = null;
-                intersoccerLatePickupProductForms().each(function () {
-                    var type = $(this).find('input[name="late_pickup_type"]').val();
-                    if (type && type !== 'none') {
-                        hidden = {
-                            option: String(type),
-                            days: $(this).find('input[name="late_pickup_days[]"]').map(function () { return $(this).val(); }).get()
-                        };
-                        return false;
-                    }
-                });
-                return hidden || { option: 'none', days: [] };
+                return { option: 'none', days: [] };
             }
 
             function intersoccerWriteLatePickupFields($targetForm, option, cost, days) {
