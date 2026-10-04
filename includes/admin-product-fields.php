@@ -109,6 +109,7 @@ function intersoccer_add_course_variation_fields($loop, $variation_data, $variat
             <?php endforeach; ?>
         </div>
         <button type="button" class="button intersoccer-add-holiday" data-variation-loop="<?php echo esc_attr($loop); ?>"><?php esc_html_e('Add Holiday Date', 'intersoccer-product-variations'); ?></button>
+        <input type="hidden" name="intersoccer_holiday_dates_present[<?php echo esc_attr($loop); ?>]" value="1" />
     </div>
     <script>
         jQuery(document).ready(function($) {
@@ -265,6 +266,43 @@ function intersoccer_count_course_sessions_through($variation_id, $parent_id, $s
     return $sessions;
 }
 
+
+function intersoccer_course_holiday_section_was_posted($loop) {
+    $loop = (int) $loop;
+    if (isset($_POST["intersoccer_holiday_dates"][$loop]) && is_array($_POST["intersoccer_holiday_dates"][$loop])) {
+        return true;
+    }
+    return isset($_POST["intersoccer_holiday_dates_present"])
+        && is_array($_POST["intersoccer_holiday_dates_present"])
+        && isset($_POST["intersoccer_holiday_dates_present"][$loop]);
+}
+
+function intersoccer_parse_posted_course_holiday_dates($loop) {
+    $loop = (int) $loop;
+    $holiday_dates = [];
+    if (!isset($_POST["intersoccer_holiday_dates"][$loop]) || !is_array($_POST["intersoccer_holiday_dates"][$loop])) {
+        return $holiday_dates;
+    }
+    foreach ($_POST["intersoccer_holiday_dates"][$loop] as $date) {
+        $sanitized_date = sanitize_text_field($date);
+        if (preg_match("/^\d{4}-\d{2}-\d{2}$/", $sanitized_date) && strtotime($sanitized_date)) {
+            $holiday_dates[] = $sanitized_date;
+        }
+    }
+    return array_values(array_unique($holiday_dates));
+}
+
+function intersoccer_save_course_holiday_dates($variation_id, $loop) {
+    $variation_id = (int) $variation_id;
+    if (!intersoccer_course_holiday_section_was_posted($loop)) {
+        $stored = get_post_meta($variation_id, "_course_holiday_dates", true);
+        return is_array($stored) ? array_values($stored) : [];
+    }
+    $holiday_dates = intersoccer_parse_posted_course_holiday_dates($loop);
+    update_post_meta($variation_id, "_course_holiday_dates", $holiday_dates);
+    return $holiday_dates;
+}
+
 // Save custom fields
 add_action('woocommerce_save_product_variation', 'intersoccer_save_course_variation_fields', 10, 2);
 function intersoccer_save_course_variation_fields($variation_id, $loop)
@@ -318,17 +356,9 @@ function intersoccer_save_course_variation_fields($variation_id, $loop)
         $weekly_discount = floatval($_POST['_course_weekly_discount'][$loop]);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            update_post_meta($variation_id, '_course_weekly_discount', $weekly_discount);
     }
 
-    // Save holiday dates
-    $holiday_dates = [];
-    if (isset($_POST['intersoccer_holiday_dates'][$loop]) && is_array($_POST['intersoccer_holiday_dates'][$loop])) {
-        foreach ($_POST['intersoccer_holiday_dates'][$loop] as $date) {
-            $sanitized_date = sanitize_text_field($date);
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $sanitized_date) && strtotime($sanitized_date)) {
-                $holiday_dates[] = $sanitized_date;
-            }
-        }
-    }
-    update_post_meta($variation_id, '_course_holiday_dates', array_unique($holiday_dates)); // Unique to avoid duplicates
+    // A hidden present flag, or a posted holiday_dates array, is an explicit update.
+    // Saves that omit both leave the stored holiday dates in place.
+    $holiday_dates = intersoccer_save_course_holiday_dates($variation_id, $loop);
 
     // Use this variation's course day and include the start date. Parent day terms and
     // calculate_course_end_date() skip the start day and can pick the wrong weekday.
