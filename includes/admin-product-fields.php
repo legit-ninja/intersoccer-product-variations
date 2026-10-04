@@ -207,6 +207,37 @@ function intersoccer_course_end_date_to_store($variation_id, $calculated) {
 }
 
 /**
+ * Storefront end date when the saved value is missing or not a real date.
+ * Uses this variation's course day. Does not write variation meta or orders.
+ *
+ * @param int          $variation_id
+ * @param int          $parent_id
+ * @param mixed        $stored_end
+ * @param mixed        $start_date
+ * @param int          $total_weeks
+ * @param mixed        $holidays
+ * @return string Y-m-d, or empty when it cannot be calculated.
+ */
+function intersoccer_storefront_course_end_date($variation_id, $parent_id, $stored_end, $start_date, $total_weeks, $holidays) {
+    if (is_string($stored_end) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $stored_end) && strtotime($stored_end)) {
+        return $stored_end;
+    }
+    if (!function_exists('intersoccer_end_date_for_course_variation')) {
+        return '';
+    }
+    if (!is_array($holidays)) {
+        $holidays = [];
+    }
+    return intersoccer_end_date_for_course_variation(
+        (int) $variation_id,
+        (int) $parent_id,
+        is_string($start_date) ? $start_date : '',
+        (int) $total_weeks,
+        $holidays
+    );
+}
+
+/**
  * Sessions from the start date through the end date, using the variation course day.
  *
  * @param int    $variation_id
