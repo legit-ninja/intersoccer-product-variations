@@ -16,9 +16,12 @@ if (!defined('ABSPATH')) {
  *
  * @return string[]
  */
-function intersoccer_get_posted_camp_days() {
+function intersoccer_get_posted_camp_days($variation_id = 0) {
     if (!isset($_POST['camp_days']) || !is_array($_POST['camp_days'])) {
         return [];
+    }
+    if (function_exists('intersoccer_normalize_posted_camp_days')) {
+        return intersoccer_normalize_posted_camp_days($_POST['camp_days'], $variation_id);
     }
     $out = [];
     foreach ($_POST['camp_days'] as $d) {
@@ -296,7 +299,7 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
     }
 
     // Camp days
-    $posted_camp_days = intersoccer_get_posted_camp_days();
+    $posted_camp_days = intersoccer_get_posted_camp_days($variation_id);
     if (!empty($posted_camp_days)) {
         $cart_item_data['camp_days'] = $posted_camp_days;
     }
@@ -429,7 +432,7 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
         : false;
 
     if ($is_single_day) {
-        $camp_days = intersoccer_get_posted_camp_days();
+        $camp_days = intersoccer_get_posted_camp_days($vid);
 
         if (empty($camp_days)) {
             wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
@@ -1198,7 +1201,10 @@ function intersoccer_calculate_camp_price_callback() {
     check_ajax_referer('intersoccer_nonce', 'nonce');
 
     $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
-    $camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
+    $raw_camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? $_POST['camp_days'] : [];
+    $camp_days = function_exists('intersoccer_normalize_posted_camp_days')
+        ? intersoccer_normalize_posted_camp_days($raw_camp_days, $variation_id)
+        : array_map('sanitize_text_field', $raw_camp_days);
 
     intersoccer_debug('InterSoccer: Processing AJAX request - Variation ID: ' . $variation_id . ', Camp days: ' . json_encode($camp_days));
 
@@ -1290,7 +1296,10 @@ function intersoccer_store_selected_days_callback() {
 
     $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
     $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
-    $camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
+    $raw_camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? $_POST['camp_days'] : [];
+    $camp_days = function_exists('intersoccer_normalize_posted_camp_days')
+        ? intersoccer_normalize_posted_camp_days($raw_camp_days, $variation_id)
+        : array_map('sanitize_text_field', $raw_camp_days);
 
     if ($product_id && function_exists('WC') && WC()->session) {
         WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
