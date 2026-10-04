@@ -484,30 +484,16 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
         $parent_id = $variation->get_parent_id() ?: $variation_id;
-        $course_day_slug = wc_get_product_terms($parent_id, 'pa_course-day', ['fields' => 'slugs'])[0] ?? 'monday';
-        $day_map = ['monday' => 1, 'tuesday' => 2, 'wednesday' => 3, 'thursday' => 4, 'friday' => 5, 'saturday' => 6, 'sunday' => 7];
-        $course_day_num = $day_map[$course_day_slug] ?? 1;
 
-        // Calculate end date if not set
+        // Missing or invalid stored end date: calculate from this variation's course day.
+        // Do not write the result back onto the variation or any order.
         if (!$end_date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) || !strtotime($end_date)) {
-            if ($data['course_start_date'] && $total_weeks > 0) {
-                $start = new DateTime($course_start_date);
-                $holiday_set = array_flip($holidays);
-                $sessions_needed = $total_weeks;
-                $current_date = clone $start;
-                $weeks_counted = 0;
-                $days_checked = 0;
-                while ($weeks_counted < $sessions_needed && $days_checked < ($total_weeks * 7 * 2)) {
-                    if ($current_date->format('N') == $course_day_num && !isset($holiday_set[$current_date->format('Y-m-d')])) {
-                        $weeks_counted++;
-                    }
-                    $current_date->add(new DateInterval('P1D'));
-                    $days_checked++;
-                }
-                $end_date = $current_date->sub(new DateInterval('P1D'))->format('Y-m-d');
+            $end_date = function_exists('intersoccer_storefront_course_end_date')
+                ? intersoccer_storefront_course_end_date($variation_id, $parent_id, $end_date, $course_start_date, $total_weeks, $holidays)
+                : '';
+            if ($end_date !== '') {
                 intersoccer_debug('InterSoccer: Calculated end_date for variation ' . $variation_id . ': ' . $end_date);
             } else {
-                $end_date = '';
                 intersoccer_warning('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
             }
         }
