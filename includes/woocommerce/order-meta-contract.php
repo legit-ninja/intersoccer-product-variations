@@ -450,7 +450,13 @@ function intersoccer_build_order_line_meta($args) {
 
     if ($product_type === 'camp') {
         if (!empty($cart_values['camp_days']) && is_array($cart_values['camp_days'])) {
-            $updates['Days Selected'] = implode(', ', array_map('sanitize_text_field', $cart_values['camp_days']));
+            $days_selected = $cart_values['camp_days'];
+            if (function_exists('intersoccer_normalize_posted_camp_days')) {
+                $days_selected = intersoccer_normalize_posted_camp_days($days_selected, $variation_id);
+            }
+            if (!empty($days_selected)) {
+                $updates['Days Selected'] = implode(', ', array_map('sanitize_text_field', $days_selected));
+            }
         }
         if (!empty($cart_values['late_pickup_type']) && $cart_values['late_pickup_type'] !== 'none') {
             $updates['Late Pickup Type'] = $cart_values['late_pickup_type'] === 'full-week' ? 'Full Week' : 'Single Day(s)';

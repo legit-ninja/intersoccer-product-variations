@@ -7,6 +7,42 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+
+if (!function_exists('intersoccer_weekday_slug_map')) {
+    /**
+     * Weekday slugs and names in English, French, and German.
+     *
+     * English slugs are listed first so the first key for each number is the English name.
+     *
+     * @return array<string,int>
+     */
+    function intersoccer_weekday_slug_map() {
+        return [
+            'monday' => 1,
+            'tuesday' => 2,
+            'wednesday' => 3,
+            'thursday' => 4,
+            'friday' => 5,
+            'saturday' => 6,
+            'sunday' => 7,
+            'lundi' => 1,
+            'mardi' => 2,
+            'mercredi' => 3,
+            'jeudi' => 4,
+            'vendredi' => 5,
+            'samedi' => 6,
+            'dimanche' => 7,
+            'montag' => 1,
+            'dienstag' => 2,
+            'mittwoch' => 3,
+            'donnerstag' => 4,
+            'freitag' => 5,
+            'samstag' => 6,
+            'sonntag' => 7,
+        ];
+    }
+}
+
 if (!class_exists('InterSoccer_Course_Schedule_Calculator')) {
     class InterSoccer_Course_Schedule_Calculator {
         /**
@@ -22,29 +58,7 @@ if (!class_exists('InterSoccer_Course_Schedule_Calculator')) {
                 return 0;
             }
 
-            $day_map = [
-                'monday' => 1,
-                'tuesday' => 2,
-                'wednesday' => 3,
-                'thursday' => 4,
-                'friday' => 5,
-                'saturday' => 6,
-                'sunday' => 7,
-                'lundi' => 1,
-                'mardi' => 2,
-                'mercredi' => 3,
-                'jeudi' => 4,
-                'vendredi' => 5,
-                'samedi' => 6,
-                'dimanche' => 7,
-                'montag' => 1,
-                'dienstag' => 2,
-                'mittwoch' => 3,
-                'donnerstag' => 4,
-                'freitag' => 5,
-                'samstag' => 6,
-                'sonntag' => 7,
-            ];
+            $day_map = intersoccer_weekday_slug_map();
 
             return $day_map[strtolower($attribute_slug)] ?? 0;
         }

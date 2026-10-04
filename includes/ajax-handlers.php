@@ -177,7 +177,11 @@ function intersoccer_ajax_update_session_data() {
 
     $product_id = absint($_POST['product_id'] ?? 0);
     $assigned_attendee = sanitize_text_field($_POST['assigned_attendee'] ?? '');
-    $camp_days = isset($_POST['camp_days']) ? array_map('sanitize_text_field', $_POST['camp_days']) : [];
+    $variation_id = isset($_POST['variation_id']) ? absint($_POST['variation_id']) : 0;
+    $raw_camp_days = isset($_POST['camp_days']) && is_array($_POST['camp_days']) ? $_POST['camp_days'] : [];
+    $camp_days = function_exists('intersoccer_normalize_posted_camp_days')
+        ? intersoccer_normalize_posted_camp_days($raw_camp_days, $variation_id)
+        : array_map('sanitize_text_field', $raw_camp_days);
     $remaining_weeks = isset($_POST['remaining_weeks']) ? absint($_POST['remaining_weeks']) : null;
 
     // Store in session or transient
