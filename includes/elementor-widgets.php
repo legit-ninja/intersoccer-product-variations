@@ -1027,6 +1027,28 @@ $intersoccer_elementor_product_page_cb = function () {
              * Persist choice, mirror value onto every attendee select for this product, update assigned_attendee on layout form, refresh button state.
              * Used by delegated change so duplicate Elementor/sticky selects all stay in sync.
              */
+            function intersoccerStashSelectedPlayer(selectedPlayer) {
+                if (typeof intersoccerCheckout === 'undefined' || !intersoccerCheckout.ajax_url) {
+                    return;
+                }
+                var playerId = '';
+                var $opt = $('[data-intersoccer-product-id="' + intersoccerPvProductId + '"]').find('select[name="player_assignment"] option:selected').first();
+                if ($opt.length && $opt.attr('data-player-id')) {
+                    playerId = String($opt.attr('data-player-id') || '');
+                }
+                // Option value may already be the UUID when player_id is used as value.
+                if (!playerId && intersoccerPlayerIndexChosen(selectedPlayer) && typeof selectedPlayer === 'string' && selectedPlayer.indexOf('-') !== -1) {
+                    playerId = String(selectedPlayer);
+                }
+                jQuery.post(intersoccerCheckout.ajax_url, {
+                    action: 'intersoccer_store_selected_player',
+                    nonce: intersoccerCheckout.nonce,
+                    product_id: intersoccerPvProductId,
+                    player_index: intersoccerPlayerIndexChosen(selectedPlayer) ? selectedPlayer : '',
+                    player_id: playerId
+                });
+            }
+
             function intersoccerApplyPlayerChoice(selectedPlayer) {
                 playerPersistence.setPlayer(selectedPlayer);
                 var $syncSels = $('[data-intersoccer-product-id="' + intersoccerPvProductId + '"]').find('select.intersoccer-player-select[name="player_assignment"], select.player-select[name="player_assignment"]');
@@ -1058,8 +1080,36 @@ $intersoccer_elementor_product_page_cb = function () {
                         assignedAttendeeInput.value = selectedPlayer;
                         $lf[0].appendChild(assignedAttendeeInput);
                     }
+                    // Keep UUID on the cart form for Stripe / Store API serialization (#64).
+                    var playerId = '';
+                    var $selOpt = $syncSels.filter(function () { return $(this).val() !== '' && $(this).val() !== null; }).first().find('option:selected');
+                    if ($selOpt.length && $selOpt.attr('data-player-id')) {
+                        playerId = String($selOpt.attr('data-player-id') || '');
+                    }
+                    if (!playerId && typeof selectedPlayer === 'string' && selectedPlayer.indexOf('-') !== -1) {
+                        playerId = String(selectedPlayer);
+                    }
+                    var idField = $lf[0] ? $lf[0].querySelector('input[name="assigned_player_id"]') : null;
+                    if (playerId) {
+                        if (idField) {
+                            idField.value = playerId;
+                        } else if ($lf[0]) {
+                            var assignedPlayerIdInput = document.createElement('input');
+                            assignedPlayerIdInput.type = 'hidden';
+                            assignedPlayerIdInput.name = 'assigned_player_id';
+                            assignedPlayerIdInput.value = playerId;
+                            $lf[0].appendChild(assignedPlayerIdInput);
+                        }
+                    } else if (idField) {
+                        idField.remove();
+                    }
+                    intersoccerStashSelectedPlayer(selectedPlayer);
                 } else if (existingField) {
                     existingField.remove();
+                    var clearId = $lf[0] ? $lf[0].querySelector('input[name="assigned_player_id"]') : null;
+                    if (clearId) {
+                        clearId.remove();
+                    }
                 }
                 intersoccerPvDispatchUpdateButtonState();
                 var variationId = $lf.find('input[name="variation_id"]').val();

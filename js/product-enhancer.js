@@ -96,6 +96,7 @@
 
             // Player selection change
             $form.on('change', '.intersoccer-player-select', function() {
+                self.stashSelectedPlayer($(this));
                 // For camps, delegate button state to elementor-widgets.php (body namespaced — may differ from enhancer's $form node)
                 if (self.config.productType === 'camp') {
                     console.log('InterSoccer Product Enhancer: Player changed, triggering intersoccer_update_button_state event');
@@ -415,6 +416,39 @@
                 $notification.text(message).show();
                 setTimeout(() => $notification.hide(), 5000);
             }
+        },
+
+        // Persist player for Apple Pay / Store API add-to-cart (#64).
+        stashSelectedPlayer: function($select) {
+            if (typeof intersoccerCheckout === 'undefined' || !intersoccerCheckout.ajax_url) {
+                return;
+            }
+            const $form = $(this.state.formSelector);
+            const $sel = $select && $select.length ? $select : $form.find('.intersoccer-player-select').first();
+            const playerValue = $sel.val();
+            const playerId = ($sel.find('option:selected').attr('data-player-id')) || '';
+            let resolvedId = playerId;
+            if (!resolvedId && playerValue !== null && playerValue !== undefined && String(playerValue).indexOf('-') !== -1) {
+                resolvedId = String(playerValue);
+            }
+            // Mirror UUID onto the product form so Stripe can serialize it.
+            let $idField = $form.find('input[name="assigned_player_id"]');
+            if (resolvedId) {
+                if ($idField.length) {
+                    $idField.val(resolvedId);
+                } else {
+                    $form.append($('<input>', { type: 'hidden', name: 'assigned_player_id', value: resolvedId }));
+                }
+            } else if ($idField.length) {
+                $idField.remove();
+            }
+            jQuery.post(intersoccerCheckout.ajax_url, {
+                action: 'intersoccer_store_selected_player',
+                nonce: intersoccerCheckout.nonce,
+                product_id: this.config.productId,
+                player_index: (playerValue === null || playerValue === undefined) ? '' : playerValue,
+                player_id: resolvedId || ''
+            });
         },
 
         // Update add to cart button state
