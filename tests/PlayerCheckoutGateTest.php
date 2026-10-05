@@ -78,6 +78,46 @@ class PlayerCheckoutGateTest extends TestCase
         $this->assertStringContainsString("woocommerce_store_api_checkout_update_order_from_request", $contents);
         $this->assertStringContainsString('intersoccer_store_selected_player', $contents);
         $this->assertStringContainsString('intersoccer_get_stashed_selected_player', $contents);
+        $this->assertStringContainsString('intersoccer_restore_stashed_player_into_post', $contents);
+        $this->assertStringContainsString('!$nonce || !wp_verify_nonce', $contents, 'Stash AJAX must require nonce');
+        $this->assertStringContainsString('intersoccer_selected_player_belongs_to_user', $contents);
+        $this->assertStringContainsString('intersoccer_find_cart_item_missing_assigned_player', $contents);
+        $this->assertStringContainsString('remove this item from your cart', $contents);
+    }
+
+    public function testValidateAcceptsStashedPlayerWithoutPost()
+    {
+        $GLOBALS['intersoccer_test_user_id'] = 42;
+        $GLOBALS['intersoccer_test_product_type'] = 'camp';
+        $GLOBALS['intersoccer_test_player_by_id'] = function ($user_id, $player_id) {
+            if ((int) $user_id === 42 && $player_id === 'uuid-luis') {
+                return ['player_id' => 'uuid-luis', 'first_name' => 'Luis', 'last_name' => 'Example', 'key' => 0];
+            }
+            return null;
+        };
+        // Seed session stash via helper when WC session exists.
+        $ok = @intersoccer_stash_selected_player(123, [
+            'player_index' => 0,
+            'player_id' => 'uuid-luis',
+        ]);
+        if (!$ok) {
+            $this->markTestSkipped('WC session stub required for stash acceptance');
+        }
+        $_POST = [];
+        $passed = intersoccer_validate_cart_item(true, 123, 1, null, null, null);
+        $this->assertTrue($passed, 'Validation must accept a stashed player before add_cart_item_data');
+    }
+
+    public function testStashRejectsPlayerNotOwnedByUser()
+    {
+        $GLOBALS['intersoccer_test_user_id'] = 42;
+        $GLOBALS['intersoccer_test_player_by_id'] = function ($user_id, $player_id) {
+            return null;
+        };
+        $ok = @intersoccer_stash_selected_player(999, [
+            'player_id' => 'someone-elses-uuid',
+        ]);
+        $this->assertFalse($ok, 'Must not stash a player ID that does not belong to the current user');
     }
 
     public function testProductEnhancerStashesPlayerForExpressCheckout()
