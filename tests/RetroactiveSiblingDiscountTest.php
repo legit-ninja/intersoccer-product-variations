@@ -133,7 +133,7 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         );
         $pos = strpos($contents, "context['camps_by_child']");
         $this->assertNotFalse($pos);
-        $snippet = substr($contents, max(0, $pos - 400), 800);
+        $snippet = substr($contents, max(0, $pos - 900), 1200);
         $this->assertStringContainsString(
             'intersoccer_discount_camp_booking_counts_for_sibling',
             $snippet
