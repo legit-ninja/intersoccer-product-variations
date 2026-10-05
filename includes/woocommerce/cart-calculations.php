@@ -93,6 +93,47 @@ function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, 
     return null;
 }
 
+if (!function_exists('intersoccer_resolve_attendee_product_id')) {
+    /**
+     * Resolve a product ID or WC_Product (including variations) to a parent product ID.
+     *
+     * Cart lines often pass $cart_item['data'] (a WC_Product_Variation). Casting that
+     * object with (int) emits a PHP warning and yields a wrong ID.
+     *
+     * @param int|WC_Product|object $product Product ID or product object.
+     * @return int Parent product ID, or 0 when unresolved.
+     */
+    function intersoccer_resolve_attendee_product_id($product) {
+        if (is_object($product) && method_exists($product, 'get_id')) {
+            $id = (int) $product->get_id();
+            if (
+                method_exists($product, 'is_type')
+                && $product->is_type('variation')
+                && method_exists($product, 'get_parent_id')
+            ) {
+                $parent_id = (int) $product->get_parent_id();
+                if ($parent_id > 0) {
+                    return $parent_id;
+                }
+            }
+            // Variation without is_type(), or parent_id available: prefer parent when set.
+            if (method_exists($product, 'get_parent_id')) {
+                $parent_id = (int) $product->get_parent_id();
+                if ($parent_id > 0) {
+                    return $parent_id;
+                }
+            }
+            return $id > 0 ? $id : 0;
+        }
+
+        if (is_numeric($product)) {
+            return (int) $product;
+        }
+
+        return 0;
+    }
+}
+
 if (!function_exists('intersoccer_product_requires_attendee')) {
     /**
      * Determine if a product requires an attendee (player) assignment at add-to-cart.
@@ -103,11 +144,11 @@ if (!function_exists('intersoccer_product_requires_attendee')) {
      * - Product category contains camp/course/birthday (term name or slug)
      * - Product name/slug contains camp/course
      *
-     * @param int $product_id Parent product ID.
+     * @param int|WC_Product|object $product_id Parent product ID, or a WC_Product / variation.
      * @return bool True when an attendee must be assigned.
      */
     function intersoccer_product_requires_attendee($product_id) {
-        $product_id = (int) $product_id;
+        $product_id = intersoccer_resolve_attendee_product_id($product_id);
         if ($product_id <= 0) {
             return false;
         }
