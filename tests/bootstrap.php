@@ -700,8 +700,24 @@ if (!function_exists('wc_get_product')) {
     }
 }
 
+if (!function_exists('clean_post_cache')) {
+    function clean_post_cache($post_id) {
+        return true;
+    }
+}
+
+if (!function_exists('wp_cache_delete')) {
+    function wp_cache_delete($key, $group = '') {
+        return true;
+    }
+}
+
 if (!function_exists('wc_get_product_terms')) {
     function wc_get_product_terms($product_id, $taxonomy, $args = []) {
+        $product_id = (int) $product_id;
+        if (isset($GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy])) {
+            return $GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy];
+        }
         return [];
     }
 }
