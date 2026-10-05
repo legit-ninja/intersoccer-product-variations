@@ -447,6 +447,47 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertSame(1, $position, 'Single-day prior must not unlock second-week rate');
     }
 
+    /**
+     * One earlier full-week plus two cart weeks => week-2 then week-3+ (#66).
+     */
+    public function testTwoCartWeeksAfterOneEarlierGetWeek2AndWeek3() {
+        $previous = [
+            ['booking_type' => 'full-week', 'season' => 'summer|2026', 'variation_id' => 101],
+        ];
+        $first_cart = intersoccer_discount_same_child_week_position($previous, 0);
+        $second_cart = intersoccer_discount_same_child_week_position($previous, 1);
+        $this->assertSame(2, $first_cart, 'First cart week after one prior is week-2');
+        $this->assertSame(3, $second_cart, 'Second cart week after one prior is week-3+');
+    }
+
+    /**
+     * Same-season any-venue helper and duplicate variation skip are present (#66 product rule).
+     */
+    public function testSameChildSeasonWeekLookupIgnoresParentAndDuplicateVariation() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString('function intersoccer_get_previous_camps_same_child_season', $contents);
+        $this->assertStringContainsString('exclude_variation_id', $contents);
+        $this->assertStringContainsString("intersoccer_get_previous_camps_same_child_season(", $contents);
+        // Progressive path must not require same parent_product_id match for week rates.
+        $this->assertStringNotContainsString(
+            "intersoccer_get_previous_camps_by_parent(
+                        \$customer_id,
+                        \$parent_product_id,
+                        \$item,
+                        \$lookback_months
+                    );",
+            $contents
+        );
+    }
+
+    public function testDifferentSeasonDoesNotShareWeekPositionLogic() {
+        // Document product rule: unresolved/different season groups never share earlier_cart_weeks.
+        $prior_same = [['booking_type' => 'full-week', 'season' => 'summer|2026']];
+        $this->assertSame(2, intersoccer_discount_same_child_week_position($prior_same, 0));
+        // Empty prior for a different season group stays first week.
+        $this->assertSame(1, intersoccer_discount_same_child_week_position([], 0));
+    }
+
     public function testTournamentSiblingDoesNotUseRetroactivePriorTotals() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringNotContainsString(
