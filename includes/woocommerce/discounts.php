@@ -878,13 +878,18 @@ function intersoccer_get_previous_sibling_child_totals($customer_id, $product_ty
 /**
  * Merge cart child spend with prior-order sibling totals for ranking.
  *
+ * Prior spend is matched onto cart identity keys when possible (name vs UUID).
+ * prior_by_key lists merged keys that received earlier-order spend so ranking
+ * does not treat a remapped returning child as brand new.
+ *
  * @param array $cart_by_child Cart items keyed by player key
  * @param array $prior_totals  Prior spend keyed by player key
- * @return array{totals: array, cart_by_child: array} Merged totals and cart map keyed by player key
+ * @return array{totals: array, cart_by_child: array, prior_by_key: array} Merged totals, cart map, and prior spend by merged key
  */
 function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
     $cart_keyed = [];
     $totals = [];
+    $prior_by_key = [];
 
     foreach ($cart_by_child as $legacy_key => $items) {
         $player_key = null;
@@ -912,16 +917,48 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
 
     if (is_array($prior_totals)) {
         foreach ($prior_totals as $player_key => $spend) {
-            if (!isset($totals[$player_key])) {
-                $totals[$player_key] = 0;
+            $matched_key = null;
+            if (function_exists('intersoccer_discount_players_match')) {
+                foreach ($cart_keyed as $existing_key => $items) {
+                    if (intersoccer_discount_players_match($existing_key, $player_key)) {
+                        $matched_key = $existing_key;
+                        break;
+                    }
+                    foreach ($items as $item) {
+                        if (intersoccer_discount_players_match($item, $player_key)) {
+                            $matched_key = $existing_key;
+                            break 2;
+                        }
+                    }
+                }
+                if ($matched_key === null) {
+                    foreach (array_keys($totals) as $existing_key) {
+                        if (intersoccer_discount_players_match($existing_key, $player_key)) {
+                            $matched_key = $existing_key;
+                            break;
+                        }
+                    }
+                }
             }
-            $totals[$player_key] += floatval($spend);
+            if ($matched_key === null) {
+                $matched_key = (string) $player_key;
+            }
+            $spend = floatval($spend);
+            if (!isset($totals[$matched_key])) {
+                $totals[$matched_key] = 0;
+            }
+            $totals[$matched_key] += $spend;
+            if (!isset($prior_by_key[$matched_key])) {
+                $prior_by_key[$matched_key] = 0;
+            }
+            $prior_by_key[$matched_key] += $spend;
         }
     }
 
     return [
         'totals' => $totals,
         'cart_by_child' => $cart_keyed,
+        'prior_by_key' => $prior_by_key,
     ];
 }
 
@@ -934,13 +971,17 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
  * are appended after them, sorted by spend. A child who was already first in
  * earlier orders stays first even when they are also in the cart.
  *
+ * Pass prior_by_key from intersoccer_merge_sibling_child_totals() — not the
+ * raw prior_totals map — so a name-keyed prior remapped onto a cart UUID still
+ * counts as returning.
+ *
  * @param array $child_totals  player_key => spend
  * @param array $cart_by_child Cart items by player key
- * @param array $prior_totals  Prior spend by player key (empty = same-cart)
+ * @param array $prior_by_key  Merged keys that received earlier-order spend
  * @return array Ordered player keys (index 0 = no sibling rate)
  */
-function intersoccer_rank_sibling_children_for_rates(array $child_totals, array $cart_by_child, array $prior_totals = []) {
-    if (empty($prior_totals)) {
+function intersoccer_rank_sibling_children_for_rates(array $child_totals, array $cart_by_child, array $prior_by_key = []) {
+    if (empty($prior_by_key)) {
         arsort($child_totals);
         return array_keys($child_totals);
     }
@@ -948,9 +989,9 @@ function intersoccer_rank_sibling_children_for_rates(array $child_totals, array 
     $had_prior = [];
     $new_in_cart = [];
     foreach ($child_totals as $key => $spend) {
-        if (array_key_exists($key, $prior_totals)) {
+        if (array_key_exists($key, $prior_by_key)) {
             // Rank prior kids by their prior spend so cart spend cannot reorder them.
-            $had_prior[$key] = floatval($prior_totals[$key]);
+            $had_prior[$key] = floatval($prior_by_key[$key]);
         } elseif (isset($cart_by_child[$key])) {
             $new_in_cart[$key] = $spend;
         } else {
@@ -1504,7 +1545,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     continue;
                 }
 
-                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $camp_children, $prior_totals);
+                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $camp_children, $merged['prior_by_key'] ?? []);
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
@@ -1674,7 +1715,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             $course_children = $merged['cart_by_child'];
 
             if (count($child_totals) >= 2) {
-                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $course_children, $prior_totals);
+                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $course_children, $merged['prior_by_key'] ?? []);
                 $template = intersoccer_translate_string('%s Course Sibling Discount', 'intersoccer-product-variations', '%s Course Sibling Discount');
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,

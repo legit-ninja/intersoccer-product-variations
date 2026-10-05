@@ -139,7 +139,7 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $sorted = intersoccer_rank_sibling_children_for_rates(
             $merged['totals'],
             $merged['cart_by_child'],
-            $prior_totals
+            $merged['prior_by_key'] ?? []
         );
 
         $this->assertCount(2, $sorted);
@@ -179,7 +179,7 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $sorted = intersoccer_rank_sibling_children_for_rates(
             $merged['totals'],
             $merged['cart_by_child'],
-            $prior_totals
+            $merged['prior_by_key'] ?? []
         );
 
         $this->assertSame(['child-a', 'child-b'], $sorted, 'Prior-only child keeps first rank; expensive cart child is second');
@@ -214,7 +214,7 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $sorted = intersoccer_rank_sibling_children_for_rates(
             $merged['totals'],
             $merged['cart_by_child'],
-            $prior_totals
+            $merged['prior_by_key'] ?? []
         );
 
         $this->assertSame('child-a', $sorted[0], 'Child already in earlier orders keeps first rank');
@@ -223,6 +223,57 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $percent = ($index_a === 1) ? 0.20 : (($index_a >= 2) ? 0.30 : 0);
         $this->assertEquals(0.0, $percent, 'Returning first child must get no sibling rate (full price)');
     }
+
+    /**
+     * After name→UUID merge (#74), ranking must use prior_by_key so a returning
+     * child does not get the sibling rate (#70 re-review).
+     */
+    public function testNameKeyedPriorMergedToUuidCartKeepsFullPrice() {
+        $cart_by_child = [
+            'uuid-jane' => [
+                [
+                    'cart_key' => 'ck_jane',
+                    'assigned_player_id' => 'uuid-jane',
+                    'assigned_attendee' => 'Jane Doe',
+                    'price' => 300.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+            'uuid-sam' => [
+                [
+                    'cart_key' => 'ck_sam',
+                    'assigned_player_id' => 'uuid-sam',
+                    'assigned_attendee' => 'Sam Sibling',
+                    'price' => 250.0,
+                    'quantity' => 1,
+                    'product_id' => 11,
+                ],
+            ],
+        ];
+        // Earlier order keyed by display name only (legacy); Jane already booked.
+        $prior_totals = [
+            'Jane Doe' => 500.0,
+            'Sam Sibling' => 200.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $this->assertArrayHasKey('prior_by_key', $merged);
+        $this->assertArrayHasKey('uuid-jane', $merged['prior_by_key'], 'Prior name spend must map onto cart UUID key');
+        $this->assertArrayNotHasKey('Jane Doe', $merged['totals'], 'Name-only prior key should merge into UUID');
+
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $merged['prior_by_key']
+        );
+
+        $this->assertSame('uuid-jane', $sorted[0], 'Returning Jane (higher prior) keeps first rank');
+        $index_jane = array_search('uuid-jane', $sorted, true);
+        $percent = ($index_jane === 1) ? 0.20 : (($index_jane >= 2) ? 0.30 : 0);
+        $this->assertEquals(0.0, $percent, 'Returning child must not get sibling rate after name→UUID merge');
+    }
+
 
     /**
      * Same-cart ranking by spend must remain unchanged when there is no prior (#63).
