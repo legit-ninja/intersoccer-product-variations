@@ -507,8 +507,26 @@ function intersoccer_build_order_line_meta($args) {
         $updates['Discount'] = sanitize_text_field($cart_values['discount_note']);
     }
 
-    if (isset($cart_values['discount_amount']) && $cart_values['discount_amount'] > 0) {
-        $updates['Discount Amount'] = wc_price($cart_values['discount_amount']);
+    if (isset($cart_values['discount_amount']) && floatval($cart_values['discount_amount']) > 0) {
+        // Store the raw number only — never wc_price()/HTML. Reports parse "Discount Amount"
+        // with a digit regex; entity-encoded CHF (&#67;…) was read as 67 instead of 105.
+        $discount_amount = round(floatval($cart_values['discount_amount']), 2);
+        $updates['Discount Amount'] = $discount_amount;
+        $updates['_intersoccer_total_item_discount'] = $discount_amount;
+        $discount_name = !empty($cart_values['discount_note'])
+            ? (string) $cart_values['discount_note']
+            : 'Line Item Discount';
+        $discount_type = function_exists('intersoccer_determine_discount_type')
+            ? intersoccer_determine_discount_type($discount_name)
+            : 'other';
+        $updates['_intersoccer_item_discounts'] = [
+            [
+                'name' => $discount_name,
+                'type' => $discount_type,
+                'amount' => $discount_amount,
+                'allocation_method' => 'cart_line',
+            ],
+        ];
     }
 
     $season_product_id = $variation_id ?: $product_id;
