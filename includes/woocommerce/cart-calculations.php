@@ -1572,6 +1572,12 @@ function intersoccer_store_selected_player_callback() {
     if ($product_id <= 0) {
         wp_send_json_error(['message' => 'Missing product_id']);
     }
+    // Shopper cleared the player: forget the stash so express checkout cannot reuse an old choice.
+    $index_empty = ($player_index === null || trim((string) $player_index) === '');
+    if ($index_empty && $player_id === '') {
+        intersoccer_clear_stashed_selected_player($product_id);
+        wp_send_json_success(['message' => 'Player cleared', 'product_id' => $product_id, 'cleared' => true]);
+    }
     $ok = intersoccer_stash_selected_player($product_id, [
         'player_index' => $player_index,
         'player_id' => $player_id,

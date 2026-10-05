@@ -478,12 +478,14 @@
 
             $button.prop('disabled', !canAddToCart);
             
-            // Handle express checkout buttons
-            const $expressContainer = $('.wc-stripe-product-checkout-container');
-            if (canAddToCart) {
-                $expressContainer.show();
-            } else {
-                $expressContainer.hide();
+            // Express checkout (Apple Pay / Google Pay): toggle the server-set body class instead of
+            // display:none, so Stripe can still mount its iframe while hidden.
+            const expressGateClass = 'intersoccer-express-needs-player';
+            if (this.state.expressGated === undefined) {
+                this.state.expressGated = $(document.body).hasClass(expressGateClass);
+            }
+            if (this.state.expressGated) {
+                $(document.body).toggleClass(expressGateClass, !(playerSelected && isLoggedIn));
             }
 
             // Update notification messages

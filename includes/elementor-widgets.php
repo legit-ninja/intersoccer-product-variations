@@ -364,6 +364,9 @@ $intersoccer_elementor_product_page_cb = function () {
             var intersoccerPvProductId = <?php echo (int) $product_id; ?>;
             var intersoccerPvPlayerSelectId = 'player_assignment_select_' + intersoccerPvProductId;
             var intersoccerPvButtonStateNs = 'intersoccer_update_button_state.intersoccerPvDispatch_' + intersoccerPvProductId;
+            /** Server adds this body class on product pages that need a player; express buttons stay hidden while it is set. */
+            var intersoccerPvExpressGateClass = 'intersoccer-express-needs-player';
+            var intersoccerPvExpressGated = $(document.body).hasClass(intersoccerPvExpressGateClass);
 
             /** Fires on document.body so product-enhancer and other modules need not target the same form node as this script's $form. */
             function intersoccerPvDispatchUpdateButtonState() {
@@ -1104,12 +1107,16 @@ $intersoccer_elementor_product_page_cb = function () {
                         idField.remove();
                     }
                     intersoccerStashSelectedPlayer(selectedPlayer);
-                } else if (existingField) {
-                    existingField.remove();
+                } else {
+                    if (existingField) {
+                        existingField.remove();
+                    }
                     var clearId = $lf[0] ? $lf[0].querySelector('input[name="assigned_player_id"]') : null;
                     if (clearId) {
                         clearId.remove();
                     }
+                    // Player cleared: drop the server stash too, so express checkout cannot reuse it.
+                    intersoccerStashSelectedPlayer('');
                 }
                 intersoccerPvDispatchUpdateButtonState();
                 var variationId = $lf.find('input[name="variation_id"]').val();
@@ -1913,6 +1920,10 @@ $intersoccer_elementor_product_page_cb = function () {
                     });
                 }
                 var hasPlayer = intersoccerPlayerIndexChosen(playerId);
+                // Apple Pay / Google Pay: show only once a player is chosen (index 0 is valid, #79).
+                if (intersoccerPvExpressGated) {
+                    $(document.body).toggleClass(intersoccerPvExpressGateClass, !hasPlayer);
+                }
                 
                 // For variable products, also check if variation is selected (variation may live on a different form.cart than layout)
                 var variationIdResolved = '';
