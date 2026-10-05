@@ -938,6 +938,41 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
  * @param string  $debug_label
  * @return array player_key => applied percent (cart children only)
  */
+
+/**
+ * Rank children for sibling rates.
+ *
+ * Same-cart (no prior spend): highest spend first (unchanged).
+ * Cross-order: prior-only children keep the early ranks; cart children follow
+ * by spend so a more expensive new registration still gets the sibling rate.
+ *
+ * @param array $child_totals  player_key => spend
+ * @param array $cart_by_child Cart items by player key
+ * @param array $prior_totals  Prior spend by player key (empty = same-cart)
+ * @return array Ordered player keys (index 0 = no sibling rate)
+ */
+function intersoccer_rank_sibling_children_for_rates(array $child_totals, array $cart_by_child, array $prior_totals = []) {
+    if (empty($prior_totals)) {
+        arsort($child_totals);
+        return array_keys($child_totals);
+    }
+
+    $prior_only = [];
+    $cart_side = [];
+    foreach ($child_totals as $key => $spend) {
+        if (isset($cart_by_child[$key])) {
+            $cart_side[$key] = $spend;
+        } else {
+            $prior_only[$key] = $spend;
+        }
+    }
+
+    arsort($prior_only);
+    arsort($cart_side);
+
+    return array_merge(array_keys($prior_only), array_keys($cart_side));
+}
+
 function intersoccer_apply_sibling_rates_to_cart($cart, $sorted_children, $cart_by_child, $rate_2nd, $rate_3rd, $message_prefix, $template, $debug_label) {
     $applied = [];
 
@@ -1465,8 +1500,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     continue;
                 }
 
-                arsort($child_totals);
-                $sorted_children = array_keys($child_totals);
+                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $camp_children, $prior_totals);
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
@@ -1636,8 +1670,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             $course_children = $merged['cart_by_child'];
 
             if (count($child_totals) >= 2) {
-                arsort($child_totals);
-                $sorted_children = array_keys($child_totals);
+                $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $course_children, $prior_totals);
                 $template = intersoccer_translate_string('%s Course Sibling Discount', 'intersoccer-product-variations', '%s Course Sibling Discount');
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,

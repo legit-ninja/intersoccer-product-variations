@@ -136,9 +136,11 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         ];
 
         $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
-        $totals = $merged['totals'];
-        arsort($totals);
-        $sorted = array_keys($totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $prior_totals
+        );
 
         $this->assertCount(2, $sorted);
         $this->assertSame('child-a', $sorted[0], 'Higher prior spend ranks first (0%)');
@@ -150,6 +152,77 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertEquals(0.20, $percent);
         $this->assertArrayHasKey('child-b', $merged['cart_by_child']);
         $this->assertArrayNotHasKey('child-a', $merged['cart_by_child']);
+    }
+
+
+    /**
+     * Cross-order: cart child more expensive than prior still gets sibling rate (#63).
+     * Same-cart spend ranking is unchanged; only cross-order ranking is adjusted.
+     */
+    public function testPriorChildPlusMoreExpensiveCartChildGetsSiblingRate() {
+        $cart_by_child = [
+            'child-b' => [
+                [
+                    'cart_key' => 'ck_b',
+                    'assigned_player_id' => 'child-b',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        $prior_totals = [
+            'child-a' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $prior_totals
+        );
+
+        $this->assertSame(['child-a', 'child-b'], $sorted, 'Prior-only child keeps first rank; expensive cart child is second');
+        $index_b = array_search('child-b', $sorted, true);
+        $rate_2nd = 0.20;
+        $percent = ($index_b === 1) ? $rate_2nd : 0;
+        $this->assertEquals(0.20, $percent, 'Second registration must get sibling rate even when cart spend is higher');
+    }
+
+    /**
+     * Same-cart ranking by spend must remain unchanged when there is no prior (#63).
+     */
+    public function testSameCartSpendRankingUnchangedWithoutPrior() {
+        $cart_by_child = [
+            'child-expensive' => [
+                [
+                    'cart_key' => 'ck_e',
+                    'assigned_player_id' => 'child-expensive',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+            'child-cheap' => [
+                [
+                    'cart_key' => 'ck_c',
+                    'assigned_player_id' => 'child-cheap',
+                    'price' => 250.0,
+                    'quantity' => 1,
+                    'product_id' => 11,
+                ],
+            ],
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, []);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            []
+        );
+
+        $this->assertSame('child-expensive', $sorted[0], 'Highest cart spend still ranks first with no prior');
+        $this->assertSame('child-cheap', $sorted[1], 'Lower cart spend ranks second');
     }
 
     public function testPriorTwoChildrenPlusCartThirdGetsThirdPlusRate() {
