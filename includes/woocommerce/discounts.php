@@ -168,13 +168,25 @@ if (!function_exists('intersoccer_merge_default_discount_rules')) {
 function intersoccer_discount_player_key($source) {
     $player_id = null;
     $legacy = null;
+    $pm_index = null;
 
     if (is_array($source)) {
         $player_id = $source['assigned_player_id'] ?? null;
         $legacy = $source['assigned_attendee'] ?? $source['assigned_player'] ?? null;
+        // PM cart/checkout historically wrote only intersoccer_player_index (PM #38 removed the picker).
+        // Fall back so sibling ranking still sees those lines when PV ATC keys are absent.
+        if (array_key_exists('intersoccer_player_index', $source)) {
+            $pm_index = $source['intersoccer_player_index'];
+        } elseif (array_key_exists('Player Index', $source)) {
+            $pm_index = $source['Player Index'];
+        }
     } elseif (is_object($source) && method_exists($source, 'get_meta')) {
         $player_id = $source->get_meta('assigned_player_id');
         $legacy = $source->get_meta('assigned_attendee') ?: $source->get_meta('assigned_player');
+        $pm_index = $source->get_meta('intersoccer_player_index');
+        if ($pm_index === '' || $pm_index === null) {
+            $pm_index = $source->get_meta('Player Index');
+        }
     }
 
     if (!empty($player_id)) {
@@ -182,6 +194,13 @@ function intersoccer_discount_player_key($source) {
     }
     if ($legacy !== null && $legacy !== '') {
         return (string) $legacy;
+    }
+    // Index 0 is a valid first-player slot (#79).
+    if ($pm_index !== null && $pm_index !== '') {
+        return (string) $pm_index;
+    }
+    if ($pm_index === 0 || $pm_index === '0') {
+        return '0';
     }
 
     return null;
@@ -206,7 +225,7 @@ function intersoccer_discount_player_identity_tokens($source) {
     }
 
     if (is_array($source)) {
-        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player'] as $field) {
+        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player', 'intersoccer_player_index', 'Player Index'] as $field) {
             if (!array_key_exists($field, $source)) {
                 continue;
             }
@@ -216,8 +235,14 @@ function intersoccer_discount_player_identity_tokens($source) {
             }
             $tokens[] = trim((string) $value);
         }
+        // Index 0 is a valid first-player slot.
+        if (array_key_exists('intersoccer_player_index', $source) && ($source['intersoccer_player_index'] === 0 || $source['intersoccer_player_index'] === '0')) {
+            $tokens[] = '0';
+        } elseif (array_key_exists('assigned_player', $source) && ($source['assigned_player'] === 0 || $source['assigned_player'] === '0')) {
+            $tokens[] = '0';
+        }
     } elseif (is_object($source) && method_exists($source, 'get_meta')) {
-        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player'] as $field) {
+        foreach (['assigned_player_id', 'assigned_attendee', 'assigned_player', 'intersoccer_player_index', 'Player Index'] as $field) {
             $value = $source->get_meta($field);
             if ($value === null || $value === '') {
                 continue;
@@ -1225,6 +1250,7 @@ function intersoccer_build_cart_context($cart_items) {
         $variation_id = $cart_item['variation_id'] ?? 0;
         $assigned_player = $cart_item['assigned_attendee'] ?? $cart_item['assigned_player'] ?? null;
         $assigned_player_id = $cart_item['assigned_player_id'] ?? null;
+        $pm_player_index = $cart_item['intersoccer_player_index'] ?? $cart_item['Player Index'] ?? null;
         $product_type = intersoccer_get_product_type($product_id);
         $price = floatval($cart_item['data']->get_price());
         
@@ -1245,6 +1271,7 @@ function intersoccer_build_cart_context($cart_items) {
             'parent_product_id' => $parent_product_id,
             'assigned_player' => $assigned_player,
             'assigned_player_id' => $assigned_player_id,
+            'intersoccer_player_index' => $pm_player_index,
             'product_type' => $product_type,
             'price' => $price,
             'quantity' => $cart_item['quantity']

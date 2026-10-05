@@ -497,8 +497,28 @@ function intersoccer_get_product_program_year($product_id) {
  * @return string
  */
 function intersoccer_discount_season_key($product_id) {
+    $product_id = (int) $product_id;
     $season = (string) (intersoccer_get_product_season($product_id) ?: '');
     $year   = (string) (intersoccer_get_product_program_year($product_id) ?: '');
+
+    // Parent-only taxonomies (pa_program-season, pa_program-year) are not copied onto
+    // variations. Cart/order paths often pass variation_id first; fall back to parent
+    // so same-week siblings on one camp variation still share a season bucket (#72 gap).
+    if (($season === '' || $year === '') && $product_id > 0 && function_exists('wc_get_product')) {
+        $product = wc_get_product($product_id);
+        if ($product && method_exists($product, 'get_parent_id')) {
+            $parent_id = (int) $product->get_parent_id();
+            if ($parent_id > 0) {
+                if ($season === '') {
+                    $season = (string) (intersoccer_get_product_season($parent_id) ?: '');
+                }
+                if ($year === '') {
+                    $year = (string) (intersoccer_get_product_program_year($parent_id) ?: '');
+                }
+            }
+        }
+    }
+
     if (function_exists('intersoccer_discount_compose_season_key')) {
         return intersoccer_discount_compose_season_key($season, $year);
     }
