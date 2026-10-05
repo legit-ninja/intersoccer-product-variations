@@ -200,6 +200,98 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertLessThan(2, count($merged['totals']));
     }
 
+
+    /**
+     * Camp prior totals must honor the same season filter as courses (#65).
+     */
+    public function testCampSeasonFilterExcludesOtherSeason() {
+        $season_filter = ['autumn|2026'];
+        $items = [
+            ['season' => 'autumn|2026', 'assigned_player_id' => 'a', 'line_total' => 100, 'booking_type' => 'full-week'],
+            ['season' => 'summer|2026', 'assigned_player_id' => 'b', 'line_total' => 200, 'booking_type' => 'full-week'],
+        ];
+        $totals = [];
+        $season_filter_set = array_map('strval', $season_filter);
+        foreach ($items as $item) {
+            if (!intersoccer_discount_camp_booking_counts_for_sibling($item['booking_type'] ?? '')) {
+                continue;
+            }
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter_set, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            $totals[$key] = ($totals[$key] ?? 0) + floatval($item['line_total']);
+        }
+        $this->assertSame(['a' => 100.0], $totals, 'Other-season camp spend must be excluded');
+    }
+
+    /**
+     * Camp sibling path must pass a season filter into prior totals (#65).
+     */
+    public function testCampSiblingPathPassesSeasonFilter() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            '($product_type === \'course\' || $product_type === \'camp\') && $season_filter_set !== null',
+            $contents,
+            'Season filter must apply to camp prior items'
+        );
+        $this->assertStringContainsString(
+            '\'season\' => $season',
+            $contents,
+            'Camp order extract must include season'
+        );
+        $this->assertStringContainsString(
+            'camps_by_season_child',
+            $contents,
+            'Cart context must group camps by season like courses'
+        );
+        $this->assertStringContainsString(
+            'foreach ($camps_by_season as $season => $season_children)',
+            $contents,
+            'Camp sibling ranking must run per season'
+        );
+        $found = false;
+        $marker = 'intersoccer_get_previous_sibling_child_totals(';
+        $pos = 0;
+        while (($pos = strpos($contents, $marker, $pos)) !== false) {
+            $snippet = substr($contents, $pos, 320);
+            if (strpos($snippet, "'camp'") !== false && (
+                strpos($snippet, 'season') !== false || strpos($snippet, '$season') !== false
+            )) {
+                $found = true;
+                break;
+            }
+            $pos += strlen($marker);
+        }
+        $this->assertTrue($found, 'Camp prior totals call must pass a season filter');
+        $meta = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php');
+        $this->assertStringContainsString('_intersoccer_discount_season_key', $meta);
+    }
+
+    /**
+     * Mixed Summer + Autumn cart must not pair children across seasons (#65).
+     */
+    public function testMixedSeasonCartChildrenDoNotShareSiblingRanking() {
+        $summer = [
+            'child-a' => [['cart_key' => 's_a', 'assigned_player_id' => 'child-a', 'price' => 500.0, 'quantity' => 1, 'product_id' => 1, 'season' => 'summer|2026']],
+        ];
+        $autumn = [
+            'child-b' => [['cart_key' => 'a_b', 'assigned_player_id' => 'child-b', 'price' => 400.0, 'quantity' => 1, 'product_id' => 2, 'season' => 'autumn|2026']],
+        ];
+
+        // Each season ranked alone has only one child => no sibling rate.
+        foreach ([$summer, $autumn] as $season_children) {
+            $merged = intersoccer_merge_sibling_child_totals($season_children, []);
+            $this->assertLessThan(2, count($merged['totals']), 'Single-season single child must not unlock sibling');
+        }
+
+        // Combined across seasons would wrongly unlock sibling — product forbids that.
+        $combined = array_merge($summer, $autumn);
+        $merged_all = intersoccer_merge_sibling_child_totals($combined, []);
+        $this->assertCount(2, $merged_all['totals'], 'Sanity: two children exist across seasons');
+    }
+
     public function testCourseSeasonFilterExcludesOtherSeason() {
         $season_filter = ['spring-2026'];
         $prior_items = [

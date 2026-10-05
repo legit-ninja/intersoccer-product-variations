@@ -405,12 +405,15 @@ function intersoccer_extract_course_items_from_order($order) {
             }
         }
 
-        $season_product_id = $variation_id ?: $product_id;
-        $season = function_exists('intersoccer_discount_season_key')
-            ? intersoccer_discount_season_key($season_product_id)
-            : (function_exists('intersoccer_get_product_season')
-                ? intersoccer_get_product_season($season_product_id)
-                : '');
+        $season = (string) ($item->get_meta('_intersoccer_discount_season_key') ?: '');
+        if ($season === '') {
+            $season_product_id = $variation_id ?: $product_id;
+            $season = function_exists('intersoccer_discount_season_key')
+                ? (string) intersoccer_discount_season_key($season_product_id)
+                : (function_exists('intersoccer_get_product_season')
+                    ? (string) (intersoccer_get_product_season($season_product_id) ?: '')
+                    : '');
+        }
         
         $course_items[] = [
             'order_id' => $order->get_id(),
@@ -532,6 +535,16 @@ function intersoccer_extract_camp_items_from_order($order) {
             $week_number = intersoccer_parse_camp_week_from_terms($camp_terms);
         }
         
+        $season = (string) ($item->get_meta('_intersoccer_discount_season_key') ?: '');
+        if ($season === '') {
+            $season_product_id = $variation_id ?: $product_id;
+            $season = function_exists('intersoccer_discount_season_key')
+                ? (string) intersoccer_discount_season_key($season_product_id)
+                : (function_exists('intersoccer_get_product_season')
+                    ? (string) (intersoccer_get_product_season($season_product_id) ?: '')
+                    : '');
+        }
+
         $camp_items[] = [
             'order_id' => $order->get_id(),
             'item_id' => $item_id,
@@ -543,6 +556,7 @@ function intersoccer_extract_camp_items_from_order($order) {
             'camp_terms' => $camp_terms,
             'booking_type' => $booking_type,
             'week_number' => $week_number,
+            'season' => $season,
             'line_total' => intersoccer_discount_order_item_line_total($item),
             'quantity' => $item->get_quantity(),
             'order_date' => $order->get_date_created()->format('Y-m-d H:i:s')
@@ -837,7 +851,7 @@ function intersoccer_get_previous_sibling_child_totals($customer_id, $product_ty
                 }
             }
 
-            if ($product_type === 'course' && $season_filter_set !== null) {
+            if (($product_type === 'course' || $product_type === 'camp') && $season_filter_set !== null) {
                 $season = isset($item['season']) ? (string) $item['season'] : '';
                 if ($season === '' || !in_array($season, $season_filter_set, true)) {
                     continue;
@@ -974,6 +988,7 @@ function intersoccer_build_cart_context($cart_items) {
         'camps_by_child' => array(),
         'courses_by_child' => array(),
         'tournaments_by_child' => array(),
+        'camps_by_season_child' => array(),
         'courses_by_season_child' => array(),
         'all_items' => array(),
         'previous_courses' => array(),     // Previous course purchases by parent_product_id and assigned_player
@@ -1045,10 +1060,23 @@ function intersoccer_build_cart_context($cart_items) {
                 // Check if it's full-week (combo discounts only apply to full-week)
                 $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
                 if ($booking_type === 'full-week' || empty($booking_type)) {
+                    $item_data['season'] = function_exists('intersoccer_discount_season_key')
+                        ? intersoccer_discount_season_key($variation_id ?: $product_id)
+                        : (function_exists('intersoccer_get_product_season')
+                            ? intersoccer_get_product_season($product_id)
+                            : '');
                     if (!isset($context['camps_by_child'][$player_key])) {
                         $context['camps_by_child'][$player_key] = array();
                     }
                     $context['camps_by_child'][$player_key][] = $item_data;
+
+                    $camp_season = isset($item_data['season']) ? (string) $item_data['season'] : '';
+                    if ($camp_season !== '') {
+                        if (!isset($context['camps_by_season_child'][$camp_season][$player_key])) {
+                            $context['camps_by_season_child'][$camp_season][$player_key] = array();
+                        }
+                        $context['camps_by_season_child'][$camp_season][$player_key][] = $item_data;
+                    }
                 }
             } elseif ($product_type === 'course') {
                 $season = function_exists('intersoccer_discount_season_key')
@@ -1388,24 +1416,57 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         $camp_3rd_rate = $discount_rates['camp']['3rd_plus_child'] ?? null;
         
         if ($camp_2nd_rate !== null || $camp_3rd_rate !== null) {
-            $camp_children = $context['camps_by_child'];
-            $prior_totals = [];
             $enable_retroactive_siblings = get_option('intersoccer_enable_retroactive_sibling_discounts', true);
             $customer_id = get_current_user_id();
             $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
 
-            if ($enable_retroactive_siblings && intersoccer_discount_customer_identifiable($customer_id)) {
-                $prior_totals = intersoccer_get_previous_sibling_child_totals($customer_id, 'camp', $lookback_months);
+            // Same-season only: never rank Summer against Autumn in one cart (#65 follow-up).
+            $camps_by_season = $context['camps_by_season_child'] ?? [];
+            if (empty($camps_by_season) && !empty($context['camps_by_child'])) {
+                foreach ($context['camps_by_child'] as $player_key => $items) {
+                    foreach ($items as $item) {
+                        $season = '';
+                        if (!empty($item['season'])) {
+                            $season = (string) $item['season'];
+                        } elseif (!empty($item['product_id']) && function_exists('intersoccer_discount_season_key')) {
+                            $season_product_id = !empty($item['variation_id']) ? $item['variation_id'] : $item['product_id'];
+                            $season = (string) intersoccer_discount_season_key($season_product_id);
+                        } elseif (!empty($item['product_id']) && function_exists('intersoccer_get_product_season')) {
+                            $season = (string) intersoccer_get_product_season($item['product_id']);
+                        }
+                        if ($season === '') {
+                            continue;
+                        }
+                        if (!isset($camps_by_season[$season][$player_key])) {
+                            $camps_by_season[$season][$player_key] = [];
+                        }
+                        $camps_by_season[$season][$player_key][] = $item;
+                    }
+                }
             }
 
-            $merged = intersoccer_merge_sibling_child_totals($camp_children, $prior_totals);
-            $child_totals = $merged['totals'];
-            $camp_children = $merged['cart_by_child'];
+            $template = intersoccer_translate_string('%s Camp Sibling Discount', 'intersoccer-product-variations', '%s Camp Sibling Discount');
+            foreach ($camps_by_season as $season => $season_children) {
+                $prior_totals = [];
+                if ($enable_retroactive_siblings && intersoccer_discount_customer_identifiable($customer_id)) {
+                    $prior_totals = intersoccer_get_previous_sibling_child_totals(
+                        $customer_id,
+                        'camp',
+                        $lookback_months,
+                        [(string) $season]
+                    );
+                }
 
-            if (count($child_totals) >= 2) {
+                $merged = intersoccer_merge_sibling_child_totals($season_children, $prior_totals);
+                $child_totals = $merged['totals'];
+                $camp_children = $merged['cart_by_child'];
+
+                if (count($child_totals) < 2) {
+                    continue;
+                }
+
                 arsort($child_totals);
                 $sorted_children = array_keys($child_totals);
-                $template = intersoccer_translate_string('%s Camp Sibling Discount', 'intersoccer-product-variations', '%s Camp Sibling Discount');
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
