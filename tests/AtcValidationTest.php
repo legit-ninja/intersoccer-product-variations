@@ -194,12 +194,12 @@ class AtcValidationTest extends TestCase
      * @group atc-validation
      * @group production-code
      */
-    public function testHasNoPostedPlayerAssignmentZero()
+    public function testHasPostedPlayerAssignmentZeroIndex()
     {
         $_POST['player_assignment'] = '0';
-        $this->assertFalse(
+        $this->assertTrue(
             intersoccer_has_posted_player_assignment(),
-            'Zero player_assignment should not count'
+            'Player index 0 is the first attendee and must count'
         );
     }
 
@@ -249,11 +249,9 @@ class AtcValidationTest extends TestCase
         $passed = intersoccer_validate_cart_item(true, 123, 1, null, null, null);
 
         $this->assertFalse($passed, 'Logged-in users without player selection should be rejected');
-        $this->assertNotEmpty($GLOBALS['wc_notices'], 'An error notice should be added');
-        $this->assertStringContainsString(
-            'select an attendee',
-            strtolower($GLOBALS['wc_notices'][0]['message']),
-            'Notice should prompt attendee selection'
+        $this->assertEmpty(
+            $GLOBALS['wc_notices'],
+            'No customer-facing select-attendee notice; block is silent server-side'
         );
     }
 
