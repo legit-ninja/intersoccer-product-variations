@@ -116,7 +116,28 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling(''));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('full-week'));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Full Week'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('ganze Woche'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Ganze Woche'));
         $this->assertFalse(intersoccer_discount_camp_booking_counts_for_sibling('single-days'));
+    }
+
+    /**
+     * Cart camp grouping must use the same full-week normalizer as prior orders (#69).
+     */
+    public function testCartCampGroupingUsesSharedFullWeekNormalizer() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling($booking_type)',
+            $contents,
+            'build_cart_context must use the shared full-week helper for camps_by_child'
+        );
+        $pos = strpos($contents, "context['camps_by_child']");
+        $this->assertNotFalse($pos);
+        $snippet = substr($contents, max(0, $pos - 400), 800);
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling',
+            $snippet
+        );
     }
 
     public function testPriorChildPlusCartChildRanksSecondChild() {

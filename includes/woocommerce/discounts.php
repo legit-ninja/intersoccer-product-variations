@@ -1057,9 +1057,9 @@ function intersoccer_build_cart_context($cart_items) {
         
         if ($player_key !== null) {
             if ($product_type === 'camp') {
-                // Check if it's full-week (combo discounts only apply to full-week)
+                // Full-week only — shared normalizer (locales / alternate spellings)
                 $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
-                if ($booking_type === 'full-week' || empty($booking_type)) {
+                if (intersoccer_discount_camp_booking_counts_for_sibling($booking_type)) {
                     $item_data['season'] = function_exists('intersoccer_discount_season_key')
                         ? intersoccer_discount_season_key($variation_id ?: $product_id)
                         : (function_exists('intersoccer_get_product_season')
