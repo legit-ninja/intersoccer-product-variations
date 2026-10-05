@@ -898,10 +898,20 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
 
     if (is_array($prior_totals)) {
         foreach ($prior_totals as $player_key => $spend) {
-            if (!isset($totals[$player_key])) {
-                $totals[$player_key] = 0;
+            $matched_key = null;
+            foreach (array_keys($totals) as $existing_key) {
+                if (intersoccer_discount_players_match($existing_key, $player_key)) {
+                    $matched_key = $existing_key;
+                    break;
+                }
             }
-            $totals[$player_key] += floatval($spend);
+            if ($matched_key === null) {
+                $matched_key = (string) $player_key;
+            }
+            if (!isset($totals[$matched_key])) {
+                $totals[$matched_key] = 0;
+            }
+            $totals[$matched_key] += floatval($spend);
         }
     }
 
