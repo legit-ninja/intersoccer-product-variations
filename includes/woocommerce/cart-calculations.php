@@ -298,6 +298,49 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         }
     }
 
+    // Apple Pay / Store API often omit player POST fields — recover from WC session stash (#64).
+    if (
+        empty($cart_item_data['assigned_player_id'])
+        && (!isset($cart_item_data['assigned_player']) || $cart_item_data['assigned_player'] === '' || $cart_item_data['assigned_player'] === null)
+        && function_exists('intersoccer_get_stashed_selected_player')
+    ) {
+        $stashed = intersoccer_get_stashed_selected_player((int) $product_id);
+        if (is_array($stashed) && (!empty($stashed['player_id']) || (isset($stashed['player_index']) && $stashed['player_index'] !== '' && $stashed['player_index'] !== null))) {
+            if (!empty($stashed['player_id'])) {
+                $_POST['assigned_player_id'] = $stashed['player_id'];
+            }
+            if (isset($stashed['player_index']) && $stashed['player_index'] !== '' && $stashed['player_index'] !== null) {
+                $_POST['player_assignment'] = $stashed['player_index'];
+            }
+            $posted_player_id = intersoccer_get_posted_assigned_player_id();
+            if ($posted_player_id !== '') {
+                $cart_item_data['assigned_player_id'] = $posted_player_id;
+                $cart_item_data['unique_key'] = 'player_' . $posted_player_id;
+            }
+            $posted_player_index = intersoccer_get_posted_player_assignment_index();
+            if ($posted_player_index !== null) {
+                $cart_item_data['assigned_player'] = $posted_player_index;
+                $user_id = get_current_user_id();
+                $player_details = intersoccer_get_player_details($user_id, $cart_item_data['assigned_player']);
+                $cart_item_data['assigned_attendee'] = $player_details['name'];
+                if (!empty($player_details['player_id'])) {
+                    $cart_item_data['assigned_player_id'] = $player_details['player_id'];
+                    if (empty($cart_item_data['unique_key'])) {
+                        $cart_item_data['unique_key'] = 'player_' . $player_details['player_id'];
+                    }
+                }
+            } elseif (!empty($cart_item_data['assigned_player_id']) && function_exists('intersoccer_get_player_by_id')) {
+                $by_id = intersoccer_get_player_by_id(get_current_user_id(), $cart_item_data['assigned_player_id']);
+                if (is_array($by_id)) {
+                    $cart_item_data['assigned_attendee'] = trim(($by_id['first_name'] ?? '') . ' ' . ($by_id['last_name'] ?? ''));
+                    if (isset($by_id['key'])) {
+                        $cart_item_data['assigned_player'] = $by_id['key'];
+                    }
+                }
+            }
+        }
+    }
+
     // Camp days
     $posted_camp_days = intersoccer_get_posted_camp_days($variation_id);
     if (!empty($posted_camp_days)) {
@@ -1310,6 +1353,157 @@ function intersoccer_store_selected_days_callback() {
         wp_send_json_error(['message' => 'Session not available']);
     }
 }
+
+
+
+/**
+ * Session key for the last player chosen on a product page (Apple Pay / Store API).
+ *
+ * @param int $product_id
+ * @return string
+ */
+function intersoccer_selected_player_session_key($product_id) {
+    return 'intersoccer_selected_player_' . absint($product_id);
+}
+
+/**
+ * Stash the selected player for a product so express checkout can recover it.
+ *
+ * @param int               $product_id
+ * @param array             $payload {player_index?: mixed, player_id?: string}
+ * @return bool
+ */
+function intersoccer_stash_selected_player($product_id, array $payload) {
+    if (!function_exists('WC') || !WC() || !WC()->session) {
+        return false;
+    }
+    $product_id = absint($product_id);
+    if ($product_id <= 0) {
+        return false;
+    }
+    $clean = [
+        'player_index' => $payload['player_index'] ?? null,
+        'player_id' => isset($payload['player_id']) ? sanitize_text_field((string) $payload['player_id']) : '',
+        'stashed_at' => time(),
+    ];
+    WC()->session->set(intersoccer_selected_player_session_key($product_id), $clean);
+    return true;
+}
+
+/**
+ * @param int $product_id
+ * @return array|null
+ */
+function intersoccer_get_stashed_selected_player($product_id) {
+    if (!function_exists('WC') || !WC() || !WC()->session) {
+        return null;
+    }
+    $data = WC()->session->get(intersoccer_selected_player_session_key($product_id));
+    return is_array($data) ? $data : null;
+}
+
+add_action('wp_ajax_intersoccer_store_selected_player', 'intersoccer_store_selected_player_callback');
+add_action('wp_ajax_nopriv_intersoccer_store_selected_player', 'intersoccer_store_selected_player_callback');
+function intersoccer_store_selected_player_callback() {
+    $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+    if ($nonce && !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
+        wp_send_json_error(['message' => 'Invalid nonce'], 403);
+    }
+    $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
+    $player_index = array_key_exists('player_index', $_POST) ? wp_unslash($_POST['player_index']) : null;
+    $player_id = isset($_POST['player_id']) ? sanitize_text_field(wp_unslash((string) $_POST['player_id'])) : '';
+    if ($product_id <= 0) {
+        wp_send_json_error(['message' => 'Missing product_id']);
+    }
+    $ok = intersoccer_stash_selected_player($product_id, [
+        'player_index' => $player_index,
+        'player_id' => $player_id,
+    ]);
+    if (!$ok) {
+        wp_send_json_error(['message' => 'Session not available']);
+    }
+    wp_send_json_success(['message' => 'Player stored', 'product_id' => $product_id]);
+}
+
+/**
+ * Whether a cart line for camp/course/birthday has an assigned player.
+ *
+ * @param array $cart_item
+ * @return bool
+ */
+function intersoccer_cart_item_has_assigned_player(array $cart_item) {
+    if (!empty($cart_item['assigned_player_id'])) {
+        return true;
+    }
+    if (isset($cart_item['assigned_player']) && $cart_item['assigned_player'] !== '' && $cart_item['assigned_player'] !== null) {
+        return true;
+    }
+    if (!empty($cart_item['assigned_attendee'])) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Block checkout when camp/course lines have no assigned player (#64).
+ */
+function intersoccer_validate_cart_players_present() {
+    if (!function_exists('WC') || !WC() || !WC()->cart) {
+        return;
+    }
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
+        if ($product_id <= 0) {
+            continue;
+        }
+        if (!function_exists('intersoccer_product_requires_attendee') || !intersoccer_product_requires_attendee($product_id)) {
+            continue;
+        }
+        if (intersoccer_cart_item_has_assigned_player($cart_item)) {
+            continue;
+        }
+        wc_add_notice(
+            __('Please select an attendee for each camp or course before checking out.', 'intersoccer-product-variations'),
+            'error'
+        );
+        return;
+    }
+}
+add_action('woocommerce_check_cart_items', 'intersoccer_validate_cart_players_present', 20);
+add_action('woocommerce_checkout_process', 'intersoccer_validate_cart_players_present', 20);
+
+/**
+ * Store API / block checkout: reject orders with camp/course lines missing a player (#64).
+ *
+ * @param \WC_Order|\WP_REST_Request $order_or_request
+ */
+function intersoccer_store_api_validate_cart_players($order_or_request = null) {
+    if (!function_exists('WC') || !WC() || !WC()->cart) {
+        return;
+    }
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
+        if ($product_id <= 0) {
+            continue;
+        }
+        if (!function_exists('intersoccer_product_requires_attendee') || !intersoccer_product_requires_attendee($product_id)) {
+            continue;
+        }
+        if (intersoccer_cart_item_has_assigned_player($cart_item)) {
+            continue;
+        }
+        if (class_exists('\Automattic\WooCommerce\StoreApi\Exceptions\RouteException')) {
+            throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
+                'intersoccer_missing_player',
+                __('Please select an attendee for each camp or course before checking out.', 'intersoccer-product-variations'),
+                400
+            );
+        }
+        throw new \Exception(__('Please select an attendee for each camp or course before checking out.', 'intersoccer-product-variations'));
+    }
+}
+add_action('woocommerce_store_api_checkout_update_order_from_request', 'intersoccer_store_api_validate_cart_players', 5, 1);
+
 
 intersoccer_debug('InterSoccer: Loaded cart-calculations.php');
 // function intersoccer_apply_combo_discounts_to_items($cart) {
