@@ -300,11 +300,36 @@ function intersoccer_discount_order_item_line_total($item) {
 }
 
 /**
+ * Lookback months for prior-order scans.
+ *
+ * Same-season matching is the primary window. When $season_scoped is true,
+ * use a loose upper bound (24 months) so an older same-season order is not
+ * dropped by the month setting. Month limit never excludes same-season rows
+ * that still fall inside that bound.
+ *
+ * @param bool $season_scoped
+ * @return int
+ */
+function intersoccer_discount_retroactive_lookback_months($season_scoped = false) {
+    if ($season_scoped) {
+        return 24;
+    }
+    $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+    if ($lookback_months < 1) {
+        $lookback_months = 6;
+    }
+    if ($lookback_months > 24) {
+        $lookback_months = 24;
+    }
+    return $lookback_months;
+}
+
+/**
  * Get customer's previous orders with configurable lookback period
- * 
+ *
  * @param int $customer_id Customer user ID
  * @param string|null $customer_email Customer email (fallback for guest orders)
- * @param int $lookback_months Number of months to look back (default: 6)
+ * @param int $lookback_months Number of months to look back (default: 6). 0 = no date filter.
  * @return array Array of WC_Order objects
  */
 function intersoccer_get_customer_previous_orders($customer_id, $customer_email = null, $lookback_months = 6) {
@@ -332,10 +357,10 @@ function intersoccer_get_customer_previous_orders($customer_id, $customer_email 
         return [];
     }
     
-    // Add date range filter
+    // Add date range filter (WC recognizes date_created, not date_after)
     if ($lookback_months > 0) {
         $date_after = date('Y-m-d', strtotime("-{$lookback_months} months"));
-        $args['date_after'] = $date_after;
+        $args['date_created'] = '>' . $date_after;
     }
     
     $order_ids = wc_get_orders($args);
@@ -775,6 +800,12 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
     if ($season_key === '') {
         return [];
     }
+    // Same-season matching is the window; always use the 24-month season-scoped scan (#68/#66).
+    if (function_exists('intersoccer_discount_retroactive_lookback_months')) {
+        $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
+    } else {
+        $lookback_months = 24;
+    }
     $player_tokens = intersoccer_discount_player_identity_tokens($player_ref);
     $player_cache = $player_tokens
         ? implode('|', $player_tokens)
@@ -894,6 +925,10 @@ function intersoccer_discount_customer_identifiable($customer_id) {
  */
 function intersoccer_get_previous_sibling_child_totals($customer_id, $product_type, $lookback_months = 6, $season_filter = null) {
     static $cache = [];
+    // Season key is the real window; months are only a loose scan bound (#68).
+    if (is_array($season_filter) && !empty($season_filter)) {
+        $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
+    }
     $season_key = is_array($season_filter) ? implode(',', $season_filter) : '';
     $cache_key = 'sibling_' . $product_type . '_' . $customer_id . '_' . $lookback_months . '_' . $season_key;
 
@@ -1124,14 +1159,9 @@ function intersoccer_build_cart_context($cart_items) {
         }
     }
     
-    // Get lookback period from settings (default: 6 months)
-    $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
-    if ($lookback_months < 1) {
-        $lookback_months = 6; // Minimum 1 month
-    }
-    if ($lookback_months > 24) {
-        $lookback_months = 24; // Maximum 24 months
-    }
+    // Absolute scan window. Season-scoped paths widen to 24 months separately (#68).
+    $lookback_months = intersoccer_discount_retroactive_lookback_months(false);
+    $lookback_months_season = intersoccer_discount_retroactive_lookback_months(true);
     
     // Build cart items context
     foreach ($cart_items as $cart_item_key => $cart_item) {
@@ -1265,7 +1295,7 @@ function intersoccer_build_cart_context($cart_items) {
                     $customer_id,
                     $combo['parent_product_id'],
                     $combo['player_ref'],
-                    $lookback_months
+                    $lookback_months_season
                 );
                 if (!empty($previous_courses)) {
                     $context['previous_courses'][$key] = $previous_courses;
@@ -1280,7 +1310,7 @@ function intersoccer_build_cart_context($cart_items) {
                     $customer_id,
                     $combo['parent_product_id'],
                     $combo['player_ref'],
-                    $lookback_months
+                    $lookback_months_season
                 );
                 if (!empty($previous_camps)) {
                     $context['previous_camps'][$key] = $previous_camps;
@@ -1531,7 +1561,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         if ($camp_2nd_rate !== null || $camp_3rd_rate !== null) {
             $enable_retroactive_siblings = get_option('intersoccer_enable_retroactive_sibling_discounts', true);
             $customer_id = get_current_user_id();
-            $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+            $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
 
             // Same-season only: never rank Summer against Autumn in one cart (#65 follow-up).
             $camps_by_season = $context['camps_by_season_child'] ?? [];
@@ -1604,7 +1634,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         
         if ($enable_retroactive_camps && ($camp_week_2_rate !== null || $camp_week_3_plus_rate !== null)) {
             $customer_id = get_current_user_id();
-            $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+            $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
 
             // Group cart full-week camps by child|season; process in cart order within each group.
             $groups = [];
@@ -1704,7 +1734,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             $prior_totals = [];
             $enable_retroactive_siblings = get_option('intersoccer_enable_retroactive_sibling_discounts', true);
             $customer_id = get_current_user_id();
-            $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+            $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
 
             $season_filter = [];
             foreach ($course_children as $items) {
@@ -1827,7 +1857,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         
                         // Check previous orders for same parent product and same assigned player
                         $customer_id = get_current_user_id();
-                        $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+                        $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
                         $previous_courses = intersoccer_get_previous_courses_by_parent(
                             $customer_id,
                             $parent_product_id,
@@ -1911,7 +1941,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         
         if ($tournament_same_child_rate !== null) {
             $customer_id = get_current_user_id();
-            $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+            $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
             
             // Group tournaments by assigned player and parent product
             $tournaments_by_player_parent = array();
