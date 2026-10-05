@@ -190,6 +190,41 @@ class RetroactiveSiblingDiscountTest extends TestCase {
     }
 
     /**
+     * Cross-order: prior order had A+B; cart only rebooks A.
+     * A already appeared in earlier orders so keeps early rank (no sibling rate).
+     */
+    public function testPriorWithTwoChildrenCartOnlyFirstChildKeepsFullPrice() {
+        $cart_by_child = [
+            'child-a' => [
+                [
+                    'cart_key' => 'ck_a',
+                    'assigned_player_id' => 'child-a',
+                    'price' => 300.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        $prior_totals = [
+            'child-a' => 500.0,
+            'child-b' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $prior_totals
+        );
+
+        $this->assertSame('child-a', $sorted[0], 'Child already in earlier orders keeps first rank');
+        $this->assertSame('child-b', $sorted[1], 'Prior sibling stays ranked by prior spend');
+        $index_a = array_search('child-a', $sorted, true);
+        $percent = ($index_a === 1) ? 0.20 : (($index_a >= 2) ? 0.30 : 0);
+        $this->assertEquals(0.0, $percent, 'Returning first child must get no sibling rate (full price)');
+    }
+
+    /**
      * Same-cart ranking by spend must remain unchanged when there is no prior (#63).
      */
     public function testSameCartSpendRankingUnchangedWithoutPrior() {

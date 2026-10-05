@@ -926,25 +926,13 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
 }
 
 /**
- * Apply sibling rate to cart lines for ranked children (cart lines only).
- *
- * @param WC_Cart $cart
- * @param array   $sorted_children Player keys highest spend first
- * @param array   $cart_by_child   Cart items by player key
- * @param float|null $rate_2nd
- * @param float|null $rate_3rd
- * @param string  $message_prefix  e.g. camp_multi_child_
- * @param string  $template        sprintf template with %s for percent
- * @param string  $debug_label
- * @return array player_key => applied percent (cart children only)
- */
-
-/**
  * Rank children for sibling rates.
  *
  * Same-cart (no prior spend): highest spend first (unchanged).
- * Cross-order: prior-only children keep the early ranks; cart children follow
- * by spend so a more expensive new registration still gets the sibling rate.
+ * Cross-order: children who already appear in earlier orders keep the early
+ * ranks (sorted by spend among themselves). Children with no earlier bookings
+ * are appended after them, sorted by spend. A child who was already first in
+ * earlier orders stays first even when they are also in the cart.
  *
  * @param array $child_totals  player_key => spend
  * @param array $cart_by_child Cart items by player key
@@ -957,22 +945,38 @@ function intersoccer_rank_sibling_children_for_rates(array $child_totals, array 
         return array_keys($child_totals);
     }
 
-    $prior_only = [];
-    $cart_side = [];
+    $had_prior = [];
+    $new_in_cart = [];
     foreach ($child_totals as $key => $spend) {
-        if (isset($cart_by_child[$key])) {
-            $cart_side[$key] = $spend;
+        if (array_key_exists($key, $prior_totals)) {
+            // Rank prior kids by their prior spend so cart spend cannot reorder them.
+            $had_prior[$key] = floatval($prior_totals[$key]);
+        } elseif (isset($cart_by_child[$key])) {
+            $new_in_cart[$key] = $spend;
         } else {
-            $prior_only[$key] = $spend;
+            $had_prior[$key] = $spend;
         }
     }
 
-    arsort($prior_only);
-    arsort($cart_side);
+    arsort($had_prior);
+    arsort($new_in_cart);
 
-    return array_merge(array_keys($prior_only), array_keys($cart_side));
+    return array_merge(array_keys($had_prior), array_keys($new_in_cart));
 }
 
+/**
+ * Apply sibling rate to cart lines for ranked children (cart lines only).
+ *
+ * @param WC_Cart $cart
+ * @param array   $sorted_children Player keys highest spend first
+ * @param array   $cart_by_child   Cart items by player key
+ * @param float|null $rate_2nd
+ * @param float|null $rate_3rd
+ * @param string  $message_prefix  e.g. camp_multi_child_
+ * @param string  $template        sprintf template with %s for percent
+ * @param string  $debug_label
+ * @return array player_key => applied percent (cart children only)
+ */
 function intersoccer_apply_sibling_rates_to_cart($cart, $sorted_children, $cart_by_child, $rate_2nd, $rate_3rd, $message_prefix, $template, $debug_label) {
     $applied = [];
 
