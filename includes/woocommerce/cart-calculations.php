@@ -211,7 +211,8 @@ if (!function_exists('intersoccer_has_posted_player_assignment')) {
         foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
             if (isset($_POST[$field])) {
                 $val = trim((string) wp_unslash($_POST[$field]));
-                if ($val !== '' && $val !== '0') {
+                // "0" is a valid first-player index in intersoccer_players; only empty means missing.
+                if ($val !== '') {
                     return true;
                 }
             }
@@ -437,10 +438,10 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
             $passed = false;
             intersoccer_warning('Cart validation failed: guest attempted ATC on attendee-required product ' . $product_id);
         } elseif (!intersoccer_has_posted_player_assignment()) {
-            wc_add_notice(
-                __('Please select an attendee before adding to cart.', 'intersoccer-product-variations'),
-                'error'
-            );
+            // Block ATC without a player, but do not show a customer-facing
+            // "please select a player/attendee" notice. Product-page JS already
+            // guides selection; a server notice was leaking onto cart/checkout
+            // and was not a useful fix when the line already had a player.
             $passed = false;
             intersoccer_warning('Cart validation failed: no player selected for attendee-required product ' . $product_id);
         }
