@@ -231,16 +231,30 @@ class RetroactiveSiblingDiscountTest extends TestCase {
      */
     public function testCampSiblingPathPassesSeasonFilter() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
-        $this->assertMatchesRegularExpression(
-            "/intersoccer_get_previous_sibling_child_totals\(\s*\$customer_id,\s*'camp',\s*\$lookback_months,\s*!empty\(\$season_filter\)/",
-            $contents,
-            'Camp sibling prior totals must receive season_filter like courses'
-        );
         $this->assertStringContainsString(
-            "(\$product_type === 'course' || \$product_type === 'camp') && \$season_filter_set !== null",
+            '($product_type === \'course\' || $product_type === \'camp\') && $season_filter_set !== null',
             $contents,
             'Season filter must apply to camp prior items'
         );
+        $this->assertStringContainsString(
+            '\'season\' => $season',
+            $contents,
+            'Camp order extract must include season'
+        );
+        $found = false;
+        $marker = 'intersoccer_get_previous_sibling_child_totals(';
+        $pos = 0;
+        while (($pos = strpos($contents, $marker, $pos)) !== false) {
+            $snippet = substr($contents, $pos, 280);
+            if (strpos($snippet, "'camp'") !== false && strpos($snippet, 'season_filter') !== false) {
+                $found = true;
+                break;
+            }
+            $pos += strlen($marker);
+        }
+        $this->assertTrue($found, 'Camp prior totals call must pass season_filter');
+        $meta = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php');
+        $this->assertStringContainsString('_intersoccer_discount_season_key', $meta);
     }
 
     public function testCourseSeasonFilterExcludesOtherSeason() {
