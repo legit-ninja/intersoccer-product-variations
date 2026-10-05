@@ -741,6 +741,28 @@ function intersoccer_get_previous_tournaments_by_parent($customer_id, $parent_pr
  * @param int $lookback_months Number of months to look back (default: 6)
  * @return array Array of camp items
  */
+
+/**
+ * Same-child camp week position by booking order (not calendar week number).
+ *
+ * Only full-week prior bookings count. Position 1 = first qualifying booking
+ * (no progressive rate); 2 = second-week rate; 3+ = third-plus rate.
+ *
+ * @param array $previous_camps Prior camp rows (same parent product + player)
+ * @return int 1-based booking position for the current cart line
+ */
+function intersoccer_discount_same_child_week_position(array $previous_camps) {
+    $prior_full_week = 0;
+    foreach ($previous_camps as $prev_camp) {
+        $booking_type = $prev_camp['booking_type'] ?? '';
+        if (!intersoccer_discount_camp_booking_counts_for_sibling($booking_type)) {
+            continue;
+        }
+        $prior_full_week++;
+    }
+    return $prior_full_week + 1;
+}
+
 function intersoccer_get_previous_camps_by_parent($customer_id, $parent_product_id, $player_ref, $lookback_months = 6) {
     static $cache = [];
     $player_tokens = intersoccer_discount_player_identity_tokens($player_ref);
@@ -1535,23 +1557,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         $lookback_months
                     );
                     
-                    // Collect all week numbers (previous + current cart)
-                    $all_weeks = [];
-                    foreach ($previous_camps as $prev_camp) {
-                        if ($prev_camp['week_number']) {
-                            $all_weeks[] = $prev_camp['week_number'];
-                        }
-                    }
-                    
-                    // Add current cart week
-                    $all_weeks[] = $current_week;
-                    
-                    // Remove duplicates and sort
-                    $all_weeks = array_unique($all_weeks);
-                    sort($all_weeks);
-                    
-                    // Determine which week this is (1st, 2nd, 3rd+, etc.)
-                    $week_position = array_search($current_week, $all_weeks) + 1; // 1-based index
+                    // Position by booking order (not calendar week). Full-week priors only.
+                    $week_position = intersoccer_discount_same_child_week_position($previous_camps);
                     
                     // Apply progressive discount based on week position
                     $percent = 0;

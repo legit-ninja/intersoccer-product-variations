@@ -416,6 +416,37 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertStringContainsString('intersoccer_enable_retroactive_sibling_discounts', $contents);
     }
 
+
+    /**
+     * Booking week 5 first then week 2 later must treat the cart line as 2nd week (#66).
+     */
+    public function testSameChildWeekPositionUsesBookingOrderNotCalendar() {
+        $previous = [
+            [
+                'week_number' => 5,
+                'booking_type' => 'full-week',
+                'order_date' => '2026-08-01 10:00:00',
+            ],
+        ];
+        $position = intersoccer_discount_same_child_week_position($previous);
+        $this->assertSame(2, $position, 'Later booking of an earlier calendar week is still the second booking');
+    }
+
+    /**
+     * Single-day prior bookings must not count toward second-week position (#66).
+     */
+    public function testSameChildWeekPositionIgnoresNonFullWeekPriors() {
+        $previous = [
+            [
+                'week_number' => 3,
+                'booking_type' => 'single-days',
+                'order_date' => '2026-08-01 10:00:00',
+            ],
+        ];
+        $position = intersoccer_discount_same_child_week_position($previous);
+        $this->assertSame(1, $position, 'Single-day prior must not unlock second-week rate');
+    }
+
     public function testTournamentSiblingDoesNotUseRetroactivePriorTotals() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringNotContainsString(
