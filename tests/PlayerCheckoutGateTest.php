@@ -1,6 +1,9 @@
 <?php
 /**
- * Apple Pay / Store API player persistence and checkout gate (#64).
+ * Apple Pay / Store API player persistence (#64 / #71).
+ *
+ * Checkout/cart "select a player" gate notices were removed per Jeremy:
+ * players are assigned at add-to-cart; a cart/checkout nag is not a fix.
  */
 
 use PHPUnit\Framework\TestCase;
@@ -52,11 +55,9 @@ class PlayerCheckoutGateTest extends TestCase
         if (!function_exists('WC')) {
             $this->markTestSkipped('WC stub required');
         }
-        // Provide a minimal session bag via WC()->session if the bootstrap supports it.
         $this->assertTrue(function_exists('intersoccer_stash_selected_player'));
         $this->assertTrue(function_exists('intersoccer_get_stashed_selected_player'));
 
-        // If session is unavailable in unit stub, stash returns false — still assert helpers exist.
         $ok = @intersoccer_stash_selected_player(12345, [
             'player_index' => 0,
             'player_id' => 'uuid-luis',
@@ -70,19 +71,24 @@ class PlayerCheckoutGateTest extends TestCase
         }
     }
 
-    public function testSourceRegistersCheckoutPlayerGate()
+    public function testSourceKeepsStashAndHasNoCheckoutPlayerNag()
     {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php');
-        $this->assertStringContainsString("add_action('woocommerce_checkout_process', 'intersoccer_validate_cart_players_present'", $contents);
-        $this->assertStringContainsString("add_action('woocommerce_check_cart_items', 'intersoccer_validate_cart_players_present'", $contents);
-        $this->assertStringContainsString("woocommerce_store_api_checkout_update_order_from_request", $contents);
         $this->assertStringContainsString('intersoccer_store_selected_player', $contents);
         $this->assertStringContainsString('intersoccer_get_stashed_selected_player', $contents);
         $this->assertStringContainsString('intersoccer_restore_stashed_player_into_post', $contents);
         $this->assertStringContainsString('!$nonce || !wp_verify_nonce', $contents, 'Stash AJAX must require nonce');
         $this->assertStringContainsString('intersoccer_selected_player_belongs_to_user', $contents);
-        $this->assertStringContainsString('intersoccer_find_cart_item_missing_assigned_player', $contents);
-        $this->assertStringContainsString('remove this item from your cart', $contents);
+        $this->assertStringContainsString('intersoccer_clear_stashed_player_after_add', $contents);
+
+        $this->assertStringNotContainsString('intersoccer_validate_cart_players_present', $contents);
+        $this->assertStringNotContainsString('intersoccer_missing_attendee_checkout_message', $contents);
+        $this->assertStringNotContainsString('intersoccer_find_cart_item_missing_assigned_player', $contents);
+        $this->assertStringNotContainsString('intersoccer_store_api_validate_cart_players', $contents);
+        $this->assertStringNotContainsString('remove this item from your cart', $contents);
+        $this->assertStringNotContainsString("add_action('woocommerce_check_cart_items', 'intersoccer_validate_cart_players_present'", $contents);
+        $this->assertStringNotContainsString("add_action('woocommerce_checkout_process', 'intersoccer_validate_cart_players_present'", $contents);
+        $this->assertStringNotContainsString('woocommerce_store_api_checkout_update_order_from_request', $contents);
     }
 
     public function testValidateAcceptsStashedPlayerWithoutPost()
@@ -95,7 +101,6 @@ class PlayerCheckoutGateTest extends TestCase
             }
             return null;
         };
-        // Seed session stash via helper when WC session exists.
         $ok = @intersoccer_stash_selected_player(123, [
             'player_index' => 0,
             'player_id' => 'uuid-luis',
