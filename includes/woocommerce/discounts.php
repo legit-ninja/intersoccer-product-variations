@@ -415,8 +415,8 @@ function intersoccer_extract_course_items_from_order($order) {
         $product_id = $item->get_product_id();
         $variation_id = $item->get_variation_id();
         
-        // Check if it's a course
-        $product_type = intersoccer_get_product_type($variation_id ?: $product_id);
+        // Check if it's a course (parent fallback when variation type is empty)
+        $product_type = intersoccer_discount_resolve_line_product_type($product_id, $variation_id);
         if ($product_type !== 'course') {
             continue;
         }
@@ -495,6 +495,55 @@ function intersoccer_extract_course_items_from_order($order) {
  * @param bool|null   $has_birthday_signals   Pre-resolved signals or null to detect.
  * @return bool True = skip (not a camp sibling baseline contributor).
  */
+/**
+ * Resolve product type for an order/cart line: try the variation, then the parent.
+ *
+ * Variations often lack `_intersoccer_product_type` (NULL) while the parent is typed
+ * camp/course/tournament. Lookback extractors must not skip those lines.
+ *
+ * @param int $product_id   Parent product ID (WC order item product_id).
+ * @param int $variation_id Variation ID or 0.
+ * @return string|null
+ */
+function intersoccer_discount_resolve_line_product_type($product_id, $variation_id = 0) {
+    if (!function_exists('intersoccer_get_product_type')) {
+        return null;
+    }
+
+    $product_id = (int) $product_id;
+    $variation_id = (int) $variation_id;
+
+    if ($variation_id > 0) {
+        $type = intersoccer_get_product_type($variation_id);
+        if ($type !== null && $type !== '') {
+            return $type;
+        }
+    }
+
+    if ($product_id > 0 && $product_id !== $variation_id) {
+        $type = intersoccer_get_product_type($product_id);
+        if ($type !== null && $type !== '') {
+            return $type;
+        }
+    }
+
+    // Last resort: parent of the variation object.
+    if ($variation_id > 0 && function_exists('wc_get_product')) {
+        $product = wc_get_product($variation_id);
+        if ($product && method_exists($product, 'get_parent_id')) {
+            $parent_id = (int) $product->get_parent_id();
+            if ($parent_id > 0) {
+                $type = intersoccer_get_product_type($parent_id);
+                if ($type !== null && $type !== '') {
+                    return $type;
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 function intersoccer_discount_exclude_product_from_camp_sibling_baseline($product_id, $product_type = null, $has_birthday_signals = null) {
     $product_id = (int) $product_id;
     if ($product_id <= 0) {
@@ -532,8 +581,10 @@ function intersoccer_extract_camp_items_from_order($order) {
         $variation_id = $item->get_variation_id();
         
         // Camps only — never seed sibling baselines from birthday (incl. mis-typed camp meta).
+        // Prefer parent for type: variations often have NULL _intersoccer_product_type (Tess #62118/#62119).
         $resolve_id = $variation_id ?: $product_id;
-        if (intersoccer_discount_exclude_product_from_camp_sibling_baseline($resolve_id)) {
+        $line_type = intersoccer_discount_resolve_line_product_type($product_id, $variation_id);
+        if (intersoccer_discount_exclude_product_from_camp_sibling_baseline($resolve_id, $line_type)) {
             continue;
         }
         
@@ -696,8 +747,8 @@ function intersoccer_extract_tournament_items_from_order($order) {
         $product_id = $item->get_product_id();
         $variation_id = $item->get_variation_id();
         
-        // Check if it's a tournament
-        $product_type = intersoccer_get_product_type($variation_id ?: $product_id);
+        // Check if it's a tournament (parent fallback when variation type is empty)
+        $product_type = intersoccer_discount_resolve_line_product_type($product_id, $variation_id);
         if ($product_type !== 'tournament') {
             continue;
         }

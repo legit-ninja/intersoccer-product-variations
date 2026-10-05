@@ -69,6 +69,7 @@ class BirthdayDiscountExclusionTest extends TestCase {
 		$discounts = dirname(__DIR__) . '/includes/woocommerce/discounts.php';
 		$contents = file_get_contents($discounts);
 		$this->assertStringContainsString('function intersoccer_discount_exclude_product_from_camp_sibling_baseline', $contents);
-		$this->assertStringContainsString('intersoccer_discount_exclude_product_from_camp_sibling_baseline($resolve_id)', $contents);
+		$this->assertStringContainsString('intersoccer_discount_exclude_product_from_camp_sibling_baseline($resolve_id, $line_type)', $contents);
+		$this->assertStringContainsString('function intersoccer_discount_resolve_line_product_type', $contents);
 	}
 }
