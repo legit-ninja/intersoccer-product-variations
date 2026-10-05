@@ -200,6 +200,49 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertLessThan(2, count($merged['totals']));
     }
 
+
+    /**
+     * Camp prior totals must honor the same season filter as courses (#65).
+     */
+    public function testCampSeasonFilterExcludesOtherSeason() {
+        $season_filter = ['autumn|2026'];
+        $items = [
+            ['season' => 'autumn|2026', 'assigned_player_id' => 'a', 'line_total' => 100, 'booking_type' => 'full-week'],
+            ['season' => 'summer|2026', 'assigned_player_id' => 'b', 'line_total' => 200, 'booking_type' => 'full-week'],
+        ];
+        $totals = [];
+        $season_filter_set = array_map('strval', $season_filter);
+        foreach ($items as $item) {
+            if (!intersoccer_discount_camp_booking_counts_for_sibling($item['booking_type'] ?? '')) {
+                continue;
+            }
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter_set, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            $totals[$key] = ($totals[$key] ?? 0) + floatval($item['line_total']);
+        }
+        $this->assertSame(['a' => 100.0], $totals, 'Other-season camp spend must be excluded');
+    }
+
+    /**
+     * Camp sibling path must pass a season filter into prior totals (#65).
+     */
+    public function testCampSiblingPathPassesSeasonFilter() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertMatchesRegularExpression(
+            "/intersoccer_get_previous_sibling_child_totals\(\s*\$customer_id,\s*'camp',\s*\$lookback_months,\s*!empty\(\$season_filter\)/",
+            $contents,
+            'Camp sibling prior totals must receive season_filter like courses'
+        );
+        $this->assertStringContainsString(
+            "(\$product_type === 'course' || \$product_type === 'camp') && \$season_filter_set !== null",
+            $contents,
+            'Season filter must apply to camp prior items'
+        );
+    }
+
     public function testCourseSeasonFilterExcludesOtherSeason() {
         $season_filter = ['spring-2026'];
         $prior_items = [
