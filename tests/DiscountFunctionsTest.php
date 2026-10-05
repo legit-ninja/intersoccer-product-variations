@@ -160,12 +160,12 @@ class DiscountFunctionsTest extends TestCase {
         );
         
         $this->assertStringContainsString(
-            'date_created',
+            "\$args['date_created']",
             $contents,
             'Date filtering should use WooCommerce date_created (date_after is ignored)'
         );
         $this->assertStringContainsString(
-            "'date_created' => '>'",
+            ">' . \$date_after",
             $contents,
             'Lookback must pass a date_created greater-than query'
         );

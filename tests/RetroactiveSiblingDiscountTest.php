@@ -414,13 +414,13 @@ class RetroactiveSiblingDiscountTest extends TestCase {
      */
     public function testLookbackQueryUsesDateCreatedNotDateAfter() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
-        $this->assertMatchesRegularExpression(
-            "/\$args\['date_created'\]\s*=\s*'>'\s*\.\s*\$date_after/",
+        $this->assertStringContainsString(
+            "\$args['date_created'] = '>' . \$date_after",
             $contents,
             'intersoccer_get_customer_previous_orders must filter with date_created'
         );
-        $this->assertDoesNotMatchRegularExpression(
-            "/\$args\['date_after'\]/",
+        $this->assertStringNotContainsString(
+            "\$args['date_after']",
             $contents,
             'date_after is ignored by WooCommerce order queries'
         );
