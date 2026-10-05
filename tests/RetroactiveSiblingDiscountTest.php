@@ -116,7 +116,28 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling(''));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('full-week'));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Full Week'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('ganze Woche'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Ganze Woche'));
         $this->assertFalse(intersoccer_discount_camp_booking_counts_for_sibling('single-days'));
+    }
+
+    /**
+     * Cart camp grouping must use the same full-week normalizer as prior orders (#69).
+     */
+    public function testCartCampGroupingUsesSharedFullWeekNormalizer() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling($booking_type)',
+            $contents,
+            'build_cart_context must use the shared full-week helper for camps_by_child'
+        );
+        $pos = strpos($contents, "context['camps_by_child']");
+        $this->assertNotFalse($pos);
+        $snippet = substr($contents, max(0, $pos - 900), 1200);
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling',
+            $snippet
+        );
     }
 
     public function testPriorChildPlusCartChildRanksSecondChild() {
@@ -136,9 +157,11 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         ];
 
         $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
-        $totals = $merged['totals'];
-        arsort($totals);
-        $sorted = array_keys($totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $merged['prior_by_key'] ?? []
+        );
 
         $this->assertCount(2, $sorted);
         $this->assertSame('child-a', $sorted[0], 'Higher prior spend ranks first (0%)');
@@ -150,6 +173,163 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertEquals(0.20, $percent);
         $this->assertArrayHasKey('child-b', $merged['cart_by_child']);
         $this->assertArrayNotHasKey('child-a', $merged['cart_by_child']);
+    }
+
+
+    /**
+     * Cross-order: cart child more expensive than prior still gets sibling rate (#63).
+     * Same-cart spend ranking is unchanged; only cross-order ranking is adjusted.
+     */
+    public function testPriorChildPlusMoreExpensiveCartChildGetsSiblingRate() {
+        $cart_by_child = [
+            'child-b' => [
+                [
+                    'cart_key' => 'ck_b',
+                    'assigned_player_id' => 'child-b',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        $prior_totals = [
+            'child-a' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $merged['prior_by_key'] ?? []
+        );
+
+        $this->assertSame(['child-a', 'child-b'], $sorted, 'Prior-only child keeps first rank; expensive cart child is second');
+        $index_b = array_search('child-b', $sorted, true);
+        $rate_2nd = 0.20;
+        $percent = ($index_b === 1) ? $rate_2nd : 0;
+        $this->assertEquals(0.20, $percent, 'Second registration must get sibling rate even when cart spend is higher');
+    }
+
+    /**
+     * Cross-order: prior order had A+B; cart only rebooks A.
+     * A already appeared in earlier orders so keeps early rank (no sibling rate).
+     */
+    public function testPriorWithTwoChildrenCartOnlyFirstChildKeepsFullPrice() {
+        $cart_by_child = [
+            'child-a' => [
+                [
+                    'cart_key' => 'ck_a',
+                    'assigned_player_id' => 'child-a',
+                    'price' => 300.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        $prior_totals = [
+            'child-a' => 500.0,
+            'child-b' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $merged['prior_by_key'] ?? []
+        );
+
+        $this->assertSame('child-a', $sorted[0], 'Child already in earlier orders keeps first rank');
+        $this->assertSame('child-b', $sorted[1], 'Prior sibling stays ranked by prior spend');
+        $index_a = array_search('child-a', $sorted, true);
+        $percent = ($index_a === 1) ? 0.20 : (($index_a >= 2) ? 0.30 : 0);
+        $this->assertEquals(0.0, $percent, 'Returning first child must get no sibling rate (full price)');
+    }
+
+    /**
+     * After name→UUID merge (#74), ranking must use prior_by_key so a returning
+     * child does not get the sibling rate (#70 re-review).
+     */
+    public function testNameKeyedPriorMergedToUuidCartKeepsFullPrice() {
+        $cart_by_child = [
+            'uuid-jane' => [
+                [
+                    'cart_key' => 'ck_jane',
+                    'assigned_player_id' => 'uuid-jane',
+                    'assigned_attendee' => 'Jane Doe',
+                    'price' => 300.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+            'uuid-sam' => [
+                [
+                    'cart_key' => 'ck_sam',
+                    'assigned_player_id' => 'uuid-sam',
+                    'assigned_attendee' => 'Sam Sibling',
+                    'price' => 250.0,
+                    'quantity' => 1,
+                    'product_id' => 11,
+                ],
+            ],
+        ];
+        // Earlier order keyed by display name only (legacy); Jane already booked.
+        $prior_totals = [
+            'Jane Doe' => 500.0,
+            'Sam Sibling' => 200.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $this->assertArrayHasKey('prior_by_key', $merged);
+        $this->assertArrayHasKey('uuid-jane', $merged['prior_by_key'], 'Prior name spend must map onto cart UUID key');
+        $this->assertArrayNotHasKey('Jane Doe', $merged['totals'], 'Name-only prior key should merge into UUID');
+
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            $merged['prior_by_key']
+        );
+
+        $this->assertSame('uuid-jane', $sorted[0], 'Returning Jane (higher prior) keeps first rank');
+        $index_jane = array_search('uuid-jane', $sorted, true);
+        $percent = ($index_jane === 1) ? 0.20 : (($index_jane >= 2) ? 0.30 : 0);
+        $this->assertEquals(0.0, $percent, 'Returning child must not get sibling rate after name→UUID merge');
+    }
+
+
+    /**
+     * Same-cart ranking by spend must remain unchanged when there is no prior (#63).
+     */
+    public function testSameCartSpendRankingUnchangedWithoutPrior() {
+        $cart_by_child = [
+            'child-expensive' => [
+                [
+                    'cart_key' => 'ck_e',
+                    'assigned_player_id' => 'child-expensive',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+            'child-cheap' => [
+                [
+                    'cart_key' => 'ck_c',
+                    'assigned_player_id' => 'child-cheap',
+                    'price' => 250.0,
+                    'quantity' => 1,
+                    'product_id' => 11,
+                ],
+            ],
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, []);
+        $sorted = intersoccer_rank_sibling_children_for_rates(
+            $merged['totals'],
+            $merged['cart_by_child'],
+            []
+        );
+
+        $this->assertSame('child-expensive', $sorted[0], 'Highest cart spend still ranks first with no prior');
+        $this->assertSame('child-cheap', $sorted[1], 'Lower cart spend ranks second');
     }
 
     public function testPriorTwoChildrenPlusCartThirdGetsThirdPlusRate() {
@@ -198,6 +378,98 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $merged = intersoccer_merge_sibling_child_totals($cart_by_child, []);
         $this->assertCount(1, $merged['totals']);
         $this->assertLessThan(2, count($merged['totals']));
+    }
+
+
+    /**
+     * Camp prior totals must honor the same season filter as courses (#65).
+     */
+    public function testCampSeasonFilterExcludesOtherSeason() {
+        $season_filter = ['autumn|2026'];
+        $items = [
+            ['season' => 'autumn|2026', 'assigned_player_id' => 'a', 'line_total' => 100, 'booking_type' => 'full-week'],
+            ['season' => 'summer|2026', 'assigned_player_id' => 'b', 'line_total' => 200, 'booking_type' => 'full-week'],
+        ];
+        $totals = [];
+        $season_filter_set = array_map('strval', $season_filter);
+        foreach ($items as $item) {
+            if (!intersoccer_discount_camp_booking_counts_for_sibling($item['booking_type'] ?? '')) {
+                continue;
+            }
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter_set, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            $totals[$key] = ($totals[$key] ?? 0) + floatval($item['line_total']);
+        }
+        $this->assertSame(['a' => 100.0], $totals, 'Other-season camp spend must be excluded');
+    }
+
+    /**
+     * Camp sibling path must pass a season filter into prior totals (#65).
+     */
+    public function testCampSiblingPathPassesSeasonFilter() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            '($product_type === \'course\' || $product_type === \'camp\') && $season_filter_set !== null',
+            $contents,
+            'Season filter must apply to camp prior items'
+        );
+        $this->assertStringContainsString(
+            '\'season\' => $season',
+            $contents,
+            'Camp order extract must include season'
+        );
+        $this->assertStringContainsString(
+            'camps_by_season_child',
+            $contents,
+            'Cart context must group camps by season like courses'
+        );
+        $this->assertStringContainsString(
+            'foreach ($camps_by_season as $season => $season_children)',
+            $contents,
+            'Camp sibling ranking must run per season'
+        );
+        $found = false;
+        $marker = 'intersoccer_get_previous_sibling_child_totals(';
+        $pos = 0;
+        while (($pos = strpos($contents, $marker, $pos)) !== false) {
+            $snippet = substr($contents, $pos, 320);
+            if (strpos($snippet, "'camp'") !== false && (
+                strpos($snippet, 'season') !== false || strpos($snippet, '$season') !== false
+            )) {
+                $found = true;
+                break;
+            }
+            $pos += strlen($marker);
+        }
+        $this->assertTrue($found, 'Camp prior totals call must pass a season filter');
+        $meta = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php');
+        $this->assertStringContainsString('_intersoccer_discount_season_key', $meta);
+    }
+
+    /**
+     * Mixed Summer + Autumn cart must not pair children across seasons (#65).
+     */
+    public function testMixedSeasonCartChildrenDoNotShareSiblingRanking() {
+        $summer = [
+            'child-a' => [['cart_key' => 's_a', 'assigned_player_id' => 'child-a', 'price' => 500.0, 'quantity' => 1, 'product_id' => 1, 'season' => 'summer|2026']],
+        ];
+        $autumn = [
+            'child-b' => [['cart_key' => 'a_b', 'assigned_player_id' => 'child-b', 'price' => 400.0, 'quantity' => 1, 'product_id' => 2, 'season' => 'autumn|2026']],
+        ];
+
+        // Each season ranked alone has only one child => no sibling rate.
+        foreach ([$summer, $autumn] as $season_children) {
+            $merged = intersoccer_merge_sibling_child_totals($season_children, []);
+            $this->assertLessThan(2, count($merged['totals']), 'Single-season single child must not unlock sibling');
+        }
+
+        // Combined across seasons would wrongly unlock sibling — product forbids that.
+        $combined = array_merge($summer, $autumn);
+        $merged_all = intersoccer_merge_sibling_child_totals($combined, []);
+        $this->assertCount(2, $merged_all['totals'], 'Sanity: two children exist across seasons');
     }
 
     public function testCourseSeasonFilterExcludesOtherSeason() {
@@ -281,6 +553,38 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertLessThan(2, $effective_count, 'With toggle off, single cart child should not get sibling discount');
     }
 
+
+    /**
+     * Prior name-only and cart UUID for the same child must merge as one (#67).
+     */
+    public function testMergePriorNameWithCartUuidTreatsOneChild() {
+        $cart_by_child = [
+            'uuid-rafael' => [
+                [
+                    'cart_key' => 'ck_r',
+                    'assigned_player_id' => 'uuid-rafael',
+                    'assigned_attendee' => 'Rafael Example',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        // Prior order keyed by display name only (legacy).
+        $prior_totals = [
+            'Rafael Example' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $this->assertCount(1, $merged['totals'], 'ID and name for one child must not rank as two');
+        $only_key = array_key_first($merged['totals']);
+        $this->assertEquals(750.0, $merged['totals'][$only_key], 'Spend should sum under one merged child');
+        $this->assertTrue(
+            intersoccer_discount_players_match($only_key, 'uuid-rafael')
+                || intersoccer_discount_players_match($only_key, 'Rafael Example')
+        );
+    }
+
     public function testMergedSpendSumsCartAndPriorForSameChild() {
         $cart_by_child = [
             'child-a' => [
@@ -316,12 +620,152 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertSame('child-b', $sorted[1]);
     }
 
+
+    /**
+     * Lookback must use date_created so wc_get_orders applies the window (#68).
+     */
+    public function testLookbackQueryUsesDateCreatedNotDateAfter() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            "\$args['date_created'] = '>' . \$date_after",
+            $contents,
+            'intersoccer_get_customer_previous_orders must filter with date_created'
+        );
+        $this->assertStringNotContainsString(
+            "\$args['date_after']",
+            $contents,
+            'date_after is ignored by WooCommerce order queries'
+        );
+    }
+
+    /**
+     * Season-scoped lookback uses a 24-month scan so same-season >6 months still counts (#68).
+     */
+    public function testSeasonScopedLookbackUsesTwentyFourMonthBound() {
+        $this->assertSame(24, intersoccer_discount_retroactive_lookback_months(true));
+        $this->assertLessThanOrEqual(24, intersoccer_discount_retroactive_lookback_months(false));
+    }
+
+    /**
+     * Previous season within the month window must not count when season filter is applied (#68).
+     */
+    public function testPreviousSeasonWithinMonthsDoesNotCount() {
+        $season_filter = ['summer|2026'];
+        $prior_items = [
+            ['season' => 'summer|2026', 'assigned_player_id' => 'a', 'line_total' => 100, 'booking_type' => 'full-week', 'months_ago' => 10],
+            ['season' => 'autumn|2025', 'assigned_player_id' => 'b', 'line_total' => 200, 'booking_type' => 'full-week', 'months_ago' => 2],
+            ['season' => '', 'assigned_player_id' => 'c', 'line_total' => 300, 'booking_type' => 'full-week', 'months_ago' => 1],
+        ];
+        $totals = [];
+        foreach ($prior_items as $item) {
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            if ($key === null) {
+                continue;
+            }
+            if (!isset($totals[$key])) {
+                $totals[$key] = 0;
+            }
+            $totals[$key] += floatval($item['line_total']);
+        }
+        $this->assertSame(['a' => 100.0], $totals, 'Only same-season resolved rows count; prior season and empty season excluded');
+    }
+
+    /**
+     * Source: season-filtered sibling totals force the 24-month season-scoped lookback (#68).
+     */
+    public function testSiblingTotalsWidenLookbackWhenSeasonFilterPresent() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString('function intersoccer_discount_retroactive_lookback_months', $contents);
+        $this->assertStringContainsString('intersoccer_discount_retroactive_lookback_months(true)', $contents);
+        $this->assertStringContainsString(
+            'Advanced: Absolute Order Scan Window',
+            file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php')
+        );
+    }
+
+
     public function testSiblingHelperFunctionsExistInSource() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringContainsString('function intersoccer_discount_player_key', $contents);
         $this->assertStringContainsString('function intersoccer_get_previous_sibling_child_totals', $contents);
         $this->assertStringContainsString('function intersoccer_merge_sibling_child_totals', $contents);
         $this->assertStringContainsString('intersoccer_enable_retroactive_sibling_discounts', $contents);
+    }
+
+
+    /**
+     * Booking week 5 first then week 2 later must treat the cart line as 2nd week (#66).
+     */
+    public function testSameChildWeekPositionUsesBookingOrderNotCalendar() {
+        $previous = [
+            [
+                'week_number' => 5,
+                'booking_type' => 'full-week',
+                'order_date' => '2026-08-01 10:00:00',
+            ],
+        ];
+        $position = intersoccer_discount_same_child_week_position($previous);
+        $this->assertSame(2, $position, 'Later booking of an earlier calendar week is still the second booking');
+    }
+
+    /**
+     * Single-day prior bookings must not count toward second-week position (#66).
+     */
+    public function testSameChildWeekPositionIgnoresNonFullWeekPriors() {
+        $previous = [
+            [
+                'week_number' => 3,
+                'booking_type' => 'single-days',
+                'order_date' => '2026-08-01 10:00:00',
+            ],
+        ];
+        $position = intersoccer_discount_same_child_week_position($previous);
+        $this->assertSame(1, $position, 'Single-day prior must not unlock second-week rate');
+    }
+
+    /**
+     * One earlier full-week plus two cart weeks => week-2 then week-3+ (#66).
+     */
+    public function testTwoCartWeeksAfterOneEarlierGetWeek2AndWeek3() {
+        $previous = [
+            ['booking_type' => 'full-week', 'season' => 'summer|2026', 'variation_id' => 101],
+        ];
+        $first_cart = intersoccer_discount_same_child_week_position($previous, 0);
+        $second_cart = intersoccer_discount_same_child_week_position($previous, 1);
+        $this->assertSame(2, $first_cart, 'First cart week after one prior is week-2');
+        $this->assertSame(3, $second_cart, 'Second cart week after one prior is week-3+');
+    }
+
+    /**
+     * Same-season any-venue helper and duplicate variation skip are present (#66 product rule).
+     */
+    public function testSameChildSeasonWeekLookupIgnoresParentAndDuplicateVariation() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString('function intersoccer_get_previous_camps_same_child_season', $contents);
+        $this->assertStringContainsString('exclude_variation_id', $contents);
+        $this->assertStringContainsString("intersoccer_get_previous_camps_same_child_season(", $contents);
+        // Progressive path must not require same parent_product_id match for week rates.
+        $this->assertStringNotContainsString(
+            "intersoccer_get_previous_camps_by_parent(
+                        \$customer_id,
+                        \$parent_product_id,
+                        \$item,
+                        \$lookback_months
+                    );",
+            $contents
+        );
+    }
+
+    public function testDifferentSeasonDoesNotShareWeekPositionLogic() {
+        // Document product rule: unresolved/different season groups never share earlier_cart_weeks.
+        $prior_same = [['booking_type' => 'full-week', 'season' => 'summer|2026']];
+        $this->assertSame(2, intersoccer_discount_same_child_week_position($prior_same, 0));
+        // Empty prior for a different season group stays first week.
+        $this->assertSame(1, intersoccer_discount_same_child_week_position([], 0));
     }
 
     public function testTournamentSiblingDoesNotUseRetroactivePriorTotals() {

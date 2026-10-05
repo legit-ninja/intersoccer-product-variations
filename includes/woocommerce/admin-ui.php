@@ -386,7 +386,7 @@ function intersoccer_render_discounts_page() {
                 <tr>
                     <th scope="row">
                         <label for="intersoccer_retroactive_discount_lookback_months">
-                            <?php _e('Order Lookback Period (Months)', 'intersoccer-product-variations'); ?>
+                            <?php _e('Advanced: Absolute Order Scan Window (Months)', 'intersoccer-product-variations'); ?>
                         </label>
                     </th>
                     <td>
@@ -399,7 +399,7 @@ function intersoccer_render_discounts_page() {
                                step="1" 
                                class="small-text">
                         <p class="description">
-                            <?php _e('Number of months to look back when checking previous orders for retroactive discounts. Range: 1-24 months. Default: 6 months.', 'intersoccer-product-variations'); ?>
+                            <?php _e('Advanced only. Same-season matching is the primary look-back window for retroactive sibling, camp week, and course discounts. This setting only caps how far back orders are scanned (1–24 months). Season-scoped paths always use a 24-month scan so an older same-season order is not dropped.', 'intersoccer-product-variations'); ?>
                         </p>
                     </td>
                 </tr>

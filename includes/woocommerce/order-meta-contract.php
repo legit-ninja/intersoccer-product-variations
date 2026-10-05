@@ -511,10 +511,20 @@ function intersoccer_build_order_line_meta($args) {
         $updates['Discount Amount'] = wc_price($cart_values['discount_amount']);
     }
 
-    $season = function_exists('intersoccer_get_product_season') ? intersoccer_get_product_season($product_id) : '';
+    $season_product_id = $variation_id ?: $product_id;
+    $season = function_exists('intersoccer_get_product_season') ? intersoccer_get_product_season($season_product_id) : '';
+    if ($season === '' && function_exists('intersoccer_get_product_season')) {
+        $season = intersoccer_get_product_season($product_id);
+    }
     if ($season) {
-        $season_key = function_exists('icl_t') ? icl_t('intersoccer-product-variations', 'Season', 'Season') : 'Season';
-        $updates[$season_key] = $season;
+        $season_label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', 'Season', 'Season') : 'Season';
+        $updates[$season_label] = $season;
+    }
+    if (function_exists('intersoccer_discount_season_key')) {
+        $discount_season = intersoccer_discount_season_key($season_product_id);
+        if ($discount_season !== '') {
+            $updates['_intersoccer_discount_season_key'] = $discount_season;
+        }
     }
 
     if (function_exists('intersoccer_get_parent_product_attributes')) {

@@ -93,6 +93,47 @@ function intersoccer_resolve_player_index_from_posted_attendee_string($user_id, 
     return null;
 }
 
+if (!function_exists('intersoccer_resolve_attendee_product_id')) {
+    /**
+     * Resolve a product ID or WC_Product (including variations) to a parent product ID.
+     *
+     * Cart lines often pass $cart_item['data'] (a WC_Product_Variation). Casting that
+     * object with (int) emits a PHP warning and yields a wrong ID.
+     *
+     * @param int|WC_Product|object $product Product ID or product object.
+     * @return int Parent product ID, or 0 when unresolved.
+     */
+    function intersoccer_resolve_attendee_product_id($product) {
+        if (is_object($product) && method_exists($product, 'get_id')) {
+            $id = (int) $product->get_id();
+            if (
+                method_exists($product, 'is_type')
+                && $product->is_type('variation')
+                && method_exists($product, 'get_parent_id')
+            ) {
+                $parent_id = (int) $product->get_parent_id();
+                if ($parent_id > 0) {
+                    return $parent_id;
+                }
+            }
+            // Variation without is_type(), or parent_id available: prefer parent when set.
+            if (method_exists($product, 'get_parent_id')) {
+                $parent_id = (int) $product->get_parent_id();
+                if ($parent_id > 0) {
+                    return $parent_id;
+                }
+            }
+            return $id > 0 ? $id : 0;
+        }
+
+        if (is_numeric($product)) {
+            return (int) $product;
+        }
+
+        return 0;
+    }
+}
+
 if (!function_exists('intersoccer_product_requires_attendee')) {
     /**
      * Determine if a product requires an attendee (player) assignment at add-to-cart.
@@ -103,11 +144,11 @@ if (!function_exists('intersoccer_product_requires_attendee')) {
      * - Product category contains camp/course/birthday (term name or slug)
      * - Product name/slug contains camp/course
      *
-     * @param int $product_id Parent product ID.
+     * @param int|WC_Product|object $product_id Parent product ID, or a WC_Product / variation.
      * @return bool True when an attendee must be assigned.
      */
     function intersoccer_product_requires_attendee($product_id) {
-        $product_id = (int) $product_id;
+        $product_id = intersoccer_resolve_attendee_product_id($product_id);
         if ($product_id <= 0) {
             return false;
         }
@@ -170,7 +211,8 @@ if (!function_exists('intersoccer_has_posted_player_assignment')) {
         foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
             if (isset($_POST[$field])) {
                 $val = trim((string) wp_unslash($_POST[$field]));
-                if ($val !== '' && $val !== '0') {
+                // "0" is a valid first-player index in intersoccer_players; only empty means missing.
+                if ($val !== '') {
                     return true;
                 }
             }
@@ -431,15 +473,13 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
             $passed = false;
             intersoccer_warning('Cart validation failed: guest attempted ATC on attendee-required product ' . $product_id);
         } else {
-            // Validation runs before add_cart_item_data; restore stashed player into $_POST first (#64).
+            // Validation runs before add_cart_item_data; restore stashed player into $_POST first (#64 / #71).
             if (!intersoccer_has_posted_player_assignment() && function_exists('intersoccer_restore_stashed_player_into_post')) {
                 intersoccer_restore_stashed_player_into_post((int) $product_id);
             }
             if (!intersoccer_has_posted_player_assignment()) {
-                wc_add_notice(
-                    __('Please select an attendee before adding to cart.', 'intersoccer-product-variations'),
-                    'error'
-                );
+                // Block ATC without a player, but do not show a customer-facing
+                // "please select a player/attendee" notice (master #79).
                 $passed = false;
                 intersoccer_warning('Cart validation failed: no player selected for attendee-required product ' . $product_id);
             }
