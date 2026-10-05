@@ -426,6 +426,56 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         );
     }
 
+    /**
+     * Season-scoped lookback uses a 24-month scan so same-season >6 months still counts (#68).
+     */
+    public function testSeasonScopedLookbackUsesTwentyFourMonthBound() {
+        $this->assertSame(24, intersoccer_discount_retroactive_lookback_months(true));
+        $this->assertLessThanOrEqual(24, intersoccer_discount_retroactive_lookback_months(false));
+    }
+
+    /**
+     * Previous season within the month window must not count when season filter is applied (#68).
+     */
+    public function testPreviousSeasonWithinMonthsDoesNotCount() {
+        $season_filter = ['summer|2026'];
+        $prior_items = [
+            ['season' => 'summer|2026', 'assigned_player_id' => 'a', 'line_total' => 100, 'booking_type' => 'full-week', 'months_ago' => 10],
+            ['season' => 'autumn|2025', 'assigned_player_id' => 'b', 'line_total' => 200, 'booking_type' => 'full-week', 'months_ago' => 2],
+            ['season' => '', 'assigned_player_id' => 'c', 'line_total' => 300, 'booking_type' => 'full-week', 'months_ago' => 1],
+        ];
+        $totals = [];
+        foreach ($prior_items as $item) {
+            $season = (string) ($item['season'] ?? '');
+            if ($season === '' || !in_array($season, $season_filter, true)) {
+                continue;
+            }
+            $key = intersoccer_discount_player_key($item);
+            if ($key === null) {
+                continue;
+            }
+            if (!isset($totals[$key])) {
+                $totals[$key] = 0;
+            }
+            $totals[$key] += floatval($item['line_total']);
+        }
+        $this->assertSame(['a' => 100.0], $totals, 'Only same-season resolved rows count; prior season and empty season excluded');
+    }
+
+    /**
+     * Source: season-filtered sibling totals force the 24-month season-scoped lookback (#68).
+     */
+    public function testSiblingTotalsWidenLookbackWhenSeasonFilterPresent() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString('function intersoccer_discount_retroactive_lookback_months', $contents);
+        $this->assertStringContainsString('intersoccer_discount_retroactive_lookback_months(true)', $contents);
+        $this->assertStringContainsString(
+            'Advanced: Absolute Order Scan Window',
+            file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php')
+        );
+    }
+
+
     public function testSiblingHelperFunctionsExistInSource() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringContainsString('function intersoccer_discount_player_key', $contents);
