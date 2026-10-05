@@ -116,7 +116,28 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling(''));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('full-week'));
         $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Full Week'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('ganze Woche'));
+        $this->assertTrue(intersoccer_discount_camp_booking_counts_for_sibling('Ganze Woche'));
         $this->assertFalse(intersoccer_discount_camp_booking_counts_for_sibling('single-days'));
+    }
+
+    /**
+     * Cart camp grouping must use the same full-week normalizer as prior orders (#69).
+     */
+    public function testCartCampGroupingUsesSharedFullWeekNormalizer() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling($booking_type)',
+            $contents,
+            'build_cart_context must use the shared full-week helper for camps_by_child'
+        );
+        $pos = strpos($contents, "context['camps_by_child']");
+        $this->assertNotFalse($pos);
+        $snippet = substr($contents, max(0, $pos - 900), 1200);
+        $this->assertStringContainsString(
+            'intersoccer_discount_camp_booking_counts_for_sibling',
+            $snippet
+        );
     }
 
     public function testPriorChildPlusCartChildRanksSecondChild() {
@@ -371,6 +392,38 @@ class RetroactiveSiblingDiscountTest extends TestCase {
             : $cart_children_count;
 
         $this->assertLessThan(2, $effective_count, 'With toggle off, single cart child should not get sibling discount');
+    }
+
+
+    /**
+     * Prior name-only and cart UUID for the same child must merge as one (#67).
+     */
+    public function testMergePriorNameWithCartUuidTreatsOneChild() {
+        $cart_by_child = [
+            'uuid-rafael' => [
+                [
+                    'cart_key' => 'ck_r',
+                    'assigned_player_id' => 'uuid-rafael',
+                    'assigned_attendee' => 'Rafael Example',
+                    'price' => 500.0,
+                    'quantity' => 1,
+                    'product_id' => 10,
+                ],
+            ],
+        ];
+        // Prior order keyed by display name only (legacy).
+        $prior_totals = [
+            'Rafael Example' => 250.0,
+        ];
+
+        $merged = intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals);
+        $this->assertCount(1, $merged['totals'], 'ID and name for one child must not rank as two');
+        $only_key = array_key_first($merged['totals']);
+        $this->assertEquals(750.0, $merged['totals'][$only_key], 'Spend should sum under one merged child');
+        $this->assertTrue(
+            intersoccer_discount_players_match($only_key, 'uuid-rafael')
+                || intersoccer_discount_players_match($only_key, 'Rafael Example')
+        );
     }
 
     public function testMergedSpendSumsCartAndPriorForSameChild() {

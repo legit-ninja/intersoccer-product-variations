@@ -1036,10 +1036,34 @@ function intersoccer_merge_sibling_child_totals($cart_by_child, $prior_totals) {
 
     if (is_array($prior_totals)) {
         foreach ($prior_totals as $player_key => $spend) {
-            if (!isset($totals[$player_key])) {
-                $totals[$player_key] = 0;
+            $matched_key = null;
+            foreach ($cart_keyed as $existing_key => $items) {
+                if (intersoccer_discount_players_match($existing_key, $player_key)) {
+                    $matched_key = $existing_key;
+                    break;
+                }
+                foreach ($items as $item) {
+                    if (intersoccer_discount_players_match($item, $player_key)) {
+                        $matched_key = $existing_key;
+                        break 2;
+                    }
+                }
             }
-            $totals[$player_key] += floatval($spend);
+            if ($matched_key === null) {
+                foreach (array_keys($totals) as $existing_key) {
+                    if (intersoccer_discount_players_match($existing_key, $player_key)) {
+                        $matched_key = $existing_key;
+                        break;
+                    }
+                }
+            }
+            if ($matched_key === null) {
+                $matched_key = (string) $player_key;
+            }
+            if (!isset($totals[$matched_key])) {
+                $totals[$matched_key] = 0;
+            }
+            $totals[$matched_key] += floatval($spend);
         }
     }
 
@@ -1176,9 +1200,9 @@ function intersoccer_build_cart_context($cart_items) {
         
         if ($player_key !== null) {
             if ($product_type === 'camp') {
-                // Check if it's full-week (combo discounts only apply to full-week)
+                // Full-week only — shared normalizer (locales / alternate spellings)
                 $booking_type = get_post_meta($variation_id ?: $product_id, 'attribute_pa_booking-type', true);
-                if ($booking_type === 'full-week' || empty($booking_type)) {
+                if (intersoccer_discount_camp_booking_counts_for_sibling($booking_type)) {
                     $item_data['season'] = function_exists('intersoccer_discount_season_key')
                         ? intersoccer_discount_season_key($variation_id ?: $product_id)
                         : (function_exists('intersoccer_get_product_season')
