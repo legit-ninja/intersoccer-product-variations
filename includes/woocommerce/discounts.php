@@ -332,13 +332,13 @@ function intersoccer_get_customer_previous_orders($customer_id, $customer_email 
         return [];
     }
     
-    // Add date range filter
+        // Add date range filter (WC recognizes date_created, not date_after)
     if ($lookback_months > 0) {
         $date_after = date('Y-m-d', strtotime("-{$lookback_months} months"));
-        $args['date_after'] = $date_after;
+        $args['date_created'] = '>' . $date_after;
     }
     
-    $order_ids = wc_get_orders($args);
+$order_ids = wc_get_orders($args);
     $orders = [];
     
     foreach ($order_ids as $order_id) {

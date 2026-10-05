@@ -408,6 +408,24 @@ class RetroactiveSiblingDiscountTest extends TestCase {
         $this->assertSame('child-b', $sorted[1]);
     }
 
+
+    /**
+     * Lookback must use date_created so wc_get_orders applies the window (#68).
+     */
+    public function testLookbackQueryUsesDateCreatedNotDateAfter() {
+        $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
+        $this->assertMatchesRegularExpression(
+            "/\$args\['date_created'\]\s*=\s*'>'\s*\.\s*\$date_after/",
+            $contents,
+            'intersoccer_get_customer_previous_orders must filter with date_created'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            "/\$args\['date_after'\]/",
+            $contents,
+            'date_after is ignored by WooCommerce order queries'
+        );
+    }
+
     public function testSiblingHelperFunctionsExistInSource() {
         $contents = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringContainsString('function intersoccer_discount_player_key', $contents);
