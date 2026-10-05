@@ -16,6 +16,31 @@
 
 use PHPUnit\Framework\TestCase;
 
+
+if (!class_exists('TestProductTypeRegistry')) {
+    class TestProductTypeRegistry
+    {
+        /** @var array<int,string|null> */
+        private static $types = [];
+
+        public static function set($product_id, $type)
+        {
+            self::$types[(int) $product_id] = $type;
+        }
+
+        public static function get($product_id)
+        {
+            $id = (int) $product_id;
+            return array_key_exists($id, self::$types) ? self::$types[$id] : null;
+        }
+
+        public static function reset()
+        {
+            self::$types = [];
+        }
+    }
+}
+
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php';
 
@@ -42,6 +67,9 @@ class AtcValidationTest extends TestCase
         unset($GLOBALS['intersoccer_test_product_categories']);
         unset($GLOBALS['intersoccer_test_product_name']);
         unset($GLOBALS['intersoccer_test_products']);
+        if (class_exists('TestProductTypeRegistry')) {
+            TestProductTypeRegistry::reset();
+        }
         parent::tearDown();
     }
 
@@ -325,5 +353,133 @@ class AtcValidationTest extends TestCase
         $cart_item_data = intersoccer_add_custom_cart_item_data([], 123, 0);
 
         $this->assertArrayHasKey('assigned_player', $cart_item_data, 'assigned_player index must be captured from assigned_attendee');
+    }
+
+    /**
+     * #77: int IDs must keep working (no object cast path).
+     *
+     * @group atc-validation
+     * @group production-code
+     * @group issue-77
+     */
+    public function testRequiresAttendeeAcceptsIntProductId()
+    {
+        unset($GLOBALS['intersoccer_test_product_type']);
+        TestProductTypeRegistry::set(123, 'camp');
+
+        $this->assertTrue(
+            intersoccer_product_requires_attendee(123),
+            'Integer parent product ID should require attendee for camps'
+        );
+    }
+
+    /**
+     * #77: simple WC_Product-like object must use get_id(), not (int) cast.
+     *
+     * @group atc-validation
+     * @group production-code
+     * @group issue-77
+     */
+    public function testRequiresAttendeeAcceptsSimpleProductObject()
+    {
+        unset($GLOBALS['intersoccer_test_product_type']);
+        TestProductTypeRegistry::set(123, 'course');
+
+        $product = new class {
+            public function get_id() { return 123; }
+            public function get_parent_id() { return 0; }
+            public function is_type($type) { return $type === 'simple'; }
+        };
+
+        $this->assertTrue(
+            intersoccer_product_requires_attendee($product),
+            'Simple product object should resolve via get_id() and require attendee for courses'
+        );
+    }
+
+    /**
+     * #77: WC_Product_Variation must not warn, and must use parent for type/attendee.
+     *
+     * PHPUnit converts warnings to exceptions (phpunit.xml), so a blind (int) cast fails this test.
+     *
+     * @group atc-validation
+     * @group production-code
+     * @group issue-77
+     */
+    public function testRequiresAttendeeAcceptsVariationObjectUsesParentWithoutWarning()
+    {
+        if (!class_exists('WC_Product_Variation', false)) {
+            eval('class WC_Product_Variation {}');
+        }
+
+        unset($GLOBALS['intersoccer_test_product_type']);
+        // Parent is a camp; variation ID alone must not be typed as camp.
+        TestProductTypeRegistry::set(100, 'camp');
+        TestProductTypeRegistry::set(999, null);
+
+        $variation = new class(999, 100) extends WC_Product_Variation {
+            private $id;
+            private $parent_id;
+            public function __construct($id, $parent_id)
+            {
+                $this->id = (int) $id;
+                $this->parent_id = (int) $parent_id;
+            }
+            public function get_id() { return $this->id; }
+            public function get_parent_id() { return $this->parent_id; }
+            public function is_type($type) { return $type === 'variation'; }
+        };
+
+        // Also assert no PHP warning/notice via an explicit handler (belt and suspenders).
+        $warnings = [];
+        set_error_handler(function ($errno, $errstr) use (&$warnings) {
+            $warnings[] = [$errno, $errstr];
+            return true;
+        });
+        try {
+            $requires = intersoccer_product_requires_attendee($variation);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings, 'Passing WC_Product_Variation must not emit warnings/notices');
+        $this->assertTrue($requires, 'Variation should require attendee based on parent product type');
+
+        // Opposite types: parent is tournament (no attendee); variation id alone is camp.
+        // Using the variation ID by mistake would incorrectly return true.
+        unset($GLOBALS['intersoccer_test_product_type']);
+        TestProductTypeRegistry::reset();
+        TestProductTypeRegistry::set(100, 'tournament');
+        TestProductTypeRegistry::set(999, 'camp');
+        $this->assertFalse(
+            intersoccer_product_requires_attendee($variation),
+            'Must use parent ID (100 / tournament), not variation ID (999 / camp)'
+        );
+    }
+
+    /**
+     * #77: resolve helper keeps ints and maps variation objects to parent.
+     *
+     * @group atc-validation
+     * @group production-code
+     * @group issue-77
+     */
+    public function testResolveAttendeeProductIdFromVariationAndInt()
+    {
+        $this->assertSame(55, intersoccer_resolve_attendee_product_id(55));
+
+        $simple = new class {
+            public function get_id() { return 77; }
+            public function get_parent_id() { return 0; }
+            public function is_type($type) { return $type === 'simple'; }
+        };
+        $this->assertSame(77, intersoccer_resolve_attendee_product_id($simple));
+
+        $variation = new class {
+            public function get_id() { return 999; }
+            public function get_parent_id() { return 100; }
+            public function is_type($type) { return $type === 'variation'; }
+        };
+        $this->assertSame(100, intersoccer_resolve_attendee_product_id($variation));
     }
 }
