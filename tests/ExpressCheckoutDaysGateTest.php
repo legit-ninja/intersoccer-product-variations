@@ -750,9 +750,7 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $this->assertSame('chf', $params['checkout']['currency_code']);
     }
 
-    /**
-     * @dataProvider phoneNotRequiredSettings
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('phoneNotRequiredSettings')]
     public function testStripeExpressParamsLeftAloneWhenPhoneNotRequired($setting)
     {
         $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = $setting;
