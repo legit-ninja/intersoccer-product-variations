@@ -375,8 +375,12 @@ function intersoccer_add_custom_cart_item_data($cart_item_data, $product_id, $va
         }
     }
 
-    // Camp days
+    // Camp days (express checkout may omit them: restore the days stashed for this variation).
     $posted_camp_days = intersoccer_get_posted_camp_days($variation_id);
+    if (empty($posted_camp_days) && function_exists('intersoccer_restore_stashed_days_into_post')
+        && intersoccer_restore_stashed_days_into_post((int) $product_id, (int) $variation_id)) {
+        $posted_camp_days = intersoccer_get_posted_camp_days($variation_id);
+    }
     if (!empty($posted_camp_days)) {
         $cart_item_data['camp_days'] = $posted_camp_days;
     }
@@ -514,6 +518,11 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
 
     if ($is_single_day) {
         $camp_days = intersoccer_get_posted_camp_days($vid);
+        // Express paths often omit camp_days[]; recover the days picked on the product page.
+        if (empty($camp_days) && function_exists('intersoccer_restore_stashed_days_into_post')
+            && intersoccer_restore_stashed_days_into_post((int) $product_id, $vid)) {
+            $camp_days = intersoccer_get_posted_camp_days($vid);
+        }
 
         if (empty($camp_days)) {
             wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
@@ -1385,6 +1394,10 @@ function intersoccer_store_selected_days_callback() {
     if ($product_id && function_exists('WC') && WC()->session) {
         WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
         WC()->session->set('intersoccer_current_variation_' . $product_id, $variation_id);
+        // Express checkout stash (user-bound, expires, tied to the variation). No days clears it.
+        if (function_exists('intersoccer_stash_selected_days')) {
+            intersoccer_stash_selected_days($product_id, $variation_id, $camp_days);
+        }
         intersoccer_debug('InterSoccer: Stored selected days in session for product ' . $product_id . ': ' . json_encode($camp_days));
         wp_send_json_success(['message' => 'Days stored', 'days' => $camp_days]);
     } else {
