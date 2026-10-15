@@ -1168,15 +1168,52 @@ function intersoccer_fill_assigned_attendee_from_player_id($item, $customer_id) 
     if ($player_id === '' || (int) $customer_id <= 0 || !function_exists('intersoccer_get_player_by_id')) {
         return false;
     }
-    $player = intersoccer_get_player_by_id((int) $customer_id, $player_id);
-    if (!is_array($player)) {
+    $by_id = intersoccer_get_player_by_id((int) $customer_id, $player_id);
+    if (!is_array($by_id)) {
         return false;
     }
-    $name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
+    $player_key = null;
+    if (isset($by_id['player']) && is_array($by_id['player'])) {
+        $player_key = isset($by_id['key']) ? $by_id['key'] : null;
+        $row = $by_id['player'];
+    } else {
+        $row = $by_id;
+    }
+    $details = function_exists('intersoccer_format_player_details_row')
+        ? intersoccer_format_player_details_row($row)
+        : [
+            'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+            'dob' => (string) ($row['dob'] ?? ''),
+            'gender' => (string) ($row['gender'] ?? ($row['player_gender'] ?? '')),
+        ];
+    $name = trim((string) ($details['name'] ?? ''));
     if ($name === '') {
         return false;
     }
     $item->update_meta_data('Assigned Attendee', $name);
+
+    $index_missing = function ($key) use ($item) {
+        $v = $item->get_meta($key, true);
+        return $v === '' || $v === null;
+    };
+    if ($player_key !== null && $index_missing('assigned_player')) {
+        $item->update_meta_data('assigned_player', $player_key);
+    }
+    if ($player_key !== null && $index_missing('_assigned_player')) {
+        $item->update_meta_data('_assigned_player', $player_key);
+    }
+
+    $meta_empty = function ($meta_key) use ($item) {
+        $v = $item->get_meta($meta_key, true);
+        return !is_string($v) || trim($v) === '';
+    };
+    if ($meta_empty('Attendee DOB') && trim((string) ($details['dob'] ?? '')) !== '') {
+        $item->update_meta_data('Attendee DOB', $details['dob']);
+    }
+    if ($meta_empty('Attendee Gender') && trim((string) ($details['gender'] ?? '')) !== '') {
+        $item->update_meta_data('Attendee Gender', $details['gender']);
+    }
+
     return true;
 }
 
