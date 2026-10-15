@@ -1052,6 +1052,30 @@ $intersoccer_elementor_product_page_cb = function () {
                 });
             }
 
+            // Stash picked camp days and late pickup choice so Apple Pay / Google Pay can recover them
+            // (express checkout does not post the product form). Nothing picked clears the stash.
+            function intersoccerStashSelectedDays($dayForm, days) {
+                if (typeof intersoccerCheckout === 'undefined' || !intersoccerCheckout.ajax_url) {
+                    return;
+                }
+                var $f = $dayForm && $dayForm.length ? $dayForm : $('[data-intersoccer-product-id="' + intersoccerPvProductId + '"]').find('form.cart').first();
+                var variationId = $f.find('input[name="variation_id"]').val();
+                if (!days) {
+                    days = $f.find('input[name="camp_days[]"]').map(function () { return $(this).val(); }).get();
+                }
+                var lpType = (typeof selectedLatePickupOption !== 'undefined') ? selectedLatePickupOption : '';
+                var lpDays = (typeof selectedLatePickupDays !== 'undefined' && lpType === 'single-days') ? selectedLatePickupDays : [];
+                jQuery.post(intersoccerCheckout.ajax_url, {
+                    action: 'intersoccer_store_express_fields',
+                    nonce: intersoccerCheckout.nonce,
+                    product_id: intersoccerPvProductId,
+                    variation_id: variationId || 0,
+                    camp_days: days || [],
+                    late_pickup_type: lpType || '',
+                    late_pickup_days: lpDays
+                });
+            }
+
             function intersoccerApplyPlayerChoice(selectedPlayer) {
                 playerPersistence.setPlayer(selectedPlayer);
                 var $syncSels = $('[data-intersoccer-product-id="' + intersoccerPvProductId + '"]').find('select.intersoccer-player-select[name="player_assignment"], select.player-select[name="player_assignment"]');
@@ -1513,6 +1537,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         // Price update is handled by the main checkbox change handler in jQuery(document).ready()
                         // to prevent duplicate AJAX calls (removed from here to avoid race conditions)
                         
+                        intersoccerStashSelectedDays($form, selectedDays);
                         intersoccerPvDispatchUpdateButtonState();
                         // Trigger WooCommerce variation check
                         $form.trigger('check_variations');
@@ -1860,6 +1885,9 @@ $intersoccer_elementor_product_page_cb = function () {
             }
             
             function updateLatePickupFormData(settings) {
+                if (typeof intersoccerStashSelectedDays === 'function') {
+                    intersoccerStashSelectedDays(null, null); // keep the express stash in step with late pickup
+                }
                 var selection = {
                     option: selectedLatePickupOption,
                     days: selectedLatePickupDays
