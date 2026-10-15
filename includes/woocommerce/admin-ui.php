@@ -1767,6 +1767,7 @@ function intersoccer_update_orders_scripts() {
 }
 add_action('admin_footer', 'intersoccer_update_orders_scripts');
 
+if ( ! function_exists( 'intersoccer_normalize_activity_type' ) ) {
 /**
  * Normalize Activity Type value for comparison across languages
  * 
@@ -1810,6 +1811,7 @@ function intersoccer_normalize_activity_type($activity_type) {
     
     // Return lowercase if no match found
     return $normalized;
+}
 }
 
 /**
