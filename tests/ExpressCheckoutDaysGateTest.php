@@ -14,8 +14,23 @@ require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-camp.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php';
+require_once dirname(__DIR__) . '/includes/woocommerce/late-pickup.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/express-checkout-player-gate.php';
 
+
+if (!function_exists('is_product')) {
+    function is_product() {
+        return !empty($GLOBALS['intersoccer_test_is_product']);
+    }
+}
+
+if (!class_exists('IntersoccerDaysGateTestRequest')) {
+    class IntersoccerDaysGateTestRequest {
+        private $params;
+        public function __construct(array $params) { $this->params = $params; }
+        public function get_param($key) { return $this->params[$key] ?? null; }
+    }
+}
 
 if (!function_exists('check_ajax_referer')) {
     function check_ajax_referer($action = -1, $query_arg = false, $stop = true) {
@@ -74,6 +89,9 @@ class ExpressCheckoutDaysGateTest extends TestCase
         MockMetaData::$data[self::WEEK_VAR]['attribute_pa_booking-type'] = 'full-week';
         unset($GLOBALS['intersoccer_test_json'], $GLOBALS['intersoccer_test_json_capture']);
         WC()->cart = null;
+        $_GET = [];
+        $GLOBALS['wc_notices'] = [];
+        unset($GLOBALS['intersoccer_express_request'], $GLOBALS['intersoccer_test_is_product']);
         $this->savedFilters = MockFilters::$filters;
         // Default: normal add-to-cart validation passes.
         MockFilters::$filters['woocommerce_add_to_cart_validation'] = function ($passed) { return $passed; };
@@ -87,6 +105,8 @@ class ExpressCheckoutDaysGateTest extends TestCase
         WC()->session = null;
         WC()->cart = null;
         MockFilters::$filters = $this->savedFilters;
+        $_GET = [];
+        unset($GLOBALS['intersoccer_express_request'], $GLOBALS['intersoccer_test_is_product'], $GLOBALS['wc_notices']);
         unset($GLOBALS['intersoccer_test_player_by_id']);
         foreach ([self::SINGLE_VAR, self::GERMAN_VAR, self::WEEK_VAR] as $v) {
             unset(MockMetaData::$data[$v]);
@@ -150,8 +170,19 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $this->assertTrue(intersoccer_express_days_gate_add_to_cart_allowed(self::CAMP_ID, self::SINGLE_VAR));
     }
 
+    private function expressRequest()
+    {
+        $GLOBALS['intersoccer_express_request'] = true;
+    }
+
+    private function expressStoreApiRequest()
+    {
+        return new IntersoccerDaysGateTestRequest(['payment_data' => [['key' => 'express_payment_type', 'value' => 'apple_pay']]]);
+    }
+
     public function testStashedDaysAreRestoredIntoPost()
     {
+        $this->expressRequest();
         $this->assertTrue(intersoccer_stash_selected_days(self::CAMP_ID, self::SINGLE_VAR, ['Tuesday', 'Thursday']));
         $this->assertTrue(intersoccer_express_days_gate_add_to_cart_allowed(self::CAMP_ID, self::SINGLE_VAR));
         $this->assertSame(['Tuesday', 'Thursday'], $_POST['camp_days']);
@@ -159,6 +190,7 @@ class ExpressCheckoutDaysGateTest extends TestCase
 
     public function testStashForAnotherVariationIsNotUsed()
     {
+        $this->expressRequest();
         intersoccer_stash_selected_days(self::CAMP_ID, self::GERMAN_VAR, ['Tuesday']);
         $this->assertFalse(intersoccer_express_days_gate_add_to_cart_allowed(self::CAMP_ID, self::SINGLE_VAR));
         $this->assertArrayNotHasKey('camp_days', $_POST);
@@ -271,18 +303,42 @@ class ExpressCheckoutDaysGateTest extends TestCase
     {
         $order = $this->order([
             11 => new IntersoccerDaysGateTestItem(self::CAMP_ID, self::SINGLE_VAR, ['Days Selected' => 'Monday, Friday']),
+            12 => new IntersoccerDaysGateTestItem(self::CAMP_ID, self::GERMAN_VAR, ['Days Selected' => 'Mittwoch']),
         ]);
-        intersoccer_days_gate_assert_order_has_days($order);
-        $this->assertTrue(true);
+        $this->assertSame([], intersoccer_days_gate_order_lines_missing_days($order));
+        $thrown = null;
+        try {
+            intersoccer_days_gate_checkout_create_order($order, []);
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        $this->assertNull($thrown, 'An order whose single-day lines carry days must be created');
     }
 
-    public function testStoreApiCheckoutRefusedFromOrderLineMeta()
+    public function testStoreApiExpressCheckoutRefusesCartLineWithoutDays()
     {
-        $order = $this->order([
-            11 => new IntersoccerDaysGateTestItem(self::CAMP_ID, self::SINGLE_VAR, []),
+        WC()->cart = $this->cartWith([
+            'k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::SINGLE_VAR, 'assigned_player_id' => 'uuid-1'],
         ]);
-        $this->expectException(Exception::class);
-        intersoccer_express_days_gate_store_api_checkout($order, null);
+        // Order lines are fine, so only the cart missing-days branch can refuse.
+        $order = $this->order([11 => new IntersoccerDaysGateTestItem(self::CAMP_ID, self::WEEK_VAR, [])]);
+        try {
+            intersoccer_express_days_gate_store_api_checkout($order, $this->expressStoreApiRequest());
+            $this->fail('Expected the express checkout to be refused');
+        } catch (Exception $e) {
+            $this->assertSame(intersoccer_express_gate_message(), $e->getMessage());
+        }
+    }
+
+    public function testStoreApiOrderLineMetaCheckRefusesWithGenericMessage()
+    {
+        $order = $this->order([11 => new IntersoccerDaysGateTestItem(self::CAMP_ID, self::SINGLE_VAR, [])]);
+        try {
+            intersoccer_express_days_gate_store_api_checkout($order, null);
+            $this->fail('Expected order creation to be refused');
+        } catch (Exception $e) {
+            $this->assertSame(intersoccer_express_gate_message(), $e->getMessage());
+        }
     }
 
     public function testStoreSelectedDaysAjaxWritesAndClearsStash()
@@ -393,19 +449,54 @@ class ExpressCheckoutDaysGateTest extends TestCase
             $posted[] = $_POST;
             return $vid !== self::GERMAN_VAR;
         };
-        WC()->cart = $this->cartWith([
+        $cart = [
             'ok' => ['product_id' => self::CAMP_ID, 'variation_id' => self::SINGLE_VAR, 'camp_days' => ['Monday'], 'assigned_player_id' => 'uuid-1', 'late_pickup_type' => 'full-week'],
             'bad' => ['product_id' => self::CAMP_ID, 'variation_id' => self::GERMAN_VAR, 'camp_days' => ['Monday'], 'assigned_player' => 0],
-        ]);
+        ];
         $_POST = ['untouched' => '1'];
-        $this->assertSame(['bad'], intersoccer_express_cart_lines_failing_validation(WC()->cart->get_cart()));
+        $this->assertSame(['bad'], intersoccer_express_cart_lines_failing_validation($cart));
         $this->assertSame(['untouched' => '1'], $_POST, 'request $_POST is restored');
         $this->assertSame('uuid-1', $posted[0]['assigned_player_id']);
         $this->assertSame('full-week', $posted[0]['late_pickup_type']);
         $this->assertSame('0', $posted[1]['player_assignment']);
+    }
 
-        $this->expectException(Exception::class);
-        intersoccer_express_days_gate_store_api_checkout($this->order([]), null);
+    public function testStoreApiExpressCheckoutKeepsValidatorMessage()
+    {
+        MockFilters::$filters['woocommerce_add_to_cart_validation'] = function ($passed) {
+            wc_add_notice('This camp is not available for the selected age group.', 'error');
+            return false;
+        };
+        WC()->cart = $this->cartWith([
+            'k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::SINGLE_VAR, 'camp_days' => ['Monday'], 'assigned_player_id' => 'uuid-1'],
+        ]);
+        try {
+            intersoccer_express_days_gate_store_api_checkout($this->order([]), $this->expressStoreApiRequest());
+            $this->fail('Expected the express checkout to be refused');
+        } catch (Exception $e) {
+            $this->assertSame('This camp is not available for the selected age group.', $e->getMessage());
+        }
+    }
+
+    public function testStoreApiRecheckSkipsNonExpressCheckout()
+    {
+        $calls = 0;
+        MockFilters::$filters['woocommerce_add_to_cart_validation'] = function ($passed) use (&$calls) {
+            $calls++;
+            return false;
+        };
+        WC()->cart = $this->cartWith([
+            'k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::SINGLE_VAR, 'assigned_player_id' => 'uuid-1'],
+        ]);
+        $normal = new IntersoccerDaysGateTestRequest(['payment_data' => [['key' => 'wc-stripe-new-payment-method', 'value' => 'false']]]);
+        $thrown = null;
+        try {
+            intersoccer_express_days_gate_store_api_checkout($this->order([]), $normal);
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        $this->assertNull($thrown, 'Normal block checkout is not rechecked here');
+        $this->assertSame(0, $calls);
     }
 
     public function testExpressRefusedWhenCartAlreadyHoldsProgramLines()
@@ -421,11 +512,20 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $this->assertNull($this->callStripeAddToCart('intersoccer_express_gate_refuse_when_cart_has_programs'));
     }
 
-    public function testCssAlsoHidesExpressWhenCartHasPrograms()
+    public function testProductPageGetsHideClassOnlyWhenCartHasPrograms()
     {
-        $css = intersoccer_express_gate_css();
-        $this->assertStringContainsString('body.intersoccer-express-cart-has-programs #wc-stripe-express-checkout-element', $css);
-        $this->assertStringContainsString('body.intersoccer-express-needs-player #wc-stripe-express-checkout-element', $css);
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        WC()->cart = $this->cartWith(['x' => ['product_id' => self::CAMP_ID, 'variation_id' => self::WEEK_VAR, 'assigned_player' => 0]]);
+        $this->assertContains('intersoccer-express-cart-has-programs', intersoccer_express_gate_cart_programs_body_class(['a']));
+
+        WC()->cart = $this->cartWith([]);
+        $this->assertNotContains('intersoccer-express-cart-has-programs', intersoccer_express_gate_cart_programs_body_class(['a']));
+
+        $GLOBALS['intersoccer_test_product_type'] = 'tournament';
+        WC()->cart = $this->cartWith(['x' => ['product_id' => 880999]]);
+        $GLOBALS['intersoccer_test_product_type'] = 'camp';
+        $GLOBALS['intersoccer_test_is_product'] = false;
+        $this->assertSame(['a'], intersoccer_express_gate_cart_programs_body_class(['a']), 'not on a product page');
     }
 
     public function testAssignedAttendeeIsFilledFromPlayerIdOnSave()
@@ -446,14 +546,149 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $this->assertFalse(intersoccer_fill_assigned_attendee_from_player_id($other, 7), 'player must belong to the order customer');
     }
 
-    public function testFrontEndStashesDaysAndPluginLoadsGate()
+    public function testStoreExpressFieldsAjaxStoresAndClears()
     {
-        $root = dirname(__DIR__);
-        $widgets = file_get_contents($root . '/includes/elementor-widgets.php');
-        $this->assertStringContainsString("intersoccerStashSelectedDays(\$form, selectedDays);", $widgets);
-        $this->assertStringContainsString("action: 'intersoccer_store_express_fields'", $widgets);
-        $this->assertStringContainsString("intersoccerStashSelectedDays(null, null);", $widgets);
-        $main = file_get_contents($root . '/intersoccer-product-variations.php');
-        $this->assertStringContainsString("'includes/woocommerce/express-checkout-player-gate.php'", $main);
+        $GLOBALS['intersoccer_test_json_capture'] = true;
+        $_POST = ['nonce' => 'valid_nonce', 'product_id' => (string) self::CAMP_ID, 'variation_id' => (string) self::SINGLE_VAR,
+                  'camp_days' => ['Monday'], 'late_pickup_type' => 'single-days', 'late_pickup_days' => ['Monday']];
+        try { intersoccer_store_express_fields_callback(); } catch (Exception $e) { $this->assertSame('AJAX_EXIT', $e->getMessage()); }
+        $this->assertFalse($GLOBALS['intersoccer_test_json']['data']['cleared']);
+        $fields = intersoccer_get_stashed_express_fields(self::CAMP_ID, self::SINGLE_VAR);
+        $this->assertSame(['Monday'], $fields['camp_days']);
+        $this->assertSame('single-days', $fields['late_pickup_type']);
+
+        $_POST = ['nonce' => 'valid_nonce', 'product_id' => (string) self::CAMP_ID, 'variation_id' => (string) self::SINGLE_VAR];
+        try { intersoccer_store_express_fields_callback(); } catch (Exception $e) { $this->assertSame('AJAX_EXIT', $e->getMessage()); }
+        $this->assertTrue($GLOBALS['intersoccer_test_json']['data']['cleared']);
+        $this->assertSame([], intersoccer_get_stashed_express_fields(self::CAMP_ID, self::SINGLE_VAR));
+    }
+
+    /* ---- Express-only restore on the normal add-to-cart hooks ---- */
+
+    public function testClassicAddToCartIgnoresStaleStash()
+    {
+        intersoccer_stash_selected_days(self::CAMP_ID, self::SINGLE_VAR, ['Tuesday']); // left over from an earlier visit
+        $_POST = ['assigned_player_id' => 'uuid-1'];
+        $data = intersoccer_add_custom_cart_item_data([], self::CAMP_ID, self::SINGLE_VAR);
+        $this->assertArrayNotHasKey('camp_days', $data, 'classic add-to-cart must not pick up stashed days');
+        $this->assertArrayNotHasKey('camp_days', $_POST);
+        $this->assertFalse(intersoccer_validate_cart_item(true, self::CAMP_ID, 1, self::SINGLE_VAR), 'classic add with no posted days is refused');
+    }
+
+    public function testExpressAddToCartRestoresStashOnNormalHooks()
+    {
+        intersoccer_stash_selected_days(self::CAMP_ID, self::SINGLE_VAR, ['Tuesday']);
+        $_GET['wc-ajax'] = 'wc_stripe_add_to_cart';
+        $_POST = ['assigned_player_id' => 'uuid-1'];
+        $data = intersoccer_add_custom_cart_item_data([], self::CAMP_ID, self::SINGLE_VAR);
+        $this->assertSame(['Tuesday'], $data['camp_days']);
+    }
+
+    public function testClassicExpressCheckoutRefusesLineWithoutDays()
+    {
+        $_POST = ['express_checkout_type' => 'apple_pay'];
+        WC()->cart = $this->cartWith(['k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::GERMAN_VAR, 'assigned_player' => 0]]);
+        $errors = $this->errors();
+        intersoccer_express_days_gate_classic_checkout([], $errors);
+        $this->assertSame([intersoccer_express_gate_message()], $errors->errors['intersoccer_payment_not_completed'] ?? null);
+
+        WC()->cart = $this->cartWith(['k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::GERMAN_VAR, 'assigned_player' => 0, 'camp_days' => ['Monday']]]);
+        $ok = $this->errors();
+        intersoccer_express_days_gate_classic_checkout([], $ok);
+        $this->assertSame([], $ok->errors);
+    }
+
+    /* ---- Late pickup cost on the express path (recomputed, never posted) ---- */
+
+    private function expressLatePickupLine(array $stash)
+    {
+        $GLOBALS['intersoccer_test_options']['intersoccer_late_pickup_per_day'] = 25.0;
+        $GLOBALS['intersoccer_test_options']['intersoccer_late_pickup_full_week'] = 90.0;
+        update_post_meta(self::WEEK_VAR, '_intersoccer_enable_late_pickup', 'yes');
+        intersoccer_stash_express_fields(self::CAMP_ID, self::WEEK_VAR, $stash);
+        $_GET['wc-ajax'] = 'wc_stripe_add_to_cart';
+        $_POST = ['assigned_player_id' => 'uuid-1', 'late_pickup_cost' => '0.01'];
+        intersoccer_restore_stashed_express_fields_into_post(self::CAMP_ID, self::WEEK_VAR);
+        return intersoccer_add_custom_cart_item_data([], self::CAMP_ID, self::WEEK_VAR);
+    }
+
+    public function testExpressLatePickupFullWeekCost()
+    {
+        $line = $this->expressLatePickupLine(['late_pickup_type' => 'full-week']);
+        $this->assertSame('full-week', $line['late_pickup_type']);
+        $this->assertEquals(90.0, (float) $line['late_pickup_cost']);
+    }
+
+    public function testExpressLatePickupSingleDaysCost()
+    {
+        $line = $this->expressLatePickupLine(['late_pickup_type' => 'single-days', 'late_pickup_days' => ['Monday', 'Wednesday', 'Friday']]);
+        $this->assertSame(['Monday', 'Wednesday', 'Friday'], $line['late_pickup_days']);
+        $this->assertEquals(75.0, (float) $line['late_pickup_cost']);
+    }
+
+    public function testExpressLatePickupFiveSingleDaysUseWeekRate()
+    {
+        $line = $this->expressLatePickupLine(['late_pickup_type' => 'single-days', 'late_pickup_days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']]);
+        $this->assertEquals(90.0, (float) $line['late_pickup_cost']);
+    }
+
+    /* ---- Billing phone on Store API checkout ---- */
+
+    private function phoneOrder($phone)
+    {
+        return new class($phone) {
+            private $p;
+            public function __construct($p) { $this->p = $p; }
+            public function get_billing_phone() { return $this->p; }
+        };
+    }
+
+    public function testStoreApiCheckoutWithoutPhoneIsRefusedWith400()
+    {
+        try {
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), new IntersoccerDaysGateTestRequest(['billing_address' => ['phone' => '  ']]));
+            $this->fail('Expected the checkout to be refused');
+        } catch (Exception $e) {
+            $this->assertSame(intersoccer_billing_phone_required_message(), $e->getMessage());
+            $this->assertSame(400, $e->getCode());
+        }
+    }
+
+    public function testStoreApiCheckoutWithPhonePasses()
+    {
+        $thrown = null;
+        try {
+            intersoccer_store_api_require_billing_phone($this->phoneOrder('+41 00 000 00 00'), null);
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), new IntersoccerDaysGateTestRequest(['billing_address' => ['phone' => '+41 00 000 00 00']]));
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        $this->assertNull($thrown);
+    }
+
+    public function testPhoneNotRequiredWhenStoreHidesPhoneField()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'hidden';
+        $thrown = null;
+        try {
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), null);
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
+        $this->assertNull($thrown);
+    }
+
+    public function testStripeExpressParamsRequirePayerPhone()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        $params = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => false, 'currency_code' => 'chf']]);
+        $this->assertTrue($params['checkout']['needs_payer_phone']);
+        $this->assertSame('chf', $params['checkout']['currency_code']);
+
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'hidden';
+        $params = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => false]]);
+        $this->assertFalse($params['checkout']['needs_payer_phone']);
+        unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
     }
 }

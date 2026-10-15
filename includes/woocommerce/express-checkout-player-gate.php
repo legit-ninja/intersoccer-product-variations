@@ -272,6 +272,78 @@ function intersoccer_express_gate_store_api_checkout($order, $request = null) {
 }
 
 /**
+ * Message shown when a Store API checkout (e.g. Apple Pay / Google Pay) has no billing phone.
+ *
+ * @return string
+ */
+function intersoccer_billing_phone_required_message() {
+    return __('Please add a phone number to your billing details so we can reach you about this booking.', 'intersoccer-product-variations');
+}
+
+/**
+ * Billing phone from the order, falling back to the request's billing_address.
+ *
+ * @param WC_Order|object|null        $order
+ * @param WP_REST_Request|object|null $request
+ * @return string
+ */
+function intersoccer_store_api_billing_phone($order, $request = null) {
+    $phone = (is_object($order) && method_exists($order, 'get_billing_phone')) ? (string) $order->get_billing_phone() : '';
+    if (trim($phone) === '' && is_object($request) && method_exists($request, 'get_param')) {
+        $billing = $request->get_param('billing_address');
+        if (is_array($billing) && isset($billing['phone']) && is_scalar($billing['phone'])) {
+            $phone = (string) $billing['phone'];
+        }
+    }
+    return trim($phone);
+}
+
+/**
+ * Store API checkout: the Store API does not validate the billing phone, and express wallets
+ * can create an order without one. Refuse with a 400 unless the store hides the phone field.
+ *
+ * @param WC_Order        $order
+ * @param WP_REST_Request $request
+ * @throws Exception
+ */
+add_action('woocommerce_store_api_checkout_update_order_from_request', 'intersoccer_store_api_require_billing_phone', 19, 2);
+function intersoccer_store_api_require_billing_phone($order, $request = null) {
+    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') === 'hidden') {
+        return;
+    }
+    if (intersoccer_store_api_billing_phone($order, $request) !== '') {
+        return;
+    }
+    intersoccer_warning('Store API checkout refused: no billing phone');
+    $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
+    if (class_exists($route_exception)) {
+        throw new $route_exception('intersoccer_billing_phone_required', intersoccer_billing_phone_required_message(), 400);
+    }
+    throw new Exception(intersoccer_billing_phone_required_message(), 400);
+}
+
+/**
+ * Ask the Stripe wallet sheet for the payer's phone even when the store marks the field optional.
+ * Filter and key confirmed in WooCommerce Stripe Gateway 10.7.2:
+ * WC_Stripe_Express_Checkout_Element::scripts() localizes apply_filters('wc_stripe_express_checkout_params', ...),
+ * whose 'checkout' entry comes from WC_Stripe_Express_Checkout_Helper::get_checkout_data() ('needs_payer_phone').
+ *
+ * @param array $params
+ * @return array
+ */
+add_filter('wc_stripe_express_checkout_params', 'intersoccer_express_force_payer_phone', 20);
+function intersoccer_express_force_payer_phone($params) {
+    if (!is_array($params) || !isset($params['checkout']) || !is_array($params['checkout'])) {
+        return $params;
+    }
+    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') === 'hidden') {
+        return $params;
+    }
+    $params['checkout']['needs_payer_phone'] = true;
+    return $params;
+}
+
+/**
  * Throw the generic Store API error when any line is missing a player.
  *
  * @param array $cart_contents
@@ -591,6 +663,10 @@ function intersoccer_restore_stashed_express_fields_into_post($product_id, $vari
  * @return bool
  */
 function intersoccer_restore_stashed_days_into_post($product_id, $variation_id) {
+    // Only Apple Pay / Google Pay requests lose the form; a classic add-to-cart must use what was posted.
+    if (!intersoccer_is_express_request()) {
+        return false;
+    }
     if (!empty($_POST['camp_days']) && is_array($_POST['camp_days'])) {
         return false;
     }
@@ -658,6 +734,81 @@ function intersoccer_express_days_gate_add_to_cart_allowed($product_id, $variati
 }
 
 /**
+ * Whether the current request is a Stripe express (Apple Pay / Google Pay) request.
+ *
+ * True for Stripe's product-page express add-to-cart (wc-ajax=wc_stripe_add_to_cart), a classic
+ * checkout POST from an express button, or a request our express hooks marked as express.
+ *
+ * @return bool
+ */
+function intersoccer_is_express_request() {
+    if (!empty($GLOBALS['intersoccer_express_request'])) {
+        return true;
+    }
+    $wc_ajax = isset($_GET['wc-ajax']) ? (string) $_GET['wc-ajax'] : (isset($_REQUEST['wc-ajax']) ? (string) $_REQUEST['wc-ajax'] : '');
+    if ($wc_ajax === 'wc_stripe_add_to_cart') {
+        return true;
+    }
+    return function_exists('intersoccer_express_gate_is_classic_express_request') && intersoccer_express_gate_is_classic_express_request();
+}
+
+/**
+ * Whether a Store API checkout request was sent by a Stripe express button.
+ * Stripe's Express Checkout Element sends express_payment_type (older Payment Request: payment_request_type)
+ * in payment_data.
+ *
+ * @param WP_REST_Request|object|null $request
+ * @return bool
+ */
+function intersoccer_store_api_request_is_express($request) {
+    if (!is_object($request) || !method_exists($request, 'get_param')) {
+        return false;
+    }
+    $payment_data = $request->get_param('payment_data');
+    if (!is_array($payment_data)) {
+        return false;
+    }
+    foreach ($payment_data as $entry) {
+        $key = is_array($entry) ? (string) ($entry['key'] ?? '') : '';
+        $value = is_array($entry) ? (string) ($entry['value'] ?? '') : '';
+        if (in_array($key, ['express_payment_type', 'payment_request_type', 'express_checkout_type'], true) && $value !== '') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Error notices currently queued (messages only).
+ *
+ * @return string[]
+ */
+function intersoccer_express_error_notice_messages() {
+    $notices = function_exists('wc_get_notices') ? (array) wc_get_notices('error') : array_values(array_filter(
+        (array) ($GLOBALS['wc_notices'] ?? []),
+        function ($n) { return is_array($n) && ($n['type'] ?? '') === 'error'; }
+    ));
+    $out = [];
+    foreach ($notices as $n) {
+        $msg = is_array($n) ? ($n['notice'] ?? $n['message'] ?? '') : (string) $n;
+        if ($msg !== '') {
+            $out[] = intersoccer_express_strip_tags((string) $msg);
+        }
+    }
+    return $out;
+}
+
+if (!function_exists('intersoccer_express_strip_tags')) {
+    /**
+     * @param string $text
+     * @return string
+     */
+    function intersoccer_express_strip_tags($text) {
+        return function_exists('wp_strip_all_tags') ? wp_strip_all_tags($text) : trim(strip_tags($text));
+    }
+}
+
+/**
  * Run the normal add-to-cart validation (woocommerce_add_to_cart_validation) for an express request.
  * Covers player, single-day days, late pickup, age group and girls-only, and anything added later.
  * Notices raised by the validators are dropped: the express path only shows the generic message.
@@ -668,11 +819,10 @@ function intersoccer_express_days_gate_add_to_cart_allowed($product_id, $variati
  * @param array $attributes
  * @return bool
  */
-function intersoccer_express_run_add_to_cart_validation($product_id, $quantity, $variation_id, array $attributes) {
+function intersoccer_express_run_add_to_cart_validation($product_id, $quantity, $variation_id, array $attributes, &$messages = null) {
+    $before = count(intersoccer_express_error_notice_messages());
     $passed = (bool) apply_filters('woocommerce_add_to_cart_validation', true, (int) $product_id, max(1, (int) $quantity), (int) $variation_id, $attributes);
-    if (!$passed && function_exists('wc_clear_notices')) {
-        wc_clear_notices();
-    }
+    $messages = array_slice(intersoccer_express_error_notice_messages(), $before);
     return $passed;
 }
 
@@ -687,6 +837,7 @@ function intersoccer_express_days_gate_stripe_add_to_cart() {
     if ($nonce === '' || !wp_verify_nonce($nonce, 'wc-stripe-add-to-cart')) {
         return; // Let Stripe's own nonce check reject it.
     }
+    $GLOBALS['intersoccer_express_request'] = true;
     $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
     $quantity = isset($_POST['qty']) ? absint($_POST['qty']) : 1;
     $attributes = intersoccer_days_gate_posted_attributes();
@@ -705,6 +856,9 @@ function intersoccer_express_days_gate_stripe_add_to_cart() {
     if ($valid) {
         return;
     }
+    if (function_exists('wc_clear_notices')) {
+        wc_clear_notices(); // product-page express sheet shows the generic message only
+    }
     if (function_exists('WC') && WC() && isset(WC()->cart) && WC()->cart && method_exists(WC()->cart, 'empty_cart')) {
         WC()->cart->empty_cart();
     }
@@ -719,8 +873,9 @@ function intersoccer_express_days_gate_stripe_add_to_cart() {
  * @param array $cart_contents
  * @return string[] Keys of lines that fail.
  */
-function intersoccer_express_cart_lines_failing_validation(array $cart_contents) {
+function intersoccer_express_cart_lines_failing_validation(array $cart_contents, &$messages = null) {
     $failing = [];
+    $messages = [];
     $saved_post = $_POST;
     foreach ($cart_contents as $key => $item) {
         if (!is_array($item)) {
@@ -747,8 +902,10 @@ function intersoccer_express_cart_lines_failing_validation(array $cart_contents)
         }
         $_POST = $post;
         $attributes = isset($item['variation']) && is_array($item['variation']) ? $item['variation'] : [];
-        if (!intersoccer_express_run_add_to_cart_validation($product_id, (int) ($item['quantity'] ?? 1), $variation_id, $attributes)) {
+        $line_messages = [];
+        if (!intersoccer_express_run_add_to_cart_validation($product_id, (int) ($item['quantity'] ?? 1), $variation_id, $attributes, $line_messages)) {
             $failing[] = (string) $key;
+            $messages = array_merge($messages, $line_messages);
         }
     }
     $_POST = $saved_post;
@@ -806,13 +963,14 @@ function intersoccer_express_days_gate_classic_checkout($data, $errors) {
  * @param string $log
  * @throws Exception
  */
-function intersoccer_days_gate_refuse($log) {
+function intersoccer_days_gate_refuse($log, $message = '') {
     intersoccer_warning($log);
+    $message = $message !== '' ? $message : intersoccer_express_gate_message();
     $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
     if (class_exists($route_exception)) {
-        throw new $route_exception('intersoccer_payment_not_completed', intersoccer_express_gate_message(), 400);
+        throw new $route_exception('intersoccer_payment_not_completed', $message, 400);
     }
-    throw new Exception(intersoccer_express_gate_message());
+    throw new Exception($message);
 }
 
 /**
@@ -825,15 +983,25 @@ function intersoccer_days_gate_refuse($log) {
  */
 add_action('woocommerce_store_api_checkout_update_order_from_request', 'intersoccer_express_days_gate_store_api_checkout', 21, 2);
 function intersoccer_express_days_gate_store_api_checkout($order, $request = null) {
-    $cart = intersoccer_express_gate_cart_contents();
-    $missing = intersoccer_express_days_gate_missing_days_keys($cart);
-    if (!empty($missing)) {
-        intersoccer_days_gate_refuse('Store API checkout refused: ' . count($missing) . ' single-day camp line(s) without days');
+    // Cart rechecks run for express (Apple Pay / Google Pay) checkouts only; the normal block
+    // checkout already went through add-to-cart validation when each line was added.
+    if (intersoccer_store_api_request_is_express($request)) {
+        $cart = intersoccer_express_gate_cart_contents();
+        $missing = intersoccer_express_days_gate_missing_days_keys($cart);
+        if (!empty($missing)) {
+            intersoccer_days_gate_refuse('Store API express checkout refused: ' . count($missing) . ' single-day camp line(s) without days');
+        }
+        $messages = [];
+        $failing = intersoccer_express_cart_lines_failing_validation($cart, $messages);
+        if (!empty($failing)) {
+            // Keep the validator's own message (e.g. age group) so the shopper knows what to fix.
+            intersoccer_days_gate_refuse(
+                'Store API express checkout refused: ' . count($failing) . ' line(s) failed add-to-cart validation',
+                !empty($messages) ? (string) $messages[0] : ''
+            );
+        }
     }
-    $failing = intersoccer_express_cart_lines_failing_validation($cart);
-    if (!empty($failing)) {
-        intersoccer_days_gate_refuse('Store API checkout refused: ' . count($failing) . ' line(s) failed add-to-cart validation');
-    }
+    // Final check on order line meta applies to every Store API checkout.
     intersoccer_days_gate_assert_order_has_days($order);
 }
 
