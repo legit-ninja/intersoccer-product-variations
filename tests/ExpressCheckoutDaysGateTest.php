@@ -741,16 +741,30 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $this->assertNull($thrown);
     }
 
-    public function testStripeExpressParamsRequirePayerPhone()
+    public function testStripeExpressParamsForcePayerPhoneWhenRequired()
     {
-        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'required';
         $params = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => false, 'currency_code' => 'chf']]);
+        unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
         $this->assertTrue($params['checkout']['needs_payer_phone']);
         $this->assertSame('chf', $params['checkout']['currency_code']);
+    }
 
-        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'hidden';
-        $params = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => false]]);
-        $this->assertFalse($params['checkout']['needs_payer_phone']);
+    /**
+     * @dataProvider phoneNotRequiredSettings
+     */
+    public function testStripeExpressParamsLeftAloneWhenPhoneNotRequired($setting)
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = $setting;
+        $off = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => false]]);
+        $on = intersoccer_express_force_payer_phone(['checkout' => ['needs_payer_phone' => true]]);
         unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
+        $this->assertFalse($off['checkout']['needs_payer_phone']);
+        $this->assertTrue($on['checkout']['needs_payer_phone'], "Stripe's own value is kept");
+    }
+
+    public static function phoneNotRequiredSettings()
+    {
+        return [['optional'], ['hidden']];
     }
 }

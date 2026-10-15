@@ -328,7 +328,7 @@ function intersoccer_store_api_require_billing_phone($order, $request = null) {
 }
 
 /**
- * Ask the Stripe wallet sheet for the payer's phone even when the store marks the field optional.
+ * Ask the Stripe wallet sheet for the payer's phone when the store requires a phone.
  * Filter and key confirmed in WooCommerce Stripe Gateway 10.7.2:
  * WC_Stripe_Express_Checkout_Element::scripts() localizes apply_filters('wc_stripe_express_checkout_params', ...),
  * whose 'checkout' entry comes from WC_Stripe_Express_Checkout_Helper::get_checkout_data() ('needs_payer_phone').
@@ -341,7 +341,8 @@ function intersoccer_express_force_payer_phone($params) {
     if (!is_array($params) || !isset($params['checkout']) || !is_array($params['checkout'])) {
         return $params;
     }
-    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') === 'hidden') {
+    // Follow the store setting: force it on only when the phone is required; otherwise keep Stripe's value.
+    if (!function_exists('get_option') || get_option('woocommerce_checkout_phone_field', 'required') !== 'required') {
         return $params;
     }
     $params['checkout']['needs_payer_phone'] = true;
