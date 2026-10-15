@@ -478,6 +478,25 @@ class ExpressCheckoutDaysGateTest extends TestCase
         }
     }
 
+    public function testStoreApiExpressRecheckClearsValidatorNotices()
+    {
+        MockFilters::$filters['woocommerce_add_to_cart_validation'] = function ($passed) {
+            wc_add_notice('This camp is not available for the selected age group.', 'error');
+            return false;
+        };
+        WC()->cart = $this->cartWith([
+            'k' => ['product_id' => self::CAMP_ID, 'variation_id' => self::SINGLE_VAR, 'camp_days' => ['Monday'], 'assigned_player_id' => 'uuid-1'],
+        ]);
+        $message = null;
+        try {
+            intersoccer_express_days_gate_store_api_checkout($this->order([]), $this->expressStoreApiRequest());
+        } catch (Exception $e) {
+            $message = $e->getMessage();
+        }
+        $this->assertSame('This camp is not available for the selected age group.', $message);
+        $this->assertSame([], intersoccer_express_error_notice_messages(), 'validator notices must not stay queued for the next page');
+    }
+
     public function testStoreApiRecheckSkipsNonExpressCheckout()
     {
         $calls = 0;
@@ -521,9 +540,15 @@ class ExpressCheckoutDaysGateTest extends TestCase
         WC()->cart = $this->cartWith([]);
         $this->assertNotContains('intersoccer-express-cart-has-programs', intersoccer_express_gate_cart_programs_body_class(['a']));
 
+        // A cart holding only a non-program product (no player needed) does not hide express.
         $GLOBALS['intersoccer_test_product_type'] = 'tournament';
+        $GLOBALS['intersoccer_test_product_name'] = 'Club Jersey';
         WC()->cart = $this->cartWith(['x' => ['product_id' => 880999]]);
+        $this->assertNotContains('intersoccer-express-cart-has-programs', intersoccer_express_gate_cart_programs_body_class(['a']));
         $GLOBALS['intersoccer_test_product_type'] = 'camp';
+        $GLOBALS['intersoccer_test_product_name'] = 'Autumn Camp';
+
+        WC()->cart = $this->cartWith(['x' => ['product_id' => self::CAMP_ID, 'variation_id' => self::WEEK_VAR, 'assigned_player' => 0]]);
         $GLOBALS['intersoccer_test_is_product'] = false;
         $this->assertSame(['a'], intersoccer_express_gate_cart_programs_body_class(['a']), 'not on a product page');
     }
@@ -643,10 +668,47 @@ class ExpressCheckoutDaysGateTest extends TestCase
         };
     }
 
+    private function expressPhoneRequest(array $billing)
+    {
+        return new IntersoccerDaysGateTestRequest([
+            'billing_address' => $billing,
+            'payment_data' => [['key' => 'express_payment_type', 'value' => 'google_pay']],
+        ]);
+    }
+
+    public function testNonExpressStoreApiCheckoutWithoutPhonePasses()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'required';
+        $thrown = null;
+        try {
+            intersoccer_store_api_require_billing_phone(
+                $this->phoneOrder(''),
+                new IntersoccerDaysGateTestRequest(['billing_address' => ['phone' => ''], 'payment_data' => []])
+            );
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
+        $this->assertNull($thrown, 'normal block checkout is left to its own phone validation');
+    }
+
+    public function testExpressCheckoutWithoutPhonePassesWhenPhoneIsOptional()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        $thrown = null;
+        try {
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest(['phone' => '']));
+        } catch (Exception $e) {
+            $thrown = $e;
+        }
+        unset($GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field']);
+        $this->assertNull($thrown, 'store marks the phone optional');
+    }
+
     public function testStoreApiCheckoutWithoutPhoneIsRefusedWith400()
     {
         try {
-            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), new IntersoccerDaysGateTestRequest(['billing_address' => ['phone' => '  ']]));
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest(['phone' => '  ']));
             $this->fail('Expected the checkout to be refused');
         } catch (Exception $e) {
             $this->assertSame(intersoccer_billing_phone_required_message(), $e->getMessage());
@@ -658,8 +720,8 @@ class ExpressCheckoutDaysGateTest extends TestCase
     {
         $thrown = null;
         try {
-            intersoccer_store_api_require_billing_phone($this->phoneOrder('+41 00 000 00 00'), null);
-            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), new IntersoccerDaysGateTestRequest(['billing_address' => ['phone' => '+41 00 000 00 00']]));
+            intersoccer_store_api_require_billing_phone($this->phoneOrder('+41 00 000 00 00'), $this->expressPhoneRequest([]));
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest(['phone' => '+41 00 000 00 00']));
         } catch (Exception $e) {
             $thrown = $e;
         }
@@ -671,7 +733,7 @@ class ExpressCheckoutDaysGateTest extends TestCase
         $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'hidden';
         $thrown = null;
         try {
-            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), null);
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest([]));
         } catch (Exception $e) {
             $thrown = $e;
         }

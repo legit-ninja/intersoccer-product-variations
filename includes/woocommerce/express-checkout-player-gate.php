@@ -299,8 +299,8 @@ function intersoccer_store_api_billing_phone($order, $request = null) {
 }
 
 /**
- * Store API checkout: the Store API does not validate the billing phone, and express wallets
- * can create an order without one. Refuse with a 400 unless the store hides the phone field.
+ * Store API express checkout: the Store API does not validate the billing phone, and express
+ * wallets can create an order without one. When the store requires a phone, refuse with a 400.
  *
  * @param WC_Order        $order
  * @param WP_REST_Request $request
@@ -308,7 +308,12 @@ function intersoccer_store_api_billing_phone($order, $request = null) {
  */
 add_action('woocommerce_store_api_checkout_update_order_from_request', 'intersoccer_store_api_require_billing_phone', 19, 2);
 function intersoccer_store_api_require_billing_phone($order, $request = null) {
-    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') === 'hidden') {
+    // Express (Apple Pay / Google Pay) checkouts only; the normal block checkout validates its own form.
+    if (!intersoccer_store_api_request_is_express($request)) {
+        return;
+    }
+    // Follow the store setting: only enforce when the phone field is required.
+    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') !== 'required') {
         return;
     }
     if (intersoccer_store_api_billing_phone($order, $request) !== '') {
@@ -809,6 +814,19 @@ if (!function_exists('intersoccer_express_strip_tags')) {
 }
 
 /**
+ * Clear queued WooCommerce notices raised by the validators.
+ *
+ * @return void
+ */
+function intersoccer_express_clear_error_notices() {
+    if (function_exists('wc_clear_notices')) {
+        wc_clear_notices();
+        return;
+    }
+    $GLOBALS['wc_notices'] = [];
+}
+
+/**
  * Run the normal add-to-cart validation (woocommerce_add_to_cart_validation) for an express request.
  * Covers player, single-day days, late pickup, age group and girls-only, and anything added later.
  * Notices raised by the validators are dropped: the express path only shows the generic message.
@@ -993,6 +1011,9 @@ function intersoccer_express_days_gate_store_api_checkout($order, $request = nul
         }
         $messages = [];
         $failing = intersoccer_express_cart_lines_failing_validation($cart, $messages);
+        // The messages are re-sent in the refusal; drop the queued notices so they do not
+        // show up again as stale errors on the next page.
+        intersoccer_express_clear_error_notices();
         if (!empty($failing)) {
             // Keep the validator's own message (e.g. age group) so the shopper knows what to fix.
             intersoccer_days_gate_refuse(
