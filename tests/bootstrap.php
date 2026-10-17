@@ -335,6 +335,18 @@ if (!function_exists('do_action')) {
     }
 }
 
+if (!function_exists('is_admin')) {
+    function is_admin() {
+        return !empty($GLOBALS['intersoccer_test_is_admin']);
+    }
+}
+
+if (!function_exists('did_action')) {
+    function did_action($hook) {
+        return 0;
+    }
+}
+
 if (!function_exists('current_user_can')) {
     function current_user_can($capability) {
         return true;

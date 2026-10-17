@@ -11,6 +11,9 @@ require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
+if (!function_exists('intersoccer_translate_string')) {
+    require_once dirname(__DIR__) . '/includes/language-helpers.php';
+}
 require_once dirname(__DIR__) . '/includes/woocommerce/discounts.php';
 
 if (!function_exists('intersoccer_get_discount_message')) {
