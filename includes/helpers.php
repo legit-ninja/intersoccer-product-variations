@@ -643,6 +643,25 @@ function intersoccer_discount_wpml_canonical_product_id($product_id) {
 }
 
 /**
+ * Canonical camp line identity for discount comparisons (variation, else parent product).
+ *
+ * @param int $variation_id
+ * @param int $product_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_camp_booking_id($variation_id, $product_id = 0) {
+    $variation_id = (int) $variation_id;
+    $product_id = (int) $product_id;
+    if ($variation_id > 0) {
+        return intersoccer_discount_wpml_canonical_variation_id($variation_id);
+    }
+    if ($product_id > 0) {
+        return intersoccer_discount_wpml_canonical_product_id($product_id);
+    }
+    return 0;
+}
+
+/**
  * Map a stored or translated season label to the default-language season name.
  *
  * @param string $label Season term name (any language).

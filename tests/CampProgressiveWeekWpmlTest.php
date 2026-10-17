@@ -3,6 +3,7 @@
  * Progressive camp week-2 discount must be language-invariant (WPML variation identity).
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
@@ -26,6 +27,8 @@ class CampProgressiveWeekWpmlTest extends TestCase
 
     private const BASE_PRICE = 525.0;
     private const WEEK_2_PRICE = 472.5;
+    /** Progressive week 3+ rate (20%) on base price — wrong tier when canonical exclude fails. */
+    private const WEEK_3_PLUS_PRICE = 420.0;
     private const CHILD_UUID = 'uuid-progressive-child';
 
     /** lang => [parent, week1_var, week2_var, season label, year, booking-type] */
@@ -223,9 +226,7 @@ class CampProgressiveWeekWpmlTest extends TestCase
         return $cases;
     }
 
-    /**
-     * @dataProvider priorAndCartLanguageMatrix
-     */
+    #[DataProvider('priorAndCartLanguageMatrix')]
     public function testWeek2DiscountInvariantAcrossLanguages(string $prior_lang, string $cart_lang): void
     {
         $customer_id = 720000 + crc32($prior_lang . $cart_lang) % 10000;
@@ -258,6 +259,52 @@ class CampProgressiveWeekWpmlTest extends TestCase
         );
     }
 
+    #[DataProvider('priorAndCartLanguageMatrix')]
+    public function testWeek2CartPriceWhenPriorIncludesSameLogicalWeekInOtherLanguage(
+        string $prior_lang,
+        string $cart_lang
+    ): void {
+        $customer_id = 731000 + crc32('wk2dup' . $prior_lang . $cart_lang) % 10000;
+        $GLOBALS['intersoccer_test_user_id'] = $customer_id;
+        $GLOBALS['intersoccer_test_wpml_current_language'] = $cart_lang;
+
+        $season_keys = [
+            'en' => 'autumn camps 2026|2026',
+            'fr' => "camps d'automne 2026|2026",
+            'de' => 'herbst camps 2026|2026',
+        ];
+        [$prior_parent, $prior_week1] = [self::WEEKS[$prior_lang][0], self::WEEKS[$prior_lang][1]];
+        $prior_week2_lang = self::priorWeek2StorageLangForCart($cart_lang);
+        [, , $prior_week2] = self::WEEKS[$prior_week2_lang];
+
+        $this->seedPriorWeek1Order($customer_id, $prior_lang, $prior_parent, $prior_week1, $season_keys[$prior_lang]);
+        $this->seedPriorWeek2Order(
+            $customer_id,
+            $prior_week2_lang,
+            self::WEEKS[$prior_week2_lang][0],
+            $prior_week2,
+            $season_keys[$prior_week2_lang],
+            770000 + $customer_id
+        );
+
+        $cart = $this->makeSingleChildWeek2Cart($cart_lang);
+        intersoccer_apply_combo_discounts_to_items($cart);
+
+        $price = $cart->cart_contents[array_key_first($cart->cart_contents)]['data']->get_price();
+        $this->assertEqualsWithDelta(
+            self::WEEK_2_PRICE,
+            $price,
+            0.001,
+            "Week-2 tier must apply when prior week-2 is stored in another locale (prior=$prior_lang cart=$cart_lang)"
+        );
+        $this->assertNotEqualsWithDelta(
+            self::WEEK_3_PLUS_PRICE,
+            $price,
+            0.001,
+            'Must not apply week-3+ tier when only one distinct prior week counts'
+        );
+    }
+
     public function testSameCartMixedLanguageTwoWeeksAppliesWeek2Discount(): void
     {
         $GLOBALS['intersoccer_test_user_id'] = 730001;
@@ -276,6 +323,39 @@ class CampProgressiveWeekWpmlTest extends TestCase
             $cart->cart_contents['week2-fr']['data']->get_price(),
             0.001,
             'Second cart week gets 10% progressive (mixed DE+FR)'
+        );
+    }
+
+    public function testSameCartMixedLanguageWeek2LinePriceWithPriorWeek2StoredInOtherLocale(): void
+    {
+        $customer_id = 730011;
+        $GLOBALS['intersoccer_test_user_id'] = $customer_id;
+        $GLOBALS['intersoccer_test_wpml_current_language'] = 'de';
+        $season_keys = [
+            'fr' => "camps d'automne 2026|2026",
+        ];
+        $this->seedPriorWeek2Order(
+            $customer_id,
+            'fr',
+            self::WEEKS['fr'][0],
+            self::WEEKS['fr'][2],
+            $season_keys['fr'],
+            770011
+        );
+
+        $cart = $this->makeTwoWeekCart('de', 'fr');
+        intersoccer_apply_combo_discounts_to_items($cart);
+
+        $this->assertEqualsWithDelta(
+            self::WEEK_2_PRICE,
+            $cart->cart_contents['week2-fr']['data']->get_price(),
+            0.001,
+            'Second mixed-locale cart week must stay on week-2 progressive tier'
+        );
+        $this->assertNotEqualsWithDelta(
+            self::WEEK_3_PLUS_PRICE,
+            $cart->cart_contents['week2-fr']['data']->get_price(),
+            0.001
         );
     }
 
@@ -355,6 +435,20 @@ class CampProgressiveWeekWpmlTest extends TestCase
         );
     }
 
+    public function testCanonicalCampBookingIdUsesProductIdWhenVariationAbsent(): void
+    {
+        $en_parent = self::WEEKS['en'][0];
+        $fr_parent = self::WEEKS['fr'][0];
+        $this->assertSame(
+            intersoccer_discount_wpml_canonical_product_id($en_parent),
+            intersoccer_discount_wpml_canonical_camp_booking_id(0, $fr_parent)
+        );
+        $this->assertSame(
+            intersoccer_discount_wpml_canonical_variation_id(self::WEEKS['de'][2]),
+            intersoccer_discount_wpml_canonical_camp_booking_id(self::WEEKS['fr'][2], self::WEEKS['fr'][0])
+        );
+    }
+
     public function testCanonicalVariationExcludeSkipsSameLogicalWeekAcrossLanguages(): void
     {
         $customer_id = 730005;
@@ -393,6 +487,12 @@ class CampProgressiveWeekWpmlTest extends TestCase
         $GLOBALS['intersoccer_test_orders'][$order_id] = $this->buildPriorOrder($parent, $variation, $season_key, $order_id);
         $GLOBALS['intersoccer_test_order_lang'][$order_id] = $lang;
         $GLOBALS['intersoccer_test_order_customer'][$order_id] = $customer_id;
+    }
+
+    private static function priorWeek2StorageLangForCart(string $cart_lang): string
+    {
+        $map = ['en' => 'fr', 'fr' => 'de', 'de' => 'fr'];
+        return $map[$cart_lang] ?? 'fr';
     }
 
     private function buildPriorOrder(

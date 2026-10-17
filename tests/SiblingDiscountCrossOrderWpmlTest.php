@@ -4,6 +4,7 @@
  * Mocks WPML order-query language filtering and get_term translation unless suppressed.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
@@ -207,9 +208,7 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider priorCartLanguagePairs
-     */
+    #[DataProvider('priorCartLanguagePairs')]
     public function testCrossOrderSiblingDiscountAcrossLanguages(string $prior_lang, string $cart_lang): void
     {
         $customer_id = 880000 + crc32($prior_lang . $cart_lang) % 1000;
@@ -280,9 +279,7 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider crossOrderWpmlBreakPairs
-     */
+    #[DataProvider('crossOrderWpmlBreakPairs')]
     public function testCrossOrderFailsWithoutWpmlOrderSuppressFilters(string $prior_lang, string $cart_lang): void
     {
         $GLOBALS['intersoccer_test_disable_discount_order_suppress_filters'] = true;
@@ -290,9 +287,7 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
         $this->runCrossOrderScenario($prior_lang, $cart_lang, $customer_id, false);
     }
 
-    /**
-     * @dataProvider crossOrderWpmlBreakPairs
-     */
+    #[DataProvider('crossOrderWpmlBreakPairs')]
     public function testCrossOrderFailsWithoutDefaultLanguageTermRead(string $prior_lang, string $cart_lang): void
     {
         $GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'] = true;

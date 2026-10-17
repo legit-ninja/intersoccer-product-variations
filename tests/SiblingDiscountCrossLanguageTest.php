@@ -17,6 +17,7 @@
  * Controls EN+EN and DE+DE pass today. FR+FR, DE+FR, EN+DE, FR+EN fail.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
@@ -212,9 +213,8 @@ class SiblingDiscountCrossLanguageTest extends TestCase
 
     /**
      * Grouping layer: both children must land in one camps_by_season_child bucket.
-     *
-     * @dataProvider languagePairs
      */
+    #[DataProvider('languagePairs')]
     public function testBothSiblingsShareOneSeasonBucket(string $langA, string $langB): void
     {
         $cart = $this->makeCart($langA, $langB);
@@ -234,9 +234,8 @@ class SiblingDiscountCrossLanguageTest extends TestCase
 
     /**
      * End-to-end cart hook: 2nd child gets the 20% camp sibling rate.
-     *
-     * @dataProvider languagePairs
      */
+    #[DataProvider('languagePairs')]
     public function testSecondChildGetsCampSiblingDiscount(string $langA, string $langB): void
     {
         $cart = $this->makeCart($langA, $langB);
@@ -273,9 +272,7 @@ class SiblingDiscountCrossLanguageTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider frenchFullWeekBookingVariants
-     */
+    #[DataProvider('frenchFullWeekBookingVariants')]
     public function testFrenchFullWeekBookingTypeCountsForSibling(string $booking_type): void
     {
         $this->assertTrue(
