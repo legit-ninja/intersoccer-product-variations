@@ -325,8 +325,11 @@ if (!function_exists('delete_option')) {
 
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
-        if ($hook === 'wpml_switch_language' && isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
-            $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+        if ($hook === 'wpml_switch_language') {
+            $GLOBALS['intersoccer_test_wpml_switch_language_count'] = (int) ($GLOBALS['intersoccer_test_wpml_switch_language_count'] ?? 0) + 1;
+            if (isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
+                $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+            }
         }
         return;
     }
