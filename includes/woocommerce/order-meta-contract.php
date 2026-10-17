@@ -624,13 +624,6 @@ function intersoccer_normalize_canonical_booking_type($raw) {
     $raw = html_entity_decode(trim((string) $raw), ENT_QUOTES, 'UTF-8');
     if (function_exists('remove_accents')) {
         $raw = remove_accents($raw);
-    }
-    $raw = strtolower($raw);
-    if ($raw === '') {
-        return '';
-    }
-    if (function_exists('remove_accents')) {
-        $raw = strtolower(remove_accents($raw));
     } else {
         $raw = strtr($raw, [
             'à' => 'a', 'â' => 'a', 'ä' => 'a', 'á' => 'a',
@@ -640,6 +633,10 @@ function intersoccer_normalize_canonical_booking_type($raw) {
             'î' => 'i', 'ï' => 'i', 'í' => 'i',
             'ç' => 'c',
         ]);
+    }
+    $raw = strtolower($raw);
+    if ($raw === '') {
+        return '';
     }
     $compact = preg_replace('/[\s_]+/', '-', $raw);
     $compact = str_replace(['(', ')'], '', (string) $compact);
