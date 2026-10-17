@@ -704,10 +704,7 @@ function intersoccer_save_camp_variation_fields($variation_id, $loop) {
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
         intersoccer_debug('Save: Saving late pickup for variation ' . $variation_id . ', loop ' . $loop);
-        intersoccer_debug('Save: POST data keys: ' . implode(', ', array_keys($_POST)));
-        if (isset($_POST['_intersoccer_enable_late_pickup'])) {
-            intersoccer_debug('Save: _intersoccer_enable_late_pickup structure: ' . json_encode($_POST['_intersoccer_enable_late_pickup']));
-        }
+        intersoccer_debug('Save: variation ' . $variation_id . ' loop ' . $loop . ', post_field_count=' . count($_POST) . ', late_pickup_field_present=' . (isset($_POST['_intersoccer_enable_late_pickup']) ? 'yes' : 'no'));
     }
 
     // Handle both array format (bulk save) and direct format (individual save)

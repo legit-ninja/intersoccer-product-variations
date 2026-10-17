@@ -42,7 +42,6 @@ function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variati
     }
 
     intersoccer_debug('InterSoccer Late Pickup: Late pickup IS enabled for this variation');
-    intersoccer_debug('InterSoccer Late Pickup: POST data - late_pickup_days: ' . (isset($_POST['late_pickup_days']) ? json_encode($_POST['late_pickup_days']) : 'NOT SET'));
 
     // Cost and base price are computed in cart-calculations.php. Do not trust the request.
     if (isset($_POST['late_pickup_type'])) {
@@ -50,7 +49,7 @@ function intersoccer_add_late_pickup_data($cart_item_data, $product_id, $variati
     }
     if (isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days'])) {
         $cart_item_data['late_pickup_days'] = array_map('sanitize_text_field', $_POST['late_pickup_days']);
-        intersoccer_debug('InterSoccer Late Pickup: Added days to cart data: ' . json_encode($cart_item_data['late_pickup_days']));
+        intersoccer_debug('InterSoccer Late Pickup: Added ' . count($cart_item_data['late_pickup_days']) . ' late pickup day(s) to cart data for variation ' . $variation_id);
     }
     return $cart_item_data;
 }
@@ -83,9 +82,6 @@ function intersoccer_add_late_pickup_to_price($cart_item, $cart_item_key) {
  */
 add_filter('woocommerce_add_to_cart_validation', 'intersoccer_validate_late_pickup', 10, 5);
 function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $variation_id = '', $variations = []) {
-    intersoccer_debug('===== InterSoccer Late Pickup Validation START =====');
-    intersoccer_debug('InterSoccer Late Pickup: Product ID: ' . $product_id . ', Variation ID: ' . $variation_id);
-    
     // Reject late pickup POST on half-day or disabled variations.
     if (!function_exists('intersoccer_variation_allows_late_pickup') || !intersoccer_variation_allows_late_pickup((int) $variation_id)) {
         if (isset($_POST['late_pickup_type']) && sanitize_text_field((string) $_POST['late_pickup_type']) !== '' && sanitize_text_field((string) $_POST['late_pickup_type']) !== 'none') {
@@ -97,30 +93,23 @@ function intersoccer_validate_late_pickup($passed, $product_id, $quantity, $vari
         return $passed;
     }
 
-    intersoccer_debug('InterSoccer Late Pickup: Late pickup IS allowed, checking POST data...');
-    intersoccer_debug('InterSoccer Late Pickup: isset($_POST[late_pickup_days]): ' . (isset($_POST['late_pickup_days']) ? 'YES' : 'NO'));
-
     // Only validate IF late pickup days are provided (optional feature)
     if (isset($_POST['late_pickup_days']) && is_array($_POST['late_pickup_days'])) {
         $late_pickup_days = array_map('sanitize_text_field', $_POST['late_pickup_days']);
         $valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         
-        intersoccer_debug('InterSoccer Late Pickup: Days submitted: ' . print_r($late_pickup_days, true));
+        intersoccer_debug('InterSoccer Late Pickup: Validating ' . count($late_pickup_days) . ' submitted day(s) for variation ' . $variation_id);
         
         foreach ($late_pickup_days as $day) {
             if (!in_array($day, $valid_days, true)) {
                 wc_add_notice(__('Invalid day selected for late pick up.', 'intersoccer-product-variations'), 'error');
-                intersoccer_debug('InterSoccer Late Pickup: ❌ VALIDATION FAILED - Invalid day: ' . $day);
+                intersoccer_debug('InterSoccer Late Pickup: VALIDATION FAILED - invalid day count for variation ' . $variation_id);
             return false;
             }
         }
         
-        intersoccer_debug('InterSoccer Late Pickup: ✅ VALIDATION PASSED - ' . count($late_pickup_days) . ' days selected');
-    } else {
-        intersoccer_debug('InterSoccer Late Pickup: No late pickup days selected (optional)');
+        intersoccer_debug('InterSoccer Late Pickup: VALIDATION PASSED - ' . count($late_pickup_days) . ' day(s) for variation ' . $variation_id);
     }
     
-    intersoccer_debug('InterSoccer Late Pickup: Returning passed = ' . ($passed ? 'true' : 'false'));
-    intersoccer_debug('===== InterSoccer Late Pickup Validation END =====');
     return $passed;
 }
