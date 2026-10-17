@@ -98,7 +98,7 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 - Commit to `github.com/legit-ninja/intersoccer-product-variations`.
 - Tag releases (e.g., `v1.10.8`) with descriptive messages.
 - Upload zip to `updates.underdogunlimited.com`.
-- Test on `staging.intersoccer.ch`, then deploy to production.
+- Test on `staging.example`, then deploy to production.
 
 ## Testing
 - **PHPUnit**: Unit tests in `/tests/` directory

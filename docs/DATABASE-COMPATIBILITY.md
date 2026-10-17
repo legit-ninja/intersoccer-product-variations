@@ -170,7 +170,7 @@ Create this file in your plugin:
 
 environments:
   staging:
-    url: "staging.intersoccer.ch"
+    url: "staging.example"
     database:
       name: "staging_wp_db"
       prefix: "wp_1244388_"

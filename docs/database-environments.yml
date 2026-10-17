@@ -6,7 +6,7 @@
 
 environments:
   staging:
-    url: "staging.intersoccer.ch"
+    url: "staging.example"
     
     database:
       name: "staging_database"           # Update with actual name
