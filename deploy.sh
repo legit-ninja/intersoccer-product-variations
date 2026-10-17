@@ -272,6 +272,8 @@ deploy_to_server() {
         --exclude='node_modules' \
         --exclude='vendor' \
         --exclude='tests' \
+        --exclude='utils' \
+        --exclude='scripts' \
         --exclude='cypress' \
         --exclude='docs' \
         --exclude='.phpunit.result.cache' \

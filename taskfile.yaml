@@ -25,7 +25,7 @@ tasks:
     desc: Build plugin/theme zip for deployment
     cmds:
       - rm -f ../{{.REPO_NAME}}.zip
-      - zip -r ../{{.REPO_NAME}}.zip . -x "*.git*" "*Taskfile.yml" "*composer.*" "*vendor*" "*tests*" "*cypress*"
+      - zip -r ../{{.REPO_NAME}}.zip . -x "*.git*" "*Taskfile.yml" "*composer.*" "*vendor*" "*tests*" "*cypress*" "*utils/*" "*scripts/*"
     vars:
       REPO_NAME: '{{.TASK}}'  # Replace with repo name, e.g., intersoccer-product-variations
 
