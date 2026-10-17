@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This document explains how to deploy the InterSoccer Product Variations plugin to the dev server.
+This document explains how to deploy the InterSoccer Product Variations plugin to a remote WordPress server.
 
 ## Initial Setup
 
@@ -31,7 +31,7 @@ This document explains how to deploy the InterSoccer Product Variations plugin t
 ## Usage
 
 ### Basic Deployment
-Deploy all plugin files to the dev server:
+Deploy all plugin files to the configured server:
 ```bash
 ./deploy.sh
 ```
@@ -181,7 +181,7 @@ This script can be integrated with GitHub Actions or GitLab CI:
 
 ```yaml
 # .github/workflows/deploy.yml
-name: Deploy to Dev Server
+name: Deploy Plugin
 
 on:
   push:

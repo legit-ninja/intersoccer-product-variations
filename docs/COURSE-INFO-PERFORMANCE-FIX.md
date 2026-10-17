@@ -214,7 +214,7 @@ If issues occur:
 2. Revert `js/variation-details.js` to previous version
 3. Revert `includes/woocommerce/cart-calculations.php` course info injection
 4. Clear all caches
-5. Investigate issue in dev environment
+5. Investigate issue on a test site
 
 ---
 

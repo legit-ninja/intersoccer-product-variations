@@ -93,7 +93,7 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 5. Configure late pickup pricing in WordPress options.
 
 ## Development Workflow
-- Code locally, deploy via SCP to `test-site.example`.
+- Code locally, then deploy to a test WordPress site using `./deploy.sh` (see `deploy.local.sh.example`).
 - Build Cypress E2E tests and PHPUnit unit tests.
 - Commit to `github.com/legit-ninja/intersoccer-product-variations`.
 - Tag releases (e.g., `v1.10.8`) with descriptive messages.
