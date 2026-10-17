@@ -320,6 +320,9 @@ add_action('init', function () {
             'Coach',
             'Organizer',
             'Manage Players',
+            'Medical information: provided (view or update in My Account).',
+            'Age at camp start: %d',
+            'Birth year: %s',
         ];
 
         foreach ($strings as $string) {

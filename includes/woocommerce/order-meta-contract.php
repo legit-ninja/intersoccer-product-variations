@@ -1580,21 +1580,212 @@ function intersoccer_is_hidden_customer_order_meta_key($key) {
 }
 
 /**
- * Mark WooCommerce order email rendering so sensitive meta can be redacted (including admin-triggered resends).
+ * Canonical English msgids for privacy redaction copy (also registered for WPML / .po).
  *
- * @return void
+ * @return array<int,string>
  */
-function intersoccer_sensitive_order_meta_begin_email_context() {
-    $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+function intersoccer_privacy_redaction_string_msgids() {
+    return [
+        'Medical information: provided (view or update in My Account).',
+        'Age at camp start: %d',
+        'Birth year: %s',
+    ];
 }
 
 /**
- * Clear email redaction flag after an order email finishes rendering.
+ * Static FR/DE fallbacks aligned with lang/intersoccer-product-variations-{fr,de}.po.
+ *
+ * @return array<string,array<string,string>>
+ */
+function intersoccer_privacy_redaction_string_i18n_map() {
+    return [
+        'Medical information: provided (view or update in My Account).' => [
+            'fr' => 'Informations médicales : fournies (consulter ou mettre à jour dans Mon compte).',
+            'de' => 'Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktualisieren).',
+        ],
+        'Age at camp start: %d' => [
+            'fr' => 'Âge au début du camp : %d',
+            'de' => 'Alter bei Campbeginn: %d',
+        ],
+        'Birth year: %s' => [
+            'fr' => 'Année de naissance : %s',
+            'de' => 'Geburtsjahr: %s',
+        ],
+    ];
+}
+
+/**
+ * Register privacy redaction strings with WPML and seed FR/DE translations from the .po map.
  *
  * @return void
  */
-function intersoccer_sensitive_order_meta_end_email_context() {
+function intersoccer_register_privacy_redaction_wpml_strings() {
+    if (!function_exists('icl_register_string')) {
+        return;
+    }
+
+    $map = intersoccer_privacy_redaction_string_i18n_map();
+    foreach (intersoccer_privacy_redaction_string_msgids() as $msgid) {
+        icl_register_string('intersoccer-product-variations', $msgid, $msgid);
+        if (!function_exists('icl_get_string_id') || !function_exists('icl_add_string_translation')) {
+            continue;
+        }
+        $string_id = icl_get_string_id($msgid, 'intersoccer-product-variations');
+        if (!$string_id) {
+            continue;
+        }
+        $status = defined('ICL_TM_COMPLETE') ? ICL_TM_COMPLETE : 10;
+        foreach ($map[$msgid] ?? [] as $lang => $translation) {
+            icl_add_string_translation($string_id, $lang, $status, $translation);
+        }
+    }
+}
+
+add_action('init', 'intersoccer_register_privacy_redaction_wpml_strings', 20);
+
+/**
+ * Translate a privacy redaction string at render time (gettext + WPML).
+ *
+ * @param string       $msgid        English msgid (may contain sprintf placeholders).
+ * @param array<mixed> $sprintf_args Optional sprintf arguments.
+ * @return string
+ */
+function intersoccer_pv_privacy_string($msgid, array $sprintf_args = []) {
+    $text = (string) $msgid;
+    $lang = apply_filters('wpml_current_language', null);
+    if (is_string($lang) && $lang !== '' && $lang !== 'en') {
+        $wpml = apply_filters('wpml_translate_single_string', $msgid, 'intersoccer-product-variations', $msgid, $lang);
+        if (is_string($wpml) && $wpml !== '' && $wpml !== $msgid) {
+            $text = $wpml;
+        } elseif (function_exists('icl_t')) {
+            $icl = icl_t('intersoccer-product-variations', $msgid, $msgid);
+            if (is_string($icl) && $icl !== '' && $icl !== $msgid) {
+                $text = $icl;
+            }
+        }
+        if ($text === $msgid) {
+            $fallback = intersoccer_privacy_redaction_string_i18n_map()[$msgid][$lang] ?? null;
+            if (is_string($fallback) && $fallback !== '') {
+                $text = $fallback;
+            }
+        }
+    }
+    if ($text === $msgid) {
+        $text = __($msgid, 'intersoccer-product-variations');
+    }
+    if ($sprintf_args !== []) {
+        return vsprintf($text, $sprintf_args);
+    }
+    return $text;
+}
+
+/**
+ * Map WPML order language to a WordPress locale for gettext during emails.
+ *
+ * @param WC_Order|null $order
+ * @return string|null Locale such as fr_FR, or null.
+ */
+function intersoccer_privacy_redaction_locale_for_order($order) {
+    if (!is_object($order) || !method_exists($order, 'get_meta')) {
+        return null;
+    }
+    $wpml = (string) $order->get_meta('wpml_language', true);
+    if ($wpml === '') {
+        return null;
+    }
+    $map = [
+        'en' => 'en_US',
+        'fr' => 'fr_FR',
+        'de' => 'de_DE',
+    ];
+    if (isset($map[$wpml])) {
+        return $map[$wpml];
+    }
+    return strpos($wpml, '_') !== false ? $wpml : null;
+}
+
+/**
+ * Begin WooCommerce order email rendering (HTML and plain templates).
+ *
+ * Hooked on woocommerce_email_before_order_table, which runs for both plain and HTML emails.
+ *
+ * @param WC_Order|false $order
+ * @param bool           $sent_to_admin
+ * @param bool           $plain_text
+ * @param WC_Email|null  $email
+ * @return void
+ */
+function intersoccer_sensitive_order_meta_begin_email_context($order = false, $sent_to_admin = false, $plain_text = false, $email = null) {
+    $depth = (int) ($GLOBALS['intersoccer_sensitive_order_meta_email_depth'] ?? 0);
+    $GLOBALS['intersoccer_sensitive_order_meta_email_depth'] = $depth + 1;
+    if ($depth > 0) {
+        return;
+    }
+    $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+
+    $locale = intersoccer_privacy_redaction_locale_for_order($order);
+    if ($locale && function_exists('switch_to_locale')) {
+        $GLOBALS['intersoccer_sensitive_order_meta_prev_locale'] = function_exists('determine_locale')
+            ? determine_locale()
+            : get_locale();
+        switch_to_locale($locale);
+        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+            unload_textdomain('intersoccer-product-variations');
+            load_plugin_textdomain(
+                'intersoccer-product-variations',
+                false,
+                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
+            );
+        }
+    }
+
+    if (is_object($order) && method_exists($order, 'get_meta')) {
+        $wpml_lang = (string) $order->get_meta('wpml_language', true);
+        if ($wpml_lang !== '' && has_action('wpml_switch_language')) {
+            $GLOBALS['intersoccer_sensitive_order_meta_prev_wpml'] = apply_filters('wpml_current_language', null);
+            do_action('wpml_switch_language', $wpml_lang);
+        }
+    }
+}
+
+/**
+ * End WooCommerce order email rendering scope.
+ *
+ * @param WC_Order|false $order
+ * @param bool           $sent_to_admin
+ * @param bool           $plain_text
+ * @param WC_Email|null  $email
+ * @return void
+ */
+function intersoccer_sensitive_order_meta_end_email_context($order = false, $sent_to_admin = false, $plain_text = false, $email = null) {
+    $depth = (int) ($GLOBALS['intersoccer_sensitive_order_meta_email_depth'] ?? 0);
+    if ($depth <= 0) {
+        return;
+    }
+    $GLOBALS['intersoccer_sensitive_order_meta_email_depth'] = $depth - 1;
+    if ($depth > 1) {
+        return;
+    }
+
     unset($GLOBALS['intersoccer_sensitive_order_meta_email']);
+
+    if (isset($GLOBALS['intersoccer_sensitive_order_meta_prev_wpml']) && has_action('wpml_switch_language')) {
+        do_action('wpml_switch_language', $GLOBALS['intersoccer_sensitive_order_meta_prev_wpml']);
+        unset($GLOBALS['intersoccer_sensitive_order_meta_prev_wpml']);
+    }
+
+    if (isset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']) && function_exists('restore_previous_locale')) {
+        restore_previous_locale();
+        unset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']);
+        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+            unload_textdomain('intersoccer-product-variations');
+            load_plugin_textdomain(
+                'intersoccer-product-variations',
+                false,
+                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
+            );
+        }
+    }
 }
 
 /**
@@ -1624,45 +1815,96 @@ function intersoccer_should_mask_sensitive_order_item_meta() {
 }
 
 /**
- * Known order-item meta keys for attendee DOB (EN and common localized labels).
+ * Order line item meta keys that store attendee date of birth (PV + PM naming, EN/FR/DE labels, storage variants).
  *
  * @return array<int,string>
  */
-function intersoccer_attendee_dob_order_meta_key_variants() {
-    return [
+function intersoccer_sensitive_order_meta_dob_keys() {
+    $keys = [
         'Attendee DOB',
+        'Player DOB',
         'Date de naissance',
         'Geburtsdatum',
+        'player_dob',
+        '_attendee_dob',
+        '_player_dob',
     ];
+
+    /**
+     * Filter order item meta keys treated as attendee DOB for privacy redaction.
+     *
+     * @param array<int,string> $keys
+     */
+    return apply_filters('intersoccer_sensitive_order_meta_dob_keys', $keys);
 }
 
 /**
- * Known order-item meta keys for medical conditions (EN and common localized labels).
+ * Order line item meta keys that store medical / allergy text (PV + PM naming, EN/FR/DE labels, storage variants).
  *
  * @return array<int,string>
  */
-function intersoccer_medical_conditions_order_meta_key_variants() {
-    return [
+function intersoccer_sensitive_order_meta_medical_keys() {
+    $keys = [
         'Medical Conditions',
+        'Player Medical',
         'Conditions médicales',
         'Medizinische Angaben',
+        'medical_conditions',
+        '_medical_conditions',
+        'player_medical',
+        '_player_medical',
     ];
+
+    /**
+     * Filter order item meta keys treated as medical conditions for privacy redaction.
+     *
+     * @param array<int,string> $keys
+     */
+    return apply_filters('intersoccer_sensitive_order_meta_medical_keys', $keys);
 }
 
 /**
- * @param string $key Raw order item meta key.
+ * Whether a formatted-meta key or display label matches a sensitive key list.
+ *
+ * @param string              $key         Stored meta key.
+ * @param string              $display_key Human-facing label from WooCommerce.
+ * @param array<int,string>   $candidates  Sensitive key list.
  * @return bool
  */
-function intersoccer_is_attendee_dob_order_meta_key($key) {
-    return in_array((string) $key, intersoccer_attendee_dob_order_meta_key_variants(), true);
+function intersoccer_sensitive_order_meta_key_matches_list($key, $display_key, array $candidates) {
+    $key = (string) $key;
+    $display_key = (string) $display_key;
+    foreach ($candidates as $candidate) {
+        $candidate = (string) $candidate;
+        if ($candidate === '') {
+            continue;
+        }
+        if ($key === $candidate || $display_key === $candidate) {
+            return true;
+        }
+        if (strcasecmp($key, $candidate) === 0 || strcasecmp($display_key, $candidate) === 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
- * @param string $key Raw order item meta key.
+ * @param string $key         Stored meta key.
+ * @param string $display_key Display key from formatted meta.
  * @return bool
  */
-function intersoccer_is_medical_conditions_order_meta_key($key) {
-    return in_array((string) $key, intersoccer_medical_conditions_order_meta_key_variants(), true);
+function intersoccer_is_sensitive_order_meta_dob_key($key, $display_key = '') {
+    return intersoccer_sensitive_order_meta_key_matches_list($key, $display_key, intersoccer_sensitive_order_meta_dob_keys());
+}
+
+/**
+ * @param string $key         Stored meta key.
+ * @param string $display_key Display key from formatted meta.
+ * @return bool
+ */
+function intersoccer_is_sensitive_order_meta_medical_key($key, $display_key = '') {
+    return intersoccer_sensitive_order_meta_key_matches_list($key, $display_key, intersoccer_sensitive_order_meta_medical_keys());
 }
 
 /**
@@ -1772,10 +2014,7 @@ function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
         $year = is_scalar($value) ? preg_replace('/[^\d]/', '', (string) $value) : '';
         $year = strlen($year) >= 4 ? substr($year, 0, 4) : '';
         if ($year !== '' && preg_match('/^\d{4}$/', $year)) {
-            return sprintf(
-                __('Birth year: %s', 'intersoccer-product-variations'),
-                $year
-            );
+            return intersoccer_pv_privacy_string('Birth year: %s', [$year]);
         }
         return '';
     }
@@ -1784,17 +2023,11 @@ function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
     if ($ref !== null && function_exists('intersoccer_age_on_date')) {
         $age = intersoccer_age_on_date($dob_ymd, $ref);
         if ($age !== null) {
-            return sprintf(
-                __('Age at camp start: %d', 'intersoccer-product-variations'),
-                (int) $age
-            );
+            return intersoccer_pv_privacy_string('Age at camp start: %d', [(int) $age]);
         }
     }
 
-    return sprintf(
-        __('Birth year: %s', 'intersoccer-product-variations'),
-        substr($dob_ymd, 0, 4)
-    );
+    return intersoccer_pv_privacy_string('Birth year: %s', [substr($dob_ymd, 0, 4)]);
 }
 
 /**
@@ -1803,7 +2036,7 @@ function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
  * @return string
  */
 function intersoccer_format_medical_conditions_for_redacted_surface() {
-    return __('Medical information: provided (view or update in My Account).', 'intersoccer-product-variations');
+    return intersoccer_pv_privacy_string('Medical information: provided (view or update in My Account).');
 }
 
 /**
@@ -1817,11 +2050,12 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
     $out = [];
     foreach ($formatted_meta as $meta) {
         $key = isset($meta->key) ? (string) $meta->key : '';
-        if ($key === '') {
+        $display_key = isset($meta->display_key) ? (string) $meta->display_key : '';
+        if ($key === '' && $display_key === '') {
             continue;
         }
 
-        if (intersoccer_is_medical_conditions_order_meta_key($key)) {
+        if (intersoccer_is_sensitive_order_meta_medical_key($key, $display_key)) {
             if (!intersoccer_order_meta_medical_conditions_has_value($meta->value ?? '')) {
                 continue;
             }
@@ -1834,7 +2068,7 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
             continue;
         }
 
-        if (intersoccer_is_attendee_dob_order_meta_key($key)) {
+        if (intersoccer_is_sensitive_order_meta_dob_key($key, $display_key)) {
             $redacted = intersoccer_format_attendee_dob_for_redacted_surface($meta->value ?? '', $item);
             if ($redacted === '') {
                 continue;
@@ -1893,8 +2127,8 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
 }
 
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
-add_action('woocommerce_email_header', 'intersoccer_sensitive_order_meta_begin_email_context', 1);
-add_action('woocommerce_email_footer', 'intersoccer_sensitive_order_meta_end_email_context', 9999);
+add_action('woocommerce_email_before_order_table', 'intersoccer_sensitive_order_meta_begin_email_context', 0, 4);
+add_action('woocommerce_email_after_order_table', 'intersoccer_sensitive_order_meta_end_email_context', 9999, 4);
 
 /**
  * Send no-cache headers on the order-received (thank-you) endpoint only.
