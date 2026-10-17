@@ -176,7 +176,7 @@ Result: User sees CHF 270 directly (NO FLICKER!) ✅
 # 2. Reopen browser
 
 # 3. Visit pre-configured URL:
-https://intersoccer.legit.ninja/shop/geneva-autumn-camps/?attribute_pa_intersoccer-venues=geneva-stade-de-varembe-nations&attribute_pa_age-group=5-13y-full-day&attribute_pa_booking-type=single-days&attribute_pa_camp-terms=autumn-week-4-october-20-24-5-days&attribute_pa_camp-times=1000-1700
+https://test-site.example/shop/geneva-autumn-camps/?attribute_pa_intersoccer-venues=geneva-stade-de-varembe-nations&attribute_pa_age-group=5-13y-full-day&attribute_pa_booking-type=single-days&attribute_pa_camp-terms=autumn-week-4-october-20-24-5-days&attribute_pa_camp-times=1000-1700
 
 # 4. Hard refresh: Ctrl+Shift+R
 
@@ -516,7 +516,7 @@ User Action: Check Wednesday checkbox (Tuesday + late pickup already selected)
 ### Emergency Cache Clear
 
 ```bash
-ssh jlee@192.168.3.3 "cd /var/www/intersoccer.legit.ninja/wp-content/plugins/intersoccer-product-variations && php force-cache-clear.php"
+ssh jlee@deploy-host.example "cd /var/www/test-site.example/wp-content/plugins/intersoccer-product-variations && php force-cache-clear.php"
 ```
 
 ---

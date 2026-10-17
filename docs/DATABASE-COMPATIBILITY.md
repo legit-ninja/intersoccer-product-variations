@@ -193,7 +193,7 @@ environments:
       - Emojis OK in error_log() and console.log()
       
   production:
-    url: "intersoccer.legit.ninja"
+    url: "test-site.example"
     database:
       name: "production_wp_db"
       prefix: "wp_"

@@ -42,7 +42,7 @@ environments:
       If it works on staging, it will work on production.
       
   production:
-    url: "intersoccer.legit.ninja"
+    url: "test-site.example"
     
     database:
       name: "production_database"        # Update with actual name

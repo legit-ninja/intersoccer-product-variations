@@ -129,7 +129,7 @@ InterSoccer: Updated .woocommerce-variation-price container
 
 1. **Close browser completely** (not just tab)
 2. **Reopen browser**
-3. **Visit:** https://intersoccer.legit.ninja/shop/geneva-autumn-camps/?attribute_pa_intersoccer-venues=geneva-stade-de-varembe-nations&attribute_pa_age-group=5-13y-full-day&attribute_pa_booking-type=single-days&attribute_pa_camp-terms=autumn-week-4-october-20-24-5-days&attribute_pa_camp-times=1000-1700
+3. **Visit:** https://test-site.example/shop/geneva-autumn-camps/?attribute_pa_intersoccer-venues=geneva-stade-de-varembe-nations&attribute_pa_age-group=5-13y-full-day&attribute_pa_booking-type=single-days&attribute_pa_camp-terms=autumn-week-4-october-20-24-5-days&attribute_pa_camp-times=1000-1700
 4. **Hard refresh:** Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)
 5. **Open console:** F12 → Console tab
 6. **Test scenario:**
@@ -326,7 +326,7 @@ When modifying price logic, check:
    ```
    Close browser completely
    Reopen browser
-   Visit: https://intersoccer.legit.ninja/shop/geneva-autumn-camps/
+   Visit: https://test-site.example/shop/geneva-autumn-camps/
    Hard refresh: Ctrl+Shift+R
    Test: Player → Tuesday → Late pickup → Add Wednesday
    ```

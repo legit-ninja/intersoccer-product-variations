@@ -93,11 +93,11 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 5. Configure late pickup pricing in WordPress options.
 
 ## Development Workflow
-- Code locally, deploy via SCP to `dev.intersoccer.legit.ninja`.
+- Code locally, deploy via SCP to `test-site.example`.
 - Build Cypress E2E tests and PHPUnit unit tests.
 - Commit to `github.com/legit-ninja/intersoccer-product-variations`.
 - Tag releases (e.g., `v1.10.8`) with descriptive messages.
-- Upload zip to `updates.underdogunlimited.com`.
+- Upload zip to `plugins.underdogunlimited.com`.
 - Test on `staging.example`, then deploy to production.
 
 ## Testing

@@ -36,7 +36,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "Test file: camp-price-flicker-regression.spec.js"
 echo "Test repo: $CYPRESS_REPO"
-echo "Target: https://intersoccer.legit.ninja"
+echo "Target: https://test-site.example"
 echo ""
 
 # Change to Cypress repo
@@ -56,7 +56,7 @@ if [ "$1" = "--open" ]; then
 else
     echo "Running Cypress test headlessly..."
     echo ""
-    CYPRESS_BASE_URL="https://intersoccer.legit.ninja" npx cypress run \
+    CYPRESS_BASE_URL="https://test-site.example" npx cypress run \
         --spec "cypress/e2e/camp-price-flicker-regression.spec.js" \
         --browser chrome
     
