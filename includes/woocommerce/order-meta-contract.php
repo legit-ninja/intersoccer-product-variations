@@ -625,15 +625,33 @@ function intersoccer_normalize_canonical_booking_type($raw) {
     if ($raw === '') {
         return '';
     }
+    if (function_exists('remove_accents')) {
+        $raw = strtolower(remove_accents($raw));
+    } else {
+        $raw = strtr($raw, [
+            'à' => 'a', 'â' => 'a', 'ä' => 'a', 'á' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ú' => 'u',
+            'ô' => 'o', 'ö' => 'o', 'ó' => 'o',
+            'î' => 'i', 'ï' => 'i', 'í' => 'i',
+            'ç' => 'c',
+        ]);
+    }
     $compact = preg_replace('/[\s_]+/', '-', $raw);
     $compact = str_replace(['(', ')'], '', (string) $compact);
     $aliases = [
         'full-week' => 'full-week',
         'fullweek' => 'full-week',
+        'ganze-woche' => 'full-week',
+        'semaine-complete' => 'full-week',
         'single-days' => 'single-days',
         'single-day' => 'single-days',
+        'einzelner-tage' => 'single-days',
+        'a-la-journee' => 'single-days',
         'full-term' => 'full-term',
         'fullterm' => 'full-term',
+        'volle-laufzeit' => 'full-term',
+        'trimestre-complet' => 'full-term',
         'buyclub' => 'buyclub',
         'buy-club' => 'buyclub',
         'other' => 'other',
@@ -644,10 +662,28 @@ function intersoccer_normalize_canonical_booking_type($raw) {
     if (strpos($raw, 'full') !== false && strpos($raw, 'week') !== false) {
         return 'full-week';
     }
+    if (strpos($raw, 'ganze') !== false && strpos($raw, 'woche') !== false) {
+        return 'full-week';
+    }
+    if (strpos($raw, 'semaine') !== false && strpos($raw, 'complet') !== false) {
+        return 'full-week';
+    }
     if (strpos($raw, 'single') !== false) {
         return 'single-days';
     }
+    if (strpos($raw, 'einzeln') !== false && strpos($raw, 'tag') !== false) {
+        return 'single-days';
+    }
+    if (strpos($raw, 'journee') !== false || strpos($raw, 'journée') !== false) {
+        return 'single-days';
+    }
     if (strpos($raw, 'term') !== false) {
+        return 'full-term';
+    }
+    if (strpos($raw, 'laufzeit') !== false) {
+        return 'full-term';
+    }
+    if (strpos($raw, 'trimestre') !== false && strpos($raw, 'complet') !== false) {
         return 'full-term';
     }
     if (strpos($raw, 'buy') !== false && strpos($raw, 'club') !== false) {

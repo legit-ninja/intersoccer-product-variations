@@ -94,4 +94,38 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         $this->assertSame('full-week', intersoccer_normalize_canonical_booking_type($raw),
             "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
     }
+
+    /** Unknown / ambiguous switch values must not default to girls-only. */
+    public static function unknownNotGirlsOnlyValues(): array {
+        return [
+            'empty slug and name' => ['', ''],
+            'garbled slug' => ['maybe', 'Maybe'],
+            'numeric zero' => ['0', '0'],
+            'english false' => ['false', 'False'],
+            'wpml slug suffix only' => ['nein-de', ''],
+        ];
+    }
+
+    /** @dataProvider unknownNotGirlsOnlyValues */
+    public function test_unknown_value_is_not_girls_only($slug, $name) {
+        $this->assertFalse(
+            intersoccer_switch_term_indicates_girls_only_session($slug, $name),
+            "Unknown pa_girls-only '{$slug}'/'{$name}' must not imply girls-only"
+        );
+    }
+
+    /** Real pa_booking-type single-day terms from sandbox (WPML). */
+    public static function singleDaysValues(): array {
+        return [
+            'EN slug single-days' => ['single-days'],
+            'DE slug einzelner-tage' => ['einzelner-tage'],
+            'FR slug a-la-journee' => ['a-la-journee'],
+        ];
+    }
+
+    /** @dataProvider singleDaysValues */
+    public function test_canonical_booking_type_single_days($raw) {
+        $this->assertSame('single-days', intersoccer_normalize_canonical_booking_type($raw),
+            "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
+    }
 }
