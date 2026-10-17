@@ -22,6 +22,7 @@ wc-product-export-*.csv
 
 # Deployment configuration (contains credentials)
 deploy.local.sh
+.deploy-dryrun/
 
 # Documentation folder (tracked in git, excluded by deploy.sh)
 # docs/ folder will be excluded by deploy.sh but kept in git

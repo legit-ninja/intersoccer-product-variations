@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This document explains how to deploy the InterSoccer Product Variations plugin to the dev server.
+This document explains how to deploy the InterSoccer Product Variations plugin to a remote WordPress server.
 
 ## Initial Setup
 
@@ -17,7 +17,7 @@ This document explains how to deploy the InterSoccer Product Variations plugin t
    Update these values:
    ```bash
    SERVER_USER="your-ssh-username"
-   SERVER_HOST="intersoccer.legit.ninja"
+   SERVER_HOST="test-site.example"
    SERVER_PATH="/var/www/html/wp-content/plugins/intersoccer-product-variations"
    SSH_PORT="22"
    SSH_KEY="~/.ssh/id_rsa"
@@ -25,13 +25,13 @@ This document explains how to deploy the InterSoccer Product Variations plugin t
 
 3. **Test SSH access:**
    ```bash
-   ssh -i ~/.ssh/id_rsa your-username@intersoccer.legit.ninja
+   ssh -i ~/.ssh/id_rsa your-username@test-site.example
    ```
 
 ## Usage
 
 ### Basic Deployment
-Deploy all plugin files to the dev server:
+Deploy all plugin files to the configured server:
 ```bash
 ./deploy.sh
 ```
@@ -181,7 +181,7 @@ This script can be integrated with GitHub Actions or GitLab CI:
 
 ```yaml
 # .github/workflows/deploy.yml
-name: Deploy to Dev Server
+name: Deploy Plugin
 
 on:
   push:

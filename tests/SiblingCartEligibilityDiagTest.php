@@ -50,7 +50,7 @@ class SiblingCartEligibilityDiagTest extends TestCase
 
     public function testDiscountSeasonKeyFallsBackToParentForVariation()
     {
-        // Parent 51723 holds season + year; variation 51724 has neither (live legit.ninja shape).
+        // Parent 51723 holds season + year; variation 51724 has neither (live catalog shape).
         $GLOBALS['intersoccer_test_product_terms'] = [
             51723 => [
                 'pa_program-season' => ['Autumn Camps 2026'],
