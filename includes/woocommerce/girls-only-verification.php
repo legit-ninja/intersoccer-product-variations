@@ -53,26 +53,76 @@ function intersoccer_taxonomy_is_girls_only_switch_attribute($taxonomy) {
 }
 
 /**
- * For switch-style girls-only attributes: selected term means girls-only unless explicitly co-ed / no.
+ * Normalize a girls-only switch term slug or label for comparison.
+ *
+ * @param string $value Raw slug or display name.
+ */
+function intersoccer_normalize_girls_only_switch_token($value) {
+    $token = strtolower(trim((string) $value));
+    if ($token === '') {
+        return '';
+    }
+    if (function_exists('remove_accents')) {
+        $token = strtolower(remove_accents($token));
+    }
+    $token = preg_replace('/-(de|fr|en|it)$/', '', $token);
+    $token = str_replace(["'", '’'], '', $token);
+    $token = preg_replace('/[\s_]+/', '-', $token);
+    $token = trim((string) $token, '-');
+    return $token;
+}
+
+/**
+ * @param string $token Normalized switch token.
+ */
+function intersoccer_girls_only_switch_token_has_leading_negation($token) {
+    $token = (string) $token;
+    if ($token === '') {
+        return false;
+    }
+    $negations = ['no', 'non', 'not', 'nein', 'kein', 'keine', 'pas'];
+    foreach ($negations as $neg) {
+        if ($token === $neg || strpos($token, $neg . '-') === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * For switch-style girls-only attributes: only an explicit "yes" means girls-only.
  *
  * @param string $slug Term slug.
  * @param string $name Term name.
  */
 function intersoccer_switch_term_indicates_girls_only_session($slug, $name) {
-    $slug_c = strtolower(trim((string) $slug));
-    $name_c = strtolower(trim((string) $name));
-    if (function_exists('remove_accents')) {
-        $slug_c = strtolower(remove_accents($slug_c));
-        $name_c = strtolower(remove_accents($name_c));
+    $yes_tokens = [
+        'yes' => true,
+        'ja' => true,
+        'oui' => true,
+        'girls-only' => true,
+        'girlsonly' => true,
+        'true' => true,
+        '1' => true,
+    ];
+
+    foreach ([$slug, $name] as $part) {
+        $token = intersoccer_normalize_girls_only_switch_token($part);
+        if ($token === '') {
+            continue;
+        }
+        if (intersoccer_girls_only_switch_token_has_leading_negation($token)) {
+            return false;
+        }
+        if (isset($yes_tokens[$token])) {
+            return true;
+        }
+        if (strpos($token, 'girls-only') !== false || strpos($token, 'girlsonly') !== false) {
+            return true;
+        }
     }
-    $hay = trim($slug_c . ' ' . $name_c);
-    if ($hay === '') {
-        return false;
-    }
-    if (preg_match('/\b(no|non|nee|mixed|mixte|coed|co-ed|co_ed|jungs|garcons|garçons|open|alle)\b/iu', $hay)) {
-        return false;
-    }
-    return true;
+
+    return false;
 }
 
 /**
