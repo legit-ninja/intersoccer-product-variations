@@ -22,12 +22,13 @@ tasks:
       - find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;
 
   build:
-    desc: Build plugin/theme zip for deployment
+    desc: Build plugin zip (runtime allowlist; matches deploy.sh)
     cmds:
-      - rm -f ../{{.REPO_NAME}}.zip
-      - zip -r ../{{.REPO_NAME}}.zip . -x "*.git*" "*Taskfile.yml" "*composer.*" "*vendor*" "*tests*" "*cypress*" "*utils/*" "*scripts/*"
-    vars:
-      REPO_NAME: '{{.TASK}}'  # Replace with repo name, e.g., intersoccer-product-variations
+      - rm -f ../intersoccer-product-variations.zip
+      - >-
+        zip -r ../intersoccer-product-variations.zip
+        intersoccer-product-variations.php wpml-config.xml README.md
+        includes css js lang
 
   hooks:
     desc: Install Git pre-commit hook to run tests automatically

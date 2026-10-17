@@ -146,6 +146,20 @@ run_phpunit_tests() {
     fi
 }
 
+# Rsync allowlist: runtime plugin files only (no deploy scripts, dev tree, or dotfiles).
+intersoccer_pv_deploy_rsync_filters() {
+    RSYNC_FILTERS=(
+        --include='/intersoccer-product-variations.php'
+        --include='/wpml-config.xml'
+        --include='/README.md'
+        --include='/includes/***'
+        --include='/css/***'
+        --include='/js/***'
+        --include='/lang/***'
+        --exclude='*'
+    )
+}
+
 run_cypress_tests() {
     print_header "Running Cypress E2E Tests"
     
@@ -247,58 +261,22 @@ deploy_to_server() {
         echo ""
     fi
     
-    # Build rsync command WITHOUT --delete flag
-    # Using --delete is dangerous - could delete other plugins if path is wrong!
-    RSYNC_CMD="rsync -avz"
-    
-    # Add dry-run flag if requested
+    intersoccer_pv_deploy_rsync_filters
+
+    local -a rsync_args=(rsync -avz)
+
     if [ "$DRY_RUN" = true ]; then
-        RSYNC_CMD="$RSYNC_CMD --dry-run"
+        rsync_args+=(--dry-run)
         echo -e "${YELLOW}DRY RUN MODE - No files will be uploaded${NC}"
         echo ""
     fi
-    
-    # Add SSH options
-    RSYNC_CMD="$RSYNC_CMD -e 'ssh -p ${SSH_PORT} -i ${SSH_KEY}'"
-    
-    # Important: Include rules must come BEFORE exclude rules in rsync
-    # Include README.md before excluding other *.md files
-    RSYNC_CMD="$RSYNC_CMD --include='README.md'"
-    
-    # Exclude files/directories
-    RSYNC_CMD="$RSYNC_CMD \
-        --exclude='.git' \
-        --exclude='.gitignore' \
-        --exclude='node_modules' \
-        --exclude='vendor' \
-        --exclude='tests' \
-        --exclude='deploy.local.sh' \
-        --exclude='utils' \
-        --exclude='scripts' \
-        --exclude='cypress' \
-        --exclude='docs' \
-        --exclude='.phpunit.result.cache' \
-        --exclude='composer.json' \
-        --exclude='composer.lock' \
-        --exclude='package.json' \
-        --exclude='package-lock.json' \
-        --exclude='phpunit.xml' \
-        --exclude='*.log' \
-        --exclude='debug.log' \
-        --exclude='*.sh' \
-        --exclude='*.md' \
-        --exclude='*.list' \
-        --exclude='run-*.php' \
-        --exclude='.DS_Store' \
-        --exclude='*.swp' \
-        --exclude='*~'"
-    
-    # Add source and destination
-    RSYNC_CMD="$RSYNC_CMD ./ ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/"
-    
-    # Execute rsync
+
+    rsync_args+=(-e "ssh -p ${SSH_PORT} -i ${SSH_KEY}")
+    rsync_args+=("${RSYNC_FILTERS[@]}")
+    rsync_args+=(./ "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/")
+
     echo "Uploading files..."
-    eval $RSYNC_CMD
+    "${rsync_args[@]}"
     
     if [ $? -eq 0 ]; then
         if [ "$DRY_RUN" = false ]; then
