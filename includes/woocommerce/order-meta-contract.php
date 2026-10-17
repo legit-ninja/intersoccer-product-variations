@@ -1895,3 +1895,35 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
 add_action('woocommerce_email_header', 'intersoccer_sensitive_order_meta_begin_email_context', 1);
 add_action('woocommerce_email_footer', 'intersoccer_sensitive_order_meta_end_email_context', 9999);
+
+/**
+ * Send no-cache headers on the order-received (thank-you) endpoint only.
+ *
+ * WooCommerce already treats the checkout page (including order-received) as non-cacheable via
+ * WC_Cache_Helper::prevent_caching() and wc_nocache_headers(); PV does not override those.
+ * This hook is an extra safeguard so thank-you output with redacted PII is not served from a page cache.
+ *
+ * @return void
+ */
+function intersoccer_send_order_received_nocache_headers() {
+    if (!function_exists('is_order_received_page') || !is_order_received_page()) {
+        return;
+    }
+
+    if (function_exists('wc_nocache_headers')) {
+        wc_nocache_headers();
+        return;
+    }
+
+    if (function_exists('wc_maybe_define_constant')) {
+        wc_maybe_define_constant('DONOTCACHEPAGE', true);
+    } elseif (!defined('DONOTCACHEPAGE')) {
+        define('DONOTCACHEPAGE', true);
+    }
+
+    if (function_exists('nocache_headers')) {
+        nocache_headers();
+    }
+}
+
+add_action('template_redirect', 'intersoccer_send_order_received_nocache_headers', 0);
