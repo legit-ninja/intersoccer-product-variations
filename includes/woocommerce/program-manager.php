@@ -89,7 +89,6 @@ class InterSoccer_Program_Manager {
 			'ajax_url'                 => admin_url('admin-ajax.php'),
 			'nonce'                    => wp_create_nonce(self::NONCE_ACTION),
 			'variation_health_nonce'   => wp_create_nonce('intersoccer_variation_health_nonce'),
-			'course_holiday_fix_nonce' => wp_create_nonce('intersoccer_course_holiday_fix_nonce'),
 			'page_url'                 => menu_page_url(self::PAGE_SLUG, false),
 			'i18n'     => [
 				'confirm_create'    => __('Create this program as a Draft product?', 'intersoccer-product-variations'),
@@ -1074,17 +1073,6 @@ class InterSoccer_Program_Manager {
 					<p class="description"><?php esc_html_e('Recalculate end dates for all course variations based on start date, sessions, and holidays.', 'intersoccer-product-variations'); ?></p>
 					<input type="submit" name="intersoccer_recalc_end_dates" class="button" value="<?php esc_attr_e('Recalculate Course End Dates', 'intersoccer-product-variations'); ?>" />
 				</form>
-
-				<?php if (function_exists('intersoccer_course_holiday_fix_has_run') && !intersoccer_course_holiday_fix_has_run()) : ?>
-				<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee;">
-					<p><strong><?php esc_html_e('Course Holiday Fix (One-time)', 'intersoccer-product-variations'); ?></strong></p>
-					<p class="description"><?php esc_html_e('Fix existing courses that were created with inflated session counts to work around the old holiday calculation bug.', 'intersoccer-product-variations'); ?></p>
-					<button type="button" class="button button-secondary" id="intersoccer-pm-course-holiday-fix-btn">
-						<?php esc_html_e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>
-					</button>
-					<div id="intersoccer-pm-holiday-fix-result" style="margin-top: 10px; display: none;"></div>
-				</div>
-				<?php endif; ?>
 			</div>
 			<?php endif; ?>
 
