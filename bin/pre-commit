@@ -1,0 +1,318 @@
+#!/usr/bin/env bash
+#
+# InterSoccer pre-commit checks.
+#
+# Runs on staged changes only and is meant to finish in well under 30 seconds:
+#   1. php -l on staged .php files (the staged version, not the working copy)
+#   2. PHPCS on staged .php files, if vendor/bin/phpcs and a phpcs config exist
+#   3. A fast PHPUnit subset (see PHPUNIT_ARGS_DEFAULT below)
+#   4. A scan of added lines for internal hostnames, IPv4 addresses, private
+#      keys and new error_log( / var_dump( / print_r( calls, plus a check that
+#      the author/committer email is not a local-domain address
+#   5. A block on staged deletions under vendor/
+#
+# Install:  bin/install-hooks.sh   (or: composer install-hooks)
+# Bypass:   git commit --no-verify
+#
+# Optional settings (environment variable, or git config key):
+#   INTERSOCCER_HOOK_PHP           intersoccer.hooks.php        PHP binary to use instead of `php`
+#   INTERSOCCER_HOOK_PHP_IMAGE     intersoccer.hooks.phpImage   Docker image used when no local PHP
+#   INTERSOCCER_HOOK_VENDOR        intersoccer.hooks.vendorDir  vendor/ directory holding phpunit
+#                                                               (for worktrees without their own)
+#   INTERSOCCER_HOOK_SKIP_PHPUNIT=1                             skip the PHPUnit step
+#   INTERSOCCER_HOOK_DENYLIST      extra local deny-list file
+#
+# Local deny-list (never commit real values): one string per line, '#' comments.
+# Read from, if present:
+#   <git common dir>/hooks-denylist
+#   ${XDG_CONFIG_HOME:-~/.config}/intersoccer-hooks/denylist
+#   $INTERSOCCER_HOOK_DENYLIST
+
+# ---- repo-specific settings -------------------------------------------------
+PHP_IMAGE_DEFAULT="php:8.4-cli"
+PHPUNIT_ARGS_DEFAULT=""
+# -----------------------------------------------------------------------------
+
+set -u
+
+SELF_REL="bin/pre-commit"
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "pre-commit: not in a git work tree" >&2; exit 1; }
+cd "$ROOT" || exit 1
+COMMON_DIR=$(cd "$(git rev-parse --git-common-dir)" && pwd)
+
+START_TS=$(date +%s)
+FAIL=0
+
+if [ -t 2 ]; then C_RED=$(printf '\033[31m'); C_YEL=$(printf '\033[33m'); C_GRN=$(printf '\033[32m'); C_OFF=$(printf '\033[0m'); else C_RED=; C_YEL=; C_GRN=; C_OFF=; fi
+say()  { printf '%s\n' "$*" >&2; }
+step() { printf '%s\n' "pre-commit: $*" >&2; }
+bad()  { printf '%s\n' "  ${C_RED}BLOCKED${C_OFF} $*" >&2; FAIL=1; }
+warn() { printf '%s\n' "  ${C_YEL}WARNING${C_OFF} $*" >&2; }
+ok()   { printf '%s\n' "  ${C_GRN}ok${C_OFF} $*" >&2; }
+
+setting() { # setting ENV_NAME gitkey default
+    local v
+    eval "v=\${$1:-}"
+    if [ -z "$v" ]; then v=$(git config --get "intersoccer.hooks.$2" 2>/dev/null || true); fi
+    if [ -z "$v" ]; then v=$3; fi
+    printf '%s' "$v"
+}
+
+PHP_IMAGE=$(setting INTERSOCCER_HOOK_PHP_IMAGE phpImage "$PHP_IMAGE_DEFAULT")
+PHP_BIN=$(setting INTERSOCCER_HOOK_PHP php "")
+VENDOR_DIR=$(setting INTERSOCCER_HOOK_VENDOR vendorDir "")
+case "$VENDOR_DIR" in "~/"*) VENDOR_DIR="$HOME/${VENDOR_DIR#\~/}";; esac
+[ -n "$VENDOR_DIR" ] || VENDOR_DIR="$ROOT/vendor"
+[ -d "$VENDOR_DIR" ] && VENDOR_DIR=$(cd "$VENDOR_DIR" && pwd)
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/intersoccer-hook.XXXXXX") || exit 1
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+# ---- how to run PHP: local binary, or the Docker image -------------------------
+PHP_MODE=none
+if [ -n "$PHP_BIN" ]; then
+    PHP_MODE=local
+elif command -v php >/dev/null 2>&1; then
+    PHP_MODE=local; PHP_BIN=php
+elif command -v docker >/dev/null 2>&1 && docker image inspect "$PHP_IMAGE" >/dev/null 2>&1; then
+    PHP_MODE=docker
+fi
+
+# php_run DIR USE_VENDOR SCRIPT [ARGS...]
+# Runs a small sh script in DIR (mounted at /app for Docker); $PHP is the php binary.
+php_run() {
+    local dir=$1 use_vendor=$2 script=$3; shift 3
+    if [ "$PHP_MODE" = docker ]; then
+        local opts
+        opts=(--rm --network none -u "$(id -u):$(id -g)" -e PHP=php -v "$dir":/app -w /app)
+        if [ "$use_vendor" = 1 ] && [ "$VENDOR_DIR" != "$dir/vendor" ]; then
+            # Create the mount point ourselves so Docker does not leave a root-owned dir.
+            [ -d "$dir/vendor" ] || mkdir "$dir/vendor"
+            opts+=(-v "$VENDOR_DIR":/app/vendor:ro)
+        fi
+        docker run "${opts[@]}" "$PHP_IMAGE" sh -c "$script" sh "$@"
+    else
+        (cd "$dir" && PHP="$PHP_BIN" sh -c "$script" sh "$@")
+    fi
+}
+
+# ---- staged file lists ---------------------------------------------------------
+STAGED_PHP=()
+while IFS= read -r -d '' f; do
+    case "$f" in vendor/*|node_modules/*) continue;; esac
+    STAGED_PHP+=("$f")
+done < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.php')
+
+RUN_TESTS=0
+while IFS= read -r -d '' f; do
+    case "$f" in vendor/*|node_modules/*) ;; *.php|phpunit.xml*|composer.json|composer.lock) RUN_TESTS=1;; esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMRD)
+
+# ---- 5. vendor/ deletions --------------------------------------------------------
+step "vendor/ deletions"
+VDEL=$(git diff --cached --name-only --no-renames --diff-filter=D -- vendor/ | wc -l | tr -d ' ')
+if [ "$VDEL" -gt 0 ]; then
+    bad "$VDEL staged deletion(s) under vendor/, e.g.:"
+    git diff --cached --name-only --no-renames --diff-filter=D -- vendor/ | head -5 | sed 's/^/      /' >&2
+    say "      Restore with: git restore --staged --worktree -- vendor/"
+else
+    ok "none"
+fi
+
+# ---- 4a. author / committer identity --------------------------------------------
+step "author/committer email"
+DENY="$TMP/denylist"
+: > "$DENY"
+for f in "$COMMON_DIR/hooks-denylist" "${XDG_CONFIG_HOME:-$HOME/.config}/intersoccer-hooks/denylist" "${INTERSOCCER_HOOK_DENYLIST:-}"; do
+    [ -n "$f" ] && [ -f "$f" ] || continue
+    sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$f" | tr 'A-Z' 'a-z' | grep -v '^$' >> "$DENY"
+done
+ident_ok=1
+for v in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+    email=$(git var "$v" 2>/dev/null | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr 'A-Z' 'a-z')
+    case "$email" in
+        *.local|*.lan|*.internal|*.intranet|*.localdomain|*.home.arpa|*.corp|*.localhost|"")
+            bad "$v uses a local-domain or empty email. Set a real one, e.g.: git config user.email <id>@users.noreply.github.com"; ident_ok=0;;
+    esac
+    if [ -s "$DENY" ] && printf '%s\n' "$email" | grep -qiF -f "$DENY"; then
+        bad "$v email matches an entry in your local deny-list"; ident_ok=0
+    fi
+done
+[ "$ident_ok" = 1 ] && ok "fine"
+
+# ---- 4b. added-line scan -----------------------------------------------------------
+step "added-line scan (hostnames, IPs, keys, debug calls)"
+git diff --cached -U0 --no-color --no-ext-diff --diff-filter=ACMR -- . \
+    ':(exclude)vendor/**' ':(exclude)node_modules/**' ":(exclude)$SELF_REL" > "$TMP/diff" 2>/dev/null
+awk -v denyfile="$DENY" '
+BEGIN {
+    n = 0
+    while ((getline t < denyfile) > 0) { if (t != "") deny[++n] = t }
+    close(denyfile)
+    split("php js css scss json md txt xml yml yaml sh html htm lock log po mo pot sql zip png jpg jpeg gif svg dist example ts tsx jsx map min twig ini conf env bak tmp csv", e, " ")
+    for (i in e) ext[e[i]] = 1
+    split("com net org io dev app ch de fr it uk co info biz eu us ca me cloud site online xyz tech host", d, " ")
+    for (i in d) tld[d[i]] = 1
+    hits = 0
+}
+function report(kind, what) {
+    printf "  BLOCKED %s:%d: %s%s\n", file, ln, kind, (what == "" ? "" : ": " what)
+    hits++
+}
+function octok(o) { return (o ~ /^[0-9]+$/ && length(o) <= 3 && o + 0 <= 255) }
+function reserved(h) { return (h ~ /(^|\.)example\.(com|org|net)$/ || h ~ /\.(test|invalid|example)$/) }
+function scan(s, l,    rest, m, pre, post, nxt, o, k, private, h, nl, lab, last) {
+    l = tolower(s)
+
+    # private key material
+    if (s ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) report("private key", "")
+
+    # new debug calls in PHP files
+    if (file ~ /\.php$/ && l ~ /(^|[^a-z0-9_$>:])(error_log|var_dump|print_r)[ \t]*\(/) {
+        match(l, /(error_log|var_dump|print_r)[ \t]*\(/)
+        report("debug call", substr(s, RSTART, RLENGTH))
+    }
+
+    # local deny-list (do not echo the entry)
+    for (k = 1; k <= n; k++) if (index(l, deny[k]) > 0) { report("matches your local deny-list", ""); break }
+
+    # IPv4 addresses
+    rest = s; pre = ""
+    while (match(rest, /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) {
+        m = substr(rest, RSTART, RLENGTH)
+        p = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : substr(pre, length(pre), 1)
+        post = substr(rest, RSTART + RLENGTH, 2)
+        pre = pre substr(rest, 1, RSTART + RLENGTH - 1)
+        rest = substr(rest, RSTART + RLENGTH)
+        if (p ~ /[0-9.A-Za-z_-]/) continue            # part of a longer token, e.g. a v-prefixed version
+        if (post ~ /^\.[0-9]/) continue               # five or more parts: a version
+        split(m, o, ".")
+        if (!(octok(o[1]) && octok(o[2]) && octok(o[3]) && octok(o[4]))) continue
+        if ((o[1] ~ /^0./) || (o[2] ~ /^0./) || (o[3] ~ /^0./) || (o[4] ~ /^0./)) continue   # zero-padded: not an address
+        o1 = o[1] + 0; o2 = o[2] + 0
+        if (o1 == 127) continue                                           # loopback
+        if (o1 == 0 && o2 == 0 && o[3] + 0 == 0 && o[4] + 0 == 0) continue  # all zeros
+        private = (o1 == 10 || (o1 == 172 && o2 >= 16 && o2 <= 31) || (o1 == 192 && o2 == 168) || (o1 == 169 && o2 == 254) || (o1 == 100 && o2 >= 64 && o2 <= 127))
+        if (!private && l ~ /version|[^a-z]ver[^a-z]/) continue           # version string on a version line
+        if (!private && o[4] + 0 == 0) continue                           # x.y.z.0: almost always a version
+        if ((o1 == 192 && o2 == 0 && o[3] + 0 == 2) || (o1 == 198 && o2 == 51 && o[3] + 0 == 100) || (o1 == 203 && o2 == 0 && o[3] + 0 == 113)) continue  # RFC 5737 documentation ranges
+        report(private ? "private (RFC1918/link-local) IPv4 address" : "IPv4 address", m)
+    }
+
+    # internal-domain hostnames (*.local, *.lan, *.internal, ...)
+    rest = l; pre = ""
+    while (match(rest, /[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)*\.(local|lan|internal|intranet|localdomain|home\.arpa|corp)/)) {
+        h = substr(rest, RSTART, RLENGTH)
+        p = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : substr(pre, length(pre), 1)
+        nxt = substr(rest, RSTART + RLENGTH, 2)
+        pre = pre substr(rest, 1, RSTART + RLENGTH - 1)
+        rest = substr(rest, RSTART + RLENGTH)
+        if (nxt ~ /^[a-z0-9_-]/) continue        # e.g. ".locale", ".local_x"
+        if (nxt ~ /^\.[a-z0-9]/) continue        # e.g. "deploy.local.sh" (a file name)
+        if (p == "." || p == "_" || p == "$") continue   # e.g. ".env.local"
+        report("internal hostname", h)
+    }
+
+    # host-like tokens containing "staging"
+    rest = l
+    while (match(rest, /[a-z0-9-]*staging[a-z0-9-]*(\.[a-z0-9-]+)+/)) {
+        h = substr(rest, RSTART, RLENGTH)
+        rest = substr(rest, RSTART + RLENGTH)
+        nl = split(h, lab, ".")
+        last = lab[nl]
+        if (last !~ /^[a-z][a-z]+$/ || (last in ext) || reserved(h)) continue
+        if (nl < 3 && !(last in tld)) continue
+        report("staging hostname", h)
+    }
+}
+/^diff --git / { inhunk = 0; file = ""; next }
+!inhunk && /^\+\+\+ / { file = substr($0, 5); sub(/^b\//, "", file); if (file == "/dev/null") file = ""; next }
+/^@@ / {
+    inhunk = 1
+    h = $0; sub(/^@@ -[0-9,]+ \+/, "", h); sub(/[ ,].*/, "", h); ln = h + 0
+    next
+}
+inhunk && /^\+/ { if (file != "") scan(substr($0, 2)); ln++; next }
+inhunk && /^ / { ln++; next }
+END { exit (hits > 0 ? 1 : 0) }
+' "$TMP/diff" >&2
+if [ $? -ne 0 ]; then
+    FAIL=1
+    say "      Remove these from the change. Hostnames, IPs, secrets and local paths must not reach GitHub."
+else
+    ok "clean"
+fi
+
+# ---- 1. php -l ---------------------------------------------------------------------
+step "php -l (${#STAGED_PHP[@]} staged file(s))"
+if [ "${#STAGED_PHP[@]}" -eq 0 ]; then
+    ok "no PHP files staged"
+elif [ "$PHP_MODE" = none ]; then
+    warn "skipped: no PHP found (no php on PATH and Docker image $PHP_IMAGE not present). Install PHP, or: docker pull $PHP_IMAGE"
+else
+    # Lint the staged blobs, not the working copy.
+    mkdir -p "$TMP/staged"
+    printf '%s\0' "${STAGED_PHP[@]}" | git checkout-index -z --stdin --prefix="$TMP/staged/"
+    if ! php_run "$TMP/staged" 0 'rc=0; for f do out=$("$PHP" -n -d display_errors=1 -l "$f" 2>&1) || { printf "%s\n" "$out" | grep -v "^Errors parsing" | sed "s/^/      /"; rc=1; }; done; exit $rc' "${STAGED_PHP[@]}" >&2; then
+        bad "PHP syntax errors (see above)"
+        LINT_FAILED=1
+    else
+        ok "no syntax errors"
+    fi
+fi
+
+# ---- 2. PHPCS ----------------------------------------------------------------------
+step "phpcs"
+PHPCS_CFG=""
+for c in .phpcs.xml phpcs.xml .phpcs.xml.dist phpcs.xml.dist; do [ -f "$ROOT/$c" ] && { PHPCS_CFG=$c; break; }; done
+if [ "${#STAGED_PHP[@]}" -eq 0 ]; then
+    ok "no PHP files staged"
+elif [ ! -x "$VENDOR_DIR/bin/phpcs" ] && [ ! -f "$VENDOR_DIR/bin/phpcs" ]; then
+    warn "skipped: vendor/bin/phpcs not found"
+elif [ -z "$PHPCS_CFG" ]; then
+    warn "skipped: no phpcs config (.phpcs.xml / phpcs.xml[.dist]) in the repo"
+elif [ "$PHP_MODE" = none ]; then
+    warn "skipped: no PHP available"
+else
+    # Checks the working-tree copy of the staged files.
+    if ! php_run "$ROOT" 1 '"$PHP" vendor/bin/phpcs -q --report=emacs --standard="$0" "$@"' "$PHPCS_CFG" "${STAGED_PHP[@]}" > "$TMP/phpcs.out" 2>&1; then
+        sed 's/^/      /' "$TMP/phpcs.out" | head -40 >&2
+        bad "PHPCS violations in staged files"
+    else
+        ok "clean"
+    fi
+fi
+
+# ---- 3. PHPUnit (fast subset) --------------------------------------------------------
+step "phpunit (fast subset: ${PHPUNIT_ARGS_DEFAULT:-default suite})"
+if [ "${INTERSOCCER_HOOK_SKIP_PHPUNIT:-0}" = 1 ]; then
+    warn "skipped (INTERSOCCER_HOOK_SKIP_PHPUNIT=1)"
+elif [ "$RUN_TESTS" = 0 ]; then
+    ok "no PHP or test config changes staged"
+elif [ "${LINT_FAILED:-0}" = 1 ]; then
+    warn "skipped: fix the syntax errors first"
+elif [ ! -f "$VENDOR_DIR/bin/phpunit" ]; then
+    warn "skipped: no vendor/bin/phpunit. Run composer install, or point intersoccer.hooks.vendorDir at a vendor/ that has it"
+elif [ "$PHP_MODE" = none ]; then
+    warn "skipped: no PHP available"
+elif [ "$PHP_MODE" = local ] && [ "$VENDOR_DIR" != "$ROOT/vendor" ]; then
+    warn "skipped: an external vendorDir needs the Docker runner (no local php mount)"
+else
+    T0=$(date +%s)
+    # shellcheck disable=SC2086
+    if php_run "$ROOT" 1 '"$PHP" -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --no-coverage --no-logging "$@"' $PHPUNIT_ARGS_DEFAULT > "$TMP/phpunit.out" 2>&1; then
+        ok "$(grep -E '^(OK|Tests:)' "$TMP/phpunit.out" | tail -1) in $(( $(date +%s) - T0 ))s"
+    else
+        tail -30 "$TMP/phpunit.out" | sed 's/^/      /' >&2
+        bad "PHPUnit failures (the run tests the working tree)"
+    fi
+fi
+
+ELAPSED=$(( $(date +%s) - START_TS ))
+if [ "$FAIL" -ne 0 ]; then
+    say "pre-commit: ${C_RED}commit blocked${C_OFF} (${ELAPSED}s). Fix the items above, or bypass with: git commit --no-verify"
+    exit 1
+fi
+say "pre-commit: ${C_GRN}all checks passed${C_OFF} (${ELAPSED}s)"
+exit 0
