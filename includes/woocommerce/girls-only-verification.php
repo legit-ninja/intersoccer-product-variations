@@ -481,7 +481,7 @@ function intersoccer_validate_player_girls_only_on_add_to_cart($passed, $product
     }
     $result = intersoccer_validate_line_player_girls_only($user_id, $player_index, (int) $product_id, absint($variation_id));
     if (is_wp_error($result)) {
-        wc_add_notice($result->get_error_message(), 'error');
+        wc_add_notice(esc_html($result->get_error_message()), 'error');
         return false;
     }
 
