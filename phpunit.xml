@@ -9,6 +9,8 @@
         <ini name="intl.default_locale" value="en"/>
         <ini name="intl.error_level" value="0"/>
         <ini name="memory_limit" value="-1"/>
+        <!-- Keep Composer from relocating vendor/ during test runs (use committed tree). -->
+        <env name="COMPOSER_VENDOR_DIR" value="vendor" force="true"/>
     </php>
     <testsuites>
         <testsuite name="Plugin Tests">
