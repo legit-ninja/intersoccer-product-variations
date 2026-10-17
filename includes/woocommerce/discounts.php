@@ -290,6 +290,15 @@ function intersoccer_discount_camp_booking_counts_for_sibling($booking_type) {
     if (!is_string($booking_type) || $booking_type === '') {
         return true;
     }
+    if (function_exists('intersoccer_normalize_canonical_booking_type')) {
+        $canonical = intersoccer_normalize_canonical_booking_type($booking_type);
+        if ($canonical === 'full-week') {
+            return true;
+        }
+        if ($canonical === 'single-days') {
+            return false;
+        }
+    }
     if (function_exists('intersoccer_is_single_day_booking_type') && intersoccer_is_single_day_booking_type($booking_type)) {
         return false;
     }
@@ -463,6 +472,9 @@ function intersoccer_extract_course_items_from_order($order) {
                 : (function_exists('intersoccer_get_product_season')
                     ? (string) (intersoccer_get_product_season($season_product_id) ?: '')
                     : '');
+        }
+        if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+            $season = (string) intersoccer_discount_normalize_season_key($season);
         }
         
         $course_items[] = [
@@ -644,6 +656,9 @@ function intersoccer_extract_camp_items_from_order($order) {
                 : (function_exists('intersoccer_get_product_season')
                     ? (string) (intersoccer_get_product_season($season_product_id) ?: '')
                     : '');
+        }
+        if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+            $season = (string) intersoccer_discount_normalize_season_key($season);
         }
 
         $camp_items[] = [
@@ -876,6 +891,9 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
     if ($season_key === '') {
         return [];
     }
+    if (function_exists('intersoccer_discount_normalize_season_key')) {
+        $season_key = (string) intersoccer_discount_normalize_season_key($season_key);
+    }
     // Same-season matching is the window; always use the 24-month season-scoped scan (#68/#66).
     if (function_exists('intersoccer_discount_retroactive_lookback_months')) {
         $lookback_months = intersoccer_discount_retroactive_lookback_months(true);
@@ -908,6 +926,9 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
         $camp_items = intersoccer_extract_camp_items_from_order($order);
         foreach ($camp_items as $camp_item) {
             $item_season = isset($camp_item['season']) ? (string) $camp_item['season'] : '';
+            if ($item_season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+                $item_season = (string) intersoccer_discount_normalize_season_key($item_season);
+            }
             if ($item_season === '' || $item_season !== $season_key) {
                 continue;
             }
@@ -1029,7 +1050,18 @@ function intersoccer_get_previous_sibling_child_totals($customer_id, $product_ty
 
     $orders = intersoccer_get_customer_previous_orders($customer_id, $customer_email, $lookback_months);
     $totals = [];
-    $season_filter_set = is_array($season_filter) ? array_map('strval', $season_filter) : null;
+    $season_filter_set = is_array($season_filter)
+        ? array_map(
+            static function ($season) {
+                $season = (string) $season;
+                if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+                    return (string) intersoccer_discount_normalize_season_key($season);
+                }
+                return $season;
+            },
+            $season_filter
+        )
+        : null;
 
     foreach ($orders as $order) {
         if ($product_type === 'camp') {
@@ -1053,6 +1085,9 @@ function intersoccer_get_previous_sibling_child_totals($customer_id, $product_ty
 
             if (($product_type === 'course' || $product_type === 'camp') && $season_filter_set !== null) {
                 $season = isset($item['season']) ? (string) $item['season'] : '';
+                if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+                    $season = (string) intersoccer_discount_normalize_season_key($season);
+                }
                 if ($season === '' || !in_array($season, $season_filter_set, true)) {
                     continue;
                 }

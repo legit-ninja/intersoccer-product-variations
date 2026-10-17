@@ -487,3 +487,98 @@ function intersoccer_discount_compose_season_key($season, $program_year = '') {
     return $season;
 }
 
+/**
+ * WPML default-language term ID for discount grouping (falls back to the given ID).
+ *
+ * @param int    $term_id
+ * @param string $taxonomy
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0) {
+        return 0;
+    }
+    if (function_exists('apply_filters')) {
+        $default_lang = apply_filters('wpml_default_language', null);
+        if ($default_lang) {
+            $canonical = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, true, $default_lang);
+            if ($canonical > 0) {
+                return $canonical;
+            }
+        }
+    }
+    return $term_id;
+}
+
+/**
+ * Default-language term name for a taxonomy term (WPML-aware).
+ *
+ * @param int    $term_id
+ * @param string $taxonomy
+ * @return string
+ */
+function intersoccer_discount_canonical_term_name($term_id, $taxonomy) {
+    $canonical_id = intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy);
+    if ($canonical_id <= 0) {
+        return '';
+    }
+    $term = get_term($canonical_id, $taxonomy);
+    if ($term && !is_wp_error($term) && !empty($term->name)) {
+        return (string) $term->name;
+    }
+    return '';
+}
+
+/**
+ * Map a stored or translated season label to the default-language season name.
+ *
+ * @param string $label Season term name (any language).
+ * @return string Canonical season name, or the original label when unresolved.
+ */
+function intersoccer_discount_canonicalize_season_label($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return '';
+    }
+    if (!empty($GLOBALS['intersoccer_test_season_label_to_canonical'][$label])) {
+        return (string) $GLOBALS['intersoccer_test_season_label_to_canonical'][$label];
+    }
+    $taxonomy = function_exists('intersoccer_attr_taxonomy')
+        ? intersoccer_attr_taxonomy('program-season')
+        : 'pa_program-season';
+    if (function_exists('get_term_by')) {
+        $term = get_term_by('name', $label, $taxonomy);
+        if (!$term && function_exists('sanitize_title')) {
+            $term = get_term_by('slug', sanitize_title($label), $taxonomy);
+        }
+        if ($term && !is_wp_error($term) && !empty($term->term_id)) {
+            $canonical = intersoccer_discount_canonical_term_name((int) $term->term_id, $taxonomy);
+            if ($canonical !== '') {
+                return $canonical;
+            }
+        }
+    }
+    return $label;
+}
+
+/**
+ * Normalize a persisted or computed discount season key for comparisons.
+ *
+ * Accepts legacy keys that used translated season term names in the label segment.
+ *
+ * @param string $key Raw _intersoccer_discount_season_key or composed key.
+ * @return string
+ */
+function intersoccer_discount_normalize_season_key($key) {
+    $key = trim((string) $key);
+    if ($key === '') {
+        return '';
+    }
+    $parts = explode('|', $key, 2);
+    $season_label = $parts[0];
+    $year_part    = isset($parts[1]) ? $parts[1] : '';
+    $canonical_label = intersoccer_discount_canonicalize_season_label($season_label);
+    return intersoccer_discount_compose_season_key($canonical_label, $year_part);
+}
+

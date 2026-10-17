@@ -479,6 +479,34 @@ function intersoccer_get_product_season($product_id) {
 }
 
 /**
+ * pa_program-season term ID for a product (parent fallback for variations).
+ *
+ * @param int $product_id Parent or variation ID.
+ * @return int
+ */
+function intersoccer_get_product_program_season_term_id($product_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0) {
+        return 0;
+    }
+    $taxonomy = intersoccer_attr_taxonomy('program-season');
+    $terms    = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'ids']);
+    if (!empty($terms) && !is_wp_error($terms)) {
+        return (int) $terms[0];
+    }
+    if (function_exists('wc_get_product')) {
+        $product = wc_get_product($product_id);
+        if ($product && method_exists($product, 'get_parent_id')) {
+            $parent_id = (int) $product->get_parent_id();
+            if ($parent_id > 0) {
+                return intersoccer_get_product_program_season_term_id($parent_id);
+            }
+        }
+    }
+    return 0;
+}
+
+/**
  * Get product program year (pa_program-year term name).
  *
  * @param int $product_id Parent or variation ID.
@@ -498,8 +526,22 @@ function intersoccer_get_product_program_year($product_id) {
  */
 function intersoccer_discount_season_key($product_id) {
     $product_id = (int) $product_id;
-    $season = (string) (intersoccer_get_product_season($product_id) ?: '');
+    $season = '';
     $year   = (string) (intersoccer_get_product_program_year($product_id) ?: '');
+
+    $season_term_id = function_exists('intersoccer_get_product_program_season_term_id')
+        ? intersoccer_get_product_program_season_term_id($product_id)
+        : 0;
+    if ($season_term_id > 0 && function_exists('intersoccer_discount_canonical_term_name')) {
+        $taxonomy = intersoccer_attr_taxonomy('program-season');
+        $season   = (string) intersoccer_discount_canonical_term_name($season_term_id, $taxonomy);
+    }
+    if ($season === '') {
+        $season = (string) (intersoccer_get_product_season($product_id) ?: '');
+        if ($season !== '' && function_exists('intersoccer_discount_canonicalize_season_label')) {
+            $season = (string) intersoccer_discount_canonicalize_season_label($season);
+        }
+    }
 
     // Parent-only taxonomies (pa_program-season, pa_program-year) are not copied onto
     // variations. Cart/order paths often pass variation_id first; fall back to parent
@@ -510,7 +552,19 @@ function intersoccer_discount_season_key($product_id) {
             $parent_id = (int) $product->get_parent_id();
             if ($parent_id > 0) {
                 if ($season === '') {
-                    $season = (string) (intersoccer_get_product_season($parent_id) ?: '');
+                    $parent_term_id = function_exists('intersoccer_get_product_program_season_term_id')
+                        ? intersoccer_get_product_program_season_term_id($parent_id)
+                        : 0;
+                    if ($parent_term_id > 0 && function_exists('intersoccer_discount_canonical_term_name')) {
+                        $taxonomy = intersoccer_attr_taxonomy('program-season');
+                        $season   = (string) intersoccer_discount_canonical_term_name($parent_term_id, $taxonomy);
+                    }
+                    if ($season === '') {
+                        $season = (string) (intersoccer_get_product_season($parent_id) ?: '');
+                        if ($season !== '' && function_exists('intersoccer_discount_canonicalize_season_label')) {
+                            $season = (string) intersoccer_discount_canonicalize_season_label($season);
+                        }
+                    }
                 }
                 if ($year === '') {
                     $year = (string) (intersoccer_get_product_program_year($parent_id) ?: '');
@@ -520,7 +574,11 @@ function intersoccer_discount_season_key($product_id) {
     }
 
     if (function_exists('intersoccer_discount_compose_season_key')) {
-        return intersoccer_discount_compose_season_key($season, $year);
+        $composed = intersoccer_discount_compose_season_key($season, $year);
+        if (function_exists('intersoccer_discount_normalize_season_key')) {
+            return intersoccer_discount_normalize_season_key($composed);
+        }
+        return $composed;
     }
     $year_norm = function_exists('intersoccer_pm_normalize_program_year')
         ? intersoccer_pm_normalize_program_year($year)

@@ -621,7 +621,11 @@ function intersoccer_normalize_canonical_activity_type($product_type) {
  * @return string full-week|single-days|full-term|buyclub|other|''
  */
 function intersoccer_normalize_canonical_booking_type($raw) {
-    $raw = strtolower(trim((string) $raw));
+    $raw = html_entity_decode(trim((string) $raw), ENT_QUOTES, 'UTF-8');
+    if (function_exists('remove_accents')) {
+        $raw = remove_accents($raw);
+    }
+    $raw = strtolower($raw);
     if ($raw === '') {
         return '';
     }
@@ -630,6 +634,8 @@ function intersoccer_normalize_canonical_booking_type($raw) {
     $aliases = [
         'full-week' => 'full-week',
         'fullweek' => 'full-week',
+        'ganze-woche' => 'full-week',
+        'semaine-complete' => 'full-week',
         'single-days' => 'single-days',
         'single-day' => 'single-days',
         'full-term' => 'full-term',
@@ -642,6 +648,12 @@ function intersoccer_normalize_canonical_booking_type($raw) {
         return $aliases[$compact];
     }
     if (strpos($raw, 'full') !== false && strpos($raw, 'week') !== false) {
+        return 'full-week';
+    }
+    if (strpos($raw, 'ganze') !== false && strpos($raw, 'woche') !== false) {
+        return 'full-week';
+    }
+    if (strpos($raw, 'semaine') !== false && strpos($raw, 'complet') !== false) {
         return 'full-week';
     }
     if (strpos($raw, 'single') !== false) {
