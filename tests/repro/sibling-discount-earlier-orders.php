@@ -168,8 +168,14 @@ if ($cart_idx === null) {
         if (!$hit) { $cart_idx = $idx; break; }
     }
 }
-if ($cart_idx === null) { $out('SETUP ERROR: every player already has a prior same-season camp'); WP_CLI::halt(2); }
-$cart_player = $line_for($cart_idx);
+if ($cart_idx === null) {
+    // No real player without a prior same-season camp: use an in-memory sibling (never saved).
+    $cart_idx = count($players);
+    $cart_player = ['assigned_player' => $cart_idx, 'assigned_attendee' => 'Repro Sibling', 'assigned_player_id' => 'repro-sibling-' . md5((string) $uid)];
+    $out('Cart child: no real player without a prior same-season camp -> in-memory sibling (not saved)');
+} else {
+    $cart_player = $line_for($cart_idx);
+}
 
 // Expected (language-neutral): distinct prior children with same-season full-week camps, excluding the cart child.
 $prior_kids = [];
@@ -200,6 +206,13 @@ $cart = new class(['line-sibling-' . $cart_lang => array_merge([
     public function get_applied_coupons() { return []; }
 };
 
+$GLOBALS['repro_order_queries'] = [];
+$qtrace = static function ($results, $args) {
+    $GLOBALS['repro_order_queries'][] = [$args, $results];
+    return $results;
+};
+// intersoccer_build_cart_context() makes the first (statically cached) previous-orders lookup, so trace from here.
+add_filter('woocommerce_order_query', $qtrace, PHP_INT_MAX, 2);
 $ctx = intersoccer_build_cart_context($cart->get_cart());
 $cart_keys = array_keys($ctx['camps_by_season_child']);
 
@@ -208,12 +221,6 @@ $trace = static function ($value, $item) {
     $GLOBALS['repro_meta_reads'][] = [$item->get_order_id(), $item->get_id(), (string) $value];
     return $value;
 };
-$GLOBALS['repro_order_queries'] = [];
-$qtrace = static function ($results, $args) {
-    $GLOBALS['repro_order_queries'][] = [$args, $results];
-    return $results;
-};
-add_filter('woocommerce_order_query', $qtrace, PHP_INT_MAX, 2);
 add_filter('woocommerce_order_item_get__intersoccer_discount_season_key', $trace, 10, 2);
 intersoccer_apply_combo_discounts_to_items($cart);
 remove_filter('woocommerce_order_item_get__intersoccer_discount_season_key', $trace, 10);
@@ -224,7 +231,7 @@ $actual = (float) ($line['intersoccer_sibling_percent'] ?? 0);
 $price = (float) $line['data']->get_price();
 $prior_totals = intersoccer_get_previous_sibling_child_totals($uid, 'camp', $lookback, $cart_keys ? [(string) $cart_keys[0]] : []);
 
-$out(sprintf("\n== wc_get_orders() calls made by the hook (intersoccer_get_customer_previous_orders), site=%s: %d", $cart_lang, count($GLOBALS['repro_order_queries'])));
+$out(sprintf("\n== wc_get_orders() calls made by the discount code (intersoccer_get_customer_previous_orders, discounts.php wc_get_orders), site=%s: %d", $cart_lang, count($GLOBALS['repro_order_queries'])));
 foreach ($GLOBALS['repro_order_queries'] as [$a, $r]) {
     $rids = array_map(static function ($x) { return is_object($x) ? $x->get_id() : (int) $x; }, (array) $r);
     $by = [];
@@ -256,10 +263,14 @@ $ok = $expected > 0 && abs($actual - $expected) < 1e-9 && abs($price - $base * (
 $src_cmp = $source['stored_key'];
 $cart_cmp = (string) ($cart_keys[0] ?? '');
 if ($norm('x') !== null) { $src_cmp = $norm($src_cmp); $cart_cmp = $norm($cart_cmp); }
-$out(sprintf('%s earlier-orders %s->%s: stored %s key %s cart key (as compared)',
-    $ok ? 'PASS' : 'FAIL', strtoupper($src_lang), strtoupper($cart_lang),
+$reached = in_array($source['order_id'], array_column($GLOBALS['repro_meta_reads'], 0), true);
+$out(sprintf('%s earlier-orders %s order -> %s cart: source order %d %s; stored %s %s cart %s (as compared)',
+    $ok ? 'PASS' : 'FAIL', strtoupper($src_lang), strtoupper($cart_lang), $source['order_id'],
+    $reached ? 'reached the season comparison' : 'NOT returned by wc_get_orders (never compared)',
     json_encode($src_cmp, JSON_UNESCAPED_UNICODE), $src_cmp === $cart_cmp ? '==' : '!=', json_encode($cart_cmp, JSON_UNESCAPED_UNICODE)));
-
+if ($ok && !$reached) {
+    $out('NOTE: PASS here is incidental (other-language orders supplied the prior children); the source order itself was not counted.');
+}
 $out(sprintf("\nBlocked write queries from this process: %d", count($GLOBALS['repro_blocked_writes'])));
 foreach ($GLOBALS['repro_blocked_writes'] as $q) { $out("  blocked: $q"); }
 if (!$ok) { WP_CLI::halt(1); }
