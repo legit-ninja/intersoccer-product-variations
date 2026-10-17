@@ -870,3 +870,15 @@ msgstr "Sélectionnez un participant"
 # wpml-name: Please select an attendee to add to cart.
 msgid "Please select an attendee to add to cart."
 msgstr "Veuillez sélectionner un participant à ajouter au panier."
+
+#, php-format
+msgid "Medical information: provided (view or update in My Account)."
+msgstr "Informations médicales : fournies (consulter ou mettre à jour dans Mon compte)."
+
+#, php-format
+msgid "Age at camp start: %d"
+msgstr "Âge au début du camp : %d"
+
+#, php-format
+msgid "Birth year: %s"
+msgstr "Année de naissance : %s"

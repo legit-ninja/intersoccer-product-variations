@@ -1580,12 +1580,288 @@ function intersoccer_is_hidden_customer_order_meta_key($key) {
 }
 
 /**
+ * Mark WooCommerce order email rendering so sensitive meta can be redacted (including admin-triggered resends).
+ *
+ * @return void
+ */
+function intersoccer_sensitive_order_meta_begin_email_context() {
+    $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+}
+
+/**
+ * Clear email redaction flag after an order email finishes rendering.
+ *
+ * @return void
+ */
+function intersoccer_sensitive_order_meta_end_email_context() {
+    unset($GLOBALS['intersoccer_sensitive_order_meta_email']);
+}
+
+/**
+ * Whether formatted order meta is being built for a WooCommerce order email.
+ *
+ * @return bool
+ */
+function intersoccer_is_sensitive_order_meta_email_context() {
+    return !empty($GLOBALS['intersoccer_sensitive_order_meta_email']);
+}
+
+/**
+ * Whether attendee DOB / medical text should be redacted on this request.
+ *
+ * Thank-you page and all order emails (customer and admin notification). My Account keeps full values.
+ *
+ * @return bool
+ */
+function intersoccer_should_mask_sensitive_order_item_meta() {
+    if (intersoccer_is_sensitive_order_meta_email_context()) {
+        return true;
+    }
+    if (function_exists('is_order_received_page') && is_order_received_page()) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Known order-item meta keys for attendee DOB (EN and common localized labels).
+ *
+ * @return array<int,string>
+ */
+function intersoccer_attendee_dob_order_meta_key_variants() {
+    return [
+        'Attendee DOB',
+        'Date de naissance',
+        'Geburtsdatum',
+    ];
+}
+
+/**
+ * Known order-item meta keys for medical conditions (EN and common localized labels).
+ *
+ * @return array<int,string>
+ */
+function intersoccer_medical_conditions_order_meta_key_variants() {
+    return [
+        'Medical Conditions',
+        'Conditions médicales',
+        'Medizinische Angaben',
+    ];
+}
+
+/**
+ * @param string $key Raw order item meta key.
+ * @return bool
+ */
+function intersoccer_is_attendee_dob_order_meta_key($key) {
+    return in_array((string) $key, intersoccer_attendee_dob_order_meta_key_variants(), true);
+}
+
+/**
+ * @param string $key Raw order item meta key.
+ * @return bool
+ */
+function intersoccer_is_medical_conditions_order_meta_key($key) {
+    return in_array((string) $key, intersoccer_medical_conditions_order_meta_key_variants(), true);
+}
+
+/**
+ * Whether stored medical meta represents user-provided information (not empty / placeholder "None").
+ *
+ * @param mixed $value
+ * @return bool
+ */
+function intersoccer_order_meta_medical_conditions_has_value($value) {
+    $raw = is_scalar($value) ? trim((string) $value) : '';
+    if ($raw === '') {
+        return false;
+    }
+    return strcasecmp($raw, 'none') !== 0;
+}
+
+/**
+ * Program start date (Y-m-d) for an order line item when available on the item or variation.
+ *
+ * Prefers stamped camp schedule meta on the line item, then course Start Date, then
+ * {@see intersoccer_get_program_reference_date()} (camp `_camp_start_date`, course `_course_start_date`, etc.).
+ *
+ * @param WC_Order_Item $item
+ * @return string|null Y-m-d or null.
+ */
+function intersoccer_get_order_item_program_start_ymd($item) {
+    if (!is_object($item) || !method_exists($item, 'get_meta')) {
+        return null;
+    }
+
+    if (function_exists('intersoccer_camp_schedule_order_meta_label_variants')) {
+        $variants = intersoccer_camp_schedule_order_meta_label_variants();
+        foreach ($variants['start'] as $label) {
+            $raw = trim((string) $item->get_meta($label, true));
+            if (function_exists('intersoccer_camp_schedule_order_meta_value_usable')
+                && intersoccer_camp_schedule_order_meta_value_usable('start', $raw)) {
+                return $raw;
+            }
+        }
+        if (function_exists('intersoccer_camp_schedule_order_meta_underscore_keys')) {
+            $underscore = intersoccer_camp_schedule_order_meta_underscore_keys()['start'];
+            $raw = trim((string) $item->get_meta($underscore, true));
+            if (function_exists('intersoccer_camp_schedule_order_meta_value_usable')
+                && intersoccer_camp_schedule_order_meta_value_usable('start', $raw)) {
+                return $raw;
+            }
+        }
+    }
+
+    $start_label = trim((string) $item->get_meta('Start Date', true));
+    if ($start_label !== '' && function_exists('intersoccer_parse_loose_date_to_ymd')) {
+        $parsed = intersoccer_parse_loose_date_to_ymd($start_label);
+        if (is_string($parsed) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed)) {
+            return $parsed;
+        }
+    }
+
+    if ($item instanceof WC_Order_Item_Product && function_exists('intersoccer_resolve_order_item_product_context')) {
+        $ctx = intersoccer_resolve_order_item_product_context($item);
+        $product_id = (int) ($ctx['resolved_product_id'] ?? 0);
+        $variation_id = (int) ($ctx['variation_id'] ?? 0);
+        $product_type = (string) ($ctx['product_type'] ?? '');
+        if (function_exists('intersoccer_get_program_reference_date')) {
+            $ref = intersoccer_get_program_reference_date($product_id, $variation_id, $product_type !== '' ? $product_type : null);
+            if (is_string($ref) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ref)) {
+                return $ref;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Normalize attendee DOB stored on an order line to Y-m-d when possible.
+ *
+ * @param mixed $value
+ * @return string|null
+ */
+function intersoccer_normalize_attendee_dob_order_meta_value($value) {
+    $raw = is_scalar($value) ? trim((string) $value) : '';
+    if ($raw === '') {
+        return null;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+        return $raw;
+    }
+    if (function_exists('intersoccer_parse_loose_date_to_ymd')) {
+        $parsed = intersoccer_parse_loose_date_to_ymd($raw);
+        if (is_string($parsed) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed)) {
+            return $parsed;
+        }
+    }
+    return null;
+}
+
+/**
+ * Redacted attendee DOB string for emails and thank-you page.
+ *
+ * @param mixed           $value Raw DOB meta value.
+ * @param WC_Order_Item   $item  Line item (for camp/course start lookup).
+ * @return string
+ */
+function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
+    $dob_ymd = intersoccer_normalize_attendee_dob_order_meta_value($value);
+    if ($dob_ymd === null) {
+        $year = is_scalar($value) ? preg_replace('/[^\d]/', '', (string) $value) : '';
+        $year = strlen($year) >= 4 ? substr($year, 0, 4) : '';
+        if ($year !== '' && preg_match('/^\d{4}$/', $year)) {
+            return sprintf(
+                __('Birth year: %s', 'intersoccer-product-variations'),
+                $year
+            );
+        }
+        return '';
+    }
+
+    $ref = intersoccer_get_order_item_program_start_ymd($item);
+    if ($ref !== null && function_exists('intersoccer_age_on_date')) {
+        $age = intersoccer_age_on_date($dob_ymd, $ref);
+        if ($age !== null) {
+            return sprintf(
+                __('Age at camp start: %d', 'intersoccer-product-variations'),
+                (int) $age
+            );
+        }
+    }
+
+    return sprintf(
+        __('Birth year: %s', 'intersoccer-product-variations'),
+        substr($dob_ymd, 0, 4)
+    );
+}
+
+/**
+ * Redacted medical conditions string for emails and thank-you page.
+ *
+ * @return string
+ */
+function intersoccer_format_medical_conditions_for_redacted_surface() {
+    return __('Medical information: provided (view or update in My Account).', 'intersoccer-product-variations');
+}
+
+/**
+ * Apply DOB / medical redaction to formatted meta objects.
+ *
+ * @param array<int,object> $formatted_meta
+ * @param WC_Order_Item     $item
+ * @return array<int,object>
+ */
+function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted_meta, $item) {
+    $out = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        if ($key === '') {
+            continue;
+        }
+
+        if (intersoccer_is_medical_conditions_order_meta_key($key)) {
+            if (!intersoccer_order_meta_medical_conditions_has_value($meta->value ?? '')) {
+                continue;
+            }
+            $redacted = intersoccer_format_medical_conditions_for_redacted_surface();
+            $meta->value = $redacted;
+            if (isset($meta->display_value)) {
+                $meta->display_value = $redacted;
+            }
+            $out[] = $meta;
+            continue;
+        }
+
+        if (intersoccer_is_attendee_dob_order_meta_key($key)) {
+            $redacted = intersoccer_format_attendee_dob_for_redacted_surface($meta->value ?? '', $item);
+            if ($redacted === '') {
+                continue;
+            }
+            $meta->value = $redacted;
+            if (isset($meta->display_value)) {
+                $meta->display_value = $redacted;
+            }
+            $out[] = $meta;
+            continue;
+        }
+
+        $out[] = $meta;
+    }
+
+    return $out;
+}
+
+/**
  * Filter order item formatted meta for customer-facing surfaces.
  *
  * Hides internal keys (assigned_player*, attribute_pa_*, underscore-prefixed)
  * from thank-you page, order emails, and My Account order views.
  *
- * Does NOT affect admin order views or reports-rosters raw meta reads.
+ * Redacts attendee DOB and medical conditions on thank-you page and order emails only.
+ *
+ * Does NOT affect admin order screens, My Account, or reports-rosters raw meta reads.
  *
  * @param array<int,object> $formatted_meta Array of formatted meta objects.
  * @param WC_Order_Item     $item           Order item.
@@ -1596,7 +1872,7 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         return $formatted_meta;
     }
 
-    if (is_admin() && !wp_doing_ajax()) {
+    if (is_admin() && !wp_doing_ajax() && !intersoccer_is_sensitive_order_meta_email_context()) {
         return $formatted_meta;
     }
 
@@ -1609,7 +1885,13 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         $filtered[] = $meta;
     }
 
+    if (intersoccer_should_mask_sensitive_order_item_meta()) {
+        $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);
+    }
+
     return $filtered;
 }
 
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
+add_action('woocommerce_email_header', 'intersoccer_sensitive_order_meta_begin_email_context', 1);
+add_action('woocommerce_email_footer', 'intersoccer_sensitive_order_meta_end_email_context', 9999);
