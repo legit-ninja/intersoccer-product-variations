@@ -161,11 +161,11 @@ class RegressionTest extends TestCase {
      * Impact: Multilingual sites showed English text
      */
     public function testCompiledTranslationFilesExist() {
-        $languages_dir = dirname(__DIR__) . '/languages';
+        $languages_dir = dirname(__DIR__) . '/lang';
         
-        // If languages directory doesn't exist, test is not applicable
+        // If lang directory doesn't exist, test is not applicable
         if (!is_dir($languages_dir)) {
-            $this->markTestSkipped('Languages directory does not exist');
+            $this->markTestSkipped('Lang directory does not exist');
             return;
         }
         
