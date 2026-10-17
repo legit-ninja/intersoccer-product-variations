@@ -142,8 +142,15 @@ if (!function_exists('add_action')) {
 }
 
 if (!function_exists('intersoccer_debug')) {
-    function intersoccer_debug($message) {
-        return;
+    function intersoccer_debug($message, array $context = []) {
+        if (empty($GLOBALS['intersoccer_capture_debug'])) {
+            return;
+        }
+        $line = (string) $message;
+        if (!empty($context)) {
+            $line .= ' ' . (function_exists('wp_json_encode') ? wp_json_encode($context) : json_encode($context));
+        }
+        $GLOBALS['intersoccer_captured_debug'][] = $line;
     }
 }
 

@@ -146,9 +146,9 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Parent attributes for product ' . $product_id . ': ' . print_r($parent_attributes, true));
-        intersoccer_debug('InterSoccer: Variation attributes for variation ' . ($variation_id ?: 'none') . ': ' . print_r($variation_attributes, true));
-        intersoccer_debug('InterSoccer: Variation map: ' . print_r($variation_map, true));
+        intersoccer_debug('InterSoccer: Parent attributes for product ' . $product_id . ' (count: ' . count($parent_attributes) . ')');
+        intersoccer_debug('InterSoccer: Variation attributes for variation ' . ($variation_id ?: 'none') . ' (count: ' . count($variation_attributes) . ')');
+        intersoccer_debug('InterSoccer: Variation map entries: ' . count($variation_map));
     }
     
     $canonical_days = intersoccer_attr_canonical_weekday_slugs();
@@ -262,7 +262,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                     } else {
                         // Skip ambiguous parent lists to avoid dumping all venues, etc.
                         if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent terms: ' . print_r($terms, true) . ')');
+                            intersoccer_debug('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent term count: ' . (is_array($terms) ? count($terms) : 0) . ')');
                         }
                         $value = '';
                     }
@@ -291,7 +291,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     }
     
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Final attributes returned for product ' . $product_id . ': ' . print_r($attributes, true));
+        intersoccer_debug('InterSoccer: Final attributes returned for product ' . $product_id . ' (count: ' . count($attributes) . ')');
     }
     
     return $attributes;
@@ -320,12 +320,9 @@ function intersoccer_add_order_item_metadata($item, $cart_item_key, $values, $or
     ]);
 
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        intersoccer_debug('InterSoccer: Completed adding order item meta for cart item ' . $cart_item_key . ', Quantity: ' . $values['quantity']);
-        intersoccer_debug('InterSoccer: Order metadata summary:');
-        intersoccer_debug('  - Assigned Attendee: ' . ($values['assigned_attendee'] ?? 'none'));
-        intersoccer_debug('  - Camp Days: ' . (isset($values['camp_days']) && is_array($values['camp_days']) ? implode(', ', $values['camp_days']) : 'none'));
-        intersoccer_debug('  - Late Pickup Type: ' . ($values['late_pickup_type'] ?? 'none'));
-        intersoccer_debug('  - Discount: ' . ($values['discount_note'] ?? 'none'));
+        $camp_day_count = isset($values['camp_days']) && is_array($values['camp_days']) ? count($values['camp_days']) : 0;
+        $has_attendee = !empty($values['assigned_attendee']) || isset($values['assigned_player']) || !empty($values['assigned_player_id']);
+        intersoccer_debug('InterSoccer: Completed order item meta for cart item ' . $cart_item_key . ', qty=' . $values['quantity'] . ', attendee_set=' . ($has_attendee ? 'yes' : 'no') . ', camp_days=' . $camp_day_count . ', late_pickup=' . (!empty($values['late_pickup_type']) ? 'yes' : 'no'));
     }
 }
 
@@ -355,7 +352,8 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Checkout display metadata - Item Key: ' . $cart_item_key . ', Attendee: ' . ($cart_item['assigned_attendee'] ?? 'none') . ', Discount: ' . ($cart_item['discount_note'] ?? 'none'));
+            $has_attendee = !empty($cart_item['assigned_attendee']) || isset($cart_item['assigned_player']) || !empty($cart_item['assigned_player_id']);
+            intersoccer_debug('InterSoccer: Checkout display metadata - item ' . $cart_item_key . ', attendee_set=' . ($has_attendee ? 'yes' : 'no') . ', has_discount_note=' . (!empty($cart_item['discount_note']) ? 'yes' : 'no'));
         }
     }
 
@@ -372,7 +370,7 @@ function intersoccer_ensure_player_assignment_format($cart_item_data, $product_i
         if ($idx !== null) {
             $cart_item_data['assigned_player'] = $idx;
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Normalized posted attendee to assigned_player: ' . $cart_item_data['assigned_player'] . ', Quantity: ' . $quantity);
+                intersoccer_debug('InterSoccer: Normalized posted attendee to assigned_player index, qty=' . $quantity);
             }
         }
     }

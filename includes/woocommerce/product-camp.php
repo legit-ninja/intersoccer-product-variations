@@ -182,13 +182,13 @@ class InterSoccer_Camp {
                 if (empty($camp_days)) {
                     $passed = false;
                     wc_add_notice(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations'), 'error');
-                    intersoccer_debug('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ': ' . print_r($_POST, true));
+                    intersoccer_debug('InterSoccer: Validation failed - no valid camp_days data for product ' . $product_id . ' (variation ' . $variation_id . ')');
                 } elseif (count($camp_days) !== $quantity) {
                     $passed = false;
                     wc_add_notice(__('The number of selected days must match the quantity.', 'intersoccer-product-variations'), 'error');
                     intersoccer_debug('InterSoccer: Validation failed - camp_days count (' . count($camp_days) . ') does not match quantity (' . $quantity . ') for product ' . $product_id);
                 } else {
-                    intersoccer_debug('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days and quantity ' . $quantity . ' for product ' . $product_id . ': ' . print_r($camp_days, true));
+                    intersoccer_debug('InterSoccer: Validated single-day camp with ' . count($camp_days) . ' days and quantity ' . $quantity . ' for product ' . $product_id);
                 }
             }
         }

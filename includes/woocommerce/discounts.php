@@ -1849,7 +1849,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     }
 
                     $cart->cart_contents[$cart_key]['discount_note'] = $message;
-                    intersoccer_debug('InterSoccer: Applied progressive camp discount ' . ($percent * 100) . '% (position ' . $week_position . ') for item ' . $item['product_id'] . ' season ' . $group['season'] . ' child ' . $group['player_key']);
+                    intersoccer_debug('InterSoccer: Applied progressive camp discount ' . ($percent * 100) . '% (position ' . $week_position . ') for item ' . $item['product_id'] . ' season ' . $group['season']);
                 }
             }
         }
@@ -1931,7 +1931,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     $assigned_players = array_unique(array_filter(array_column($items, 'assigned_player')));
                     if (count($assigned_players) !== 1) {
                         if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer: Skipping same-season discount - items have different assigned players: ' . implode(', ', $assigned_players));
+                            intersoccer_debug('InterSoccer: Skipping same-season discount - items have ' . count($assigned_players) . ' distinct assigned_player value(s)');
                         }
                         continue;
                     }
@@ -1962,7 +1962,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
                         $discount_label = sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $percent * 100);
                         $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', $discount_label);
-                        intersoccer_debug('InterSoccer: Applied ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id'] . ' for attendee ' . $assigned_player);
+                        intersoccer_debug('InterSoccer: Applied ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id']);
                     }
                     // Case 2: Only 1 course in cart, but check previous orders for retroactive discount
                     elseif (count($items) === 1 && $enable_retroactive) {
@@ -2021,7 +2021,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                             $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
                             $discount_label = sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $percent * 100);
                             $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', $discount_label);
-                            intersoccer_debug('InterSoccer: Applied retroactive ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id'] . ' for attendee ' . $assigned_player . ' (previous order found)');
+                            intersoccer_debug('InterSoccer: Applied retroactive ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id'] . ' (previous order found)');
                         }
                     }
                 }
@@ -2142,7 +2142,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                             $message = intersoccer_get_discount_message('tournament_same_child_multiple_days', 'cart_message', $discount_label);
                             $cart->cart_contents[$cart_key]['discount_note'] = $message;
                             
-                            intersoccer_debug('InterSoccer: Applied tournament same-child discount ' . ($percent * 100) . '% to day ' . $day_position . ' for item ' . $item['product_id'] . ' for attendee ' . $assigned_player);
+                            intersoccer_debug('InterSoccer: Applied tournament same-child discount ' . ($percent * 100) . '% to day ' . $day_position . ' for item ' . $item['product_id']);
                         }
                     }
                 }
@@ -2249,7 +2249,7 @@ function intersoccer_attach_same_season_discount_note($cart) {
         
         if (count($attendees) !== 1) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Skipping same-season discount note - items have different assigned attendees: ' . implode(', ', $attendees));
+                intersoccer_debug('InterSoccer: Skipping same-season discount note - items have ' . count($attendees) . ' distinct attendee value(s)');
             }
             continue;
         }
@@ -2266,7 +2266,7 @@ function intersoccer_attach_same_season_discount_note($cart) {
         if (!empty($target['cart_key']) && isset($cart->cart_contents[$target['cart_key']])) {
             $cart->cart_contents[$target['cart_key']]['discount_note'] = $message;
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Attached same-season discount note to cart item ' . $target['variation_id'] . ' for attendee ' . $group['attendee']);
+                intersoccer_debug('InterSoccer: Attached same-season discount note to cart item ' . $target['variation_id']);
             }
         }
     }

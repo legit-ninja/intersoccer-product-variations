@@ -3924,7 +3924,7 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
 
         if (!is_array($player)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Invalid player selection ' . $selected_raw . ' for customer ' . $customer_id);
+                intersoccer_debug('InterSoccer: Invalid player selection for customer ' . $customer_id);
             }
             continue;
         }
@@ -3956,10 +3956,9 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
             intersoccer_debug(sprintf(
-                'InterSoccer: Updated player assignment for order item %d | Player: %s (index: %d) | Customer: %d',
+                'InterSoccer: Updated player assignment for order item %d | player_index: %d | customer: %d',
                 $item_id,
-                $player_name,
-                $selected_index,
+                $resolved_index,
                 $customer_id
             ));
         }

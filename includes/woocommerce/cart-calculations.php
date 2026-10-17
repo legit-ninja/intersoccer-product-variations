@@ -1296,7 +1296,7 @@ function intersoccer_calculate_camp_price_callback() {
         ? intersoccer_normalize_posted_camp_days($raw_camp_days, $variation_id)
         : array_map('sanitize_text_field', $raw_camp_days);
 
-    intersoccer_debug('InterSoccer: Processing AJAX request - Variation ID: ' . $variation_id . ', Camp days: ' . json_encode($camp_days));
+    intersoccer_debug('InterSoccer: Processing AJAX camp price request - variation ' . $variation_id . ', camp_day_count=' . count($camp_days));
 
     if (!$variation_id) {
         intersoccer_warning('InterSoccer: Invalid variation ID in AJAX request');
@@ -1398,7 +1398,7 @@ function intersoccer_store_selected_days_callback() {
         if (function_exists('intersoccer_stash_selected_days')) {
             intersoccer_stash_selected_days($product_id, $variation_id, $camp_days);
         }
-        intersoccer_debug('InterSoccer: Stored selected days in session for product ' . $product_id . ': ' . json_encode($camp_days));
+        intersoccer_debug('InterSoccer: Stored ' . count($camp_days) . ' selected day(s) in session for product ' . $product_id);
         wp_send_json_success(['message' => 'Days stored', 'days' => $camp_days]);
     } else {
         wp_send_json_error(['message' => 'Session not available']);
