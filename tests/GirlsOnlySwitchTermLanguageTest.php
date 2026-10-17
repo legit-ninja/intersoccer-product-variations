@@ -54,6 +54,36 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         ];
     }
 
+    /** Apostrophe in display labels must normalize to girls-only (slug and name paths). */
+    public static function apostropheYesLabels(): array {
+        return [
+            "Girl's Only name only" => ['', "Girl's Only"],
+            "Girls' Only name only" => ['', "Girls' Only"],
+            "Girls’ only name only (unicode apostrophe)" => ['', "Girls’ only"],
+            "Girl's Only slug only" => ["girl's-only", ''],
+            "Girls' Only slug only" => ["girls'-only", ''],
+        ];
+    }
+
+    /** @dataProvider apostropheYesLabels */
+    public function test_apostrophe_yes_label_is_girls_only($slug, $name) {
+        $this->assertTrue(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
+    }
+
+    public static function negatedGirlsOnlySlugs(): array {
+        return [
+            'not-girls-only' => ['not-girls-only', ''],
+            'no-girls-only' => ['no-girls-only', ''],
+            'non-girls-only' => ['non-girls-only', ''],
+            'nein-girls-only' => ['nein-girls-only', ''],
+        ];
+    }
+
+    /** @dataProvider negatedGirlsOnlySlugs */
+    public function test_leading_negation_slug_is_not_girls_only($slug, $name) {
+        $this->assertFalse(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
+    }
+
     /** @dataProvider noValues */
     public function test_no_value_allows_boys($slug, $name) {
         $this->assertFalse(

@@ -66,9 +66,27 @@ function intersoccer_normalize_girls_only_switch_token($value) {
         $token = strtolower(remove_accents($token));
     }
     $token = preg_replace('/-(de|fr|en|it)$/', '', $token);
-    $token = preg_replace('/[\s_\'’]+/', '-', $token);
+    $token = str_replace(["'", '’'], '', $token);
+    $token = preg_replace('/[\s_]+/', '-', $token);
     $token = trim((string) $token, '-');
     return $token;
+}
+
+/**
+ * @param string $token Normalized switch token.
+ */
+function intersoccer_girls_only_switch_token_has_leading_negation($token) {
+    $token = (string) $token;
+    if ($token === '') {
+        return false;
+    }
+    $negations = ['no', 'non', 'not', 'nein', 'kein', 'keine', 'pas'];
+    foreach ($negations as $neg) {
+        if ($token === $neg || strpos($token, $neg . '-') === 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -92,6 +110,9 @@ function intersoccer_switch_term_indicates_girls_only_session($slug, $name) {
         $token = intersoccer_normalize_girls_only_switch_token($part);
         if ($token === '') {
             continue;
+        }
+        if (intersoccer_girls_only_switch_token_has_leading_negation($token)) {
+            return false;
         }
         if (isset($yes_tokens[$token])) {
             return true;
