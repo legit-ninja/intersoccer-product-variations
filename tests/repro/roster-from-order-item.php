@@ -44,8 +44,6 @@ $cases = [
     ['DE 62467/7887', 62467, 7887, []],
     ['EN 62465/7885', 62465, 7885, []],
     ['FR 62466/7886', 62466, 7886, []],
-    ['EN 62465/7885 as genuine girls-only camp', 62465, 7885, ['activity_type' => 'Camp, Girls Only']],
-    ['FR 62466/7886 as genuine girls-only camp (FR label)', 62466, 7886, ['activity_type' => 'Camp, Filles uniquement']],
 ];
 $fail = 0;
 foreach ($cases as [$label, $oid, $iid, $override]) {
@@ -77,6 +75,14 @@ foreach ($cases as [$label, $oid, $iid, $override]) {
         $fail++;
         echo "   ERROR " . get_class($t) . ': ' . $t->getMessage() . "\n";
     }
+}
+echo "-- genuine girls-only EN/FR camp: EN/FR rows above with the activity_type RR itself stores for girls-only camps\n";
+foreach ([['EN', 62465, 7885], ['FR', 62466, 7886]] as [$lg, $oid, $iid]) {
+    [, $data] = repro_build_row($oid, $iid, $call, $prop);
+    $data['girls_only'] = 1;
+    $data['activity_type'] = intersoccer_canonical_activity_type_for_roster('Camp, Girls Only');
+    try { (new Roster($data))->validate(); echo "   PASS $lg girls-only row validates\n"; }
+    catch (ValidationException $e) { $fail++; echo "   FAIL $lg girls-only (activity_type=" . json_encode($data['activity_type']) . "): " . $e->getMessage() . ' ' . json_encode($e->getValidationErrors()) . "\n"; }
 }
 echo "-- helper probes (DE/FR/EN normalisation)\n";
 foreach (['full-week', 'semaine-complete', 'ganze-woche', 'Ganze Woche', 'other'] as $v) {

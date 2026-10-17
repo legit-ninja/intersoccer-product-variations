@@ -14,6 +14,9 @@ if (!defined('ABSPATH')) {
 if (!function_exists('add_filter')) {
     function add_filter($hook, $callback, $priority = 10, $accepted_args = 1) { return true; }
 }
+if (!function_exists('add_action')) {
+    function add_action($hook, $callback, $priority = 10, $accepted_args = 1) { return true; }
+}
 if (!function_exists('apply_filters')) {
     function apply_filters($hook, $value) { return $value; }
 }
@@ -66,7 +69,10 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
             "'Girls Only' order meta must not be written for '{$slug}'/'{$name}'");
     }
 
-    /** @dataProvider yesValues — control: yes stays girls-only. */
+    /**
+     * Control: yes stays girls-only.
+     * @dataProvider yesValues
+     */
     public function test_yes_value_is_girls_only($slug, $name) {
         $this->assertTrue(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
     }
