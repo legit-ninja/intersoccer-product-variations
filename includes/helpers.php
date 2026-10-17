@@ -487,3 +487,232 @@ function intersoccer_discount_compose_season_key($season, $program_year = '') {
     return $season;
 }
 
+/**
+ * Whether WPML default language is configured (discount paths only).
+ *
+ * @return bool
+ */
+function intersoccer_discount_wpml_is_configured() {
+    return function_exists('apply_filters') && (bool) apply_filters('wpml_default_language', null);
+}
+
+/**
+ * Run a callback while WPML is switched to a language, restoring the previous language.
+ *
+ * @param string|null $language_code Target language or null to skip switching.
+ * @param callable    $callback
+ * @return mixed
+ */
+function intersoccer_discount_wpml_execute_in_language($language_code, callable $callback) {
+    if ($language_code === null || $language_code === '' || !intersoccer_discount_wpml_is_configured()) {
+        return $callback();
+    }
+    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
+        return $callback();
+    }
+    $previous = apply_filters('wpml_current_language', null);
+    $switched = false;
+    if (function_exists('do_action') && $previous !== $language_code) {
+        do_action('wpml_switch_language', $language_code);
+        $switched = true;
+    }
+    $restore_term_suppress = false;
+    if (array_key_exists('intersoccer_test_wpml_suppress_term_filters', $GLOBALS)) {
+        $restore_term_suppress = true;
+        $prior_term_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'];
+        $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+    }
+    try {
+        return $callback();
+    } finally {
+        if ($restore_term_suppress) {
+            $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prior_term_suppress;
+        }
+        if ($switched && $previous !== null && $previous !== '' && function_exists('do_action')) {
+            do_action('wpml_switch_language', $previous);
+        }
+    }
+}
+
+/**
+ * WPML default-language term ID for discount grouping (falls back to the given ID).
+ *
+ * @param int    $term_id
+ * @param string $taxonomy
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0) {
+        return 0;
+    }
+    if (function_exists('apply_filters')) {
+        $default_lang = apply_filters('wpml_default_language', null);
+        if ($default_lang) {
+            $canonical = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, true, $default_lang);
+            if ($canonical > 0) {
+                return $canonical;
+            }
+        }
+    }
+    return $term_id;
+}
+
+/**
+ * Default-language term name for a taxonomy term (WPML-aware).
+ *
+ * @param int    $term_id
+ * @param string $taxonomy
+ * @return string
+ */
+function intersoccer_discount_canonical_term_name($term_id, $taxonomy) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0) {
+        return '';
+    }
+    $use_default_lang_term = empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read']);
+    $read_id = $use_default_lang_term
+        ? intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy)
+        : $term_id;
+    if ($read_id <= 0) {
+        return '';
+    }
+    $restore_term_suppress = false;
+    if (
+        $use_default_lang_term
+        && array_key_exists('intersoccer_test_wpml_suppress_term_filters', $GLOBALS)
+    ) {
+        $restore_term_suppress = true;
+        $prior_term_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'];
+        $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+    }
+    try {
+        $term = get_term($read_id, $taxonomy);
+        if ($term && !is_wp_error($term) && !empty($term->name)) {
+            return (string) $term->name;
+        }
+        return '';
+    } finally {
+        if ($restore_term_suppress) {
+            $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prior_term_suppress;
+        }
+    }
+}
+
+/**
+ * Default-language product or variation ID for discount identity (WPML-aware).
+ *
+ * @param int    $post_id Product or variation ID.
+ * @param string $type    WPML element type: product or product_variation.
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_post_id($post_id, $type) {
+    $post_id = (int) $post_id;
+    if ($post_id <= 0) {
+        return 0;
+    }
+    if (!function_exists('apply_filters')) {
+        return $post_id;
+    }
+    $default_lang = apply_filters('wpml_default_language', null);
+    if (!$default_lang) {
+        return $post_id;
+    }
+    $canonical = (int) apply_filters('wpml_object_id', $post_id, $type, true, $default_lang);
+    return $canonical > 0 ? $canonical : $post_id;
+}
+
+/**
+ * Default-language variation ID for discount comparisons (falls back to raw ID).
+ *
+ * @param int $variation_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_variation_id($variation_id) {
+    return intersoccer_discount_wpml_canonical_post_id($variation_id, 'product_variation');
+}
+
+/**
+ * Default-language product ID for discount comparisons (falls back to raw ID).
+ *
+ * @param int $product_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_product_id($product_id) {
+    return intersoccer_discount_wpml_canonical_post_id($product_id, 'product');
+}
+
+/**
+ * Canonical camp line identity for discount comparisons (variation, else parent product).
+ *
+ * @param int $variation_id
+ * @param int $product_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_camp_booking_id($variation_id, $product_id = 0) {
+    $variation_id = (int) $variation_id;
+    $product_id = (int) $product_id;
+    if ($variation_id > 0) {
+        return intersoccer_discount_wpml_canonical_variation_id($variation_id);
+    }
+    if ($product_id > 0) {
+        return intersoccer_discount_wpml_canonical_product_id($product_id);
+    }
+    return 0;
+}
+
+/**
+ * Map a stored or translated season label to the default-language season name.
+ *
+ * @param string $label Season term name (any language).
+ * @return string Canonical season name, or the original label when unresolved.
+ */
+function intersoccer_discount_canonicalize_season_label($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return '';
+    }
+    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
+        return $label;
+    }
+    if (!empty($GLOBALS['intersoccer_test_season_label_to_canonical'][$label])) {
+        return (string) $GLOBALS['intersoccer_test_season_label_to_canonical'][$label];
+    }
+    $taxonomy = function_exists('intersoccer_attr_taxonomy')
+        ? intersoccer_attr_taxonomy('program-season')
+        : 'pa_program-season';
+    if (function_exists('get_term_by')) {
+        $term = get_term_by('name', $label, $taxonomy);
+        if (!$term && function_exists('sanitize_title')) {
+            $term = get_term_by('slug', sanitize_title($label), $taxonomy);
+        }
+        if ($term && !is_wp_error($term) && !empty($term->term_id)) {
+            $canonical = intersoccer_discount_canonical_term_name((int) $term->term_id, $taxonomy);
+            if ($canonical !== '') {
+                return $canonical;
+            }
+        }
+    }
+    return $label;
+}
+
+/**
+ * Normalize a persisted or computed discount season key for comparisons.
+ *
+ * Accepts legacy keys that used translated season term names in the label segment.
+ *
+ * @param string $key Raw _intersoccer_discount_season_key or composed key.
+ * @return string
+ */
+function intersoccer_discount_normalize_season_key($key) {
+    $key = trim((string) $key);
+    if ($key === '') {
+        return '';
+    }
+    $parts = explode('|', $key, 2);
+    $season_label = $parts[0];
+    $year_part    = isset($parts[1]) ? $parts[1] : '';
+    $canonical_label = intersoccer_discount_canonicalize_season_label($season_label);
+    return intersoccer_discount_compose_season_key($canonical_label, $year_part);
+}
+

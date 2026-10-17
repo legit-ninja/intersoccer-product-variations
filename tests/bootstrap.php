@@ -325,7 +325,25 @@ if (!function_exists('delete_option')) {
 
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
+        if ($hook === 'wpml_switch_language') {
+            $GLOBALS['intersoccer_test_wpml_switch_language_count'] = (int) ($GLOBALS['intersoccer_test_wpml_switch_language_count'] ?? 0) + 1;
+            if (isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
+                $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+            }
+        }
         return;
+    }
+}
+
+if (!function_exists('is_admin')) {
+    function is_admin() {
+        return !empty($GLOBALS['intersoccer_test_is_admin']);
+    }
+}
+
+if (!function_exists('did_action')) {
+    function did_action($hook) {
+        return 0;
     }
 }
 
@@ -633,12 +651,47 @@ if (!function_exists('taxonomy_exists')) {
 
 if (!function_exists('get_term')) {
     function get_term($term, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        $term_id = is_object($term) ? (int) ($term->term_id ?? 0) : (int) $term;
+        if (
+            $term_id > 0
+            && !empty($GLOBALS['intersoccer_test_wpml_simulate_term_filters'])
+            && empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters'])
+            && isset($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+            && is_callable($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+        ) {
+            $term_id = (int) call_user_func($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'], $term_id);
+        }
+        if ($term_id > 0 && !empty($GLOBALS['intersoccer_test_terms'][$term_id])) {
+            $row = $GLOBALS['intersoccer_test_terms'][$term_id];
+            return (object) [
+                'term_id' => $term_id,
+                'name' => $row['name'] ?? '',
+                'slug' => $row['slug'] ?? sanitize_title($row['name'] ?? ''),
+                'taxonomy' => $row['taxonomy'] ?? $taxonomy,
+            ];
+        }
         return null;
     }
 }
 
 if (!function_exists('get_term_by')) {
     function get_term_by($field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+            foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
+                if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
+                    continue;
+                }
+                if ($field === 'name' && isset($row['name']) && (string) $row['name'] === (string) $value) {
+                    return get_term((int) $term_id, $taxonomy);
+                }
+                if ($field === 'slug') {
+                    $slug = $row['slug'] ?? sanitize_title($row['name'] ?? '');
+                    if ((string) $slug === (string) $value) {
+                        return get_term((int) $term_id, $taxonomy);
+                    }
+                }
+            }
+        }
         return false;
     }
 }
@@ -715,6 +768,10 @@ if (!function_exists('wp_cache_delete')) {
 if (!function_exists('wc_get_product_terms')) {
     function wc_get_product_terms($product_id, $taxonomy, $args = []) {
         $product_id = (int) $product_id;
+        $fields = isset($args['fields']) ? $args['fields'] : 'names';
+        if ($fields === 'ids' && isset($GLOBALS['intersoccer_test_product_term_ids'][$product_id][$taxonomy])) {
+            return $GLOBALS['intersoccer_test_product_term_ids'][$product_id][$taxonomy];
+        }
         if (isset($GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy])) {
             return $GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy];
         }
@@ -724,6 +781,32 @@ if (!function_exists('wc_get_product_terms')) {
 
 if (!function_exists('wc_get_orders')) {
     function wc_get_orders($args = []) {
+        if (isset($GLOBALS['intersoccer_test_wc_get_orders']) && is_callable($GLOBALS['intersoccer_test_wc_get_orders'])) {
+            return call_user_func($GLOBALS['intersoccer_test_wc_get_orders'], $args);
+        }
         return [];
+    }
+}
+
+if (!function_exists('wc_get_order')) {
+    function wc_get_order($order_id) {
+        $order_id = (int) $order_id;
+        if (isset($GLOBALS['intersoccer_test_orders'][$order_id])) {
+            return $GLOBALS['intersoccer_test_orders'][$order_id];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('remove_accents')) {
+    function remove_accents($text) {
+        $text = (string) $text;
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                return $converted;
+            }
+        }
+        return $text;
     }
 }
