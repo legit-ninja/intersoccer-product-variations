@@ -776,3 +776,15 @@ msgstr "Bitte beheben Sie den Fehler, um fortzufahren."
 # wpml-name: Request failed
 msgid "Request failed"
 msgstr "Anfrage fehlgeschlagen"
+
+#, php-format
+msgid "Medical information: provided (view or update in My Account)."
+msgstr "Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktualisieren)."
+
+#, php-format
+msgid "Age at camp start: %d"
+msgstr "Alter bei Campbeginn: %d"
+
+#, php-format
+msgid "Birth year: %s"
+msgstr "Geburtsjahr: %s"
