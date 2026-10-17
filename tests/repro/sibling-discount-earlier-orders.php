@@ -100,12 +100,14 @@ $out(sprintf("\n== All orders of user %d (direct SQL): %d", $uid, count($ids)));
 $valid = ['completed', 'processing', 'on-hold'];
 $prior = [];
 $order_lang = [];
+$order_status_ok = [];
 foreach ($ids as $oid) {
     $o = wc_get_order((int) $oid);
     if (!$o) { continue; }
     $lang = (string) $o->get_meta('wpml_language');
     $icl = $wpdb->get_var($wpdb->prepare("SELECT language_code FROM {$P}icl_translations WHERE element_type='post_shop_order' AND element_id=%d", $oid));
     $order_lang[(int) $oid] = $lang;
+    if (in_array($o->get_status(), ['completed', 'processing', 'on-hold'], true)) { $order_status_ok[(int) $oid] = $lang; }
     $items = intersoccer_extract_camp_items_from_order($o);
     $out(sprintf('order %d wpml_language=%s icl_translations=%s status=%s camp_items=%d', $oid, $lang ?: '-', $icl ?: '-', $o->get_status(), count($items)));
     if (!in_array($o->get_status(), $valid, true)) { continue; }
@@ -240,6 +242,9 @@ foreach ($GLOBALS['repro_order_queries'] as [$a, $r]) {
     $out(sprintf('  args customer_id=%s status=%s date_created=%s -> %d orders by lang %s; %s-language orders of this user NOT returned: %s',
         var_export($a['customer_id'] ?? null, true), json_encode($a['status'] ?? null), $a['date_created'] ?? '-', count($rids),
         json_encode($by), strtoupper($src_lang), json_encode(array_values(array_diff($src_all, $rids)))));
+    $out(sprintf('  suppress_filters=%s; returned ids=%s', var_export($a['suppress_filters'] ?? null, true), json_encode($rids)));
+    $missing = array_values(array_diff(array_keys($order_status_ok), $rids));
+    $out(sprintf('  completed/processing/on-hold orders of this user (any language) NOT returned: %s', json_encode($missing)));
 }
 $out("\n== Values compared at discounts.php (season filter in intersoccer_get_previous_sibling_child_totals)");
 $out(sprintf('FR cart season key (camps_by_season_child, site=%s): %s%s', $cart_lang, json_encode($cart_keys, JSON_UNESCAPED_UNICODE),
