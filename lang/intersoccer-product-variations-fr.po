@@ -731,6 +731,16 @@ msgstr "ID de variation invalide."
 msgid "Invalid product ID."
 msgstr "ID de produit invalide."
 
+#, php-format
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s"
+msgstr "Cette session est réservée aux filles. Le genre de la participante sélectionnée doit être « Fille » dans votre compte. Mettez à jour sous « Gérer les participantes » : %s"
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr "Cette session est réservée aux filles. Le genre de la participante sélectionnée doit être « Fille » dans votre compte. Veuillez mettre à jour « Gérer les participantes » avant de réserver."
+
+msgid "This session is for girls only. Please choose a female attendee or pick a different session."
+msgstr "Cette session est réservée aux filles. Veuillez sélectionner une joueuse ou choisir une autre session."
+
 # wpml-name: c4716ed2f447aa22072d91c1acbe83e7
 #~ msgid "Late Pick Up Cost: "
 #~ msgstr "Coût de récupération tardive : "

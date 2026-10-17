@@ -776,3 +776,13 @@ msgstr "Bitte beheben Sie den Fehler, um fortzufahren."
 # wpml-name: Request failed
 msgid "Request failed"
 msgstr "Anfrage fehlgeschlagen"
+
+#, php-format
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s"
+msgstr "Diese Session ist nur für Mädchen. Für den gewählten Teilnehmer muss im Konto das Geschlecht «Weiblich» hinterlegt sein. Bitte unter «Teilnehmer verwalten» aktualisieren: %s"
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr "Diese Session ist nur für Mädchen. Für den gewählten Teilnehmer muss im Konto das Geschlecht «Weiblich» hinterlegt sein. Bitte «Teilnehmer verwalten» vor der Buchung aktualisieren."
+
+msgid "This session is for girls only. Please choose a female attendee or pick a different session."
+msgstr "Diese Session ist nur für Mädchen. Bitte wählen Sie eine Spielerin oder eine andere Session."

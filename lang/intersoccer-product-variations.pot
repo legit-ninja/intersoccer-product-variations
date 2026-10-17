@@ -839,3 +839,13 @@ msgstr ""
 # wpml-name: Request failed
 msgid "Request failed"
 msgstr ""
+
+#, php-format
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s"
+msgstr ""
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr ""
+
+msgid "This session is for girls only. Please choose a female attendee or pick a different session."
+msgstr ""
