@@ -16,6 +16,9 @@
  *   - cart line: WPML translation of that variation into REPRO_CART_LANG (default fr)
  *   - cart child: the first player with no prior same-season camp in ANY language
  * Optional env: REPRO_SOURCE_LANG, REPRO_CART_LANG, REPRO_CART_PLAYER_INDEX, REPRO_SOURCE_ORDER.
+ * Exit: 0 PASS, 1 FAIL, 2 setup error, 3 SKIP (no source-language order for this user).
+ * Orders are listed by direct SQL; the orders the discount lookup actually gets are traced via the
+ * woocommerce_order_query filter during the hook (WPML filters that WP_Query by current language).
  *
  * Tracing: the stored key is captured by hooking WC_Data::get_meta's view filter
  * (woocommerce_order_item_get__intersoccer_discount_season_key) during the real cart hook, i.e. the exact
@@ -82,27 +85,41 @@ $is_full_week = static function ($bt) {
     return intersoccer_discount_camp_booking_counts_for_sibling($bt);
 };
 
-// ---- Earlier orders, via the plugin's own order scan (same statuses / lookback as the discount code).
-$user = get_user_by('id', $uid);
+// ---- ALL of the customer's orders, read straight from the DB (no WPML query filtering), with WPML language.
+// Do NOT call intersoccer_get_customer_previous_orders() here: it has a static cache, and the real hook
+// must make the first call under the cart site language.
 $lookback = intersoccer_discount_retroactive_lookback_months(true);
-$orders = intersoccer_get_customer_previous_orders($uid, $user ? $user->user_email : null, $lookback);
-$out(sprintf("\n== Earlier orders scanned by intersoccer_get_customer_previous_orders (lookback %d months): %d", $lookback, count($orders)));
+$ids = $wpdb->get_col($wpdb->prepare(
+    "SELECT p.ID FROM {$P}posts p JOIN {$P}postmeta c ON c.post_id=p.ID AND c.meta_key='_customer_user' AND c.meta_value=%s
+     WHERE p.post_type='shop_order' ORDER BY p.ID", (string) $uid));
+$wpml_settings = get_option('icl_sitepress_settings', []);
+$out(sprintf("\n== WPML settings: shop_order translation mode=%s (0=not translatable,1=translatable,2=display-as-translated); icl_translations rows for this user's orders=%d",
+    var_export($wpml_settings['custom_posts_sync_option']['shop_order'] ?? null, true),
+    $ids ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$P}icl_translations WHERE element_type='post_shop_order' AND element_id IN (" . implode(',', array_map('intval', $ids)) . ")") : 0));
+$out(sprintf("\n== All orders of user %d (direct SQL): %d", $uid, count($ids)));
+$valid = ['completed', 'processing', 'on-hold'];
 $prior = [];
-foreach ($orders as $o) {
+$order_lang = [];
+foreach ($ids as $oid) {
+    $o = wc_get_order((int) $oid);
+    if (!$o) { continue; }
     $lang = (string) $o->get_meta('wpml_language');
-    foreach (intersoccer_extract_camp_items_from_order($o) as $it) {
+    $icl = $wpdb->get_var($wpdb->prepare("SELECT language_code FROM {$P}icl_translations WHERE element_type='post_shop_order' AND element_id=%d", $oid));
+    $order_lang[(int) $oid] = $lang;
+    $items = intersoccer_extract_camp_items_from_order($o);
+    $out(sprintf('order %d wpml_language=%s icl_translations=%s status=%s camp_items=%d', $oid, $lang ?: '-', $icl ?: '-', $o->get_status(), count($items)));
+    if (!in_array($o->get_status(), $valid, true)) { continue; }
+    foreach ($items as $it) {
         $item = $o->get_item($it['item_id']);
-        $stored = $item ? (string) $item->get_meta('_intersoccer_discount_season_key', true, 'edit') : '';
         $it['order_lang'] = $lang;
-        $it['stored_key'] = $stored;
+        $it['stored_key'] = $item ? (string) $item->get_meta('_intersoccer_discount_season_key', true, 'edit') : '';
         $it['sig'] = $season_sig($it['variation_id'] ?: $it['product_id']);
         $it['player_key'] = intersoccer_discount_player_key($it);
         $it['full_week'] = $is_full_week($it['booking_type']);
         $prior[] = $it;
-        $out(sprintf('order %d [%s] status=%s item %d product %d/%d player_key=%s attendee=%s booking=%s full_week=%s stored _intersoccer_discount_season_key=%s season_sig=%s total=%.2f',
-            $it['order_id'], $lang ?: '?', $o->get_status(), $it['item_id'], $it['product_id'], $it['variation_id'],
-            $it['player_key'], json_encode($it['assigned_player'], JSON_UNESCAPED_UNICODE), $it['booking_type'],
-            $it['full_week'] ? 'yes' : 'no', json_encode($stored, JSON_UNESCAPED_UNICODE), $it['sig'], $it['line_total']));
+        $out(sprintf('    item %d product %d/%d player_key=%s booking=%s full_week=%s stored _intersoccer_discount_season_key=%s season_sig=%s total=%.2f',
+            $it['item_id'], $it['product_id'], $it['variation_id'], $it['player_key'], $it['booking_type'],
+            $it['full_week'] ? 'yes' : 'no', json_encode($it['stored_key'], JSON_UNESCAPED_UNICODE), $it['sig'], $it['line_total']));
     }
 }
 
@@ -114,7 +131,7 @@ foreach ($prior as $it) {
         $source = $it; break;
     }
 }
-if (!$source) { $out("SETUP ERROR: no $src_lang full-week camp item with a stored season key for user $uid"); WP_CLI::halt(2); }
+if (!$source) { $out("SKIP: no $src_lang full-week camp order item with a stored season key for user $uid (direction not covered)"); WP_CLI::halt(3); }
 $out(sprintf("\n== Source %s item: order %d item %d variation %d player_key=%s stored key=%s",
     strtoupper($src_lang), $source['order_id'], $source['item_id'], $source['variation_id'], $source['player_key'], json_encode($source['stored_key'], JSON_UNESCAPED_UNICODE)));
 
@@ -191,15 +208,32 @@ $trace = static function ($value, $item) {
     $GLOBALS['repro_meta_reads'][] = [$item->get_order_id(), $item->get_id(), (string) $value];
     return $value;
 };
+$GLOBALS['repro_order_queries'] = [];
+$qtrace = static function ($results, $args) {
+    $GLOBALS['repro_order_queries'][] = [$args, $results];
+    return $results;
+};
+add_filter('woocommerce_order_query', $qtrace, PHP_INT_MAX, 2);
 add_filter('woocommerce_order_item_get__intersoccer_discount_season_key', $trace, 10, 2);
 intersoccer_apply_combo_discounts_to_items($cart);
 remove_filter('woocommerce_order_item_get__intersoccer_discount_season_key', $trace, 10);
+remove_filter('woocommerce_order_query', $qtrace, PHP_INT_MAX);
 
 $line = reset($cart->cart_contents);
 $actual = (float) ($line['intersoccer_sibling_percent'] ?? 0);
 $price = (float) $line['data']->get_price();
 $prior_totals = intersoccer_get_previous_sibling_child_totals($uid, 'camp', $lookback, $cart_keys ? [(string) $cart_keys[0]] : []);
 
+$out(sprintf("\n== wc_get_orders() calls made by the hook (intersoccer_get_customer_previous_orders), site=%s: %d", $cart_lang, count($GLOBALS['repro_order_queries'])));
+foreach ($GLOBALS['repro_order_queries'] as [$a, $r]) {
+    $rids = array_map(static function ($x) { return is_object($x) ? $x->get_id() : (int) $x; }, (array) $r);
+    $by = [];
+    foreach ($rids as $rid) { $by[$order_lang[$rid] ?? '?'][] = $rid; }
+    $src_all = array_keys(array_filter($order_lang, static function ($l) use ($src_lang) { return $l === $src_lang; }));
+    $out(sprintf('  args customer_id=%s status=%s date_created=%s -> %d orders by lang %s; %s-language orders of this user NOT returned: %s',
+        var_export($a['customer_id'] ?? null, true), json_encode($a['status'] ?? null), $a['date_created'] ?? '-', count($rids),
+        json_encode($by), strtoupper($src_lang), json_encode(array_values(array_diff($src_all, $rids)))));
+}
 $out("\n== Values compared at discounts.php (season filter in intersoccer_get_previous_sibling_child_totals)");
 $out(sprintf('FR cart season key (camps_by_season_child, site=%s): %s%s', $cart_lang, json_encode($cart_keys, JSON_UNESCAPED_UNICODE),
     $norm('x') !== null ? ' normalized=' . json_encode(array_map($norm, $cart_keys), JSON_UNESCAPED_UNICODE) : ''));
@@ -211,7 +245,8 @@ foreach ($GLOBALS['repro_meta_reads'] as [$oid, $iid, $v]) {
     $out(sprintf('stored key read by the hook: order %d item %d = %s%s', $oid, $iid, json_encode($v, JSON_UNESCAPED_UNICODE),
         $norm('x') !== null ? ' normalized=' . json_encode($norm($v), JSON_UNESCAPED_UNICODE) : ''));
 }
-$out(sprintf('meta reads traced during hook: %d', count($GLOBALS['repro_meta_reads'])));
+$out(sprintf('meta reads traced during hook: %d%s', count($GLOBALS['repro_meta_reads']),
+    in_array($source['order_id'], array_column($GLOBALS['repro_meta_reads'], 0), true) ? '' : sprintf(' (source %s order %d never reached the comparison)', strtoupper($src_lang), $source['order_id'])));
 $out(sprintf('intersoccer_get_previous_sibling_child_totals(%d, camp, %d, [cart key]) = %s', $uid, $lookback, json_encode($prior_totals)));
 
 $out("\n== Result");
