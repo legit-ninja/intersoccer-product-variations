@@ -325,6 +325,9 @@ if (!function_exists('delete_option')) {
 
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
+        if ($hook === 'wpml_switch_language' && isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
+            $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+        }
         return;
     }
 }
@@ -634,6 +637,15 @@ if (!function_exists('taxonomy_exists')) {
 if (!function_exists('get_term')) {
     function get_term($term, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
         $term_id = is_object($term) ? (int) ($term->term_id ?? 0) : (int) $term;
+        if (
+            $term_id > 0
+            && !empty($GLOBALS['intersoccer_test_wpml_simulate_term_filters'])
+            && empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters'])
+            && isset($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+            && is_callable($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+        ) {
+            $term_id = (int) call_user_func($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'], $term_id);
+        }
         if ($term_id > 0 && !empty($GLOBALS['intersoccer_test_terms'][$term_id])) {
             $row = $GLOBALS['intersoccer_test_terms'][$term_id];
             return (object) [

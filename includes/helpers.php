@@ -488,6 +488,53 @@ function intersoccer_discount_compose_season_key($season, $program_year = '') {
 }
 
 /**
+ * Whether WPML default language is configured (discount paths only).
+ *
+ * @return bool
+ */
+function intersoccer_discount_wpml_is_configured() {
+    return function_exists('apply_filters') && (bool) apply_filters('wpml_default_language', null);
+}
+
+/**
+ * Run a callback while WPML is switched to a language, restoring the previous language.
+ *
+ * @param string|null $language_code Target language or null to skip switching.
+ * @param callable    $callback
+ * @return mixed
+ */
+function intersoccer_discount_wpml_execute_in_language($language_code, callable $callback) {
+    if ($language_code === null || $language_code === '' || !intersoccer_discount_wpml_is_configured()) {
+        return $callback();
+    }
+    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
+        return $callback();
+    }
+    $previous = apply_filters('wpml_current_language', null);
+    $switched = false;
+    if (function_exists('do_action') && $previous !== $language_code) {
+        do_action('wpml_switch_language', $language_code);
+        $switched = true;
+    }
+    $restore_term_suppress = false;
+    if (array_key_exists('intersoccer_test_wpml_suppress_term_filters', $GLOBALS)) {
+        $restore_term_suppress = true;
+        $prior_term_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'];
+        $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+    }
+    try {
+        return $callback();
+    } finally {
+        if ($restore_term_suppress) {
+            $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prior_term_suppress;
+        }
+        if ($switched && $previous !== null && $previous !== '' && function_exists('do_action')) {
+            do_action('wpml_switch_language', $previous);
+        }
+    }
+}
+
+/**
  * WPML default-language term ID for discount grouping (falls back to the given ID).
  *
  * @param int    $term_id
@@ -523,11 +570,20 @@ function intersoccer_discount_canonical_term_name($term_id, $taxonomy) {
     if ($canonical_id <= 0) {
         return '';
     }
-    $term = get_term($canonical_id, $taxonomy);
-    if ($term && !is_wp_error($term) && !empty($term->name)) {
-        return (string) $term->name;
+    $read_term = static function () use ($canonical_id, $taxonomy) {
+        $term = get_term($canonical_id, $taxonomy);
+        if ($term && !is_wp_error($term) && !empty($term->name)) {
+            return (string) $term->name;
+        }
+        return '';
+    };
+    $default_lang = intersoccer_discount_wpml_is_configured()
+        ? (string) apply_filters('wpml_default_language', '')
+        : '';
+    if ($default_lang !== '') {
+        return (string) intersoccer_discount_wpml_execute_in_language($default_lang, $read_term);
     }
-    return '';
+    return $read_term();
 }
 
 /**
@@ -540,6 +596,9 @@ function intersoccer_discount_canonicalize_season_label($label) {
     $label = trim((string) $label);
     if ($label === '') {
         return '';
+    }
+    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
+        return $label;
     }
     if (!empty($GLOBALS['intersoccer_test_season_label_to_canonical'][$label])) {
         return (string) $GLOBALS['intersoccer_test_season_label_to_canonical'][$label];

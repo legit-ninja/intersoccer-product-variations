@@ -396,7 +396,15 @@ function intersoccer_get_customer_previous_orders($customer_id, $customer_email 
         $date_after = date('Y-m-d', strtotime("-{$lookback_months} months"));
         $args['date_created'] = '>' . $date_after;
     }
-    
+
+    if (
+        empty($GLOBALS['intersoccer_test_disable_discount_order_suppress_filters'])
+        && intersoccer_discount_wpml_is_configured()
+    ) {
+        // WPML filters wc_get_orders by the current language; sibling lookback needs every language.
+        $args['suppress_filters'] = true;
+    }
+
     $order_ids = wc_get_orders($args);
     $orders = [];
     
