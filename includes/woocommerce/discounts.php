@@ -912,7 +912,14 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
     $player_cache = $player_tokens
         ? implode('|', $player_tokens)
         : md5(function_exists('wp_json_encode') ? wp_json_encode($player_ref) : json_encode($player_ref));
-    $cache_key = 'camps_season_' . $customer_id . '_' . $season_key . '_' . $player_cache . '_' . $lookback_months . '_' . (int) $exclude_variation_id;
+    $exclude_canonical_variation_id = 0;
+    if ((int) $exclude_variation_id > 0 && function_exists('intersoccer_discount_wpml_canonical_variation_id')) {
+        $exclude_canonical_variation_id = intersoccer_discount_wpml_canonical_variation_id((int) $exclude_variation_id);
+    } elseif ((int) $exclude_variation_id > 0) {
+        $exclude_canonical_variation_id = (int) $exclude_variation_id;
+    }
+
+    $cache_key = 'camps_season_' . $customer_id . '_' . $season_key . '_' . $player_cache . '_' . $lookback_months . '_' . $exclude_canonical_variation_id;
 
     if (isset($cache[$cache_key])) {
         return $cache[$cache_key];
@@ -928,7 +935,6 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
 
     $orders = intersoccer_get_customer_previous_orders($customer_id, $customer_email, $lookback_months);
     $matching_camps = [];
-    $exclude_variation_id = (int) $exclude_variation_id;
 
     foreach ($orders as $order) {
         $camp_items = intersoccer_extract_camp_items_from_order($order);
@@ -946,8 +952,14 @@ function intersoccer_get_previous_camps_same_child_season($customer_id, $player_
             if (!intersoccer_discount_camp_booking_counts_for_sibling($camp_item['booking_type'] ?? '')) {
                 continue;
             }
-            if ($exclude_variation_id > 0 && (int) ($camp_item['variation_id'] ?? 0) === $exclude_variation_id) {
-                continue;
+            if ($exclude_canonical_variation_id > 0) {
+                $item_variation_id = (int) ($camp_item['variation_id'] ?? 0);
+                $item_canonical = function_exists('intersoccer_discount_wpml_canonical_variation_id')
+                    ? intersoccer_discount_wpml_canonical_variation_id($item_variation_id)
+                    : $item_variation_id;
+                if ($item_canonical === $exclude_canonical_variation_id) {
+                    continue;
+                }
             }
             $matching_camps[] = $camp_item;
         }

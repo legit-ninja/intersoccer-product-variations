@@ -566,24 +566,80 @@ function intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy) {
  * @return string
  */
 function intersoccer_discount_canonical_term_name($term_id, $taxonomy) {
-    $canonical_id = intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy);
-    if ($canonical_id <= 0) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0) {
         return '';
     }
-    $read_term = static function () use ($canonical_id, $taxonomy) {
-        $term = get_term($canonical_id, $taxonomy);
+    $use_default_lang_term = empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read']);
+    $read_id = $use_default_lang_term
+        ? intersoccer_discount_wpml_canonical_term_id($term_id, $taxonomy)
+        : $term_id;
+    if ($read_id <= 0) {
+        return '';
+    }
+    $restore_term_suppress = false;
+    if (
+        $use_default_lang_term
+        && array_key_exists('intersoccer_test_wpml_suppress_term_filters', $GLOBALS)
+    ) {
+        $restore_term_suppress = true;
+        $prior_term_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'];
+        $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+    }
+    try {
+        $term = get_term($read_id, $taxonomy);
         if ($term && !is_wp_error($term) && !empty($term->name)) {
             return (string) $term->name;
         }
         return '';
-    };
-    $default_lang = intersoccer_discount_wpml_is_configured()
-        ? (string) apply_filters('wpml_default_language', '')
-        : '';
-    if ($default_lang !== '') {
-        return (string) intersoccer_discount_wpml_execute_in_language($default_lang, $read_term);
+    } finally {
+        if ($restore_term_suppress) {
+            $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prior_term_suppress;
+        }
     }
-    return $read_term();
+}
+
+/**
+ * Default-language product or variation ID for discount identity (WPML-aware).
+ *
+ * @param int    $post_id Product or variation ID.
+ * @param string $type    WPML element type: product or product_variation.
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_post_id($post_id, $type) {
+    $post_id = (int) $post_id;
+    if ($post_id <= 0) {
+        return 0;
+    }
+    if (!function_exists('apply_filters')) {
+        return $post_id;
+    }
+    $default_lang = apply_filters('wpml_default_language', null);
+    if (!$default_lang) {
+        return $post_id;
+    }
+    $canonical = (int) apply_filters('wpml_object_id', $post_id, $type, true, $default_lang);
+    return $canonical > 0 ? $canonical : $post_id;
+}
+
+/**
+ * Default-language variation ID for discount comparisons (falls back to raw ID).
+ *
+ * @param int $variation_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_variation_id($variation_id) {
+    return intersoccer_discount_wpml_canonical_post_id($variation_id, 'product_variation');
+}
+
+/**
+ * Default-language product ID for discount comparisons (falls back to raw ID).
+ *
+ * @param int $product_id
+ * @return int
+ */
+function intersoccer_discount_wpml_canonical_product_id($product_id) {
+    return intersoccer_discount_wpml_canonical_post_id($product_id, 'product');
 }
 
 /**
