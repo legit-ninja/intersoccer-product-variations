@@ -272,6 +272,7 @@ deploy_to_server() {
         --exclude='node_modules' \
         --exclude='vendor' \
         --exclude='tests' \
+        --exclude='deploy.local.sh' \
         --exclude='utils' \
         --exclude='scripts' \
         --exclude='cypress' \
