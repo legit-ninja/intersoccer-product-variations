@@ -1378,6 +1378,7 @@ function intersoccer_clear_session_data_callback() {
         if (function_exists('WC') && WC()->session) {
             WC()->session->set('intersoccer_selected_days_' . $product_id, []);
             WC()->session->set('intersoccer_remaining_weeks_' . $product_id, null);
+            intersoccer_schedule_wc_session_volatile_refresh_before_save();
             intersoccer_debug('InterSoccer: Session data cleared for product ' . $product_id);
             wp_send_json_success(['message' => 'Session data cleared']);
         } else {

@@ -39,6 +39,12 @@ if (!class_exists('WC_Cache_Helper')) {
     }
 }
 
+if (!function_exists('check_ajax_referer')) {
+    function check_ajax_referer($action = -1, $query_arg = false, $stop = true) {
+        return true;
+    }
+}
+
 if (!function_exists('WC')) {
     function WC() {
         if (!isset($GLOBALS['intersoccer_days_gate_wc'])) {
@@ -205,6 +211,39 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $s->shutdown_save();
     }
 
+    private function runClearSessionDataAjax(SiblingDropRequestSession $s): void
+    {
+        WC()->session = $s;
+        $_POST = ['nonce' => 'valid_nonce', 'product_id' => (string) self::CAMP_ID];
+        try {
+            intersoccer_clear_session_data_callback();
+        } catch (Exception $e) {
+            $this->assertSame('AJAX_EXIT', $e->getMessage());
+        }
+        $_POST = [];
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        WC()->session = null;
+        $s->shutdown_save();
+    }
+
+    private function bookSecondChildClearSessionData(string $discount, bool $overlap): int
+    {
+        $this->runStashAjax($this->startRequest(), 0);
+        $this->addToCartRequest(0);
+        $this->discountRequest($discount);
+        if ($overlap) {
+            $ajax = $this->startRequest();
+            $this->addToCartRequest(1);
+            $this->assertSame(2, $this->cartLinesNow(), 'add-to-cart for child 2 did commit 2 lines');
+            $this->runClearSessionDataAjax($ajax);
+        } else {
+            $this->runClearSessionDataAjax($this->startRequest());
+            $this->addToCartRequest(1);
+        }
+        return $this->cartLinesNow();
+    }
+
     private function bookSecondChildSelectedDays(string $discount, bool $overlap): int
     {
         $this->runStashAjax($this->startRequest(), 0);
@@ -357,6 +396,11 @@ class SiblingDropSessionRaceReproTest extends TestCase
     public function testRaceSelectedDaysCouponSecondChildLineIsKept(): void
     {
         $this->assertSame(2, $this->bookSecondChildSelectedDays('coupon', true), 'second sibling camp line dropped (coupon, overlapping store_selected_days AJAX)');
+    }
+
+    public function testRaceClearSessionDataCouponSecondChildLineIsKept(): void
+    {
+        $this->assertSame(2, $this->bookSecondChildClearSessionData('coupon', true), 'second sibling camp line dropped (coupon, overlapping clear_session_data AJAX)');
     }
 
     /** FAILS on 2.10.17 and master: the stale AJAX save drops child 2. */
