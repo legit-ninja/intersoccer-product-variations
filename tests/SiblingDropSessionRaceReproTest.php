@@ -842,9 +842,14 @@ class SiblingDropSessionRaceReproTest extends TestCase
             'stashed_at' => time(),
         ]);
         $GLOBALS['intersoccer_pv_cas_always_fail_writes'] = true;
+        $GLOBALS['intersoccer_test_warnings'] = [];
+        $GLOBALS['intersoccer_test_errors'] = [];
         $this->finishHandlerShutdown($ajax);
         unset($GLOBALS['intersoccer_pv_cas_always_fail_writes']);
         $this->assertSame(2, $this->cartLinesNow());
+        $this->assertSame([], $GLOBALS['intersoccer_test_warnings'], 'fallback is logged at error level, not warning');
+        $this->assertCount(1, $GLOBALS['intersoccer_test_errors']);
+        $this->assertMatchesRegularExpression('/^PV session CAS save kind=\S+ prevented_stale=[01] attempts=10 fallback=1$/', $GLOBALS['intersoccer_test_errors'][0]);
     }
 
     public function testGuestNoPersistedRowUsesFallbackSave(): void

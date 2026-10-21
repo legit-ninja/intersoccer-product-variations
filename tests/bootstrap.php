@@ -163,6 +163,12 @@ if (!function_exists('intersoccer_warning')) {
     }
 }
 
+if (!function_exists('intersoccer_error')) {
+    function intersoccer_error($message) {
+        $GLOBALS['intersoccer_test_errors'][] = (string) $message;
+    }
+}
+
 if (!function_exists('wp_get_post_terms')) {
     function wp_get_post_terms($post_id, $taxonomy, $args = []) {
         return [];

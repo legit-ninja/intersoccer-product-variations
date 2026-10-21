@@ -451,14 +451,19 @@ function intersoccer_pv_wc_session_cas_persist($session) {
 }
 
 /**
- * Log (warning level: WP_DEBUG only, WC logs) only when a stale cart write was prevented,
- * a CAS retry happened or the WC fallback save ran. No session key, customer or cart data.
+ * Log only when a stale cart write was prevented, a CAS retry happened or the WC fallback save ran.
+ * Fallback (all CAS attempts failed): error level, logged without WP_DEBUG. Otherwise warning level
+ * (WP_DEBUG only). No session key, customer or cart data.
  */
 function intersoccer_pv_wc_session_log_save_outcome($prevented_stale, $attempts, $fallback) {
-    if ((!$prevented_stale && $attempts <= 1 && !$fallback) || !function_exists('intersoccer_warning')) {
+    if (!$prevented_stale && $attempts <= 1 && !$fallback) {
         return;
     }
-    intersoccer_warning(sprintf('PV session CAS save kind=%s prevented_stale=%d attempts=%d fallback=%d',
+    $logger = $fallback ? 'intersoccer_error' : 'intersoccer_warning';
+    if (!function_exists($logger)) {
+        return;
+    }
+    $logger(sprintf('PV session CAS save kind=%s prevented_stale=%d attempts=%d fallback=%d',
         intersoccer_pv_wc_session_request_kind(), $prevented_stale ? 1 : 0, (int) $attempts, $fallback ? 1 : 0));
 }
 
