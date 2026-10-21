@@ -63,16 +63,22 @@ final class SiblingDropSessionStore {
     }
 }
 
-/** Mirrors WC_Session_Handler: read whole row at request start, write whole row at shutdown if dirty. */
+/**
+ * Mirrors WC_Session_Handler + WC_Abstract_Session: per-key maybe_serialize in _data,
+ * get() = maybe_unserialize, get_session() returns the raw row (WC 10.5 class-wc-session-handler.php).
+ */
 final class SiblingDropRequestSession {
-    private $customer; private $data; private $dirty = false;
+    private $customer;
+    /** @var array<string, mixed> Serialized per-key values like WC_Abstract_Session::$_data. */
+    private $data;
+    private $dirty = false;
+
     public function __construct($customer) {
         $this->customer = (string) $customer;
         $this->data = SiblingDropSessionStore::$rows[$this->customer] ?? [];
         $this->primeSessionObjectCache();
     }
 
-    /** Same as WC loading session_value into wp_cache_add at request start. */
     private function primeSessionObjectCache(): void {
         wp_cache_add(
             SiblingDropSessionStore::wcSessionCacheKey($this->customer),
@@ -81,12 +87,43 @@ final class SiblingDropRequestSession {
             3600
         );
     }
-    public function get($key, $default = null) { return $this->data[$key] ?? $default; }
-    public function set($key, $value) { if (($this->data[$key] ?? null) !== $value) { $this->data[$key] = $value; $this->dirty = true; } }
-    public function __unset($key) { if (array_key_exists($key, $this->data)) { unset($this->data[$key]); $this->dirty = true; } }
-    public function get_session_data() { return $this->data; }
-    public function get_customer_id() { return $this->customer; }
-    /** Mirrors WC_Session_Handler::get_session() for merge-before-save in stash AJAX. */
+
+    public function get($key, $default = null) {
+        $key = is_string($key) ? $key : (string) $key;
+        return array_key_exists($key, $this->data) ? maybe_unserialize($this->data[$key]) : $default;
+    }
+
+    public function set($key, $value) {
+        $key = is_string($key) ? $key : (string) $key;
+        if ($value === null) {
+            $this->__unset($key);
+            return;
+        }
+        $serialized = maybe_serialize($value);
+        if (($this->data[$key] ?? null) === $serialized) {
+            return;
+        }
+        $this->data[$key] = $serialized;
+        $this->dirty = true;
+    }
+
+    public function __unset($key) {
+        $key = is_string($key) ? $key : (string) $key;
+        if (array_key_exists($key, $this->data)) {
+            unset($this->data[$key]);
+            $this->dirty = true;
+        }
+    }
+
+    /** Raw row (serialized values), like WC_Abstract_Session::get_session_data(). */
+    public function get_session_data() {
+        return $this->data;
+    }
+
+    public function get_customer_id() {
+        return $this->customer;
+    }
+
     public function get_session($customer_id) {
         if ((string) $customer_id !== $this->customer) {
             return [];
@@ -100,7 +137,13 @@ final class SiblingDropRequestSession {
         wp_cache_add($cache_key, $fresh, WC_SESSION_CACHE_GROUP, 3600);
         return $fresh;
     }
-    public function shutdown_save() { if ($this->dirty) { SiblingDropSessionStore::$rows[$this->customer] = $this->data; $this->dirty = false; } }
+
+    public function shutdown_save() {
+        if ($this->dirty) {
+            SiblingDropSessionStore::$rows[$this->customer] = $this->data;
+            $this->dirty = false;
+        }
+    }
 }
 
 class SiblingDropSessionRaceReproTest extends TestCase
@@ -150,12 +193,38 @@ class SiblingDropSessionRaceReproTest extends TestCase
     }
 
     /** Add-to-cart POST: WC_Cart_Session::set_session() stores the new cart; shutdown saves it. */
-    private function addToCartRequest(int $childIndex): void
+    private function addToCartRequest(int $childIndex, int $productId = self::CAMP_ID): void
     {
         $s = $this->startRequest();
         $cart = $s->get('cart', []);
-        $cart['line_child_' . $childIndex] = ['product_id' => self::CAMP_ID, 'quantity' => 1, 'assigned_player' => $childIndex, 'unique_key' => 'player_player-uuid-' . $childIndex];
+        if (!is_array($cart)) {
+            $cart = [];
+        }
+        $cart['line_child_' . $childIndex] = ['product_id' => $productId, 'quantity' => 1, 'assigned_player' => $childIndex, 'unique_key' => 'player_player-uuid-' . $childIndex];
         $s->set('cart', $cart);
+        $s->shutdown_save();
+    }
+
+    /** Runs PV after-add clear hooks inside an add-to-cart request (must not schedule volatile refresh). */
+    private function addToCartRequestWithAfterAddClear(int $childIndex, int $productId = self::CAMP_ID): void
+    {
+        $s = $this->startRequest();
+        WC()->session = $s;
+        $_REQUEST['add-to-cart'] = (string) $productId;
+        $cart = $s->get('cart', []);
+        if (!is_array($cart)) {
+            $cart = [];
+        }
+        $cart['line_child_' . $childIndex] = ['product_id' => $productId, 'quantity' => 1, 'assigned_player' => $childIndex, 'unique_key' => 'player_player-uuid-' . $childIndex];
+        $s->set('cart', $cart);
+        intersoccer_clear_stashed_player_after_add('key', $productId, 1, self::VAR_ID, null, []);
+        intersoccer_clear_stashed_express_fields_after_add('key', $productId, 1, self::VAR_ID, null, []);
+        unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown']);
+        $this->assertEmpty($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'] ?? null, 'add-to-cart must not schedule volatile refresh');
+        $_REQUEST = [];
+        WC()->session = null;
         $s->shutdown_save();
     }
 
@@ -172,10 +241,10 @@ class SiblingDropSessionRaceReproTest extends TestCase
     }
 
     /** PV's real product-page AJAX handler, run inside the given request's session. */
-    private function runStashAjax(SiblingDropRequestSession $s, int $childIndex): void
+    private function runStashAjax(SiblingDropRequestSession $s, int $childIndex, int $productId = self::CAMP_ID): void
     {
         WC()->session = $s;
-        $_POST = ['nonce' => 'valid_nonce', 'product_id' => self::CAMP_ID, 'player_index' => (string) $childIndex, 'player_id' => ''];
+        $_POST = ['nonce' => 'valid_nonce', 'product_id' => $productId, 'player_index' => (string) $childIndex, 'player_id' => ''];
         try {
             intersoccer_store_selected_player_callback();
         } catch (Exception $e) {
@@ -343,7 +412,9 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $s = $this->startRequest();
         $this->runStashAjax($s, 1);
         $row = SiblingDropSessionStore::$rows[(string) self::USER_ID] ?? [];
-        $this->assertNotEmpty($row[intersoccer_selected_player_session_key(self::CAMP_ID)] ?? null, 'stash AJAX marks the session dirty and saves it');
+        $stashKey = intersoccer_selected_player_session_key(self::CAMP_ID);
+        $stashVal = isset($row[$stashKey]) ? maybe_unserialize($row[$stashKey]) : null;
+        $this->assertNotEmpty($stashVal, 'stash AJAX marks the session dirty and saves it');
     }
 
     public function testOverlappingStashRequestObjectCacheStillHasStaleCart(): void
@@ -355,9 +426,10 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $this->seedStaleSessionObjectCache($ajax);
         $cached = wp_cache_get($cache_key, WC_SESSION_CACHE_GROUP);
         $this->assertIsArray($cached);
-        $this->assertCount(1, (array) ($cached['cart'] ?? []), 'stale snapshot is in object cache');
+        $this->assertCount(1, (array) maybe_unserialize($cached['cart'] ?? ''), 'stale snapshot is in object cache');
         $this->addToCartRequest(1);
-        $this->assertCount(1, (array) ($ajax->get_session(self::USER_ID)['cart'] ?? []), 'get_session still serves the cached 1-line cart');
+        $staleRow = $ajax->get_session(self::USER_ID);
+        $this->assertCount(1, (array) maybe_unserialize($staleRow['cart'] ?? ''), 'get_session still serves the cached 1-line cart');
         $this->assertSame(2, $this->cartLinesNow(), 'DB row already has both children');
     }
 
@@ -386,6 +458,79 @@ class SiblingDropSessionRaceReproTest extends TestCase
         WC()->session = $ajax;
         intersoccer_refresh_wc_session_volatile_from_store();
         $this->assertCount(2, (array) $ajax->get('cart'), 'cache drop + get_session reads the 2-line DB row');
+        $this->assertIsArray($ajax->get('cart'), 'merged cart must be decoded to an array');
+    }
+
+    public function testSequentialAddsWithAfterAddClearAndOverlappingStashKeepBothLines(): void
+    {
+        $this->runStashAjax($this->startRequest(), 0);
+        $this->addToCartRequestWithAfterAddClear(0);
+        $this->discountRequest('coupon');
+        $ajax = $this->startRequest();
+        $this->addToCartRequestWithAfterAddClear(1);
+        $this->assertSame(2, $this->cartLinesNow(), 'second sequential add committed 2 lines');
+        $this->runStashAjax($ajax, 1);
+        $this->assertSame(2, $this->cartLinesNow());
+        $session = $this->startRequest();
+        $this->assertIsArray($session->get('cart'));
+        $this->assertSame(['repro-sibdrop10'], $session->get('applied_coupons'));
+    }
+
+    public function testAddToCartAfterAddClearDoesNotScheduleVolatileRefresh(): void
+    {
+        unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        $this->addToCartRequestWithAfterAddClear(0);
+        $this->assertEmpty($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'] ?? null);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: int, 2: int, 3: string}>
+     */
+    public static function siblingBookingLocaleMatrix(): array
+    {
+        $localeOffsets = ['en' => 0, 'fr' => 1000, 'de' => 2000];
+        $scenarios = [
+            'two_different_camps' => [51723, 51823],
+            'course_and_camp' => [52700, 51723],
+            'coupon_with_points' => [51723, 51723],
+        ];
+        $matrix = [];
+        foreach ($localeOffsets as $locale => $offset) {
+            foreach ($scenarios as $name => [$first, $second]) {
+                $matrix[$name . '_' . $locale] = [$locale, $first + $offset, $second + $offset, $name];
+            }
+        }
+        return $matrix;
+    }
+
+    /**
+     * @dataProvider siblingBookingLocaleMatrix
+     */
+    public function testSequentialAndOverlappingStashKeepsLinesPerLocale(string $locale, int $firstProductId, int $secondProductId, string $scenario): void
+    {
+        $GLOBALS['intersoccer_test_wpml_current_language'] = $locale;
+        $stashProductId = $secondProductId;
+        $this->runStashAjax($this->startRequest(), 0, $firstProductId);
+        $this->addToCartRequestWithAfterAddClear(0, $firstProductId);
+        if ($scenario === 'coupon_with_points') {
+            $s = $this->startRequest();
+            $s->set('applied_coupons', ['repro-sibdrop10']);
+            $s->set('intersoccer_points_to_redeem', 20);
+            $s->shutdown_save();
+        } else {
+            $this->discountRequest('coupon');
+        }
+        $ajax = $this->startRequest();
+        $this->addToCartRequestWithAfterAddClear(1, $secondProductId);
+        $this->assertSame(2, $this->cartLinesNow());
+        $this->runStashAjax($ajax, 1, $stashProductId);
+        $this->assertSame(2, $this->cartLinesNow());
+        $session = $this->startRequest();
+        $this->assertIsArray($session->get('cart'));
+        $this->assertSame(['repro-sibdrop10'], $session->get('applied_coupons'));
+        if ($scenario === 'coupon_with_points') {
+            $this->assertSame(20, (int) $session->get('intersoccer_points_to_redeem'));
+        }
     }
 
     public function testRaceExpressFieldsCouponSecondChildLineIsKept(): void

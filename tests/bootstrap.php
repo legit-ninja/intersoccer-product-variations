@@ -685,6 +685,15 @@ if (!function_exists('maybe_unserialize')) {
     }
 }
 
+if (!function_exists('maybe_serialize')) {
+    function maybe_serialize($data) {
+        if (is_array($data) || is_object($data)) {
+            return serialize($data);
+        }
+        return $data;
+    }
+}
+
 if (!function_exists('taxonomy_exists')) {
     function taxonomy_exists($taxonomy) {
         return true;

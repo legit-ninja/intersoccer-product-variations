@@ -1469,6 +1469,46 @@ function intersoccer_wc_session_store_cache_delete_row($customer_id) {
 }
 
 /**
+ * Whether volatile session refresh must not run (add-to-cart, cart/checkout, Store API).
+ *
+ * @return bool
+ */
+function intersoccer_pv_wc_session_volatile_refresh_is_blocked() {
+    if (!empty($_REQUEST['add-to-cart'])) {
+        return true;
+    }
+    if (function_exists('did_action') && did_action('woocommerce_add_to_cart') > 0) {
+        return true;
+    }
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return true;
+    }
+    if (!empty($_REQUEST['wc-ajax'])) {
+        $wc_ajax = function_exists('wc_clean') ? wc_clean(wp_unslash((string) $_REQUEST['wc-ajax'])) : sanitize_text_field(wp_unslash((string) $_REQUEST['wc-ajax']));
+        $blocked = ['update_order_review', 'checkout', 'get_refreshed_fragments', 'add_to_cart', 'remove_from_cart', 'apply_coupon', 'remove_coupon'];
+        if (in_array($wc_ajax, $blocked, true)) {
+            return true;
+        }
+    }
+    return (bool) apply_filters('intersoccer_pv_block_wc_session_volatile_refresh', false);
+}
+
+/**
+ * @param string $key Session key name.
+ * @param mixed  $value Decoded value from get_session().
+ * @return bool
+ */
+function intersoccer_pv_wc_session_volatile_decoded_value_is_valid($key, $value) {
+    if ($key === 'cart' || $key === 'applied_coupons' || $key === 'removed_cart_contents') {
+        return is_array($value);
+    }
+    if ($key === 'coupon_discount_totals' || $key === 'coupon_discount_tax_totals' || $key === 'cart_totals') {
+        return is_array($value);
+    }
+    return true;
+}
+
+/**
  * Re-read volatile session keys from the DB row before this request saves the session.
  *
  * Product-page stash handlers load the session (and cart) at request start. A overlapping
@@ -1476,9 +1516,15 @@ function intersoccer_wc_session_store_cache_delete_row($customer_id) {
  * merge, shutdown would write the stale cart back. Drops the request-start object-cache
  * copy first (WC_Session_Handler::get_session uses wp_cache_get before the DB).
  *
+ * get_session() returns the stored row: each value is still a per-key serialized string
+ * (see WC_Abstract_Session::get / ::set). Decode with maybe_unserialize before set().
+ *
  * @return void
  */
 function intersoccer_refresh_wc_session_volatile_from_store() {
+    if (intersoccer_pv_wc_session_volatile_refresh_is_blocked()) {
+        return;
+    }
     if (!function_exists('WC') || !WC() || !WC()->session) {
         return;
     }
@@ -1499,20 +1545,28 @@ function intersoccer_refresh_wc_session_volatile_from_store() {
         return;
     }
     foreach (intersoccer_wc_session_volatile_keys_for_product_page_ajax() as $key) {
-        if (array_key_exists($key, $fresh)) {
-            $session->set($key, $fresh[$key]);
+        if (!array_key_exists($key, $fresh)) {
+            continue;
         }
+        $decoded = maybe_unserialize($fresh[$key]);
+        if (!intersoccer_pv_wc_session_volatile_decoded_value_is_valid($key, $decoded)) {
+            continue;
+        }
+        $session->set($key, $decoded);
     }
 }
 
 /**
  * Schedule a one-time shutdown merge immediately before WC_Session_Handler::save_data (priority 20).
  *
- * Only called from product-page stash/clear handlers — not add-to-cart or checkout.
+ * Only called from product-page stash AJAX callbacks — not add-to-cart or checkout.
  *
  * @return void
  */
 function intersoccer_schedule_wc_session_volatile_refresh_before_save() {
+    if (intersoccer_pv_wc_session_volatile_refresh_is_blocked()) {
+        return;
+    }
     if (!empty($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'])) {
         return;
     }
@@ -1605,7 +1659,6 @@ function intersoccer_stash_selected_player($product_id, array $payload) {
         'stashed_at' => time(),
     ];
     WC()->session->set(intersoccer_selected_player_session_key($product_id), $clean);
-    intersoccer_schedule_wc_session_volatile_refresh_before_save();
     return true;
 }
 
@@ -1625,7 +1678,6 @@ function intersoccer_clear_stashed_selected_player($product_id) {
     } else {
         WC()->session->set($key, null);
     }
-    intersoccer_schedule_wc_session_volatile_refresh_before_save();
 }
 
 /**
@@ -1709,6 +1761,7 @@ function intersoccer_store_selected_player_callback() {
     $index_empty = ($player_index === null || trim((string) $player_index) === '');
     if ($index_empty && $player_id === '') {
         intersoccer_clear_stashed_selected_player($product_id);
+        intersoccer_schedule_wc_session_volatile_refresh_before_save();
         wp_send_json_success(['message' => 'Player cleared', 'product_id' => $product_id, 'cleared' => true]);
     }
     $ok = intersoccer_stash_selected_player($product_id, [
@@ -1718,6 +1771,7 @@ function intersoccer_store_selected_player_callback() {
     if (!$ok) {
         wp_send_json_error(['message' => 'Unable to store player for this account']);
     }
+    intersoccer_schedule_wc_session_volatile_refresh_before_save();
     wp_send_json_success(['message' => 'Player stored', 'product_id' => $product_id]);
 }
 

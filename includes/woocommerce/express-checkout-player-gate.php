@@ -559,9 +559,6 @@ function intersoccer_stash_express_fields($product_id, $variation_id, array $sou
         'user_id' => (int) get_current_user_id(),
         'stashed_at' => time(),
     ]);
-    if (function_exists('intersoccer_schedule_wc_session_volatile_refresh_before_save')) {
-        intersoccer_schedule_wc_session_volatile_refresh_before_save();
-    }
     return true;
 }
 
@@ -596,9 +593,6 @@ function intersoccer_clear_stashed_express_fields($product_id) {
         WC()->session->__unset($key);
     } else {
         WC()->session->set($key, null);
-    }
-    if (function_exists('intersoccer_schedule_wc_session_volatile_refresh_before_save')) {
-        intersoccer_schedule_wc_session_volatile_refresh_before_save();
     }
 }
 
@@ -708,6 +702,9 @@ function intersoccer_store_express_fields_callback() {
     $stored = intersoccer_stash_express_fields($product_id, $variation_id, $_POST);
     if (!$stored) {
         intersoccer_clear_stashed_express_fields($product_id);
+    }
+    if (function_exists('intersoccer_schedule_wc_session_volatile_refresh_before_save')) {
+        intersoccer_schedule_wc_session_volatile_refresh_before_save();
     }
     wp_send_json_success(['product_id' => $product_id, 'cleared' => !$stored]);
 }
