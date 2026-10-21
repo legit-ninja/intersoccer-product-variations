@@ -2693,7 +2693,7 @@ msgstr ""
 
 #: includesoocommerce/program-manager.php:3779
 msgid "Camp Terms"
-msgstr "Conditions du camp"
+msgstr "Semaine de camp"
 
 #: includesoocommerce/program-manager.php:3780
 msgid "Camp Times"
