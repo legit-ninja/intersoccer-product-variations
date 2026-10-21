@@ -3209,3 +3209,7 @@ msgstr "Participant effacé"
 #: follow-up-6
 msgid "Unable to store player for this account"
 msgstr "Impossible d'enregistrer le participant pour ce compte"
+
+#: merge master #105
+msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
+msgstr "Les données de réservation sont encore en cours d'enregistrement. Veuillez patienter un instant, puis réessayez d'ajouter au panier."

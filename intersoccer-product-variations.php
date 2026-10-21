@@ -413,6 +413,7 @@ add_action('wp_enqueue_scripts', function () {
                         $course_display_strings,
                         [
                             'player_assignment' => $player_assignment_strings,
+                            'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
                         ]
                     ),
                 ]

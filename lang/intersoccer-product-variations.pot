@@ -3333,3 +3333,7 @@ msgstr ""
 
 msgid "Unable to store player for this account"
 msgstr ""
+
+msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
+msgstr ""
+

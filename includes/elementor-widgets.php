@@ -298,7 +298,10 @@ $intersoccer_elementor_product_page_cb = function () {
                     'Wednesday' => __('Wednesday', 'intersoccer-product-variations'),
                     'Thursday' => __('Thursday', 'intersoccer-product-variations'),
                     'Friday' => __('Friday', 'intersoccer-product-variations'),
-                ]); ?>
+                ]); ?>,
+                i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
+                    stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>
+                })
             });
             var latePickupI18n = window.intersoccerCheckout.latePickupI18n || {};
             var weekdayI18n = window.intersoccerCheckout.weekdays || {};
@@ -592,8 +595,8 @@ $intersoccer_elementor_product_page_cb = function () {
                     h.value = String(idx);
                     $targetForm[0].appendChild(h);
                 }
-                // Mirror player onto layout form + assigned_attendee hidden field for POST.
-                intersoccerApplyPlayerChoice(idx);
+                // Mirror player onto layout form + assigned_attendee hidden field for POST (no new stash on ATC).
+                intersoccerApplyPlayerChoice(idx, { skipStash: true });
             }
 
             /**
@@ -991,6 +994,204 @@ $intersoccer_elementor_product_page_cb = function () {
                 return '';
             };
             var isSubmitting = false;
+            var intersoccerPvLastSavedPlayerStashSig = '';
+            var intersoccerPvInFlightPlayerStashSig = '';
+            window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+            window.intersoccerPvPendingStashDeferreds = window.intersoccerPvPendingStashDeferreds || [];
+
+            function intersoccerPvPlayerStashSignature(selectedPlayer, playerId) {
+                var idx = intersoccerPlayerIndexChosen(selectedPlayer) ? String(selectedPlayer) : '';
+                return String(playerId || '') + '|' + idx;
+            }
+
+            function intersoccerPvSnapshotStashPendingBaseline() {
+                window.intersoccerPvStashPendingBeforeAtc = (window.intersoccerPvPendingStashAjax || []).slice();
+                window.intersoccerPvDeferredPendingBeforeAtc = (window.intersoccerPvPendingStashDeferreds || []).slice();
+                window.intersoccerPvStashPendingBaselineCaptured = true;
+            }
+
+            function intersoccerPvConsumeStashPendingBaseline() {
+                window.intersoccerPvStashPendingBaselineCaptured = false;
+                window.intersoccerPvStashPendingBeforeAtc = [];
+                window.intersoccerPvDeferredPendingBeforeAtc = [];
+            }
+
+            function intersoccerPvHasPendingStashForSubmitWait() {
+                if (window.intersoccerPvStashPendingBaselineCaptured) {
+                    var bx = window.intersoccerPvStashPendingBeforeAtc || [];
+                    var bd = window.intersoccerPvDeferredPendingBeforeAtc || [];
+                    var xhrPending = bx.some(function (xhr) {
+                        return xhr && xhr.state && xhr.state() === 'pending';
+                    });
+                    if (xhrPending) {
+                        return true;
+                    }
+                    return bd.some(function (dfd) {
+                        return dfd && dfd.state && dfd.state() === 'pending';
+                    });
+                }
+                return intersoccerPvHasPendingProductPageStashAjax();
+            }
+
+            function intersoccerPvWaitForPreClickStashAjax(options) {
+                var safetyMs = (options && typeof options.safetyMs === 'number')
+                    ? options.safetyMs
+                    : (typeof options === 'number' ? options : 60000);
+                return new Promise(function (resolve) {
+                    var deadline = Date.now() + safetyMs;
+                    (function tick() {
+                        if (!intersoccerPvHasPendingStashForSubmitWait()) {
+                            resolve({ timedOut: false });
+                            return;
+                        }
+                        if (Date.now() >= deadline) {
+                            resolve({ timedOut: true });
+                            return;
+                        }
+                        setTimeout(tick, 40);
+                    })();
+                });
+            }
+
+            function intersoccerPvStashSubmitWaitGuardKey() {
+                return String(intersoccerPvProductId);
+            }
+
+            function intersoccerPvIsStashSubmitWaitInProgress() {
+                var map = window.intersoccerPvStashSubmitWaitInProgress;
+                return !!(map && map[intersoccerPvStashSubmitWaitGuardKey()]);
+            }
+
+            function intersoccerPvRestoreStashSubmitWaitButtons($form) {
+                if (!$form || !$form.length) {
+                    return;
+                }
+                $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').each(function () {
+                    var $btn = $(this);
+                    if ($btn.data('intersoccerPvPreStashWaitDisabled') === undefined) {
+                        return;
+                    }
+                    var wasDisabled = $btn.data('intersoccerPvPreStashWaitDisabled');
+                    var hadDisabledClass = $btn.data('intersoccerPvPreStashWaitHadDisabledClass');
+                    $btn.prop('disabled', wasDisabled);
+                    if (hadDisabledClass) {
+                        $btn.addClass('disabled');
+                    } else {
+                        $btn.removeClass('disabled');
+                    }
+                    $btn.removeData('intersoccerPvPreStashWaitDisabled');
+                    $btn.removeData('intersoccerPvPreStashWaitHadDisabledClass');
+                });
+            }
+
+            function intersoccerPvSetStashSubmitWaitInProgress($form, active) {
+                if (!window.intersoccerPvStashSubmitWaitInProgress) {
+                    window.intersoccerPvStashSubmitWaitInProgress = {};
+                }
+                var key = intersoccerPvStashSubmitWaitGuardKey();
+                if (active) {
+                    window.intersoccerPvStashSubmitWaitInProgress[key] = true;
+                    if ($form && $form.length) {
+                        $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').each(function () {
+                            var $btn = $(this);
+                            if ($btn.data('intersoccerPvPreStashWaitDisabled') === undefined) {
+                                $btn.data('intersoccerPvPreStashWaitDisabled', $btn.prop('disabled'));
+                                $btn.data('intersoccerPvPreStashWaitHadDisabledClass', $btn.hasClass('disabled'));
+                            }
+                            $btn.prop('disabled', true).addClass('disabled');
+                        });
+                    }
+                } else {
+                    delete window.intersoccerPvStashSubmitWaitInProgress[key];
+                    intersoccerPvRestoreStashSubmitWaitButtons($form);
+                }
+            }
+            if (!window.intersoccerPvRegisterPendingProductPageStashDeferred) {
+                window.intersoccerPvRegisterPendingProductPageStashDeferred = function (deferred) {
+                    if (!deferred || typeof deferred.always !== 'function') {
+                        return deferred;
+                    }
+                    window.intersoccerPvPendingStashDeferreds.push(deferred);
+                    deferred.always(function () {
+                        var list = window.intersoccerPvPendingStashDeferreds;
+                        var idx = list.indexOf(deferred);
+                        if (idx >= 0) {
+                            list.splice(idx, 1);
+                        }
+                    });
+                    return deferred;
+                };
+            }
+            if (!window.intersoccerPvTrackProductPageStashAjax) {
+                window.intersoccerPvTrackProductPageStashAjax = function (jqXHR) {
+                    if (!jqXHR || typeof jqXHR.always !== 'function') {
+                        return jqXHR;
+                    }
+                    window.intersoccerPvPendingStashAjax.push(jqXHR);
+                    jqXHR.always(function () {
+                        var list = window.intersoccerPvPendingStashAjax;
+                        var idx = list.indexOf(jqXHR);
+                        if (idx >= 0) {
+                            list.splice(idx, 1);
+                        }
+                    });
+                    return jqXHR;
+                };
+            }
+            if (!window.intersoccerPvHasPendingProductPageStashAjax) {
+                window.intersoccerPvHasPendingProductPageStashAjax = function () {
+                    var deferredsPending = (window.intersoccerPvPendingStashDeferreds || []).some(function (dfd) {
+                        return dfd && dfd.state && dfd.state() === 'pending';
+                    });
+                    if (deferredsPending) {
+                        return true;
+                    }
+                    return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
+                        return xhr && xhr.state && xhr.state() === 'pending';
+                    });
+                };
+            }
+            if (!window.intersoccerPvGetStashWaitTimeoutMessage) {
+                window.intersoccerPvGetStashWaitTimeoutMessage = function () {
+                    var checkout = window.intersoccerCheckout || {};
+                    var i18n = checkout.i18n || {};
+                    return i18n.stash_wait_timeout || 'Booking data is still saving. Please wait a moment, then try Add to cart again.';
+                };
+            }
+            if (!window.intersoccerPvShowStashWaitTimeoutNotice) {
+                window.intersoccerPvShowStashWaitTimeoutNotice = function ($form) {
+                    var message = window.intersoccerPvGetStashWaitTimeoutMessage();
+                    var $notice = $('<div class="woocommerce-error intersoccer-pv-stash-wait-notice" role="alert"></div>').text(message);
+                    var $target = ($form && $form.length) ? $form : $('form.cart').first();
+                    if ($target.length) {
+                        $target.prepend($notice);
+                    } else {
+                        $('body').prepend($notice);
+                    }
+                    $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+                };
+            }
+            if (!window.intersoccerPvWaitForProductPageStashAjax) {
+                window.intersoccerPvWaitForProductPageStashAjax = function (options) {
+                    var safetyMs = (options && typeof options.safetyMs === 'number')
+                        ? options.safetyMs
+                        : (typeof options === 'number' ? options : 60000);
+                    return new Promise(function (resolve) {
+                        var deadline = Date.now() + safetyMs;
+                        (function tick() {
+                            if (!intersoccerPvHasPendingProductPageStashAjax()) {
+                                resolve({ timedOut: false });
+                                return;
+                            }
+                            if (Date.now() >= deadline) {
+                                resolve({ timedOut: true });
+                                return;
+                            }
+                            setTimeout(tick, 40);
+                        })();
+                    });
+                };
+            }
             var lastValidAvailableDays = null; // Cache last valid available days to prevent reset on player change
             
             // ENHANCEMENT: Player persistence state management
@@ -1040,7 +1241,8 @@ $intersoccer_elementor_product_page_cb = function () {
              * Persist choice, mirror value onto every attendee select for this product, update assigned_attendee on layout form, refresh button state.
              * Used by delegated change so duplicate Elementor/sticky selects all stay in sync.
              */
-            function intersoccerStashSelectedPlayer(selectedPlayer) {
+            function intersoccerStashSelectedPlayer(selectedPlayer, options) {
+                options = options || {};
                 if (typeof intersoccerCheckout === 'undefined' || !intersoccerCheckout.ajax_url) {
                     return;
                 }
@@ -1053,13 +1255,35 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (!playerId && intersoccerPlayerIndexChosen(selectedPlayer) && typeof selectedPlayer === 'string' && selectedPlayer.indexOf('-') !== -1) {
                     playerId = String(selectedPlayer);
                 }
-                jQuery.post(intersoccerCheckout.ajax_url, {
+                var sig = intersoccerPvPlayerStashSignature(selectedPlayer, playerId);
+                if (!options.force) {
+                    if (sig === intersoccerPvLastSavedPlayerStashSig || sig === intersoccerPvInFlightPlayerStashSig) {
+                        return;
+                    }
+                }
+                intersoccerPvInFlightPlayerStashSig = sig;
+                var jqXHR = jQuery.post(intersoccerCheckout.ajax_url, {
                     action: 'intersoccer_store_selected_player',
                     nonce: intersoccerCheckout.nonce,
                     product_id: intersoccerPvProductId,
                     player_index: intersoccerPlayerIndexChosen(selectedPlayer) ? selectedPlayer : '',
                     player_id: playerId
                 });
+                jqXHR.always(function () {
+                    if (intersoccerPvInFlightPlayerStashSig === sig) {
+                        intersoccerPvInFlightPlayerStashSig = '';
+                    }
+                });
+                jqXHR.done(function () {
+                    intersoccerPvLastSavedPlayerStashSig = sig;
+                });
+                jqXHR.fail(function () {
+                    if (intersoccerPvLastSavedPlayerStashSig === sig) {
+                        intersoccerPvLastSavedPlayerStashSig = '';
+                    }
+                });
+                intersoccerPvTrackProductPageStashAjax(jqXHR);
+                return jqXHR;
             }
 
             // Stash picked camp days and late pickup choice so Apple Pay / Google Pay can recover them
@@ -1075,7 +1299,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 var lpType = (typeof selectedLatePickupOption !== 'undefined') ? selectedLatePickupOption : '';
                 var lpDays = (typeof selectedLatePickupDays !== 'undefined' && lpType === 'single-days') ? selectedLatePickupDays : [];
-                jQuery.post(intersoccerCheckout.ajax_url, {
+                intersoccerPvTrackProductPageStashAjax(jQuery.post(intersoccerCheckout.ajax_url, {
                     action: 'intersoccer_store_express_fields',
                     nonce: intersoccerCheckout.nonce,
                     product_id: intersoccerPvProductId,
@@ -1083,10 +1307,11 @@ $intersoccer_elementor_product_page_cb = function () {
                     camp_days: days || [],
                     late_pickup_type: lpType || '',
                     late_pickup_days: lpDays
-                });
+                }));
             }
 
-            function intersoccerApplyPlayerChoice(selectedPlayer) {
+            function intersoccerApplyPlayerChoice(selectedPlayer, options) {
+                options = options || {};
                 playerPersistence.setPlayer(selectedPlayer);
                 var $syncSels = $('[data-intersoccer-product-id="' + intersoccerPvProductId + '"]').find('select.intersoccer-player-select[name="player_assignment"], select.player-select[name="player_assignment"]');
                 if (!$syncSels.length) {
@@ -1140,7 +1365,9 @@ $intersoccer_elementor_product_page_cb = function () {
                     } else if (idField) {
                         idField.remove();
                     }
-                    intersoccerStashSelectedPlayer(selectedPlayer);
+                    if (!options.skipStash) {
+                        intersoccerStashSelectedPlayer(selectedPlayer, options);
+                    }
                 } else {
                     if (existingField) {
                         existingField.remove();
@@ -1150,7 +1377,9 @@ $intersoccer_elementor_product_page_cb = function () {
                         clearId.remove();
                     }
                     // Player cleared: drop the server stash too, so express checkout cannot reuse it.
-                    intersoccerStashSelectedPlayer('');
+                    if (!options.skipStash) {
+                        intersoccerStashSelectedPlayer('');
+                    }
                 }
                 intersoccerPvDispatchUpdateButtonState();
                 var variationId = $lf.find('input[name="variation_id"]').val();
@@ -2058,55 +2287,12 @@ $intersoccer_elementor_product_page_cb = function () {
             }
             <?php endif; ?>
 
-            // Handle form submission (all WC forms for this product when camp/course + variable — sticky/duplicate layouts)
-            $pvForms.on('submit', function(e) {
-                debug('InterSoccer: Form submit event triggered');
-                
-                // Verify this is the product form, not the search form
-                var $currentForm = $(this);
-                if ($currentForm.hasClass('search_form') || $currentForm.attr('role') === 'search') {
-                    debugWarn('InterSoccer: Submit handler triggered on search form, ignoring');
-                    return; // Don't prevent default, let search form submit normally
-                }
-                
-                // Double-check: ensure this form has product form elements
-                if (!$currentForm.find('input[name="variation_id"], input[name="add-to-cart"], button.single_add_to_cart_button').length) {
-                    debugWarn('InterSoccer: Submit handler triggered on non-product form, ignoring');
-                    return; // Don't prevent default
-                }
-                
-                <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
-                // For camp and course products, validate before forcing standard POST submission
-                // Ensure we're using the product form, not the search form
-                var $productForm = $currentForm;
-                if ($productForm.hasClass('search_form') || $productForm.attr('role') === 'search') {
-                    debugError('InterSoccer: ERROR - Attempting to validate search form instead of product form!');
-                    // Try to find the actual product form
-                    $productForm = $('form.variations_form.cart, form.cart:not(.search_form), .woocommerce-product-details form:not(.search_form), .single-product form:not(.search_form)').first();
-                    if (!$productForm.length || !$productForm.find('input[name="variation_id"], input[name="add-to-cart"], button.single_add_to_cart_button').length) {
-                        debugError('InterSoccer: Could not find product form, aborting');
-                        e.preventDefault();
-                        e.stopImmediatePropagation();
-                        return false;
-                    }
-                    debug('InterSoccer: Found correct product form for validation:', $productForm[0]);
-                }
-                intersoccerEnsurePlayerIndexOnForm($productForm);
-                intersoccerEnsureCampDaysOnForm($productForm);
-                intersoccerEnsureLatePickupOnForm($productForm);
-                intersoccerEnsureVariationIdOnForm($productForm);
-                intersoccerEnsureVariationAttributesOnForm($productForm);
-
-                // Check if button is disabled (indicates form is not ready)
+            function intersoccerPvValidateCampCourseProductForm($productForm) {
                 var $submitButton = $productForm.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
                 if ($submitButton.length && ($submitButton.prop('disabled') || $submitButton.hasClass('disabled') || $submitButton.hasClass('wc-variation-selection-needed'))) {
                     debug('InterSoccer: ❌ Validation failed - submit button is disabled');
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
                     return false;
                 }
-                
-                // Validate required fields before submission
                 var variationId = $productForm.find('input[name="variation_id"]').val();
                 var $playerSelect = intersoccerGetPlayerSelectForThisProduct();
                 var playerAssignment = $playerSelect.length > 0 ? $playerSelect.val() : '';
@@ -2132,62 +2318,153 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 var bookingType = typeof window.intersoccerGetBookingTypeFromForm === 'function' ? window.intersoccerGetBookingTypeFromForm($productForm) : '';
                 var campDays = $productForm.find('input[name="camp_days[]"]').map(function() { return $(this).val(); }).get();
-                
-                // CRITICAL: Ensure assigned_attendee field exists BEFORE reading its value
-                // This must happen before validation to ensure the field is present
                 if (intersoccerPlayerIndexChosen(playerAssignment)) {
                     var existingField = $productForm[0].querySelector('input[name="assigned_attendee"]');
                     if (existingField) {
-                        // Field exists - just update the value
                         existingField.value = playerAssignment;
-                        debug('InterSoccer: Updated existing assigned_attendee field with value:', playerAssignment);
-                    } else {
-                        // Field doesn't exist - create it
+                    } else if ($productForm[0]) {
                         var assignedAttendeeInput = document.createElement('input');
                         assignedAttendeeInput.type = 'hidden';
                         assignedAttendeeInput.name = 'assigned_attendee';
                         assignedAttendeeInput.value = playerAssignment;
                         $productForm[0].appendChild(assignedAttendeeInput);
-                        debug('InterSoccer: Created assigned_attendee field with value:', playerAssignment);
                     }
                 }
-                
-                // NOW read the assigned_attendee value after ensuring the field exists
-                var $assignedAttendeeInput = $productForm.find('input[name="assigned_attendee"]');
-                var assignedAttendee = $assignedAttendeeInput.length > 0 ? $assignedAttendeeInput.val() : '';
-                
-                debug('InterSoccer: Validation - Variation ID:', variationId, 'Player:', playerAssignment, 'Attendee:', assignedAttendee);
-                
-                // Check if variation is selected
                 if (!variationId || variationId === '0' || variationId === '') {
-                    debug('InterSoccer: ❌ Validation failed - no variation selected');
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
                     alert('<?php echo esc_js(__('Please select a variation.', 'intersoccer-product-variations')); ?>');
                     return false;
                 }
-                
-                // Note: Course attendee validation is handled server-side in cart-calculations.php
-                // This prevents false positives from client-side validation timing issues
-                
-                // For single-day camps, require camp days
                 <?php if ($product_type === 'camp'): ?>
                 var isSingleDay = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
-                
                 if (isSingleDay && (!campDays || campDays.length === 0)) {
-                    debug('InterSoccer: ❌ Validation failed - no camp days selected for single-day camp');
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
                     alert('<?php echo esc_js(__('Please select at least one day for this single-day camp.', 'intersoccer-product-variations')); ?>');
                     return false;
                 }
                 <?php endif; ?>
+                return true;
+            }
+
+            function intersoccerPvScheduleNativeProductFormSubmit($productForm, e, afterNativeSubmit) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+                var currentUrl = window.location.href.split('?')[0];
+                var formAction = $productForm.attr('action');
+                var home_url = '<?php echo esc_js(home_url()); ?>';
+                if (!formAction || formAction === '' || formAction === '#' || formAction.indexOf('?') !== -1 || formAction === home_url || formAction === home_url + '/') {
+                    $productForm.attr('action', currentUrl);
+                } else if (formAction === home_url || formAction === home_url + '/') {
+                    $productForm.attr('action', currentUrl);
+                }
+                $productForm.attr('method', 'post');
+                var wpRefererField = $productForm.find('input[name="_wp_http_referer"]');
+                if (!wpRefererField.length) {
+                    $productForm.append($('<input>', {
+                        type: 'hidden',
+                        name: '_wp_http_referer',
+                        value: currentUrl
+                    }));
+                }
+                var formElement = $productForm[0];
+                setTimeout(function () {
+                    try {
+                        try {
+                            HTMLFormElement.prototype.submit.call(formElement);
+                        } catch (error) {
+                            debugError('InterSoccer Form: Error during form submission:', error);
+                            try {
+                                formElement.submit();
+                            } catch (fallbackError) {
+                                debugError('InterSoccer Form: Fallback form submission failed:', fallbackError);
+                            }
+                        }
+                    } finally {
+                        if (typeof afterNativeSubmit === 'function') {
+                            afterNativeSubmit();
+                        }
+                    }
+                }, 10);
+            }
+
+            function intersoccerPvResubmitCampCourseFormAfterStashWait($productForm) {
+                intersoccerPvRestoreStashSubmitWaitButtons($productForm);
+                intersoccerEnsurePlayerIndexOnForm($productForm);
+                intersoccerEnsureCampDaysOnForm($productForm);
+                intersoccerEnsureLatePickupOnForm($productForm);
+                intersoccerEnsureVariationIdOnForm($productForm);
+                intersoccerEnsureVariationAttributesOnForm($productForm);
+                if (!intersoccerPvValidateCampCourseProductForm($productForm)) {
+                    return false;
+                }
+                intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {
+                    intersoccerPvSetStashSubmitWaitInProgress($productForm, false);
+                });
+                return true;
+            }
+
+            // Handle form submission (all WC forms for this product when camp/course + variable — sticky/duplicate layouts)
+            $pvForms.on('submit', function(e) {
+                debug('InterSoccer: Form submit event triggered');
                 
-                // All validations passed, proceed with standard POST submission
+                // Verify this is the product form, not the search form
+                var $currentForm = $(this);
+                if ($currentForm.hasClass('search_form') || $currentForm.attr('role') === 'search') {
+                    debugWarn('InterSoccer: Submit handler triggered on search form, ignoring');
+                    return; // Don't prevent default, let search form submit normally
+                }
+                
+                // Double-check: ensure this form has product form elements
+                if (!$currentForm.find('input[name="variation_id"], input[name="add-to-cart"], button.single_add_to_cart_button').length) {
+                    debugWarn('InterSoccer: Submit handler triggered on non-product form, ignoring');
+                    return; // Don't prevent default
+                }
+
+                <?php if (in_array($product_type, ['camp', 'course'], true) && $is_variable): ?>
+                if (intersoccerPvIsStashSubmitWaitInProgress()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+                // Use the click-time snapshot when this submit came from an Add click; otherwise snapshot now.
+                if (!window.intersoccerPvStashPendingBaselineCaptured) {
+                    intersoccerPvSnapshotStashPendingBaseline();
+                }
+                if (intersoccerPvHasPendingStashForSubmitWait()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    var $stashWaitForm = $currentForm;
+                    $stashWaitForm.find('.intersoccer-pv-stash-wait-notice').remove();
+                    intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, true);
+                    intersoccerPvWaitForPreClickStashAjax({ safetyMs: 60000 }).then(function (result) {
+                        intersoccerPvConsumeStashPendingBaseline();
+                        if (result && result.timedOut) {
+                            intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, false);
+                            if (window.intersoccerPvShowStashWaitTimeoutNotice) {
+                                window.intersoccerPvShowStashWaitTimeoutNotice($stashWaitForm);
+                            }
+                            return;
+                        }
+                        var stashWaitResubmitScheduled = false;
+                        try {
+                            stashWaitResubmitScheduled = intersoccerPvResubmitCampCourseFormAfterStashWait($stashWaitForm);
+                        } finally {
+                            if (!stashWaitResubmitScheduled) {
+                                intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, false);
+                            }
+                        }
+                    });
+                    return false;
+                }
+                intersoccerPvConsumeStashPendingBaseline();
+                <?php endif; ?>
+                
+                <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
+                // For camp and course products, validate before forcing standard POST submission
                 // Ensure we're using the product form, not the search form
                 var $productForm = $currentForm;
                 if ($productForm.hasClass('search_form') || $productForm.attr('role') === 'search') {
-                    debugError('InterSoccer: ERROR - Attempting to submit search form instead of product form!');
+                    debugError('InterSoccer: ERROR - Attempting to validate search form instead of product form!');
                     // Try to find the actual product form
                     $productForm = $('form.variations_form.cart, form.cart:not(.search_form), .woocommerce-product-details form:not(.search_form), .single-product form:not(.search_form)').first();
                     if (!$productForm.length || !$productForm.find('input[name="variation_id"], input[name="add-to-cart"], button.single_add_to_cart_button').length) {
@@ -2196,98 +2473,22 @@ $intersoccer_elementor_product_page_cb = function () {
                         e.stopImmediatePropagation();
                         return false;
                     }
-                    debug('InterSoccer: Found correct product form:', $productForm[0]);
+                    debug('InterSoccer: Found correct product form for validation:', $productForm[0]);
                 }
-                
-                // Ensure form action is set to current product page URL
-                // This ensures WooCommerce can determine the correct referer for redirects
-                var currentUrl = window.location.href.split('?')[0]; // Remove query params
-                var formAction = $productForm.attr('action');
-                
-                debug('===== InterSoccer: Form Submission Debug =====');
-                debug('InterSoccer Form: window.location.href:', window.location.href);
-                debug('InterSoccer Form: currentUrl (cleaned):', currentUrl);
-                debug('InterSoccer Form: Form action (before):', formAction);
-                debug('InterSoccer Form: Form method:', $form.attr('method'));
-                
-                // Set form action to current page if not already set or if it's empty/invalid
-                var home_url = '<?php echo esc_js(home_url()); ?>';
-                if (!formAction || formAction === '' || formAction === '#' || formAction.indexOf('?') !== -1 || formAction === home_url || formAction === home_url + '/') {
-                    $productForm.attr('action', currentUrl);
-                    debug('InterSoccer Form: Set form action to current page:', currentUrl);
-                } else {
-                    debug('InterSoccer Form: Form action already set:', formAction);
-                    // If form action is home page, update it to product page
-                    if (formAction === home_url || formAction === home_url + '/') {
-                        $productForm.attr('action', currentUrl);
-                        debug('InterSoccer Form: Form action was home page, updated to product page:', currentUrl);
-                    }
+                intersoccerEnsurePlayerIndexOnForm($productForm);
+                intersoccerEnsureCampDaysOnForm($productForm);
+                intersoccerEnsureLatePickupOnForm($productForm);
+                intersoccerEnsureVariationIdOnForm($productForm);
+                intersoccerEnsureVariationAttributesOnForm($productForm);
+
+                if (!intersoccerPvValidateCampCourseProductForm($productForm)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
                 }
-                
-                // Ensure form method is POST
-                $productForm.attr('method', 'post');
-                
-                // Log all form data before submission
-                var formData = {};
-                $productForm.serializeArray().forEach(function(item) {
-                    if (formData[item.name]) {
-                        if (Array.isArray(formData[item.name])) {
-                            formData[item.name].push(item.value);
-                        } else {
-                            formData[item.name] = [formData[item.name], item.value];
-                        }
-                    } else {
-                        formData[item.name] = item.value;
-                    }
-                });
-                debug('InterSoccer Form: Form data to be submitted:', formData);
-                
-                // Check for _wp_http_referer field
-                var wpRefererField = $productForm.find('input[name="_wp_http_referer"]');
-                if (wpRefererField.length) {
-                    debug('InterSoccer Form: _wp_http_referer field found, value:', wpRefererField.val());
-                } else {
-                    debug('InterSoccer Form: _wp_http_referer field NOT found, adding it');
-                    // Add _wp_http_referer field to ensure WooCommerce gets correct referer
-                    $productForm.append($('<input>', {
-                        type: 'hidden',
-                        name: '_wp_http_referer',
-                        value: currentUrl
-                    }));
-                }
-                
-                // Stop all other handlers from executing (like v1.11.22)
-                e.stopImmediatePropagation();
-                
                 debug('InterSoccer Form: ✅ Validation passed - Forcing standard POST submission for <?php echo $product_type; ?> product');
-                
-                // Get the actual form element from the product form
-                var formElement = $productForm[0];
-                
-                // Log final form state before submission
-                debug('InterSoccer Form: Final form action:', formElement.action);
-                debug('InterSoccer Form: Final form method:', formElement.method);
-                debug('InterSoccer Form: Form element:', formElement);
-                debug('InterSoccer Form: Form classes:', formElement.className);
-                
-                // Submit the product form natively (bypassing all jQuery handlers)
-                // This matches v1.11.22 behavior which was working correctly
-                // Note: Validation is handled server-side in cart-calculations.php
-                setTimeout(function() {
-                    debug('InterSoccer Form: Native form submit executed');
-                    debug('InterSoccer Form: Submitting to action:', formElement.action);
-                    debug('InterSoccer Form: Form method:', formElement.method);
-                    debug('===== InterSoccer: Form Submission Debug End =====');
-                    
-                    // Catch any JavaScript errors during submission
-                    try {
-                        formElement.submit();
-                    } catch (error) {
-                        debugError('InterSoccer Form: Error during form submission:', error);
-                    }
-                }, 10);
-                
-                return;  // Don't execute any code below this
+                intersoccerPvScheduleNativeProductFormSubmit($productForm, e);
+                return false;
                 <?php endif; ?>
                 
                 isSubmitting = true;
@@ -2329,6 +2530,13 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (!$productForm.length) {
                     $productForm = $form;
                 }
+                if (intersoccerPvIsStashSubmitWaitInProgress()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+                // Saves pending now are the only ones the submit may wait on (consumed by the submit handler).
+                intersoccerPvSnapshotStashPendingBaseline();
                 intersoccerEnsurePlayerIndexOnForm($productForm);
                 intersoccerEnsureCampDaysOnForm($productForm);
                 intersoccerEnsureLatePickupOnForm($productForm);
@@ -2355,6 +2563,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Check if button is disabled
                 if ($button.prop('disabled')) {
                     debug('InterSoccer: ❌ Button is DISABLED, preventing submission');
+                    intersoccerPvConsumeStashPendingBaseline();
                     e.preventDefault();
                     return false;
                 }
