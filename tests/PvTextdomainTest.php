@@ -89,6 +89,29 @@ if (!function_exists('restore_previous_locale')) {
     }
 }
 
+if (!function_exists('pv_textdomain_test_add_action')) {
+    function pv_textdomain_test_add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
+        $GLOBALS['intersoccer_pv_textdomain_test_actions'][$hook][$priority][] = [
+            'cb' => $callback,
+            'accepted_args' => $accepted_args,
+        ];
+    }
+}
+
+if (!function_exists('pv_textdomain_test_do_action')) {
+    function pv_textdomain_test_do_action($hook, ...$args) {
+        if (empty($GLOBALS['intersoccer_pv_textdomain_test_actions'][$hook])) {
+            return;
+        }
+        ksort($GLOBALS['intersoccer_pv_textdomain_test_actions'][$hook]);
+        foreach ($GLOBALS['intersoccer_pv_textdomain_test_actions'][$hook] as $callbacks) {
+            foreach ($callbacks as $item) {
+                call_user_func_array($item['cb'], array_slice($args, 0, (int) $item['accepted_args']));
+            }
+        }
+    }
+}
+
 if (!class_exists('WC_Order')) {
     class WC_Order {
         public function get_meta($key) {
@@ -138,6 +161,7 @@ class PvTextdomainTest extends TestCase {
         $GLOBALS['intersoccer_test_textdomain_loaded'] = [];
         $GLOBALS['intersoccer_test_textdomain_unload_reloadable'] = [];
         $GLOBALS['intersoccer_test_mo_translations'] = [];
+        $GLOBALS['intersoccer_pv_textdomain_test_actions'] = [];
         $GLOBALS['intersoccer_test_locale'] = 'en_US';
         unset($GLOBALS['intersoccer_pv_textdomain_locale']);
         $GLOBALS['intersoccer_test_is_admin'] = false;
@@ -154,6 +178,9 @@ class PvTextdomainTest extends TestCase {
     public function test_textdomain_loader_registered_on_init_not_plugins_loaded(): void {
         $src = file_get_contents(dirname(__DIR__) . '/includes/pv-textdomain.php');
         $this->assertStringContainsString("add_action('init', 'intersoccer_pv_load_textdomain_for_current_locale', 20);", $src);
+        $this->assertStringContainsString("add_action('wpml_language_has_switched', 'intersoccer_pv_load_textdomain_for_current_locale', 10, 0);", $src);
+        $this->assertStringContainsString("add_action('change_locale', 'intersoccer_pv_load_textdomain_for_current_locale', 10, 0);", $src);
+        $this->assertStringNotContainsString("add_action('plugins_loaded'", $src);
         $this->assertStringContainsString('unload_textdomain($domain, true)', $src);
         $this->assertStringContainsString('load_textdomain($domain, $mofile, $locale)', $src);
     }
@@ -181,6 +208,16 @@ class PvTextdomainTest extends TestCase {
         $loaded = $GLOBALS['intersoccer_test_textdomain_loaded']['intersoccer-product-variations'];
         $entries = self::readMoEntries($loaded['mofile']);
         $this->assertSame('Hinweis', $entries['Note']);
+    }
+
+    public function test_wpml_language_has_switched_reloads_textdomain_for_de_de(): void {
+        pv_textdomain_test_add_action('wpml_language_has_switched', 'intersoccer_pv_load_textdomain_for_current_locale', 10, 0);
+        $this->assertTrue(intersoccer_pv_load_textdomain_for_current_locale('fr_FR'));
+        $this->assertStringEndsWith('fr_FR.mo', $GLOBALS['intersoccer_test_textdomain_loaded']['intersoccer-product-variations']['mofile']);
+        $GLOBALS['intersoccer_test_locale'] = 'de_DE';
+        pv_textdomain_test_do_action('wpml_language_has_switched');
+        $this->assertSame('de_DE', $GLOBALS['intersoccer_pv_textdomain_locale']);
+        $this->assertStringEndsWith('de_DE.mo', $GLOBALS['intersoccer_test_textdomain_loaded']['intersoccer-product-variations']['mofile']);
     }
 
     public function test_explicit_locale_argument_used_not_only_determine_locale(): void {
