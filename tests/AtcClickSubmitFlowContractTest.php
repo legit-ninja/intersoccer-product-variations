@@ -34,9 +34,11 @@ class AtcClickSubmitFlowContractTest extends TestCase
     {
         $php = $this->elementorWidgetsSource();
         $this->assertStringContainsString('intersoccerPvSnapshotStashPendingBaseline', $php);
+        $this->assertStringContainsString('intersoccerPvConsumeStashPendingBaseline', $php);
         $this->assertStringContainsString('intersoccerPvHasPendingStashForSubmitWait', $php);
         $this->assertStringContainsString('intersoccerPvWaitForPreClickStashAjax', $php);
         $this->assertStringContainsString('intersoccerPvStashPendingBeforeAtc', $php);
+        $this->assertStringContainsString('if (!window.intersoccerPvResubmitAfterStashWait)', $php);
         $this->assertStringNotContainsString('$stashWaitForm.trigger(\'submit\')', $php);
     }
 

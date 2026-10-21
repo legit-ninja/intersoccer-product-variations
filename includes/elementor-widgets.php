@@ -1000,6 +1000,12 @@ $intersoccer_elementor_product_page_cb = function () {
                 window.intersoccerPvStashPendingBaselineCaptured = true;
             }
 
+            function intersoccerPvConsumeStashPendingBaseline() {
+                window.intersoccerPvStashPendingBaselineCaptured = false;
+                window.intersoccerPvStashPendingBeforeAtc = [];
+                window.intersoccerPvDeferredPendingBeforeAtc = [];
+            }
+
             function intersoccerPvHasPendingStashForSubmitWait() {
                 if (window.intersoccerPvStashPendingBaselineCaptured) {
                     var bx = window.intersoccerPvStashPendingBeforeAtc || [];
@@ -2347,7 +2353,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
 
                 <?php if (in_array($product_type, ['camp', 'course'], true) && $is_variable): ?>
-                if (!window.intersoccerPvStashPendingBaselineCaptured) {
+                if (!window.intersoccerPvResubmitAfterStashWait) {
                     intersoccerPvSnapshotStashPendingBaseline();
                 }
                 if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingStashForSubmitWait()) {
@@ -2356,6 +2362,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     var $stashWaitForm = $currentForm;
                     $stashWaitForm.find('.intersoccer-pv-stash-wait-notice').remove();
                     intersoccerPvWaitForPreClickStashAjax({ safetyMs: 60000 }).then(function (result) {
+                        intersoccerPvConsumeStashPendingBaseline();
                         if (result && result.timedOut) {
                             if (window.intersoccerPvShowStashWaitTimeoutNotice) {
                                 window.intersoccerPvShowStashWaitTimeoutNotice($stashWaitForm);
@@ -2368,6 +2375,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     });
                     return false;
                 }
+                intersoccerPvConsumeStashPendingBaseline();
                 <?php endif; ?>
                 
                 <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
