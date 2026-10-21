@@ -2276,18 +2276,58 @@ function intersoccer_pv_format_stored_order_date_for_display($text) {
  * @param string $text Stored value.
  * @return string
  */
+function intersoccer_pv_stored_english_order_date_token_pattern() {
+    return '/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}/';
+}
+
+/**
+ * Extract whole stored English date tokens from a comma-containing Holidays value.
+ *
+ * @param string $text Stored Holidays meta value.
+ * @return array<int,string>
+ */
+function intersoccer_pv_extract_stored_order_date_list_segments($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return [];
+    }
+
+    if (!preg_match_all(intersoccer_pv_stored_english_order_date_token_pattern(), $text, $matches)) {
+        return [];
+    }
+
+    return $matches[0];
+}
+
 function intersoccer_pv_format_stored_order_date_list_for_display($text) {
     $text = trim((string) $text);
     if ($text === '') {
         return '';
     }
 
-    if (strpos($text, ',') === false) {
+    $segments = intersoccer_pv_extract_stored_order_date_list_segments($text);
+    if ($segments === []) {
+        if (strpos($text, ',') !== false) {
+            return $text;
+        }
+
         return intersoccer_pv_format_stored_order_date_for_display($text);
     }
 
-    $parts = array_map('trim', explode(',', $text));
-    $formatted = array_map('intersoccer_pv_format_stored_order_date_for_display', $parts);
+    if (count($segments) === 1 && trim($segments[0]) === $text) {
+        return intersoccer_pv_format_stored_order_date_for_display($segments[0]);
+    }
+
+    $scratch = $text;
+    foreach ($segments as $segment) {
+        $scratch = str_replace($segment, '', $scratch);
+    }
+    $scratch = preg_replace('/[\s,]+/', '', $scratch);
+    if ($scratch !== '') {
+        return $text;
+    }
+
+    $formatted = array_map('intersoccer_pv_format_stored_order_date_for_display', $segments);
 
     return implode(', ', $formatted);
 }

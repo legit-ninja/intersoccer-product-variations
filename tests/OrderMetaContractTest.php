@@ -1005,13 +1005,47 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame($stored, $display);
     }
 
-    public function test_holidays_date_list_localized_for_customer_display() {
+    public function test_holidays_date_list_localized_with_distinct_years() {
         $GLOBALS['intersoccer_test_is_admin'] = false;
-        $stored = 'October 19, 2026, November 2, 2026';
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'Y-m-d';
+                }
+                return $translation;
+            };
+        }
+        $stored = 'October 19, 2027, November 2, 2028';
         $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
-        $this->assertStringNotContainsString('October 19, 2026', $display);
-        $this->assertStringContainsString('2026', $display);
-        $this->assertStringContainsString(',', $display);
+        $this->assertSame('2027-10-19, 2028-11-02', $display);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_holidays_single_english_date_localized() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'Y-m-d';
+                }
+                return $translation;
+            };
+        }
+        $stored = 'October 19, 2027';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertSame('2027-10-19', $display);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_holidays_unparseable_mixed_text_unchanged() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $stored = 'School break, October 19, 2027';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertSame($stored, $display);
     }
 
     public function test_note_display_key_translatable() {
