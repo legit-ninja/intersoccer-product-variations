@@ -132,16 +132,6 @@ async function openHarnessPage(browser, inlineScript, jqueryPath) {
 
   await page.setContent(buildHtml(inlineScript), { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.jQuery !== 'undefined' && window.jQuery('form.cart').length > 0);
-  await page.evaluate(() => {
-    window.setInterval(() => {
-      const btn = document.querySelector('button.single_add_to_cart_button');
-      if (btn) {
-        btn.disabled = false;
-        btn.removeAttribute('disabled');
-        btn.classList.remove('disabled', 'wc-variation-selection-needed');
-      }
-    }, 25);
-  });
 
   return {
     page,
@@ -322,7 +312,7 @@ async function main() {
         form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
       await h.page.waitForTimeout(120);
-      if (h.addPosts.length !== 0) failures.push(`(e) expected 0 add while waiting on Enter`);
+      if (h.addPosts.length !== 0) failures.push(`(e) expected 0 add POSTs while waiting on Enter, got ${h.addPosts.length}`);
       h.clearStashHold();
       if (releaseStash) releaseStash();
       await h.page.waitForTimeout(400);
@@ -374,10 +364,9 @@ async function main() {
       await enableAddButton(h.page);
       await h.page.click('button.single_add_to_cart_button', { force: true });
       await h.page.waitForTimeout(50);
-      await enableAddButton(h.page);
       await h.page.click('button.single_add_to_cart_button', { force: true });
       await h.page.waitForTimeout(80);
-      if (h.addPosts.length !== 0) failures.push(`(g) expected 0 add while stash held, got ${h.addPosts.length}`);
+      if (h.addPosts.length !== 0) failures.push(`(g) expected 0 add POSTs while stash held, got ${h.addPosts.length}`);
       h.clearStashHold();
       if (releaseStash) releaseStash();
       await h.page.waitForTimeout(400);
@@ -417,12 +406,67 @@ async function main() {
         form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
       await h.page.waitForTimeout(80);
-      if (h.addPosts.length !== 0) failures.push(`(h) expected 0 add while waiting on duplicate submit`);
+      if (h.addPosts.length !== 0) failures.push(`(h) expected 0 add POSTs while waiting on duplicate submit, got ${h.addPosts.length}`);
       h.clearStashHold();
       if (releaseStash) releaseStash();
       await h.page.waitForTimeout(400);
       if (h.addPosts.length !== 1) failures.push(`(h) expected 1 add after stash, got ${h.addPosts.length}`);
       { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(h) expected 1 add submission attempt, got ${n}`); }
+      await h.context.close();
+    }
+
+    // (i) Single click waits on pending save — button disabled during wait; one add after release
+    {
+      const h = await openHarnessPage(browser, inlineScript, jqueryPath);
+      let releaseStash;
+      h.setStashHold(
+        (route) =>
+          new Promise((resolve) => {
+            releaseStash = () => {
+              route.fulfill({ status: 200, contentType: 'text/plain', body: '0' });
+              resolve();
+            };
+          })
+      );
+      await h.page.selectOption('select[name="player_assignment"]', '0');
+      await h.page.evaluate(() => {
+        document.querySelector('select[name="player_assignment"]').dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await h.page.waitForTimeout(30);
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(120);
+      const btnDuring = await h.page.evaluate(() => {
+        const btn = document.querySelector('button.single_add_to_cart_button');
+        return btn ? { disabled: btn.disabled, hasDisabledClass: btn.classList.contains('disabled') } : null;
+      });
+      if (!btnDuring || btnDuring.disabled !== true) {
+        failures.push(
+          `(i) expected add button prop disabled true during wait, got ${JSON.stringify(btnDuring)} add POSTs=${h.addPosts.length}`
+        );
+      }
+      if (h.addPosts.length !== 0) {
+        failures.push(`(i) expected 0 add POSTs during wait, got ${h.addPosts.length}`);
+      }
+      h.clearStashHold();
+      if (releaseStash) releaseStash();
+      await h.page.waitForTimeout(400);
+      if (h.addPosts.length !== 1) {
+        failures.push(`(i) expected 1 add POST after stash release, got ${h.addPosts.length}`);
+      }
+      {
+        const n = await addAttempts(h.page);
+        if (n !== 1) failures.push(`(i) expected 1 add submission attempt, got ${n} add POSTs=${h.addPosts.length}`);
+      }
+      const btnAfter = await h.page.evaluate(() => {
+        const btn = document.querySelector('button.single_add_to_cart_button');
+        return btn ? { disabled: btn.disabled, hasDisabledClass: btn.classList.contains('disabled') } : null;
+      });
+      if (!btnAfter || btnAfter.disabled !== false || btnAfter.hasDisabledClass) {
+        failures.push(
+          `(i) expected add button enabled after wait add (prop disabled false, no .disabled class), got ${JSON.stringify(btnAfter)} add POSTs=${h.addPosts.length}`
+        );
+      }
       await h.context.close();
     }
   } finally {
@@ -433,7 +477,7 @@ async function main() {
     console.error('FAILURES:\n' + failures.join('\n'));
     process.exit(1);
   }
-  console.log('OK: all browser ATC stash flow assertions passed (8 scenarios).');
+  console.log('OK: all browser ATC stash flow assertions passed (9 scenarios).');
   process.exit(0);
 }
 
