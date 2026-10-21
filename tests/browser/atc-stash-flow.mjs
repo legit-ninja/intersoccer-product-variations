@@ -285,6 +285,11 @@ async function main() {
       const notice = await h.page.locator('.intersoccer-pv-stash-wait-notice').textContent().catch(() => '');
       if (!notice || !notice.includes(TIMEOUT_NOTICE)) failures.push(`(d) timeout notice missing: ${notice}`);
       if (h.addPosts.length !== 0) failures.push(`(d) expected 0 add on timeout, got ${h.addPosts.length}`);
+      const guardCleared = await h.page.evaluate(() => {
+        const map = window.intersoccerPvStashSubmitWaitInProgress || {};
+        return !Object.values(map).some((v) => v === true);
+      });
+      if (!guardCleared) failures.push('(d) stash submit wait guard not cleared after timeout');
       await h.context.close();
     }
 
@@ -347,6 +352,79 @@ async function main() {
       { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(f) expected 1 add submission attempt, got ${n}`); }
       await h.context.close();
     }
+
+    // (g) Double-click during stash wait — second click blocked; later add still works
+    {
+      const h = await openHarnessPage(browser, inlineScript, jqueryPath);
+      let releaseStash;
+      h.setStashHold(
+        (route) =>
+          new Promise((resolve) => {
+            releaseStash = () => {
+              route.fulfill({ status: 200, contentType: 'text/plain', body: '0' });
+              resolve();
+            };
+          })
+      );
+      await h.page.selectOption('select[name="player_assignment"]', '0');
+      await h.page.evaluate(() => {
+        document.querySelector('select[name="player_assignment"]').dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await h.page.waitForTimeout(30);
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(50);
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(80);
+      if (h.addPosts.length !== 0) failures.push(`(g) expected 0 add while stash held, got ${h.addPosts.length}`);
+      h.clearStashHold();
+      if (releaseStash) releaseStash();
+      await h.page.waitForTimeout(400);
+      if (h.addPosts.length !== 1) failures.push(`(g) expected 1 add after stash, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(g) expected 1 add submission attempt after first add, got ${n}`); }
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(200);
+      if (h.addPosts.length !== 2) failures.push(`(g) expected 2 add POSTs after second legitimate click, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 2) failures.push(`(g) expected 2 add submission attempts total, got ${n}`); }
+      await h.context.close();
+    }
+
+    // (h) Enter/submit during stash wait — second submit blocked; one add after release
+    {
+      const h = await openHarnessPage(browser, inlineScript, jqueryPath);
+      let releaseStash;
+      h.setStashHold(
+        (route) =>
+          new Promise((resolve) => {
+            releaseStash = () => {
+              route.fulfill({ status: 200, contentType: 'text/plain', body: '0' });
+              resolve();
+            };
+          })
+      );
+      await h.page.selectOption('select[name="player_assignment"]', '0');
+      await h.page.evaluate(() => {
+        document.querySelector('select[name="player_assignment"]').dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await h.page.waitForTimeout(30);
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(50);
+      await h.page.evaluate(() => {
+        const form = document.getElementById('pv-form');
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      await h.page.waitForTimeout(80);
+      if (h.addPosts.length !== 0) failures.push(`(h) expected 0 add while waiting on duplicate submit`);
+      h.clearStashHold();
+      if (releaseStash) releaseStash();
+      await h.page.waitForTimeout(400);
+      if (h.addPosts.length !== 1) failures.push(`(h) expected 1 add after stash, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(h) expected 1 add submission attempt, got ${n}`); }
+      await h.context.close();
+    }
   } finally {
     await browser.close();
   }
@@ -355,7 +433,7 @@ async function main() {
     console.error('FAILURES:\n' + failures.join('\n'));
     process.exit(1);
   }
-  console.log('OK: all browser ATC stash flow assertions passed (6 scenarios).');
+  console.log('OK: all browser ATC stash flow assertions passed (8 scenarios).');
   process.exit(0);
 }
 

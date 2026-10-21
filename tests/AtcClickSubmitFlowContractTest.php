@@ -38,7 +38,14 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('intersoccerPvHasPendingStashForSubmitWait', $php);
         $this->assertStringContainsString('intersoccerPvWaitForPreClickStashAjax', $php);
         $this->assertStringContainsString('intersoccerPvStashPendingBeforeAtc', $php);
-        $this->assertStringContainsString('if (!window.intersoccerPvResubmitAfterStashWait && !window.intersoccerPvStashPendingBaselineCaptured)', $php);
+        $this->assertStringContainsString('intersoccerPvIsStashSubmitWaitInProgress', $php);
+        $this->assertStringContainsString('intersoccerPvSetStashSubmitWaitInProgress', $php);
+        $this->assertStringContainsString('intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, true)', $php);
+        $this->assertStringContainsString('intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, false)', $php);
+        $this->assertStringContainsString('intersoccerPvPreStashWaitDisabled', $php);
+        $this->assertStringContainsString('function intersoccerPvScheduleNativeProductFormSubmit($productForm, e, afterNativeSubmit)', $php);
+        $this->assertStringContainsString('intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {', $php);
+        $this->assertStringNotContainsString('intersoccerPvResubmitAfterStashWait', $php);
         $this->assertStringNotContainsString('$stashWaitForm.trigger(\'submit\')', $php);
     }
 
@@ -49,7 +56,7 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('e.preventDefault()', $php);
         $this->assertStringContainsString('HTMLFormElement.prototype.submit.call(formElement)', $php);
         $this->assertStringContainsString('intersoccerPvResubmitCampCourseFormAfterStashWait', $php);
-        $this->assertStringContainsString('intersoccerPvScheduleNativeProductFormSubmit($productForm, null)', $php);
+        $this->assertStringContainsString('intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {', $php);
     }
 
     public function testStashWaitTimeoutStringStillLocalizedInWidgetScript(): void
