@@ -5,10 +5,17 @@
 (function($) {
     'use strict';
 
-    const playerMessages = (window.intersoccerCheckout && window.intersoccerCheckout.i18n && window.intersoccerCheckout.i18n.player_assignment) || {};
+    const checkoutI18n = (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {};
+    const playerMessages = checkoutI18n.player_assignment || {};
     const getPlayerMessage = (key, fallback) => {
         if (playerMessages && Object.prototype.hasOwnProperty.call(playerMessages, key)) {
             return playerMessages[key];
+        }
+        return fallback;
+    };
+    const getCourseLabel = (key, fallback) => {
+        if (checkoutI18n && Object.prototype.hasOwnProperty.call(checkoutI18n, key) && checkoutI18n[key]) {
+            return checkoutI18n[key];
         }
         return fallback;
     };
@@ -349,18 +356,18 @@
             let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
                 const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
-                html += `<p><strong>Start Date:</strong> ${startDate}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}:</strong> ${startDate}</p>`;
             }
             if (courseData.end_date) {
                 const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
-                html += `<p><strong>End Date:</strong> ${endDate}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}:</strong> ${endDate}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
                 const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
-                html += `<p><strong>Holidays (No Session):</strong> ${holidays}</p>`;
+                html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}:</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
-                html += `<p><strong>Remaining Sessions:</strong> ${courseData.remaining_sessions}`;
+                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}:</strong> ${courseData.remaining_sessions}`;
                 if (courseData.total_sessions) {
                     html += ` of ${courseData.total_sessions}`;
                 }
@@ -388,7 +395,7 @@
             // Check day selection for single-day camps
             const bookingType = $form.find('select[name="attribute_pa_booking-type"]').val();
             if (bookingType === 'single-days' && this.state.selectedDays.length === 0) {
-                this.showError('days', 'Please select at least one day.');
+                this.showError('days', getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.'));
                 return false;
             }
             */

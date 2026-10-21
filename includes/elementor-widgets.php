@@ -1502,7 +1502,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     if (isSubmitting) {
                         $dayNotification.hide().css('display', 'none');
                     } else if (actuallyCheckedCount === 0) {
-                        $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                        $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                     } else {
                         $dayNotification.hide();
                     }
@@ -1526,7 +1526,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         var $dayNotification = $daySelection.find('.intersoccer-day-notification');
                         if (!isSubmitting) {
                             if (selectedDays.length === 0) {
-                                $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                                $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                             } else {
                                 $dayNotification.hide();
                             }
@@ -2019,7 +2019,7 @@ $intersoccer_elementor_product_page_cb = function () {
                             $dayNotification.hide();
                         } else if (isSingleDayBooking && !daysSelected) {
                             $attendeeNotification.hide();
-                            $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                            $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                         } else {
                             // Variation not selected or other issue
                             $attendeeNotification.hide();
