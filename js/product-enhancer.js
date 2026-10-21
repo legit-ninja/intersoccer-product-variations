@@ -6,6 +6,22 @@
     'use strict';
 
     window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+    window.intersoccerPvPendingStashDeferreds = window.intersoccerPvPendingStashDeferreds || [];
+
+    function intersoccerPvRegisterPendingProductPageStashDeferred(deferred) {
+        if (!deferred || typeof deferred.always !== 'function') {
+            return deferred;
+        }
+        window.intersoccerPvPendingStashDeferreds.push(deferred);
+        deferred.always(function () {
+            const list = window.intersoccerPvPendingStashDeferreds;
+            const idx = list.indexOf(deferred);
+            if (idx >= 0) {
+                list.splice(idx, 1);
+            }
+        });
+        return deferred;
+    }
 
     function intersoccerPvTrackProductPageStashAjax(jqXHR) {
         if (!jqXHR || typeof jqXHR.always !== 'function') {
@@ -23,6 +39,12 @@
     }
 
     function intersoccerPvHasPendingProductPageStashAjax() {
+        const deferredsPending = (window.intersoccerPvPendingStashDeferreds || []).some(function (dfd) {
+            return dfd && dfd.state && dfd.state() === 'pending';
+        });
+        if (deferredsPending) {
+            return true;
+        }
         return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
             return xhr && xhr.state && xhr.state() === 'pending';
         });
@@ -43,6 +65,7 @@
     }
 
     window.intersoccerPvTrackProductPageStashAjax = intersoccerPvTrackProductPageStashAjax;
+    window.intersoccerPvRegisterPendingProductPageStashDeferred = intersoccerPvRegisterPendingProductPageStashDeferred;
     window.intersoccerPvHasPendingProductPageStashAjax = intersoccerPvHasPendingProductPageStashAjax;
     window.intersoccerPvWaitForProductPageStashAjax = intersoccerPvWaitForProductPageStashAjax;
 

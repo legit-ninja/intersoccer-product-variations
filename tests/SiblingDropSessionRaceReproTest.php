@@ -183,6 +183,46 @@ class SiblingDropSessionRaceReproTest extends TestCase
     }
 
     /** PV express-fields AJAX (camp days / late pickup), same session race as player stash. */
+    /** Legacy camp-day session AJAX (intersoccer_store_selected_days), same race as other stash handlers. */
+    private function runSelectedDaysStashAjax(SiblingDropRequestSession $s, array $campDays): void
+    {
+        WC()->session = $s;
+        $_POST = [
+            'nonce' => 'valid_nonce',
+            'product_id' => self::CAMP_ID,
+            'variation_id' => self::VAR_ID,
+            'camp_days' => $campDays,
+        ];
+        try {
+            intersoccer_store_selected_days_callback();
+        } catch (Exception $e) {
+            $this->assertSame('AJAX_EXIT', $e->getMessage());
+        }
+        $_POST = [];
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        WC()->session = null;
+        $s->shutdown_save();
+    }
+
+    private function bookSecondChildSelectedDays(string $discount, bool $overlap): int
+    {
+        $this->runStashAjax($this->startRequest(), 0);
+        $this->addToCartRequest(0);
+        $this->discountRequest($discount);
+        $daysChild2 = ['Tuesday'];
+        if ($overlap) {
+            $ajax = $this->startRequest();
+            $this->addToCartRequest(1);
+            $this->assertSame(2, $this->cartLinesNow(), 'add-to-cart for child 2 did commit 2 lines');
+            $this->runSelectedDaysStashAjax($ajax, $daysChild2);
+        } else {
+            $this->runSelectedDaysStashAjax($this->startRequest(), $daysChild2);
+            $this->addToCartRequest(1);
+        }
+        return $this->cartLinesNow();
+    }
+
     private function runExpressFieldsStashAjax(SiblingDropRequestSession $s, array $campDays): void
     {
         WC()->session = $s;
@@ -312,6 +352,11 @@ class SiblingDropSessionRaceReproTest extends TestCase
     public function testRaceExpressFieldsCouponSecondChildLineIsKept(): void
     {
         $this->assertSame(2, $this->bookSecondChildExpressFields('coupon', true), 'second sibling camp line dropped (coupon, overlapping express-fields stash AJAX)');
+    }
+
+    public function testRaceSelectedDaysCouponSecondChildLineIsKept(): void
+    {
+        $this->assertSame(2, $this->bookSecondChildSelectedDays('coupon', true), 'second sibling camp line dropped (coupon, overlapping store_selected_days AJAX)');
     }
 
     /** FAILS on 2.10.17 and master: the stale AJAX save drops child 2. */

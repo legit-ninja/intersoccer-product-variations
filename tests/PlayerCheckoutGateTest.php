@@ -142,4 +142,17 @@ class PlayerCheckoutGateTest extends TestCase
         $this->assertStringContainsString('intersoccerPvTrackProductPageStashAjax', $php);
         $this->assertStringContainsString('intersoccer_store_express_fields', $php);
     }
+
+    public function testCampDaySessionStashTracksPendingAjaxBeforeSubmit()
+    {
+        $php = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php');
+        $this->assertStringContainsString('intersoccer_store_selected_days', $php);
+        $this->assertStringContainsString('intersoccer_schedule_wc_session_volatile_refresh_before_save', $php);
+        $this->assertStringContainsString('intersoccerPvRegisterPendingProductPageStashDeferred', $php);
+        $this->assertStringContainsString('intersoccerPvTrackProductPageStashAjax', $php);
+
+        $js = file_get_contents(dirname(__DIR__) . '/js/product-enhancer.js');
+        $this->assertStringContainsString('intersoccerPvRegisterPendingProductPageStashDeferred', $js);
+        $this->assertStringContainsString('intersoccerPvPendingStashDeferreds', $js);
+    }
 }

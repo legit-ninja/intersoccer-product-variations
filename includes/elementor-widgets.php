@@ -982,6 +982,23 @@ $intersoccer_elementor_product_page_cb = function () {
             };
             var isSubmitting = false;
             window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+            window.intersoccerPvPendingStashDeferreds = window.intersoccerPvPendingStashDeferreds || [];
+            if (!window.intersoccerPvRegisterPendingProductPageStashDeferred) {
+                window.intersoccerPvRegisterPendingProductPageStashDeferred = function (deferred) {
+                    if (!deferred || typeof deferred.always !== 'function') {
+                        return deferred;
+                    }
+                    window.intersoccerPvPendingStashDeferreds.push(deferred);
+                    deferred.always(function () {
+                        var list = window.intersoccerPvPendingStashDeferreds;
+                        var idx = list.indexOf(deferred);
+                        if (idx >= 0) {
+                            list.splice(idx, 1);
+                        }
+                    });
+                    return deferred;
+                };
+            }
             if (!window.intersoccerPvTrackProductPageStashAjax) {
                 window.intersoccerPvTrackProductPageStashAjax = function (jqXHR) {
                     if (!jqXHR || typeof jqXHR.always !== 'function') {
@@ -1000,6 +1017,12 @@ $intersoccer_elementor_product_page_cb = function () {
             }
             if (!window.intersoccerPvHasPendingProductPageStashAjax) {
                 window.intersoccerPvHasPendingProductPageStashAjax = function () {
+                    var deferredsPending = (window.intersoccerPvPendingStashDeferreds || []).some(function (dfd) {
+                        return dfd && dfd.state && dfd.state() === 'pending';
+                    });
+                    if (deferredsPending) {
+                        return true;
+                    }
                     return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
                         return xhr && xhr.state && xhr.state() === 'pending';
                     });

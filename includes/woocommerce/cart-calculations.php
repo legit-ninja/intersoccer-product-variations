@@ -1081,25 +1081,37 @@ function intersoccer_add_price_update_script() {
                 });
 
                 // Store selected days in session for price HTML filter (non-blocking)
-                setTimeout(function() {
-                    $.ajax({
-                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
-                        type: 'POST',
-                        data: {
-                            action: 'intersoccer_store_selected_days',
-                            nonce: '<?php echo esc_js($nonce); ?>',
-                            product_id: <?php echo intval($product_id); ?>,
-                            variation_id: currentVariationId,
-                            camp_days: campDays
-                        },
-                        success: function(storeResponse) {
-                            console.log('InterSoccer: Days stored in session:', storeResponse);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('InterSoccer: Failed to store days in session:', status, error);
+                (function () {
+                    var stashDaysDeferred = $.Deferred();
+                    if (typeof window.intersoccerPvRegisterPendingProductPageStashDeferred === 'function') {
+                        window.intersoccerPvRegisterPendingProductPageStashDeferred(stashDaysDeferred);
+                    }
+                    setTimeout(function() {
+                        var stashXhr = $.ajax({
+                            url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                            type: 'POST',
+                            data: {
+                                action: 'intersoccer_store_selected_days',
+                                nonce: '<?php echo esc_js($nonce); ?>',
+                                product_id: <?php echo intval($product_id); ?>,
+                                variation_id: currentVariationId,
+                                camp_days: campDays
+                            },
+                            success: function(storeResponse) {
+                                console.log('InterSoccer: Days stored in session:', storeResponse);
+                            },
+                            error: function(xhr, status, error) {
+                                console.error('InterSoccer: Failed to store days in session:', status, error);
+                            }
+                        });
+                        if (typeof window.intersoccerPvTrackProductPageStashAjax === 'function') {
+                            window.intersoccerPvTrackProductPageStashAjax(stashXhr);
                         }
-                    });
-                }, 100);
+                        stashXhr.always(function () {
+                            stashDaysDeferred.resolve();
+                        });
+                    }, 100);
+                })();
 
                 // Update hidden inputs for camp days
                 $('input.intersoccer-camp-day-input').remove();
@@ -1325,6 +1337,7 @@ function intersoccer_calculate_camp_price_callback() {
         if ($product_id) {
             WC()->session->set('intersoccer_selected_days_' . $product_id, $camp_days);
             WC()->session->set('intersoccer_current_variation_' . $product_id, $variation_id);
+            intersoccer_schedule_wc_session_volatile_refresh_before_save();
             intersoccer_debug('InterSoccer: Stored ' . count($camp_days) . ' selected days in session for product ' . $product_id);
         }
     } elseif ($is_single_day && empty($camp_days)) {
@@ -1333,6 +1346,7 @@ function intersoccer_calculate_camp_price_callback() {
         if ($product_id) {
             WC()->session->set('intersoccer_selected_days_' . $product_id, null);
             WC()->session->set('intersoccer_current_variation_' . $product_id, null);
+            intersoccer_schedule_wc_session_volatile_refresh_before_save();
             intersoccer_debug('InterSoccer: Cleared session data for product ' . $product_id . ' (no days selected)');
         }
     }
@@ -1398,6 +1412,7 @@ function intersoccer_store_selected_days_callback() {
         if (function_exists('intersoccer_stash_selected_days')) {
             intersoccer_stash_selected_days($product_id, $variation_id, $camp_days);
         }
+        intersoccer_schedule_wc_session_volatile_refresh_before_save();
         intersoccer_debug('InterSoccer: Stored selected days in session for product ' . $product_id . ': ' . json_encode($camp_days));
         wp_send_json_success(['message' => 'Days stored', 'days' => $camp_days]);
     } else {
