@@ -19,6 +19,7 @@
  * FAIL (1 line left), the *Sequential* controls and the precondition PASS.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
@@ -642,9 +643,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         return $matrix;
     }
 
-    /**
-     * @dataProvider siblingBookingLocaleMatrix
-     */
+    #[DataProvider('siblingBookingLocaleMatrix')]
     public function testSequentialAndOverlappingStashKeepsLinesPerLocale(string $locale, int $firstProductId, int $secondProductId, string $scenario): void
     {
         $GLOBALS['intersoccer_test_wpml_current_language'] = $locale;
@@ -728,9 +727,8 @@ class SiblingDropSessionRaceReproTest extends TestCase
 
     /**
      * Handler started before add, add commits fully, handler finishes after (slow-server interleaving).
-     *
-     * @dataProvider slowServerHandlerMatrix
      */
+    #[DataProvider('slowServerHandlerMatrix')]
     public function testSlowServerHandlerStartedBeforeAddKeepsNewerLine(string $handler): void
     {
         MockMetaData::$data[self::VAR_ID]['attribute_pa_booking-type'] = 'single-days';
