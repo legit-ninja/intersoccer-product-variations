@@ -2353,7 +2353,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
 
                 <?php if (in_array($product_type, ['camp', 'course'], true) && $is_variable): ?>
-                if (!window.intersoccerPvResubmitAfterStashWait) {
+                // Use the click-time snapshot when this submit came from an Add click; otherwise snapshot now.
+                if (!window.intersoccerPvResubmitAfterStashWait && !window.intersoccerPvStashPendingBaselineCaptured) {
                     intersoccerPvSnapshotStashPendingBaseline();
                 }
                 if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingStashForSubmitWait()) {
@@ -2441,7 +2442,6 @@ $intersoccer_elementor_product_page_cb = function () {
             // Also handle button click directly (delegated: sticky bars / duplicate forms may place the button outside the primary $form)
             $(document.body).off('click.intersoccerPvAtc<?php echo (int) $product_id; ?>').on('click.intersoccerPvAtc<?php echo (int) $product_id; ?>', 'form:not(.search_form) button.single_add_to_cart_button, form:not(.search_form) input[type="submit"][name="add-to-cart"]', function(e) {
                 debug('=== InterSoccer: Buy Now button clicked ===');
-                intersoccerPvSnapshotStashPendingBaseline();
                 var $button = $(this);
                 var $productForm = $button.closest('form').not('.search_form');
                 if (!intersoccerPvFormIsForThisProduct($productForm)) {
@@ -2450,6 +2450,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (!$productForm.length) {
                     $productForm = $form;
                 }
+                // Saves pending now are the only ones the submit may wait on (consumed by the submit handler).
+                intersoccerPvSnapshotStashPendingBaseline();
                 intersoccerEnsurePlayerIndexOnForm($productForm);
                 intersoccerEnsureCampDaysOnForm($productForm);
                 intersoccerEnsureLatePickupOnForm($productForm);
@@ -2476,6 +2478,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Check if button is disabled
                 if ($button.prop('disabled')) {
                     debug('InterSoccer: ❌ Button is DISABLED, preventing submission');
+                    intersoccerPvConsumeStashPendingBaseline();
                     e.preventDefault();
                     return false;
                 }

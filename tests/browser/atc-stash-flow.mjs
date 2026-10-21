@@ -83,6 +83,22 @@ function buildHtml(inlineScript) {
 
 async function openHarnessPage(browser, inlineScript, jqueryPath) {
   const context = await browser.newContext();
+  // Count add submissions at the source: native submit() calls plus submit events whose default
+  // action was not prevented (a navigation can cancel an earlier POST before page.route sees it).
+  await context.addInitScript(() => {
+    window.__pvNativeSubmits = 0;
+    window.__pvDefaultSubmits = 0;
+    const nativeSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function () {
+      window.__pvNativeSubmits += 1;
+      return nativeSubmit.call(this);
+    };
+    window.addEventListener('submit', (ev) => {
+      setTimeout(() => {
+        if (!ev.defaultPrevented) window.__pvDefaultSubmits += 1;
+      }, 0);
+    }, true);
+  });
   const page = await context.newPage();
   const stashPosts = [];
   const addPosts = [];
@@ -108,7 +124,8 @@ async function openHarnessPage(browser, inlineScript, jqueryPath) {
     }
     if (req.method() === 'POST' && url.includes('/product/camp-test')) {
       addPosts.push(post);
-      return route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>ok</body></html>' });
+      // 204 keeps the current document, so the submit counters below survive the POST.
+      return route.fulfill({ status: 204, body: '' });
     }
     return route.fulfill({ status: 404, body: 'not found' });
   });
@@ -151,6 +168,14 @@ async function enableAddButton(page) {
   });
 }
 
+async function addAttempts(page) {
+  try {
+    return await page.evaluate(() => (window.__pvNativeSubmits || 0) + (window.__pvDefaultSubmits || 0));
+  } catch (e) {
+    return -1; // page navigated away; counters lost
+  }
+}
+
 function parseAddBody(post) {
   const out = {};
   for (const part of post.split('&')) {
@@ -187,6 +212,7 @@ async function main() {
       const elapsed = Date.now() - t0;
       const body = h.addPosts.length ? parseAddBody(h.addPosts[0]) : {};
       if (h.addPosts.length !== 1) failures.push(`(a) expected 1 add POST, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(a) expected 1 add submission attempt, got ${n}`); }
       if (h.stashPosts.length !== stashAfterChange) failures.push(`(a) expected no extra stash on click, stash ${h.stashPosts.length} vs ${stashAfterChange}`);
       if (elapsed > 1000) failures.push(`(a) add took ${elapsed}ms`);
       if (body.assigned_attendee !== '0') failures.push(`(a) assigned_attendee missing`);
@@ -207,6 +233,7 @@ async function main() {
       const body = h.addPosts.length ? parseAddBody(h.addPosts[0]) : {};
       if (h.stashPosts.length !== 0) failures.push(`(b) expected 0 stash, got ${h.stashPosts.length}`);
       if (h.addPosts.length !== 1) failures.push(`(b) expected 1 add, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(b) expected 1 add submission attempt, got ${n}`); }
       if (body.assigned_attendee !== '0') failures.push(`(b) assigned_attendee missing on add`);
       await h.context.close();
     }
@@ -237,6 +264,7 @@ async function main() {
       if (releaseStash) releaseStash();
       await h.page.waitForTimeout(400);
       if (h.addPosts.length !== 1) failures.push(`(c) expected 1 add after stash, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(c) expected 1 add submission attempt, got ${n}`); }
       await h.context.close();
     }
 
@@ -294,6 +322,29 @@ async function main() {
       if (releaseStash) releaseStash();
       await h.page.waitForTimeout(400);
       if (h.addPosts.length !== 1) failures.push(`(e) expected 1 add after stash, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(e) expected 1 add submission attempt, got ${n}`); }
+      await h.context.close();
+    }
+
+    // (f) Save started after the click snapshot (during click dispatch) must not block the submit
+    {
+      const h = await openHarnessPage(browser, inlineScript, jqueryPath);
+      h.setStashHold((route) => new Promise(() => {}));
+      await h.page.evaluate(() => {
+        const sel = document.querySelector('select[name="player_assignment"]');
+        sel.value = '0';
+        // Body listener added after the widget script runs after its delegated click handler.
+        document.body.addEventListener('click', () => {
+          sel.value = '1';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }, { once: true });
+      });
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(150);
+      if (h.stashPosts.length !== 1) failures.push(`(f) expected 1 click-time stash, got ${h.stashPosts.length}`);
+      if (h.addPosts.length !== 1) failures.push(`(f) expected 1 add without waiting on click-time stash, got ${h.addPosts.length}`);
+      { const n = await addAttempts(h.page); if (n !== 1) failures.push(`(f) expected 1 add submission attempt, got ${n}`); }
       await h.context.close();
     }
   } finally {
@@ -304,7 +355,7 @@ async function main() {
     console.error('FAILURES:\n' + failures.join('\n'));
     process.exit(1);
   }
-  console.log('OK: all browser ATC stash flow assertions passed (5 scenarios).');
+  console.log('OK: all browser ATC stash flow assertions passed (6 scenarios).');
   process.exit(0);
 }
 
