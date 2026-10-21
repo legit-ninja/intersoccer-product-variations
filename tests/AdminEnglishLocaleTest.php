@@ -90,7 +90,9 @@ class AdminEnglishLocaleTest extends TestCase {
     public function test_switched_locale_keeps_translations_in_admin() {
         $GLOBALS['intersoccer_test_is_admin'] = true;
         $GLOBALS['intersoccer_test_locale_switched'] = true;
+        $GLOBALS['wp_locale_switcher'] = new stdClass();
         $this->assertFalse(intersoccer_pv_is_admin_english_context());
+        unset($GLOBALS['wp_locale_switcher']);
     }
 
     public function test_other_domains_untouched() {
@@ -103,5 +105,12 @@ class AdminEnglishLocaleTest extends TestCase {
         $this->assertSame('Male', intersoccer_pv_admin_format_player_gender_label('male'));
         $this->assertSame('Male', intersoccer_pv_admin_format_player_gender_label('Garçon'));
         $this->assertSame('Female', intersoccer_pv_admin_format_player_gender_label('female'));
+    }
+
+    public function test_gettext_filter_safe_without_locale_switcher() {
+        unset($GLOBALS['wp_locale_switcher']);
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $this->assertTrue(intersoccer_pv_is_admin_english_context());
+        $this->assertSame('Assigned Attendee', intersoccer_pv_filter_gettext('Participant', 'Assigned Attendee', 'intersoccer-product-variations'));
     }
 }

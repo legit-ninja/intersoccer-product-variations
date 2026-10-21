@@ -932,4 +932,69 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('Camp Terms', $label);
     }
 
+    public function test_build_order_line_meta_stores_english_activity_type_key() {
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'course',
+            'cart_values' => [],
+        ]);
+        $this->assertArrayHasKey('Activity Type', $built['updates']);
+        $this->assertArrayNotHasKey("Type d'activité", $built['updates']);
+    }
+
+    public function test_activity_type_value_translates_with_localized_meta_key() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Course') {
+                return 'Cours';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Course', "Type d'activité");
+        $this->assertSame('Cours', $display);
+        MockFilters::reset();
+    }
+
+    public function test_localized_camp_week_index_hidden_from_customer_meta() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Index de semaine du camp'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Camp-Wochenindex'));
+    }
+
+    public function test_note_dash_mojibake_repaired_at_display() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $raw = 'Sie können jederzeit einsteigen ? die Preise werden anteilig berechnet';
+        $fixed = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
+        $this->assertStringContainsString('–', $fixed);
+        $this->assertStringNotContainsString(' ? ', $fixed);
+    }
+
+    public function test_email_context_translates_order_meta_label() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Camp Terms') {
+                return 'Semaine de camp';
+            }
+            return $translation;
+        };
+        $label = intersoccer_translate_stored_order_meta_display_key('Camp Terms', 'Camp Terms');
+        $this->assertSame('Semaine de camp', $label);
+        unset($GLOBALS['intersoccer_sensitive_order_meta_email']);
+        MockFilters::reset();
+    }
+
+    public function test_medical_none_translated_for_customer() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'None') {
+                return 'Aucune';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('None', 'Medical Conditions');
+        $this->assertSame('Aucune', $display);
+        MockFilters::reset();
+    }
+
 }

@@ -683,7 +683,7 @@ msgstr ""
 
 #: includes/elementor-widgets.php:120
 msgid "Select Days"
-msgstr ""
+msgstr "Tage auswählen"
 
 #: includes/elementor-widgets.php:2166
 msgid "Please select a variation."
@@ -1439,7 +1439,7 @@ msgstr "Name von Freund(in) oder Geschwister"
 
 #: includesoocommerce/campaign-checkout-field.php:244
 msgid "Guardian's email"
-msgstr ""
+msgstr "E-Mail des Elternteils"
 
 #: includesoocommerce/campaign-checkout-field.php:245
 msgid "parent@example.com"
@@ -1453,7 +1453,7 @@ msgstr "Bitte geben Sie an, zu wem Ihr Kind dazukommt."
 
 #: includesoocommerce/campaign-checkout-field.php:418
 msgid "Please enter the other guardian's email address."
-msgstr ""
+msgstr "Bitte geben Sie die E-Mail-Adresse des anderen Elternteils ein."
 
 #: includesoocommerce/campaign-checkout-field.php:488
 msgid "Joining With"
@@ -1462,7 +1462,7 @@ msgstr "Dabei mit"
 #: includesoocommerce/campaign-checkout-field.php:495
 #: includesoocommerce/campaign-leads.php:387
 msgid "Guardian email"
-msgstr ""
+msgstr "E-Mail des Elternteils"
 
 #: includesoocommerce/campaign-leads.php:377
 msgid "Campaign leads"
@@ -3069,3 +3069,39 @@ msgstr "Samstag"
 #: includes/woocommerce/order-meta-contract.php
 msgid "Sunday"
 msgstr "Sonntag"
+#: follow-up-3
+msgid "Select late pick up option (optional)"
+msgstr "Wählen Sie eine Option für die Spätabholung (optional)"
+#: follow-up-3
+msgid "No Late Pickup"
+msgstr "Keine Spätabholung"
+#: follow-up-3
+msgid "Single Days"
+msgstr "Einzelne Tage"
+#: follow-up-3
+msgid "No late pick up selected"
+msgstr "Keine Spätabholung ausgewählt"
+#: follow-up-3
+msgid "Full Week (5 days): "
+msgstr "Ganze Woche (5 Tage): "
+#: follow-up-3
+msgid "Select at least one day"
+msgstr "Wählen Sie mindestens einen Tag"
+#: follow-up-3
+msgid "%d day: "
+msgstr "%d Tag: "
+#: follow-up-3
+msgid "%d days: "
+msgstr "%d Tage: "
+#: follow-up-3
+msgid "Invalid selection"
+msgstr "Ungültige Auswahl"
+#: follow-up-3
+msgid "Player DOB"
+msgstr "Geburtsdatum des Spielers"
+#: follow-up-3
+msgid "Player Medical"
+msgstr "Medizinische Angaben des Spielers"
+#: follow-up-3
+msgid "j F Y"
+msgstr "j. F Y"

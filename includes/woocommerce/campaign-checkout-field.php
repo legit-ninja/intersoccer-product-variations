@@ -241,8 +241,8 @@ if (!function_exists('intersoccer_campaign_joining_field_args')) {
             : [];
         $label = __('Who is your child joining?', 'intersoccer-product-variations');
         $placeholder = __('Friend or sibling name', 'intersoccer-product-variations');
-        $email_label = intersoccer_campaign_translate('Guardian\'s email', __('Guardian\'s email', 'intersoccer-product-variations'));
-        $email_placeholder = intersoccer_campaign_translate('parent@example.com', __('parent@example.com', 'intersoccer-product-variations'));
+        $email_label = __('Guardian\'s email', 'intersoccer-product-variations');
+        $email_placeholder = __('parent@example.com', 'intersoccer-product-variations');
         $group_offer = intersoccer_campaign_active_group_offer();
         if ($group_offer) {
             $label = intersoccer_campaign_translate($group_offer['id'] . '_group_field_label', $group_offer['group_field_label'] ?: $label);

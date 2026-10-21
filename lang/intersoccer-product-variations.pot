@@ -3285,3 +3285,39 @@ msgstr ""
 #: includes/woocommerce/order-meta-contract.php
 msgid "Sunday"
 msgstr ""
+
+msgid "Select late pick up option (optional)"
+msgstr ""
+
+msgid "No Late Pickup"
+msgstr ""
+
+msgid "Single Days"
+msgstr ""
+
+msgid "No late pick up selected"
+msgstr ""
+
+msgid "Full Week (5 days): "
+msgstr ""
+
+msgid "Select at least one day"
+msgstr ""
+
+msgid "%d day: "
+msgstr ""
+
+msgid "%d days: "
+msgstr ""
+
+msgid "Invalid selection"
+msgstr ""
+
+msgid "Player DOB"
+msgstr ""
+
+msgid "Player Medical"
+msgstr ""
+
+msgid "j F Y"
+msgstr ""

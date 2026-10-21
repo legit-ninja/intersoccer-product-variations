@@ -146,6 +146,26 @@ function intersoccer_get_multilingual_plugin() {
  *
  * @return array<string,string>
  */
+/**
+ * Late pickup Elementor / inline JS strings (customer-facing).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_get_late_pickup_elementor_strings() {
+    return [
+        'selectOptional' => __('Select late pick up option (optional)', 'intersoccer-product-variations'),
+        'noLatePickup' => __('No Late Pickup', 'intersoccer-product-variations'),
+        'fullWeek' => __('Full Week', 'intersoccer-product-variations'),
+        'singleDays' => __('Single Days', 'intersoccer-product-variations'),
+        'noSelection' => __('No late pick up selected', 'intersoccer-product-variations'),
+        'fullWeekFiveDays' => __('Full Week (5 days): ', 'intersoccer-product-variations'),
+        'selectAtLeastOneDay' => __('Select at least one day', 'intersoccer-product-variations'),
+        'dayCountSingular' => __('%d day: ', 'intersoccer-product-variations'),
+        'dayCountPlural' => __('%d days: ', 'intersoccer-product-variations'),
+        'invalidSelection' => __('Invalid selection', 'intersoccer-product-variations'),
+    ];
+}
+
 function intersoccer_get_course_display_strings() {
     return [
         'start_date' => __('Start Date', 'intersoccer-product-variations'),

@@ -228,7 +228,7 @@ class OrderMetaPrivacyTest extends TestCase {
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
         $map = $this->meta_map($filtered);
         $this->assertSame('Peanut allergy', $map['Player Medical']);
-        $this->assertSame('2016-03-15', $map['Player DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_thank_you_page_redacts_pv_and_pm_meta_keys(): void {
@@ -244,10 +244,8 @@ class OrderMetaPrivacyTest extends TestCase {
             $this->assertStringContainsString('Medical information: provided', $map[$k]);
             $this->assertStringNotContainsString('Peanut', $map[$k]);
         }
-        foreach (['Attendee DOB', 'Player DOB'] as $k) {
-            $this->assertStringNotContainsString('2015-06-20', $map[$k]);
-            $this->assertStringNotContainsString('2016-03-15', $map[$k]);
-        }
+        $this->assertStringNotContainsString('2015-06-20', $map['Attendee DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_html_email_redacts_player_dob_and_player_medical(): void {
@@ -257,7 +255,7 @@ class OrderMetaPrivacyTest extends TestCase {
         intersoccer_sensitive_order_meta_end_email_context(false, false, false, null);
         $map = $this->meta_map($filtered);
         $this->assertStringNotContainsString('Peanut', $map['Player Medical']);
-        $this->assertStringNotContainsString('2016-03-15', $map['Player DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_plain_text_customer_email_redacts_both_naming_sets(): void {
@@ -279,7 +277,7 @@ class OrderMetaPrivacyTest extends TestCase {
         $this->end_plain_email();
         $map = $this->meta_map($filtered);
         $this->assertStringNotContainsString('Peanut', $map['Medical Conditions']);
-        $this->assertStringNotContainsString('2016-03-15', $map['Player DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_birth_year_when_camp_start_unknown(): void {

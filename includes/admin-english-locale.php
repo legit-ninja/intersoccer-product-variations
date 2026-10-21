@@ -10,6 +10,17 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Safe is_locale_switched() before WordPress boots $wp_locale_switcher (plugins_loaded fatals).
+ */
+function intersoccer_pv_wp_locale_switcher_is_active_switched() {
+    if (!isset($GLOBALS['wp_locale_switcher']) || !is_object($GLOBALS['wp_locale_switcher'])) {
+        return false;
+    }
+
+    return function_exists('is_locale_switched') && is_locale_switched();
+}
+
+/**
  * Whether the current request is a storefront-originated admin-ajax call.
  */
 function intersoccer_pv_is_frontend_originated_ajax() {
@@ -39,7 +50,7 @@ function intersoccer_pv_is_admin_english_context() {
         return false;
     }
 
-    if (function_exists('is_locale_switched') && is_locale_switched()) {
+    if (intersoccer_pv_wp_locale_switcher_is_active_switched()) {
         return false;
     }
 
