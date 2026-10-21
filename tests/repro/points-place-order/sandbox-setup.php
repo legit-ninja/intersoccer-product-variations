@@ -3,7 +3,7 @@
 $out = [];
 foreach (['pts', 'ctl'] as $tag) {
     $email = "repro-ppo-$tag@example.test";
-    $pw = 'Rp-' . substr(hash('sha256', $tag . 'ppo-local-only'), 0, 20);
+    $pw = wp_generate_password(24, false);
     if ($u = get_user_by('email', $email)) { $uid = $u->ID; wp_set_password($pw, $uid); }
     else { $uid = wp_insert_user(['user_login' => "repro-ppo-$tag", 'user_email' => $email, 'user_pass' => $pw, 'role' => 'customer', 'first_name' => 'Repro', 'last_name' => 'Parent']); }
     if (is_wp_error($uid)) { echo "ERR ", $uid->get_error_message(), "\n"; exit(1); }
