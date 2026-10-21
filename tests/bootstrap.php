@@ -137,6 +137,10 @@ if (!function_exists('add_shortcode')) {
 
 if (!function_exists('add_action')) {
     function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
+        if (!isset($GLOBALS['intersoccer_test_actions'][$hook][$priority])) {
+            $GLOBALS['intersoccer_test_actions'][$hook][$priority] = [];
+        }
+        $GLOBALS['intersoccer_test_actions'][$hook][$priority][] = $callback;
         return true;
     }
 }
@@ -155,7 +159,13 @@ if (!function_exists('intersoccer_info')) {
 
 if (!function_exists('intersoccer_warning')) {
     function intersoccer_warning($message) {
-        return;
+        $GLOBALS['intersoccer_test_warnings'][] = (string) $message;
+    }
+}
+
+if (!function_exists('intersoccer_error')) {
+    function intersoccer_error($message) {
+        $GLOBALS['intersoccer_test_errors'][] = (string) $message;
     }
 }
 
@@ -186,15 +196,38 @@ if (!class_exists('WP_Error')) {
     }
 }
 
+if (!function_exists('intersoccer_test_object_cache_get_store')) {
+    function &intersoccer_test_object_cache_get_store() {
+        if (!isset($GLOBALS['intersoccer_test_object_cache']) || !is_array($GLOBALS['intersoccer_test_object_cache'])) {
+            $GLOBALS['intersoccer_test_object_cache'] = [];
+        }
+        return $GLOBALS['intersoccer_test_object_cache'];
+    }
+}
+
 if (!function_exists('wp_cache_get')) {
     function wp_cache_get($key, $group = '', $force = false, &$found = null) {
-        $found = false;
-        return false;
+        $store = intersoccer_test_object_cache_get_store();
+        $found = isset($store[$group][$key]);
+        return $found ? $store[$group][$key] : false;
     }
 }
 
 if (!function_exists('wp_cache_set')) {
     function wp_cache_set($key, $data, $group = '', $expire = 0) {
+        $store = &intersoccer_test_object_cache_get_store();
+        $store[$group][$key] = $data;
+        return true;
+    }
+}
+
+if (!function_exists('wp_cache_add')) {
+    function wp_cache_add($key, $data, $group = '', $expire = 0) {
+        $store = intersoccer_test_object_cache_get_store();
+        if (isset($store[$group][$key])) {
+            return false;
+        }
+        $store[$group][$key] = $data;
         return true;
     }
 }
@@ -329,6 +362,16 @@ if (!function_exists('do_action')) {
             $GLOBALS['intersoccer_test_wpml_switch_language_count'] = (int) ($GLOBALS['intersoccer_test_wpml_switch_language_count'] ?? 0) + 1;
             if (isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
                 $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+            }
+        }
+        if (!empty($GLOBALS['intersoccer_test_actions'][$hook]) && is_array($GLOBALS['intersoccer_test_actions'][$hook])) {
+            ksort($GLOBALS['intersoccer_test_actions'][$hook]);
+            foreach ($GLOBALS['intersoccer_test_actions'][$hook] as $callbacks) {
+                foreach ($callbacks as $callback) {
+                    if (is_callable($callback)) {
+                        call_user_func_array($callback, $args);
+                    }
+                }
             }
         }
         return;
@@ -509,13 +552,32 @@ if (!function_exists('update_postmeta_cache')) {
 
 if (!function_exists('wp_cache_delete')) {
     function wp_cache_delete($key, $group = '') {
-        return true;
+        $store = &intersoccer_test_object_cache_get_store();
+        if (isset($store[$group][$key])) {
+            unset($store[$group][$key]);
+            return true;
+        }
+        return false;
     }
 }
 
 if (!function_exists('get_post_field')) {
     function get_post_field($field, $post = null, $context = 'display') {
         return '';
+    }
+}
+
+if (!function_exists('wp_get_post_parent_id')) {
+    function wp_get_post_parent_id($post_id) {
+        $post_id = (int) $post_id;
+        $map = $GLOBALS['intersoccer_test_wp_get_post_parent_id_map'] ?? null;
+        if (is_array($map) && array_key_exists($post_id, $map)) {
+            return (int) $map[$post_id];
+        }
+        if (isset($GLOBALS['intersoccer_test_wp_get_post_parent_id_default'])) {
+            return (int) $GLOBALS['intersoccer_test_wp_get_post_parent_id_default'];
+        }
+        return 0;
     }
 }
 
@@ -643,6 +705,15 @@ if (!function_exists('maybe_unserialize')) {
     }
 }
 
+if (!function_exists('maybe_serialize')) {
+    function maybe_serialize($data) {
+        if (is_array($data) || is_object($data)) {
+            return serialize($data);
+        }
+        return $data;
+    }
+}
+
 if (!function_exists('taxonomy_exists')) {
     function taxonomy_exists($taxonomy) {
         return true;
@@ -755,12 +826,6 @@ if (!function_exists('wc_get_product')) {
 
 if (!function_exists('clean_post_cache')) {
     function clean_post_cache($post_id) {
-        return true;
-    }
-}
-
-if (!function_exists('wp_cache_delete')) {
-    function wp_cache_delete($key, $group = '') {
         return true;
     }
 }

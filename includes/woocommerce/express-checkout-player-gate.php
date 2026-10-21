@@ -703,6 +703,9 @@ function intersoccer_store_express_fields_callback() {
     if (!$stored) {
         intersoccer_clear_stashed_express_fields($product_id);
     }
+    if (function_exists('intersoccer_schedule_wc_session_volatile_refresh_before_save')) {
+        intersoccer_schedule_wc_session_volatile_refresh_before_save();
+    }
     wp_send_json_success(['product_id' => $product_id, 'cleared' => !$stored]);
 }
 
