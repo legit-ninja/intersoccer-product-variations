@@ -1052,6 +1052,28 @@ $intersoccer_elementor_product_page_cb = function () {
                 return !!(map && map[intersoccerPvStashSubmitWaitGuardKey()]);
             }
 
+            function intersoccerPvRestoreStashSubmitWaitButtons($form) {
+                if (!$form || !$form.length) {
+                    return;
+                }
+                $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').each(function () {
+                    var $btn = $(this);
+                    if ($btn.data('intersoccerPvPreStashWaitDisabled') === undefined) {
+                        return;
+                    }
+                    var wasDisabled = $btn.data('intersoccerPvPreStashWaitDisabled');
+                    var hadDisabledClass = $btn.data('intersoccerPvPreStashWaitHadDisabledClass');
+                    $btn.prop('disabled', wasDisabled);
+                    if (hadDisabledClass) {
+                        $btn.addClass('disabled');
+                    } else {
+                        $btn.removeClass('disabled');
+                    }
+                    $btn.removeData('intersoccerPvPreStashWaitDisabled');
+                    $btn.removeData('intersoccerPvPreStashWaitHadDisabledClass');
+                });
+            }
+
             function intersoccerPvSetStashSubmitWaitInProgress($form, active) {
                 if (!window.intersoccerPvStashSubmitWaitInProgress) {
                     window.intersoccerPvStashSubmitWaitInProgress = {};
@@ -1071,24 +1093,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     }
                 } else {
                     delete window.intersoccerPvStashSubmitWaitInProgress[key];
-                    if ($form && $form.length) {
-                        $form.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').each(function () {
-                            var $btn = $(this);
-                            if ($btn.data('intersoccerPvPreStashWaitDisabled') === undefined) {
-                                return;
-                            }
-                            var wasDisabled = $btn.data('intersoccerPvPreStashWaitDisabled');
-                            var hadDisabledClass = $btn.data('intersoccerPvPreStashWaitHadDisabledClass');
-                            $btn.prop('disabled', wasDisabled);
-                            if (hadDisabledClass) {
-                                $btn.addClass('disabled');
-                            } else {
-                                $btn.removeClass('disabled');
-                            }
-                            $btn.removeData('intersoccerPvPreStashWaitDisabled');
-                            $btn.removeData('intersoccerPvPreStashWaitHadDisabledClass');
-                        });
-                    }
+                    intersoccerPvRestoreStashSubmitWaitButtons($form);
                 }
             }
             if (!window.intersoccerPvRegisterPendingProductPageStashDeferred) {
@@ -2364,30 +2369,38 @@ $intersoccer_elementor_product_page_cb = function () {
                 var formElement = $productForm[0];
                 setTimeout(function () {
                     try {
-                        HTMLFormElement.prototype.submit.call(formElement);
-                    } catch (error) {
-                        debugError('InterSoccer Form: Error during form submission:', error);
-                        formElement.submit();
-                    }
-                    if (typeof afterNativeSubmit === 'function') {
-                        afterNativeSubmit();
+                        try {
+                            HTMLFormElement.prototype.submit.call(formElement);
+                        } catch (error) {
+                            debugError('InterSoccer Form: Error during form submission:', error);
+                            try {
+                                formElement.submit();
+                            } catch (fallbackError) {
+                                debugError('InterSoccer Form: Fallback form submission failed:', fallbackError);
+                            }
+                        }
+                    } finally {
+                        if (typeof afterNativeSubmit === 'function') {
+                            afterNativeSubmit();
+                        }
                     }
                 }, 10);
             }
 
             function intersoccerPvResubmitCampCourseFormAfterStashWait($productForm) {
+                intersoccerPvRestoreStashSubmitWaitButtons($productForm);
                 intersoccerEnsurePlayerIndexOnForm($productForm);
                 intersoccerEnsureCampDaysOnForm($productForm);
                 intersoccerEnsureLatePickupOnForm($productForm);
                 intersoccerEnsureVariationIdOnForm($productForm);
                 intersoccerEnsureVariationAttributesOnForm($productForm);
                 if (!intersoccerPvValidateCampCourseProductForm($productForm)) {
-                    intersoccerPvSetStashSubmitWaitInProgress($productForm, false);
-                    return;
+                    return false;
                 }
                 intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {
                     intersoccerPvSetStashSubmitWaitInProgress($productForm, false);
                 });
+                return true;
             }
 
             // Handle form submission (all WC forms for this product when camp/course + variable — sticky/duplicate layouts)
@@ -2432,7 +2445,14 @@ $intersoccer_elementor_product_page_cb = function () {
                             }
                             return;
                         }
-                        intersoccerPvResubmitCampCourseFormAfterStashWait($stashWaitForm);
+                        var stashWaitResubmitScheduled = false;
+                        try {
+                            stashWaitResubmitScheduled = intersoccerPvResubmitCampCourseFormAfterStashWait($stashWaitForm);
+                        } finally {
+                            if (!stashWaitResubmitScheduled) {
+                                intersoccerPvSetStashSubmitWaitInProgress($stashWaitForm, false);
+                            }
+                        }
                     });
                     return false;
                 }

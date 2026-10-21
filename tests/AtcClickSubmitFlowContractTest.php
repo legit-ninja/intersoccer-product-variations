@@ -47,6 +47,29 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {', $php);
         $this->assertStringNotContainsString('intersoccerPvResubmitAfterStashWait', $php);
         $this->assertStringNotContainsString('$stashWaitForm.trigger(\'submit\')', $php);
+        $this->assertStringContainsString('function intersoccerPvRestoreStashSubmitWaitButtons', $php);
+        $this->assertStringContainsString('var stashWaitResubmitScheduled = false', $php);
+        $this->assertStringContainsString('if (!stashWaitResubmitScheduled)', $php);
+    }
+
+    public function testResubmitAfterStashWaitRestoresButtonsBeforeValidation(): void
+    {
+        $php = $this->elementorWidgetsSource();
+        if (!preg_match(
+            '/function intersoccerPvResubmitCampCourseFormAfterStashWait\(\$productForm\) \{(.*?)\n            \}/s',
+            $php,
+            $m
+        )) {
+            $this->fail('intersoccerPvResubmitCampCourseFormAfterStashWait body not found');
+        }
+        $body = $m[1];
+        $restorePos = strpos($body, 'intersoccerPvRestoreStashSubmitWaitButtons');
+        $validatePos = strpos($body, 'intersoccerPvValidateCampCourseProductForm');
+        $this->assertNotFalse($restorePos, 'restore helper call missing from resubmit function');
+        $this->assertNotFalse($validatePos, 'validate call missing from resubmit function');
+        $this->assertLessThan($validatePos, $restorePos, 'restore must run before validation in resubmit path');
+        $this->assertStringContainsString('return true', $body);
+        $this->assertStringContainsString('return false', $body);
     }
 
     public function testNativeSubmitUsesPreventDefaultAndHtmlFormElementSubmit(): void
@@ -57,6 +80,20 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('HTMLFormElement.prototype.submit.call(formElement)', $php);
         $this->assertStringContainsString('intersoccerPvResubmitCampCourseFormAfterStashWait', $php);
         $this->assertStringContainsString('intersoccerPvScheduleNativeProductFormSubmit($productForm, null, function () {', $php);
+        $this->assertStringContainsString('Fallback form submission failed', $php);
+        if (!preg_match(
+            '/function intersoccerPvScheduleNativeProductFormSubmit\(\$productForm, e, afterNativeSubmit\) \{(.*?)\n            \}/s',
+            $php,
+            $m
+        )) {
+            $this->fail('intersoccerPvScheduleNativeProductFormSubmit body not found');
+        }
+        $scheduleBody = $m[1];
+        $finallyPos = strpos($scheduleBody, '} finally {');
+        $afterNativePos = strpos($scheduleBody, 'afterNativeSubmit');
+        $this->assertNotFalse($finallyPos, 'finally block missing from native submit scheduler');
+        $this->assertNotFalse($afterNativePos, 'afterNativeSubmit missing from native submit scheduler');
+        $this->assertGreaterThan($finallyPos, $afterNativePos, 'afterNativeSubmit must run inside finally');
     }
 
     public function testStashWaitTimeoutStringStillLocalizedInWidgetScript(): void
