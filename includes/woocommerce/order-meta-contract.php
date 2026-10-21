@@ -1763,13 +1763,8 @@ function intersoccer_sensitive_order_meta_begin_email_context($order = false, $s
             ? determine_locale()
             : get_locale();
         switch_to_locale($locale);
-        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
-            unload_textdomain('intersoccer-product-variations');
-            load_plugin_textdomain(
-                'intersoccer-product-variations',
-                false,
-                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
-            );
+        if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')) {
+            intersoccer_pv_load_textdomain_for_current_locale($locale);
         }
     }
 
@@ -1811,13 +1806,8 @@ function intersoccer_sensitive_order_meta_end_email_context($order = false, $sen
     if (isset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']) && function_exists('restore_previous_locale')) {
         restore_previous_locale();
         unset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']);
-        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
-            unload_textdomain('intersoccer-product-variations');
-            load_plugin_textdomain(
-                'intersoccer-product-variations',
-                false,
-                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
-            );
+        if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')) {
+            intersoccer_pv_load_textdomain_for_current_locale();
         }
     }
 }

@@ -19,14 +19,7 @@ if (!defined('ABSPATH')) {
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Load plugin text domain for translations
-add_action('plugins_loaded', function () {
-    load_plugin_textdomain(
-        'intersoccer-product-variations',
-        false,
-        dirname(plugin_basename(__FILE__)) . '/lang'
-    );
-});
+require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/pv-textdomain.php';
 
 // Register strings for WPML translation on init to ensure WPML is loaded
 add_action('init', function () {

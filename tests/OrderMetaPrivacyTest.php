@@ -85,6 +85,7 @@ if (!function_exists('unload_textdomain')) {
 if (!function_exists('load_plugin_textdomain')) {
     function load_plugin_textdomain($domain, $deprecated, $path) {
         $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = true;
+        return true;
     }
 }
 
