@@ -230,6 +230,9 @@ class SiblingDropSessionRaceReproTest extends TestCase
             ];
         };
         MockFilters::$filters['intersoccer_pv_wc_session_persisted_row_cas_write'] = static function ($null, $customer_id, $old_blob, $new_blob, $expiry) {
+            if (!empty($GLOBALS['intersoccer_pv_cas_always_fail_writes'])) {
+                return false;
+            }
             if (!empty($GLOBALS['intersoccer_pv_cas_simulate_write_conflict_once'])) {
                 $GLOBALS['intersoccer_pv_cas_simulate_write_conflict_once'] = false;
                 $GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] = (int) ($GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] ?? 0) + 1;
@@ -259,6 +262,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         };
         intersoccer_pv_wc_session_register_cart_mutation_hooks();
         add_action('shutdown', 'intersoccer_pv_wc_session_shutdown_save_router', 20);
+        add_action('woocommerce_load_cart_from_session', 'intersoccer_pv_wc_session_snapshot_cart_on_load', 0);
     }
 
     protected function tearDown(): void
@@ -529,6 +533,16 @@ class SiblingDropSessionRaceReproTest extends TestCase
         return $this->cartLinesNow();
     }
 
+    public function testSnapshotCartHookWithoutArgumentUsesWcSession(): void
+    {
+        $this->addToCartRequest(0);
+        WC()->session = $this->startRequest();
+        unset($GLOBALS['intersoccer_pv_wc_session_cart_snapshot']);
+        do_action('woocommerce_load_cart_from_session');
+        $this->assertSame(1, (int) ($GLOBALS['intersoccer_pv_wc_session_cart_snapshot']['lines'] ?? -1));
+        WC()->session = null;
+    }
+
     public function testPreconditionStashHandlerWritesSession(): void
     {
         $s = $this->startRequest();
@@ -795,6 +809,24 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] = 0;
         $this->finishHandlerShutdown($ajax);
         $this->assertSame(1, (int) ($GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] ?? 0));
+        $this->assertSame(2, $this->cartLinesNow());
+    }
+
+    public function testCasExhaustionFallbackSaveKeepsNewerCartLine(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->addToCartRequest(1);
+        WC()->session = $ajax;
+        $ajax->set(intersoccer_selected_player_session_key(self::CAMP_ID), [
+            'player_index' => 1,
+            'player_id' => 'player-uuid-1',
+            'user_id' => self::USER_ID,
+            'stashed_at' => time(),
+        ]);
+        $GLOBALS['intersoccer_pv_cas_always_fail_writes'] = true;
+        $this->finishHandlerShutdown($ajax);
+        unset($GLOBALS['intersoccer_pv_cas_always_fail_writes']);
         $this->assertSame(2, $this->cartLinesNow());
     }
 

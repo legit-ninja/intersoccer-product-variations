@@ -149,6 +149,19 @@ function intersoccer_pv_wc_session_snapshot_cart_from_session($session) {
 }
 
 /**
+ * WooCommerce fires woocommerce_load_cart_from_session with no arguments (WC 3.2+).
+ *
+ * @param mixed $session Optional session instance (tests may pass explicitly).
+ * @return void
+ */
+function intersoccer_pv_wc_session_snapshot_cart_on_load($session = null) {
+    if ($session === null && function_exists('WC') && WC() && WC()->session) {
+        $session = WC()->session;
+    }
+    intersoccer_pv_wc_session_snapshot_cart_from_session($session);
+}
+
+/**
  * @return string
  */
 function intersoccer_pv_wc_session_request_kind() {
@@ -347,7 +360,7 @@ function intersoccer_pv_wc_session_cas_persist($session) {
         ? (int) $GLOBALS['intersoccer_pv_wc_session_cart_snapshot']['lines']
         : $lines_local;
 
-    $max_attempts = (int) apply_filters('intersoccer_pv_wc_session_cas_max_attempts', 3);
+    $max_attempts = (int) apply_filters('intersoccer_pv_wc_session_cas_max_attempts', 10);
     $prevented_stale = false;
     $lines_out = $lines_local;
 
@@ -411,8 +424,31 @@ function intersoccer_pv_wc_session_cas_persist($session) {
         $lines_local = $lines_out;
     }
 
+    if (function_exists('intersoccer_wc_session_store_cache_delete_row')) {
+        intersoccer_wc_session_store_cache_delete_row($customer_id);
+    }
+    $final_row = intersoccer_pv_wc_session_read_persisted_row($customer_id);
+    if ($final_row !== null) {
+        $final_stored_bundle = maybe_unserialize($final_row['session_value']);
+        if (!is_array($final_stored_bundle)) {
+            $final_stored_bundle = [];
+        }
+        $final_db_decoded = intersoccer_pv_wc_session_decode_bundle($final_stored_bundle);
+        $final_lines_db = intersoccer_pv_wc_session_cart_line_count($final_db_decoded['cart'] ?? null);
+        if ($final_lines_db > $lines_local) {
+            $prevented_stale = true;
+        }
+        $local_decoded = intersoccer_pv_wc_session_merge_local_with_db_cart_keys($local_decoded, $final_db_decoded);
+        $lines_out = intersoccer_pv_wc_session_cart_line_count($local_decoded['cart'] ?? null);
+        $final_merged_bundle = intersoccer_pv_wc_session_encode_bundle($local_decoded);
+        intersoccer_pv_wc_session_reflection_set_handler_state($session, $final_merged_bundle, true);
+        $expiry = $final_row['session_expiry'] > 0 ? (int) $final_row['session_expiry'] : $expiry;
+    }
+
     if ($session instanceof WC_Session_Handler) {
         $session->save_data();
+    } elseif (method_exists($session, 'pv_fallback_save_data')) {
+        $session->pv_fallback_save_data();
     }
     intersoccer_pv_wc_session_log_save_outcome('fallback_wc', $prevented_stale, $snapshot_lines, $lines_local, $lines_out);
 }
@@ -502,4 +538,4 @@ function intersoccer_pv_wc_session_cart_safe_save_bootstrap() {
 }
 
 add_action('woocommerce_init', 'intersoccer_pv_wc_session_cart_safe_save_bootstrap', 999);
-add_action('woocommerce_load_cart_from_session', 'intersoccer_pv_wc_session_snapshot_cart_from_session', 0);
+add_action('woocommerce_load_cart_from_session', 'intersoccer_pv_wc_session_snapshot_cart_on_load', 0);
