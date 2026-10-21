@@ -9,6 +9,30 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * English sprintf templates for sibling discount labels persisted on cart/order lines.
+ * Translate for shoppers via intersoccer_translate_stored_discount_label_for_display().
+ *
+ * @return string Template with %s placeholder for the numeric percent (no %% suffix).
+ */
+function intersoccer_sibling_discount_storage_template_camp() {
+    return '%s%% Camp Sibling Discount';
+}
+
+/**
+ * @return string
+ */
+function intersoccer_sibling_discount_storage_template_course() {
+    return '%s%% Course Sibling Discount';
+}
+
+/**
+ * @return string
+ */
+function intersoccer_sibling_discount_storage_template_tournament() {
+    return '%s%% Tournament Sibling Discount';
+}
+
 if (!function_exists('intersoccer_get_default_discount_rules')) {
     function intersoccer_get_default_discount_rules() {
         return [
@@ -1783,8 +1807,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 }
             }
 
-            /* translators: %s: discount percentage number without percent sign */
-            $template = __('%s%% Camp Sibling Discount', 'intersoccer-product-variations');
+            $template = intersoccer_sibling_discount_storage_template_camp();
             foreach ($camps_by_season as $season => $season_children) {
                 $prior_totals = [];
                 if ($enable_retroactive_siblings && intersoccer_discount_customer_identifiable($customer_id)) {
@@ -1962,8 +1985,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
 
             if (count($child_totals) >= 2) {
                 $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $course_children, $merged['prior_by_key'] ?? []);
-                /* translators: %s: discount percentage number without percent sign */
-                $template = __('%s%% Course Sibling Discount', 'intersoccer-product-variations');
+                $template = intersoccer_sibling_discount_storage_template_course();
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
@@ -2115,8 +2137,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             if (count($child_totals) >= 2) {
                 arsort($child_totals);
                 $sorted_children = array_keys($child_totals);
-                /* translators: %s: discount percentage number without percent sign */
-                $template = __('%s%% Tournament Sibling Discount', 'intersoccer-product-variations');
+                $template = intersoccer_sibling_discount_storage_template_tournament();
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,

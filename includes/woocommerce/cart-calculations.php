@@ -651,10 +651,13 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
 
         // Discount Note
         if (isset($cart_item['discount_note']) && !empty($cart_item['discount_note'])) {
+            $discount_display = function_exists('intersoccer_translate_stored_discount_label_for_display')
+                ? intersoccer_translate_stored_discount_label_for_display($cart_item['discount_note'])
+                : $cart_item['discount_note'];
             $item_data[] = [
                 'key' => __('Discount', 'intersoccer-product-variations'),
-                'value' => esc_html($cart_item['discount_note']),
-                'display' => '<span class="intersoccer-cart-meta intersoccer-discount">' . esc_html($cart_item['discount_note']) . '</span>'
+                'value' => esc_html($discount_display),
+                'display' => '<span class="intersoccer-cart-meta intersoccer-discount">' . esc_html($discount_display) . '</span>'
             ];
         }
 

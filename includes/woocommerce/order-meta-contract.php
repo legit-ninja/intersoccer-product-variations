@@ -2194,6 +2194,16 @@ function intersoccer_translate_stored_order_meta_display_key($display_key, $meta
  * @param string $meta_key  Meta key.
  * @return string
  */
+/**
+ * Translate a stored discount label (cart/checkout/order display only).
+ *
+ * @param string $label English label from cart/order storage.
+ * @return string
+ */
+function intersoccer_translate_stored_discount_label_for_display($label) {
+    return intersoccer_translate_stored_order_meta_display_value($label, 'Discount');
+}
+
 function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
     if (!intersoccer_is_customer_order_meta_display_context()) {
         return $value;

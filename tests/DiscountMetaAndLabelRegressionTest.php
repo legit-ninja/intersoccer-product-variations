@@ -122,27 +122,17 @@ class DiscountMetaAndLabelRegressionTest extends TestCase
 
     public function testSiblingDiscountLabelsIncludePercentSign()
     {
-        // Source templates in discounts.php (must keep %% so sprintf emits a literal %).
         $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
-        $this->assertStringContainsString(
-            "__('%s%% Camp Sibling Discount', 'intersoccer-product-variations')",
-            $src
-        );
-        $this->assertStringContainsString(
-            "__('%s%% Course Sibling Discount', 'intersoccer-product-variations')",
-            $src
-        );
-        $this->assertStringContainsString(
-            "__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations')",
-            $src
-        );
+        $this->assertStringContainsString('intersoccer_sibling_discount_storage_template_camp()', $src);
+        $this->assertStringContainsString('intersoccer_sibling_discount_storage_template_course()', $src);
+        $this->assertStringContainsString('intersoccer_sibling_discount_storage_template_tournament()', $src);
         $this->assertStringNotContainsString(
-            "__('%s Camp Sibling Discount', 'intersoccer-product-variations')",
+            "__('%s%% Camp Sibling Discount', 'intersoccer-product-variations')",
             $src,
-            'Unescaped %s without %% would print "20 Camp Sibling Discount"'
+            'Sibling storage templates must stay English literals, not __() at cart time'
         );
 
-        $this->assertSame('20% Camp Sibling Discount', sprintf('%s%% Camp Sibling Discount', 20));
+        $this->assertSame('20% Camp Sibling Discount', sprintf(intersoccer_sibling_discount_storage_template_camp(), 20));
         $this->assertSame('20% Course Sibling Discount', sprintf('%s%% Course Sibling Discount', 20));
         $this->assertSame('20% Tournament Sibling Discount', sprintf('%s%% Tournament Sibling Discount', 20));
         $this->assertSame(
@@ -157,8 +147,39 @@ class DiscountMetaAndLabelRegressionTest extends TestCase
 
     public function testApplySiblingRatesFallbackLabelContainsPercent()
     {
-        $fallback = sprintf('%s%% Camp Sibling Discount', 0.20 * 100);
+        $fallback = sprintf(intersoccer_sibling_discount_storage_template_camp(), 0.20 * 100);
         $this->assertStringContainsString('20%', $fallback);
         $this->assertDoesNotMatchRegularExpression('/^20[^%]/', $fallback);
+    }
+
+    public function testSiblingDiscountStoredEnglishDisplayedTranslatedInFrench()
+    {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $stored = sprintf(intersoccer_sibling_discount_storage_template_camp(), 20);
+        $this->assertSame('20% Camp Sibling Discount', $stored);
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 1,
+            'variation_id' => 2,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'discount_note' => $stored,
+            ],
+        ]);
+        $this->assertSame('20% Camp Sibling Discount', $built['updates']['Discount']);
+
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === '%s%% Camp Sibling Discount') {
+                    return '%s%% Réduction fratrie camp';
+                }
+                return $translation;
+            };
+        }
+        $display = intersoccer_translate_stored_discount_label_for_display($stored);
+        $this->assertSame('20% Réduction fratrie camp', $display);
+        if (class_exists('MockFilters')) {
+            unset(MockFilters::$filters['gettext_intersoccer-product-variations']);
+        }
     }
 }

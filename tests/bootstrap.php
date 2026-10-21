@@ -113,7 +113,11 @@ if (!function_exists('esc_attr')) {
 
 if (!function_exists('__')) {
     function __($text, $domain = 'default') {
-        return $text;
+        $translation = $text;
+        if (class_exists('MockFilters') && isset(MockFilters::$filters['gettext_' . $domain])) {
+            $translation = call_user_func(MockFilters::$filters['gettext_' . $domain], $translation, $text, $domain);
+        }
+        return $translation;
     }
 }
 
