@@ -1,16 +1,4 @@
-msgid ""
-msgstr ""
-"Project-Id-Version: WPML_EXPORT_intersoccer-product-variations\n"
-"Report-Msgid-Bugs-To: \n"
-"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
-"Language-Team: German <>\n"
-"MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: \n"
-"PO-Revision-Date: 2025-10-17 10:09-0400\n"
-"Language: de\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 
 #: includesoocommerce/admin-ui.php:3297
 msgid "Processing Speed"
@@ -18,7 +6,7 @@ msgstr "Verarbeitungsgeschwindigkeit"
 
 #: includesoocommerce/admin-ui.php:3285
 msgid "Higher numbers find more orders but take longer to scan initially."
-msgstr "Höhere Werte finden mehr Bestellungen, der erste Scan dauert jedoch länger.Höhere Zahlen finden mehr Bestellungen, aber dauern länger beim ersten Scannen."
+msgstr "\"\"HÃ¶here Zahlen finden mehr Bestellungen, aber dauern lÃ¤nger beim ersten \"\"Scannen."
 
 #: includesoocommerce/admin-ui.php:3275
 msgid "Orders to Scan"
@@ -2801,3 +2789,130 @@ msgstr ""
 #: includesoocommerce/program-manager.php:3799
 msgid "No programs found. Create one to get started!"
 msgstr ""
+
+# wpml-name: 7b22344fd895e14c47399f85200a2ace
+msgid "An error occurred while refreshing attributes:"
+msgstr "Ein Fehler ist beim Aktualisieren der Attribute aufgetreten: "
+
+# wpml-name: 42b4d0483c08574a5f99032b321a7485
+msgid "An error occurred while processing the action:"
+msgstr "Ein Fehler ist bei der Verarbeitung der Aktion aufgetreten: "
+
+# wpml-name: c8fdea49d80596005fac81da45cc1763
+msgid "Action completed successfully!"
+msgstr "Aktion erfolgreich abgeschlossen!"
+
+# wpml-name: 10842c54ba5faae950c177c4b0c5cdc0
+msgid "Please select an action and at least one discount."
+msgstr "Bitte wählen Sie eine Aktion und mindestens einen Rabatt aus."
+
+# wpml-name: 25fed406cb0a88646d8059cad51345a3
+msgid "An error occurred while saving the discount:"
+msgstr "Ein Fehler ist beim Speichern des Rabatts aufgetreten: "
+
+# wpml-name: 0e8bc5808bec14350b627a5c71fd36de
+msgid "Discount saved successfully!"
+msgstr "Rabatt erfolgreich gespeichert!"
+
+# wpml-name: 575f5f86d2c7ea113c6710c1037c4465
+msgid "Saving..."
+msgstr "Speichern..."
+
+# wpml-name: 7badfbc455735b33283d92ea477996de
+msgid "Add New Discount"
+msgstr "Neuen Rabatt hinzufügen"
+
+# wpml-name: c4716ed2f447aa22072d91c1acbe83e7
+msgid "Late Pickup Cost:"
+msgstr "Kosten für späte Abholung:"
+
+msgid "Select Late Pickup Days"
+msgstr "Spätabholtage auswählen"
+
+msgid "Single Day"
+msgstr "Einzelner Tag"
+
+msgid "Late Pickup Type"
+msgstr "Art der Spätabholung"
+
+msgid "Friday"
+msgstr "Freitag"
+
+msgid "Thursday"
+msgstr "Donnerstag"
+
+msgid "Wednesday"
+msgstr "Mittwoch"
+
+msgid "Tuesday"
+msgstr "Dienstag"
+
+msgid "Monday"
+msgstr "Montag"
+
+# wpml-name: 98cb3e604330f6b2df6030c245cf554a
+msgid "Same child, multiple courses in same season"
+msgstr "Gleiches Kind, mehrere Kurse in derselben Saison"
+
+# wpml-name: 1a16f21e6041f067495481d41f6160ee
+msgid "50% Same Season Course Discount"
+msgstr "50% Rabatt für Kurs gleiche Saison"
+
+# wpml-name: fd2f2092d275d1300031a6d6c0bc098a
+msgid "Third or additional child course discount"
+msgstr "Drittes oder zusätzliches Kind Kurs-Rabatt"
+
+# wpml-name: 7db077256d3f7e63ec6ca63f8e8c4fd8
+msgid "30% Multi-Child Course Discount"
+msgstr "30% Mehrkind-Kurs-Rabatt"
+
+# wpml-name: 04b5e611f90d20ab1c291e4248254d42
+msgid "Second child course discount"
+msgstr "Zweites Kind Kurs-Rabatt"
+
+# wpml-name: 62aa7b74de55c9aaf1f39d5763fb2aca
+msgid "20% Course Sibling Discount"
+msgstr "20% Kurs-Geschwister-Rabatt"
+
+# wpml-name: 9fb5155b9ce71a9393f4e4facee5d4c2
+msgid "Third or additional child camp discount"
+msgstr "Drittes oder zusätzliches Kind Camp-Rabatt"
+
+# wpml-name: b42b4793ca0578246755d052e8e60812
+msgid "25% Multi-Child Discount Applied"
+msgstr "25% Mehrkind-Rabatt angewendet"
+
+# wpml-name: b9ec5d7b8e696f6df33609fe478a4fbb
+msgid "Second child camp discount"
+msgstr "Zweites Kind Camp-Rabatt"
+
+# wpml-name: 54f818895232f9d69a713052a8c0c93c
+msgid "20% Sibling Discount Applied"
+msgstr "20% Geschwister-Rabatt angewendet"
+
+# wpml-name: tournament_multi_child_discount_template
+msgid "%d%% Tournament Multi-Child Discount (Child %d)"
+msgstr "%d%% Turnier Mehrkind-Rabatt (Kind %d)"
+
+# wpml-name: tournament_2nd_child
+msgid "20% Tournament Sibling Discount"
+msgstr "20% Turnier Geschwisterrabatt"
+
+# wpml-name: tournament_3rd_plus_child
+msgid "30% Multi-Child Tournament Discount"
+msgstr "30% Mehrkind-Rabatt Turnier"
+
+msgid "Sessions Remaining:"
+msgstr "Verbleibende Trainings:"
+
+#, php-format
+msgid "Medical information: provided (view or update in My Account)."
+msgstr "Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktualisieren)."
+
+#, php-format
+msgid "Age at camp start: %d"
+msgstr "Alter bei Campbeginn: %d"
+
+#, php-format
+msgid "Birth year: %s"
+msgstr "Geburtsjahr: %s"

@@ -2201,7 +2201,87 @@ function intersoccer_translate_stored_order_meta_display_key($display_key, $meta
  * @return string
  */
 function intersoccer_translate_stored_discount_label_for_display($label) {
-    return intersoccer_translate_stored_order_meta_display_value($label, 'Discount');
+    return intersoccer_translate_persisted_discount_label_for_display($label);
+}
+
+/**
+ * Translate English discount labels stored on cart lines / order meta (display only).
+ *
+ * @param string $label Stored English label.
+ * @return string
+ */
+function intersoccer_translate_persisted_discount_label_for_display($label) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $label;
+    }
+
+    $text = is_scalar($label) ? (string) $label : '';
+    if ($text === '') {
+        return $label;
+    }
+
+    $percent = '(\d+(?:\.\d+)?)';
+    $rules = [
+        '/^' . $percent . '\s*%?\s*Camp Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Camp Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Course Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Course Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Tournament Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Camp Week 2 Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Camp Week 2 Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Camp Week (\d+)\+ Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Camp Week %d+ Discount', 'intersoccer-product-variations'), $m[1], $m[2]);
+        },
+        '/^' . $percent . '\s*%?\s*Same Season Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Tournament Multiple Days Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Tournament Multiple Days Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Camp Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Camp Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Camp Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Camp Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Tournament Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Tournament Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Tournament Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Tournament Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Discount Applied$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Discount Applied', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^20\s*%?\s*Course Sibling Discount$/' => static function () {
+            return __('20% Course Sibling Discount', 'intersoccer-product-variations');
+        },
+        '/^30\s*%?\s*Multi-Child Course Discount$/' => static function () {
+            return __('30% Multi-Child Course Discount', 'intersoccer-product-variations');
+        },
+        '/^50\s*%?\s*Same-Season Course Discount$/' => static function () {
+            return __('50% Same-Season Course Discount', 'intersoccer-product-variations');
+        },
+    ];
+
+    foreach ($rules as $pattern => $callback) {
+        if (preg_match($pattern, $text, $matches)) {
+            return $callback($matches);
+        }
+    }
+
+    return $label;
 }
 
 function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
@@ -2223,14 +2303,11 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
         }
     }
 
-    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Camp Sibling Discount$/', $text, $matches)) {
-        return sprintf(__('%s%% Camp Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
-    }
-    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Course Sibling Discount$/', $text, $matches)) {
-        return sprintf(__('%s%% Course Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
-    }
-    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Tournament Sibling Discount$/', $text, $matches)) {
-        return sprintf(__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
+    if ($meta_key === 'Discount' || $meta_key === '') {
+        $translated = intersoccer_translate_persisted_discount_label_for_display($text);
+        if ($translated !== $text) {
+            return $translated;
+        }
     }
 
     return $value;

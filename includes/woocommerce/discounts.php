@@ -33,6 +33,29 @@ function intersoccer_sibling_discount_storage_template_tournament() {
     return '%s%% Tournament Sibling Discount';
 }
 
+/**
+ * English storage templates for other persisted cart/order discount labels.
+ *
+ * @param string $key Template key.
+ * @return string
+ */
+function intersoccer_discount_label_storage_template($key) {
+    $templates = [
+        'camp_week_2' => '%d%% Camp Week 2 Discount',
+        'camp_week_n_plus' => '%d%% Camp Week %d+ Discount',
+        'same_season_course' => '%d%% Same Season Course Discount',
+        'tournament_multiple_days' => '%d%% Tournament Multiple Days Discount',
+        'sibling_camp' => '%d%% Sibling Camp Discount',
+        'multi_child_camp' => '%d%% Multi-Child Camp Discount',
+        'sibling_course' => '%d%% Sibling Course Discount',
+        'multi_child_course' => '%d%% Multi-Child Course Discount',
+        'sibling_tournament' => '%d%% Sibling Tournament Discount',
+        'multi_child_tournament' => '%d%% Multi-Child Tournament Discount',
+    ];
+
+    return $templates[$key] ?? '';
+}
+
 if (!function_exists('intersoccer_get_default_discount_rules')) {
     function intersoccer_get_default_discount_rules() {
         return [
@@ -1928,10 +1951,17 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                     $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
 
                     if ($week_position === 2) {
-                        $discount_label = sprintf(__('%d%% Camp Week 2 Discount', 'intersoccer-product-variations'), $percent * 100);
+                        $discount_label = sprintf(
+                            intersoccer_discount_label_storage_template('camp_week_2'),
+                            $percent * 100
+                        );
                         $message = intersoccer_get_discount_message('camp_progressive_week_2', 'cart_message', $discount_label);
                     } else {
-                        $discount_label = sprintf(__('%d%% Camp Week %d+ Discount', 'intersoccer-product-variations'), $percent * 100, $week_position);
+                        $discount_label = sprintf(
+                            intersoccer_discount_label_storage_template('camp_week_n_plus'),
+                            $percent * 100,
+                            $week_position
+                        );
                         $message = intersoccer_get_discount_message('camp_progressive_week_3_plus', 'cart_message', $discount_label);
                     }
 
@@ -2047,7 +2077,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                         $discounted_price = $base_price * (1 - $percent);
                         $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
                         $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
-                        $discount_label = sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $percent * 100);
+                        $discount_label = sprintf(intersoccer_discount_label_storage_template('same_season_course'), $percent * 100);
                         $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', $discount_label);
                         intersoccer_debug('InterSoccer: Applied ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id'] . ' for attendee ' . $assigned_player);
                     }
@@ -2106,7 +2136,7 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                             $discounted_price = $base_price * (1 - $percent);
                             $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
                             $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
-                            $discount_label = sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $percent * 100);
+                            $discount_label = sprintf(intersoccer_discount_label_storage_template('same_season_course'), $percent * 100);
                             $cart->cart_contents[$cart_key]['discount_note'] = intersoccer_get_discount_message('course_same_season', 'cart_message', $discount_label);
                             intersoccer_debug('InterSoccer: Applied retroactive ' . ($percent * 100) . '% same-season discount to item ' . $item['product_id'] . ' for attendee ' . $assigned_player . ' (previous order found)');
                         }
@@ -2225,7 +2255,10 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                             $cart->cart_contents[$cart_key]['data']->set_price($discounted_price);
                             $cart->cart_contents[$cart_key]['discount_amount'] = $base_price - $discounted_price;
                             
-                            $discount_label = sprintf(__('%d%% Tournament Multiple Days Discount', 'intersoccer-product-variations'), $percent * 100);
+                            $discount_label = sprintf(
+                                intersoccer_discount_label_storage_template('tournament_multiple_days'),
+                                $percent * 100
+                            );
                             $message = intersoccer_get_discount_message('tournament_same_child_multiple_days', 'cart_message', $discount_label);
                             $cart->cart_contents[$cart_key]['discount_note'] = $message;
                             
@@ -2343,7 +2376,10 @@ function intersoccer_attach_same_season_discount_note($cart) {
 
         // Apply note to second item (index 1)
         $target = $items[1];
-        $discount_label = sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $same_season_rate * 100);
+        $discount_label = sprintf(
+            intersoccer_discount_label_storage_template('same_season_course'),
+            $same_season_rate * 100
+        );
         $message = intersoccer_get_discount_message(
             'course_same_season',
             'cart_message',
@@ -2395,9 +2431,15 @@ function intersoccer_apply_camp_combo_discounts($camps_by_child) {
         
         // Enhanced discount label with discount type info
         if ($i === 1) {
-            $discount_label = sprintf(__('%d%% Sibling Camp Discount', 'intersoccer-product-variations'), $discount_percentage);
+            $discount_label = sprintf(
+                intersoccer_discount_label_storage_template('sibling_camp'),
+                $discount_percentage
+            );
         } else {
-            $discount_label = sprintf(__('%d%% Multi-Child Camp Discount', 'intersoccer-product-variations'), $discount_percentage);
+            $discount_label = sprintf(
+                intersoccer_discount_label_storage_template('multi_child_camp'),
+                $discount_percentage
+            );
         }
         
         WC()->cart->add_fee($discount_label, -$discount_amount);
@@ -2446,9 +2488,15 @@ function intersoccer_apply_course_combo_discounts($courses_by_child) {
             
             // Enhanced discount label
             if ($i === 1) {
-                $discount_label = sprintf(__('%d%% Sibling Course Discount', 'intersoccer-product-variations'), $discount_percentage);
+                $discount_label = sprintf(
+                    intersoccer_discount_label_storage_template('sibling_course'),
+                    $discount_percentage
+                );
             } else {
-                $discount_label = sprintf(__('%d%% Multi-Child Course Discount', 'intersoccer-product-variations'), $discount_percentage);
+                $discount_label = sprintf(
+                    intersoccer_discount_label_storage_template('multi_child_course'),
+                    $discount_percentage
+                );
             }
             
             WC()->cart->add_fee($discount_label, -$discount_amount);
@@ -2498,9 +2546,15 @@ function intersoccer_apply_tournament_combo_discounts($tournaments_by_child) {
             
             // Enhanced discount label
             if ($i === 1) {
-                $discount_label = sprintf(__('%d%% Sibling Tournament Discount', 'intersoccer-product-variations'), $discount_percentage);
+                $discount_label = sprintf(
+                    intersoccer_discount_label_storage_template('sibling_tournament'),
+                    $discount_percentage
+                );
             } else {
-                $discount_label = sprintf(__('%d%% Multi-Child Tournament Discount', 'intersoccer-product-variations'), $discount_percentage);
+                $discount_label = sprintf(
+                    intersoccer_discount_label_storage_template('multi_child_tournament'),
+                    $discount_percentage
+                );
             }
             
             WC()->cart->add_fee($discount_label, -$discount_amount);
