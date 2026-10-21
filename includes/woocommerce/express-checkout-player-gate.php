@@ -559,6 +559,9 @@ function intersoccer_stash_express_fields($product_id, $variation_id, array $sou
         'user_id' => (int) get_current_user_id(),
         'stashed_at' => time(),
     ]);
+    if (function_exists('intersoccer_refresh_wc_session_volatile_from_store')) {
+        intersoccer_refresh_wc_session_volatile_from_store();
+    }
     return true;
 }
 
@@ -593,6 +596,9 @@ function intersoccer_clear_stashed_express_fields($product_id) {
         WC()->session->__unset($key);
     } else {
         WC()->session->set($key, null);
+    }
+    if (function_exists('intersoccer_refresh_wc_session_volatile_from_store')) {
+        intersoccer_refresh_wc_session_volatile_from_store();
     }
 }
 

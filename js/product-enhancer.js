@@ -5,6 +5,47 @@
 (function($) {
     'use strict';
 
+    window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+
+    function intersoccerPvTrackProductPageStashAjax(jqXHR) {
+        if (!jqXHR || typeof jqXHR.always !== 'function') {
+            return jqXHR;
+        }
+        window.intersoccerPvPendingStashAjax.push(jqXHR);
+        jqXHR.always(function () {
+            const list = window.intersoccerPvPendingStashAjax;
+            const idx = list.indexOf(jqXHR);
+            if (idx >= 0) {
+                list.splice(idx, 1);
+            }
+        });
+        return jqXHR;
+    }
+
+    function intersoccerPvHasPendingProductPageStashAjax() {
+        return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
+            return xhr && xhr.state && xhr.state() === 'pending';
+        });
+    }
+
+    function intersoccerPvWaitForProductPageStashAjax(timeoutMs) {
+        const limit = typeof timeoutMs === 'number' ? timeoutMs : 5000;
+        return new Promise(function (resolve) {
+            const deadline = Date.now() + limit;
+            (function tick() {
+                if (!intersoccerPvHasPendingProductPageStashAjax() || Date.now() >= deadline) {
+                    resolve();
+                    return;
+                }
+                setTimeout(tick, 40);
+            })();
+        });
+    }
+
+    window.intersoccerPvTrackProductPageStashAjax = intersoccerPvTrackProductPageStashAjax;
+    window.intersoccerPvHasPendingProductPageStashAjax = intersoccerPvHasPendingProductPageStashAjax;
+    window.intersoccerPvWaitForProductPageStashAjax = intersoccerPvWaitForProductPageStashAjax;
+
     const playerMessages = (window.intersoccerCheckout && window.intersoccerCheckout.i18n && window.intersoccerCheckout.i18n.player_assignment) || {};
     const getPlayerMessage = (key, fallback) => {
         if (playerMessages && Object.prototype.hasOwnProperty.call(playerMessages, key)) {
@@ -77,6 +118,16 @@
             // Form submission validation is now handled by elementor-widgets.php
             // Only keeping quantity enforcement here
             $form.on('submit', function(e) {
+                if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingProductPageStashAjax()) {
+                    e.preventDefault();
+                    const $defer = $form;
+                    intersoccerPvWaitForProductPageStashAjax(5000).then(function () {
+                        window.intersoccerPvResubmitAfterStashWait = true;
+                        $defer.trigger('submit');
+                        window.intersoccerPvResubmitAfterStashWait = false;
+                    });
+                    return false;
+                }
                 // Force quantity to 1 for InterSoccer products
                 if (['camp', 'course'].includes(self.config.productType)) {
                     $form.find('input[name="quantity"], .quantity input[type="number"]').val(1);
@@ -442,13 +493,13 @@
             } else if ($idField.length) {
                 $idField.remove();
             }
-            jQuery.post(intersoccerCheckout.ajax_url, {
+            intersoccerPvTrackProductPageStashAjax(jQuery.post(intersoccerCheckout.ajax_url, {
                 action: 'intersoccer_store_selected_player',
                 nonce: intersoccerCheckout.nonce,
                 product_id: this.config.productId,
                 player_index: (playerValue === null || playerValue === undefined) ? '' : playerValue,
                 player_id: resolvedId || ''
-            });
+            }));
         },
 
         // Update add to cart button state

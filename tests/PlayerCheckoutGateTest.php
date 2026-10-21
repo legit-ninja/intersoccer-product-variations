@@ -131,5 +131,15 @@ class PlayerCheckoutGateTest extends TestCase
         $this->assertStringContainsString('stashSelectedPlayer', $js);
         $this->assertStringContainsString('intersoccer_store_selected_player', $js);
         $this->assertStringContainsString('assigned_player_id', $js);
+        $this->assertStringContainsString('intersoccerPvWaitForProductPageStashAjax', $js);
+        $this->assertStringContainsString('intersoccerPvTrackProductPageStashAjax', $js);
+    }
+
+    public function testElementorWidgetsWaitsForPendingStashAjaxBeforeSubmit()
+    {
+        $php = file_get_contents(dirname(__DIR__) . '/includes/elementor-widgets.php');
+        $this->assertStringContainsString('intersoccerPvWaitForProductPageStashAjax', $php);
+        $this->assertStringContainsString('intersoccerPvTrackProductPageStashAjax', $php);
+        $this->assertStringContainsString('intersoccer_store_express_fields', $php);
     }
 }

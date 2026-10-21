@@ -1408,6 +1408,63 @@ function intersoccer_store_selected_days_callback() {
 
 
 /**
+ * WooCommerce session keys that must not be overwritten by stale in-memory copies
+ * when product-page stash AJAX runs (player / camp-days fire-and-forget).
+ *
+ * @return string[]
+ */
+function intersoccer_wc_session_volatile_keys_for_product_page_ajax() {
+    $keys = [
+        'cart',
+        'cart_totals',
+        'cart_hash',
+        'applied_coupons',
+        'coupon_discount_totals',
+        'coupon_discount_tax_totals',
+        'removed_cart_contents',
+        'order_awaiting_payment',
+        'intersoccer_points_to_redeem',
+    ];
+
+    /**
+     * @param string[] $keys
+     */
+    return apply_filters('intersoccer_wc_session_volatile_keys', $keys);
+}
+
+/**
+ * Re-read volatile session keys from the DB row before this request saves the session.
+ *
+ * Product-page stash handlers load the session (and cart) at request start. A overlapping
+ * add-to-cart can commit a newer cart while stash AJAX is still in flight; without this
+ * merge, shutdown would write the stale cart back.
+ *
+ * @return void
+ */
+function intersoccer_refresh_wc_session_volatile_from_store() {
+    if (!function_exists('WC') || !WC() || !WC()->session) {
+        return;
+    }
+    $session = WC()->session;
+    if (!method_exists($session, 'get_customer_id') || !method_exists($session, 'get_session')) {
+        return;
+    }
+    $customer_id = $session->get_customer_id();
+    if ($customer_id === '' || $customer_id === null || $customer_id === false) {
+        return;
+    }
+    $fresh = $session->get_session($customer_id);
+    if (!is_array($fresh) || $fresh === []) {
+        return;
+    }
+    foreach (intersoccer_wc_session_volatile_keys_for_product_page_ajax() as $key) {
+        if (array_key_exists($key, $fresh)) {
+            $session->set($key, $fresh[$key]);
+        }
+    }
+}
+
+/**
  * Session key for the last player chosen on a product page (Apple Pay / Store API).
  *
  * @param int $product_id
@@ -1487,6 +1544,7 @@ function intersoccer_stash_selected_player($product_id, array $payload) {
         'stashed_at' => time(),
     ];
     WC()->session->set(intersoccer_selected_player_session_key($product_id), $clean);
+    intersoccer_refresh_wc_session_volatile_from_store();
     return true;
 }
 
@@ -1506,6 +1564,7 @@ function intersoccer_clear_stashed_selected_player($product_id) {
     } else {
         WC()->session->set($key, null);
     }
+    intersoccer_refresh_wc_session_volatile_from_store();
 }
 
 /**

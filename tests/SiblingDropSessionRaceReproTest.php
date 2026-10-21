@@ -52,12 +52,21 @@ final class SiblingDropRequestSession {
     public function set($key, $value) { if (($this->data[$key] ?? null) !== $value) { $this->data[$key] = $value; $this->dirty = true; } }
     public function __unset($key) { if (array_key_exists($key, $this->data)) { unset($this->data[$key]); $this->dirty = true; } }
     public function get_session_data() { return $this->data; }
+    public function get_customer_id() { return $this->customer; }
+    /** Mirrors WC_Session_Handler::get_session() for merge-before-save in stash AJAX. */
+    public function get_session($customer_id) {
+        if ((string) $customer_id !== $this->customer) {
+            return [];
+        }
+        return SiblingDropSessionStore::$rows[$this->customer] ?? [];
+    }
     public function shutdown_save() { if ($this->dirty) { SiblingDropSessionStore::$rows[$this->customer] = $this->data; $this->dirty = false; } }
 }
 
 class SiblingDropSessionRaceReproTest extends TestCase
 {
     private const CAMP_ID = 51723;
+    private const VAR_ID = 51724;
     private const USER_ID = 42;
 
     protected function setUp(): void
@@ -77,7 +86,13 @@ class SiblingDropSessionRaceReproTest extends TestCase
     {
         $_POST = [];
         WC()->session = null;
-        unset($GLOBALS['intersoccer_test_player_by_index'], $GLOBALS['intersoccer_test_json_capture'], $GLOBALS['intersoccer_test_json']);
+        unset(
+            $GLOBALS['intersoccer_test_player_by_index'],
+            $GLOBALS['intersoccer_test_json_capture'],
+            $GLOBALS['intersoccer_test_json'],
+            $GLOBALS['intersoccer_test_user_id'],
+            $GLOBALS['intersoccer_test_product_type']
+        );
         parent::tearDown();
     }
 
@@ -123,6 +138,46 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $s->shutdown_save();
     }
 
+    /** PV express-fields AJAX (camp days / late pickup), same session race as player stash. */
+    private function runExpressFieldsStashAjax(SiblingDropRequestSession $s, array $campDays): void
+    {
+        WC()->session = $s;
+        $_POST = [
+            'nonce' => 'valid_nonce',
+            'product_id' => self::CAMP_ID,
+            'variation_id' => self::VAR_ID,
+            'camp_days' => $campDays,
+            'late_pickup_type' => '',
+            'late_pickup_days' => [],
+        ];
+        try {
+            intersoccer_store_express_fields_callback();
+        } catch (Exception $e) {
+            $this->assertSame('AJAX_EXIT', $e->getMessage());
+        }
+        $_POST = [];
+        WC()->session = null;
+        $s->shutdown_save();
+    }
+
+    private function bookSecondChildExpressFields(string $discount, bool $overlap): int
+    {
+        $this->runStashAjax($this->startRequest(), 0);
+        $this->addToCartRequest(0);
+        $this->discountRequest($discount);
+        $daysChild2 = ['Tuesday'];
+        if ($overlap) {
+            $ajax = $this->startRequest();
+            $this->addToCartRequest(1);
+            $this->assertSame(2, $this->cartLinesNow(), 'add-to-cart for child 2 did commit 2 lines');
+            $this->runExpressFieldsStashAjax($ajax, $daysChild2);
+        } else {
+            $this->runExpressFieldsStashAjax($this->startRequest(), $daysChild2);
+            $this->addToCartRequest(1);
+        }
+        return $this->cartLinesNow();
+    }
+
     private function cartLinesNow(): int
     {
         return count($this->startRequest()->get('cart', []));
@@ -151,6 +206,11 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $this->runStashAjax($s, 1);
         $row = SiblingDropSessionStore::$rows[(string) self::USER_ID] ?? [];
         $this->assertNotEmpty($row[intersoccer_selected_player_session_key(self::CAMP_ID)] ?? null, 'stash AJAX marks the session dirty and saves it');
+    }
+
+    public function testRaceExpressFieldsCouponSecondChildLineIsKept(): void
+    {
+        $this->assertSame(2, $this->bookSecondChildExpressFields('coupon', true), 'second sibling camp line dropped (coupon, overlapping express-fields stash AJAX)');
     }
 
     /** FAILS on 2.10.17 and master: the stale AJAX save drops child 2. */

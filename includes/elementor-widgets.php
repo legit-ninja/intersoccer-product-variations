@@ -981,6 +981,45 @@ $intersoccer_elementor_product_page_cb = function () {
                 return '';
             };
             var isSubmitting = false;
+            window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+            if (!window.intersoccerPvTrackProductPageStashAjax) {
+                window.intersoccerPvTrackProductPageStashAjax = function (jqXHR) {
+                    if (!jqXHR || typeof jqXHR.always !== 'function') {
+                        return jqXHR;
+                    }
+                    window.intersoccerPvPendingStashAjax.push(jqXHR);
+                    jqXHR.always(function () {
+                        var list = window.intersoccerPvPendingStashAjax;
+                        var idx = list.indexOf(jqXHR);
+                        if (idx >= 0) {
+                            list.splice(idx, 1);
+                        }
+                    });
+                    return jqXHR;
+                };
+            }
+            if (!window.intersoccerPvHasPendingProductPageStashAjax) {
+                window.intersoccerPvHasPendingProductPageStashAjax = function () {
+                    return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
+                        return xhr && xhr.state && xhr.state() === 'pending';
+                    });
+                };
+            }
+            if (!window.intersoccerPvWaitForProductPageStashAjax) {
+                window.intersoccerPvWaitForProductPageStashAjax = function (timeoutMs) {
+                    var limit = typeof timeoutMs === 'number' ? timeoutMs : 5000;
+                    return new Promise(function (resolve) {
+                        var deadline = Date.now() + limit;
+                        (function tick() {
+                            if (!intersoccerPvHasPendingProductPageStashAjax() || Date.now() >= deadline) {
+                                resolve();
+                                return;
+                            }
+                            setTimeout(tick, 40);
+                        })();
+                    });
+                };
+            }
             var lastValidAvailableDays = null; // Cache last valid available days to prevent reset on player change
             
             // ENHANCEMENT: Player persistence state management
@@ -1043,13 +1082,13 @@ $intersoccer_elementor_product_page_cb = function () {
                 if (!playerId && intersoccerPlayerIndexChosen(selectedPlayer) && typeof selectedPlayer === 'string' && selectedPlayer.indexOf('-') !== -1) {
                     playerId = String(selectedPlayer);
                 }
-                jQuery.post(intersoccerCheckout.ajax_url, {
+                intersoccerPvTrackProductPageStashAjax(jQuery.post(intersoccerCheckout.ajax_url, {
                     action: 'intersoccer_store_selected_player',
                     nonce: intersoccerCheckout.nonce,
                     product_id: intersoccerPvProductId,
                     player_index: intersoccerPlayerIndexChosen(selectedPlayer) ? selectedPlayer : '',
                     player_id: playerId
-                });
+                }));
             }
 
             // Stash picked camp days and late pickup choice so Apple Pay / Google Pay can recover them
@@ -1065,7 +1104,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 }
                 var lpType = (typeof selectedLatePickupOption !== 'undefined') ? selectedLatePickupOption : '';
                 var lpDays = (typeof selectedLatePickupDays !== 'undefined' && lpType === 'single-days') ? selectedLatePickupDays : [];
-                jQuery.post(intersoccerCheckout.ajax_url, {
+                intersoccerPvTrackProductPageStashAjax(jQuery.post(intersoccerCheckout.ajax_url, {
                     action: 'intersoccer_store_express_fields',
                     nonce: intersoccerCheckout.nonce,
                     product_id: intersoccerPvProductId,
@@ -1073,7 +1112,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     camp_days: days || [],
                     late_pickup_type: lpType || '',
                     late_pickup_days: lpDays
-                });
+                }));
             }
 
             function intersoccerApplyPlayerChoice(selectedPlayer) {
@@ -2074,6 +2113,20 @@ $intersoccer_elementor_product_page_cb = function () {
                     debugWarn('InterSoccer: Submit handler triggered on non-product form, ignoring');
                     return; // Don't prevent default
                 }
+
+                <?php if (in_array($product_type, ['camp', 'course'], true) && $is_variable): ?>
+                if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingProductPageStashAjax()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    var $stashWaitForm = $currentForm;
+                    intersoccerPvWaitForProductPageStashAjax(5000).then(function () {
+                        window.intersoccerPvResubmitAfterStashWait = true;
+                        $stashWaitForm.trigger('submit');
+                        window.intersoccerPvResubmitAfterStashWait = false;
+                    });
+                    return false;
+                }
+                <?php endif; ?>
                 
                 <?php if (in_array($product_type, ['camp', 'course']) && $is_variable): ?>
                 // For camp and course products, validate before forcing standard POST submission
