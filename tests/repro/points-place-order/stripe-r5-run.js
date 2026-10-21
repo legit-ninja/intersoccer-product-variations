@@ -18,7 +18,7 @@ const ATTR={"pa_intersoccer-venues":"geneva-stade-de-varembe-nations","pa_age-gr
    if(h!==HOST && !u.startsWith('data:') && !u.startsWith('blob:')){ if(/(^|\.)stripe(cdn)?\.(com|network)$/.test(h)){st.stripe++; return r.continue();} if(process.env.HCAP && /(^|\.)hcaptcha\.com$/.test(h)){st.hcap=(st.hcap||0)+1; return r.continue();} if(process.env.OPEN){st.extOpen=(st.extOpen||0)+1; return r.continue();} st.ext++; return r.abort(); }
    return r.continue();});
  const p=await ctx.newPage(); const perr=[]; p.on('pageerror',e=>{perr.push(String(e.message).slice(0,300)); emit({kind:'pageerror',m:String(e.message).slice(0,300)});});
- p.on('console',m=>{ if(m.type()==='error'||/\[REPRO\]/.test(m.text())) emit({kind:'console',type:m.type(),m:m.text().slice(0,300)}); });
+ const cerr=[]; p.on('console',m=>{ if(m.type()==='error') cerr.push(m.text().slice(0,200));  if(m.type()==='error'||/\[REPRO\]/.test(m.text())) emit({kind:'console',type:m.type(),m:m.text().slice(0,300)}); });
  let rec=false; p.on('request',q=>{ if(!rec) return; const u=q.url(); let h=''; try{h=new URL(u).host}catch(e){} const pd=q.postData()||''; const a=(new URLSearchParams(pd)).get('action'); reqs.push({m:q.method(),host:h===HOST?'local':h,path:h===HOST?new URL(u).pathname+new URL(u).search.replace(/[?&](_wpnonce|security|nonce)=[^&]*/g,''):new URL(u).pathname,action:a}); });
  p.on('response',async r=>{ if(!rec) return; const u=r.url(); let h=''; try{h=new URL(u).host}catch(e){} const isWc=/wc-ajax=/.test(u)||/admin-ajax\.php/.test(u); const isStripeApi=/(^|\.)(api|merchant-ui-api|m)\.stripe\.com$/.test(h)||/stripe\.com$/.test(h)&&/\/v1\//.test(u); if(!isWc&&!isStripeApi) return; let body=''; try{ body=(await r.text()).slice(0,700);}catch(e){body='(no body)';} emit({kind:'resp',s:r.status(),m:r.request().method(),host:h===HOST?'local':h,path:new URL(u).pathname+(/wc-ajax=([a-z_]+)/.exec(u)||['',''])[0],action:(new URLSearchParams(r.request().postData()||'')).get('action'),body:RD(body)}); });
  p.on('requestfailed',q=>{ if(!rec) return; let h=''; try{h=new URL(q.url()).host}catch(e){} emit({kind:'reqfail',host:h===HOST?'local':h,path:new URL(q.url()).pathname,err:q.failure()&&q.failure().errorText}); });
@@ -58,6 +58,12 @@ const ATTR={"pa_intersoccer-venues":"geneva-stade-de-varembe-nations","pa_age-gr
  if(process.env.NOBILL){ for(const sel of ['#billing_first_name','#billing_last_name','#billing_address_1','#billing_city','#billing_postcode','#billing_phone']){const l=p.locator(sel); if(await l.count()) await l.fill('');} emit({kind:'billing_cleared'}); } else if(!process.env.RAW){const ph=p.locator('#billing_phone'); await ph.fill(''); await ph.pressSequentially('791234567',{delay:30}); await p.waitForTimeout(500);}
  const terms=p.locator('#terms'); if(await terms.count()) await terms.check({force:true}).catch(()=>{});
  await p.waitForTimeout(1500);
+ // SETTLE (default; RAW skips): fire update_checkout, wait until updated_checkout has fired AND finished: no .blockUI anywhere,
+ // form not .processing, #payment / review table not blockUI-blocked, no jQuery AJAX in flight; then 1.5s with no new refresh.
+ if(!process.env.RAW){ const t0=Date.now(); await p.evaluate(()=>{window.__uc=0;window.__ucN=0;jQuery(document.body).on('updated_checkout',()=>{window.__uc=1;window.__ucN++;});jQuery(document.body).trigger('update_checkout');});
+  const idle=()=>p.waitForFunction(()=>{const $=jQuery,f=document.querySelector('form.checkout');return window.__uc===1&&!document.querySelector('.blockUI')&&f&&!f.classList.contains('processing')&&!$('#payment').data('blockUI.isBlocked')&&!$('.woocommerce-checkout-review-order-table').data('blockUI.isBlocked')&&$.active===0;},null,{timeout:90000,polling:100}).then(()=>true).catch(()=>false);
+  let ok=await idle(); let stable=false; for(let i=0;i<10&&ok&&!stable;i++){ const n0=await p.evaluate(()=>window.__ucN); await p.waitForTimeout(1500); const s2=await p.evaluate(()=>({n:window.__ucN,blk:document.querySelectorAll('.blockUI').length,proc:document.querySelector('form.checkout').classList.contains('processing'),act:jQuery.active})); stable=s2.n===n0&&!s2.blk&&!s2.proc&&s2.act===0; if(!stable) ok=await idle(); }
+  emit({kind:'settle',ok,stable,ms:Date.now()-t0,updated_checkout_n:await p.evaluate(()=>window.__ucN)}); }
  // instrumentation (page-side, non-invasive): log triggerHandler results for checkout_place_order*, submit events, form state
  const pre=await p.evaluate(()=>{const $=window.jQuery; const f=document.querySelector('form.checkout'); const po=document.querySelector('#place_order');
    window.__repro={th:[],submits:[]};
@@ -68,7 +74,7 @@ const ATTR={"pa_intersoccer-venues":"geneva-stade-de-varembe-nations","pa_age-gr
    return {placeOrderInForm:!!(po&&po.form===f), poDisabled:po&&po.disabled, poType:po&&po.type, formClasses:f&&f.className, blocked:$(f).data('blockUI.isBlocked')||0,
      formEvents:Object.fromEntries(Object.entries(ev).map(([k,v])=>[k,v.length])), placeOrderEvents:Object.keys(pevs), docClickDelegates:(docev.click||[]).map(h=>h.selector).filter(Boolean).slice(0,40), pm:(document.querySelector('input[name=payment_method]:checked')||{}).value};});
  emit({kind:'pre_click',...pre});
- if(!process.env.RAW){ await p.locator('#place_order').scrollIntoViewIfNeeded(); await p.waitForTimeout(500); }
+ if(!process.env.RAW&&!process.env.NOSCROLL){ await p.locator('#place_order').scrollIntoViewIfNeeded(); await p.waitForTimeout(500); }
  emit({kind:'geo',...(await p.evaluate(()=>{const po=document.querySelector('#place_order'); const r=po.getBoundingClientRect(); const top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return {r:[Math.round(r.x),Math.round(r.y),Math.round(r.width),Math.round(r.height)],top:top?(top.tagName+'#'+top.id+'.'+String(top.className).slice(0,80)):null,active:document.activeElement&&(document.activeElement.tagName+'#'+document.activeElement.id),paymentBlocked:window.jQuery('#payment').data('blockUI.isBlocked')||0,overlays:document.querySelectorAll('.blockUI.blockOverlay').length,vh:innerHeight};}))});
  rec=true;
  await p.locator('#place_order').click({timeout:20000}).catch(e=>emit({kind:'click_err',e:String(e).slice(0,600)}));
@@ -83,5 +89,6 @@ const ATTR={"pa_intersoccer-venues":"geneva-stade-de-varembe-nations","pa_age-gr
  emit({kind:'billing_phone',v:(await p.locator('#billing_phone').inputValue().catch(()=>'')).replace(/\d(?=\d{3})/g,'x'),itiCountry:await p.evaluate(()=>{const e=document.querySelector('.iti__selected-dial-code, .iti__selected-flag'); return e?(e.innerText||e.title||'').trim().slice(0,30):null;})});
  const oid=(p.url().match(/order-received\/(\d+)/)||[])[1]||''; if(oid) fs.writeFileSync(path.join(process.env.OUTDIR||'/tmp','oid-'+LABEL+'.txt'),oid);
  emit({kind:'after_click',got_order:!!oid,...post,requests:reqs.filter(r=>!/\.(css|js|png|jpe?g|svg|woff2?|gif|webp)$/.test(r.path)).slice(0,40)});
+ emit({kind:'summary',checkout_submit:reqs.filter(r=>/wc-ajax=checkout(&|$)/.test(r.path)).length,stripe_pm_calls:reqs.filter(r=>/payment_methods/.test(r.path)).length,got_order:!!oid,token_errors:perr.filter(m=>/Invalid or unexpected token/.test(m)).length,other_page_errors:perr.filter(m=>!/Invalid or unexpected token/.test(m)),console_errors:cerr});
  emit({kind:'end',st,page_errors:perr.length});
  await b.close(); })().catch(e=>{emit({kind:'fatal',e:String(e).slice(0,300)});process.exit(1);});
