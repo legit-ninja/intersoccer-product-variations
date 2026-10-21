@@ -777,6 +777,14 @@ msgstr "Bitte beheben Sie den Fehler, um fortzufahren."
 msgid "Request failed"
 msgstr "Anfrage fehlgeschlagen"
 
+# wpml-name: Please add a phone number to your billing details so we can reach you about this booking.
+msgid "Please add a phone number to your billing details so we can reach you about this booking."
+msgstr "Bitte fügen Sie Ihren Rechnungsangaben eine Telefonnummer hinzu, damit wir Sie zu dieser Buchung erreichen können."
+
+# wpml-name: Please enter a complete phone number, including the country code (for example +41 79 123 45 67).
+msgid "Please enter a complete phone number, including the country code (for example +41 79 123 45 67)."
+msgstr "Bitte geben Sie eine vollständige Telefonnummer mit Ländervorwahl ein (zum Beispiel +41 79 123 45 67)."
+
 #, php-format
 msgid "Medical information: provided (view or update in My Account)."
 msgstr "Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktualisieren)."

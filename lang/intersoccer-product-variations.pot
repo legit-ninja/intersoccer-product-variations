@@ -839,3 +839,11 @@ msgstr ""
 # wpml-name: Request failed
 msgid "Request failed"
 msgstr ""
+
+# wpml-name: Please add a phone number to your billing details so we can reach you about this booking.
+msgid "Please add a phone number to your billing details so we can reach you about this booking."
+msgstr ""
+
+# wpml-name: Please enter a complete phone number, including the country code (for example +41 79 123 45 67).
+msgid "Please enter a complete phone number, including the country code (for example +41 79 123 45 67)."
+msgstr ""

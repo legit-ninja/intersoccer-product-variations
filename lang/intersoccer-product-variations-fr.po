@@ -882,3 +882,11 @@ msgstr "Âge au début du camp : %d"
 #, php-format
 msgid "Birth year: %s"
 msgstr "Année de naissance : %s"
+
+# wpml-name: Please add a phone number to your billing details so we can reach you about this booking.
+msgid "Please add a phone number to your billing details so we can reach you about this booking."
+msgstr "Veuillez ajouter un numéro de téléphone à vos coordonnées de facturation afin que nous puissions vous contacter au sujet de cette réservation."
+
+# wpml-name: Please enter a complete phone number, including the country code (for example +41 79 123 45 67).
+msgid "Please enter a complete phone number, including the country code (for example +41 79 123 45 67)."
+msgstr "Veuillez saisir un numéro de téléphone complet, avec l'indicatif du pays (par exemple +41 79 123 45 67)."

@@ -281,6 +281,59 @@ function intersoccer_billing_phone_required_message() {
 }
 
 /**
+ * Message shown when express checkout billing phone is present but incomplete.
+ *
+ * @return string
+ */
+function intersoccer_billing_phone_incomplete_message() {
+    return __('Please enter a complete phone number, including the country code (for example +41 79 123 45 67).', 'intersoccer-product-variations');
+}
+
+/**
+ * Whether a billing phone looks complete enough for express checkout (no third-party validator on Store API).
+ *
+ * @param string $phone
+ * @param string $country ISO 3166-1 alpha-2 billing country (default CH).
+ * @return bool
+ */
+function intersoccer_phone_is_complete($phone, $country = 'CH') {
+    $phone = (string) $phone;
+    if ($phone === '') {
+        return false;
+    }
+    $normalized = preg_replace('/[\s.\-\/()]/', '', $phone);
+    if (strpos($normalized, '00') === 0) {
+        $normalized = '+' . substr($normalized, 2);
+    }
+    if ($normalized === '' || !preg_match('/^\+?\d+$/', $normalized)) {
+        return false;
+    }
+    if ($normalized[0] === '+') {
+        $digits = substr($normalized, 1);
+        if ($digits === '') {
+            return false;
+        }
+        if (strpos($digits, '41') === 0) {
+            return (bool) preg_match('/^41\d{9}$/', $digits);
+        }
+        if (strpos($digits, '33') === 0) {
+            return (bool) preg_match('/^33\d{9}$/', $digits);
+        }
+        $len = strlen($digits);
+        return $len >= 8 && $len <= 15;
+    }
+    $country = strtoupper((string) $country);
+    if ($country === 'CH' || $country === 'FR') {
+        if (preg_match('/^0\d{9}$/', $normalized)) {
+            return true;
+        }
+        return (bool) preg_match('/^\d{9}$/', $normalized);
+    }
+    $len = strlen($normalized);
+    return $len >= 6 && $len <= 14;
+}
+
+/**
  * Billing phone from the order, falling back to the request's billing_address.
  *
  * @param WC_Order|object|null        $order
@@ -299,8 +352,28 @@ function intersoccer_store_api_billing_phone($order, $request = null) {
 }
 
 /**
+ * Billing country from the order, falling back to the request's billing_address.
+ *
+ * @param WC_Order|object|null        $order
+ * @param WP_REST_Request|object|null $request
+ * @return string ISO 3166-1 alpha-2
+ */
+function intersoccer_store_api_billing_country($order, $request = null) {
+    $country = (is_object($order) && method_exists($order, 'get_billing_country')) ? (string) $order->get_billing_country() : '';
+    if ($country === '' && is_object($request) && method_exists($request, 'get_param')) {
+        $billing = $request->get_param('billing_address');
+        if (is_array($billing) && isset($billing['country']) && is_scalar($billing['country'])) {
+            $country = (string) $billing['country'];
+        }
+    }
+    $country = strtoupper(trim($country));
+    return $country !== '' ? $country : 'CH';
+}
+
+/**
  * Store API express checkout: the Store API does not validate the billing phone, and express
- * wallets can create an order without one. When the store requires a phone, refuse with a 400.
+ * wallets can create an order without one. When the store requires a phone, refuse empty values;
+ * any non-empty phone must look complete.
  *
  * @param WC_Order        $order
  * @param WP_REST_Request $request
@@ -312,19 +385,27 @@ function intersoccer_store_api_require_billing_phone($order, $request = null) {
     if (!intersoccer_store_api_request_is_express($request)) {
         return;
     }
-    // Follow the store setting: only enforce when the phone field is required.
-    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') !== 'required') {
-        return;
+    $phone = intersoccer_store_api_billing_phone($order, $request);
+    $phone_required = !function_exists('get_option') || get_option('woocommerce_checkout_phone_field', 'required') === 'required';
+    if ($phone === '') {
+        if (!$phone_required) {
+            return;
+        }
+        intersoccer_warning('Store API checkout refused: no billing phone');
+        $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
+        if (class_exists($route_exception)) {
+            throw new $route_exception('intersoccer_billing_phone_required', intersoccer_billing_phone_required_message(), 400);
+        }
+        throw new Exception(intersoccer_billing_phone_required_message(), 400);
     }
-    if (intersoccer_store_api_billing_phone($order, $request) !== '') {
-        return;
+    if (!intersoccer_phone_is_complete($phone, intersoccer_store_api_billing_country($order, $request))) {
+        intersoccer_warning('Store API checkout refused: incomplete billing phone');
+        $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
+        if (class_exists($route_exception)) {
+            throw new $route_exception('intersoccer_billing_phone_incomplete', intersoccer_billing_phone_incomplete_message(), 400);
+        }
+        throw new Exception(intersoccer_billing_phone_incomplete_message(), 400);
     }
-    intersoccer_warning('Store API checkout refused: no billing phone');
-    $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
-    if (class_exists($route_exception)) {
-        throw new $route_exception('intersoccer_billing_phone_required', intersoccer_billing_phone_required_message(), 400);
-    }
-    throw new Exception(intersoccer_billing_phone_required_message(), 400);
 }
 
 /**
