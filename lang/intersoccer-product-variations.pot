@@ -3157,3 +3157,131 @@ msgstr ""
 #: includes/woocommerce/cart-calculations.php
 msgid "Late Pickup Days"
 msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Male"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Female"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Other"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Attendee DOB"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Attendee Gender"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Medical Conditions"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Activity Type"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Discount Amount"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Campaign Code"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Campaign Discount %"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Girls Only"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp Start Date"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp End Date"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp Week Index"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Sites InterSoccer"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Age Group"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Canton / Region"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "City"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Booking Type"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Days of Week"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Course Day"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Course Times"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Tournament Day"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Full Term"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Birthday Party"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Unknown"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Summer"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Autumn"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Spring"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Winter"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Saturday"
+msgstr ""
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Sunday"
+msgstr ""

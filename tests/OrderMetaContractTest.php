@@ -84,6 +84,8 @@ if (!function_exists('wp_doing_ajax')) {
 
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
+require_once dirname(__DIR__) . '/includes/admin-english-locale.php';
+require_once dirname(__DIR__) . '/includes/language-helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
 if (!class_exists('WC_Order')) {
@@ -873,6 +875,61 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame($updates['assigned_player'], $updates['_assigned_player']);
 
         unset($GLOBALS['intersoccer_test_player_details']);
+    }
+
+    public function test_stored_order_meta_display_key_map_covers_booking_labels() {
+        $map = intersoccer_stored_order_meta_display_key_map();
+        $this->assertArrayHasKey('Assigned Attendee', $map);
+        $this->assertArrayHasKey('Camp Terms', $map);
+        $this->assertArrayHasKey('Age Group', $map);
+        $this->assertArrayHasKey('Attendee Gender', $map);
+        $this->assertSame('Camp Start Date', $map['Date de début du camp']);
+        $this->assertSame('Age Group', $map["Groupe d'âge"]);
+    }
+
+    public function test_attendee_gender_stays_english_in_admin_order_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $display = intersoccer_translate_stored_order_meta_display_value('female', 'Attendee Gender');
+        $this->assertSame('Female', $display);
+        $display_male = intersoccer_translate_stored_order_meta_display_value('Garçon', 'Attendee Gender');
+        $this->assertSame('Male', $display_male);
+    }
+
+    public function test_attendee_gender_translated_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Male') {
+                return 'Garçon';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Male', 'Attendee Gender');
+        $this->assertSame('Garçon', $display);
+        MockFilters::reset();
+    }
+
+    public function test_days_selected_weekdays_translate_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Monday') {
+                return 'Lundi';
+            }
+            if ($text === 'Tuesday') {
+                return 'Mardi';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Monday, Tuesday', 'Days Selected');
+        $this->assertSame('Lundi, Mardi', $display);
+        MockFilters::reset();
+    }
+
+    public function test_order_meta_labels_unchanged_in_admin_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $label = intersoccer_translate_stored_order_meta_display_key('Camp Terms', 'Camp Terms');
+        $this->assertSame('Camp Terms', $label);
     }
 
 }

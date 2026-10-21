@@ -2145,27 +2145,162 @@ function intersoccer_is_customer_order_meta_display_context() {
  * @return array<string,string> English key => English msgid for gettext.
  */
 function intersoccer_stored_order_meta_display_key_map() {
-    $keys = [
-        'Late Pickup Type',
-        'Late Pickup Days',
-        'Late Pickup Cost',
-        'Assigned Attendee',
-        'Holidays',
-        'Days Selected',
-        'Discount',
-        'Start Date',
-        'End Date',
-        'Total Sessions',
-        'Sessions Remaining',
-        'Remaining Sessions',
-    ];
+    static $cached = null;
+    if ($cached !== null) {
+        return apply_filters('intersoccer_stored_order_meta_display_key_map', $cached);
+    }
 
     $map = [];
-    foreach ($keys as $key) {
+    $skip_keys = ['assigned_player', 'assigned_player_id'];
+    foreach (intersoccer_order_meta_checkout_extras() as $key) {
+        if (in_array($key, $skip_keys, true) || strpos($key, '_') === 0) {
+            continue;
+        }
         $map[$key] = $key;
     }
 
-    return apply_filters('intersoccer_stored_order_meta_display_key_map', $map);
+    if (function_exists('intersoccer_camp_schedule_order_meta_labels_en')
+        && function_exists('intersoccer_camp_schedule_order_meta_label_variants')) {
+        $en_camp = intersoccer_camp_schedule_order_meta_labels_en();
+        foreach (intersoccer_camp_schedule_order_meta_label_variants() as $field => $variants) {
+            $msgid = $en_camp[$field] ?? '';
+            if ($msgid === '') {
+                continue;
+            }
+            $map[$msgid] = $msgid;
+            foreach ($variants as $variant) {
+                if ($variant !== '') {
+                    $map[$variant] = $msgid;
+                }
+            }
+        }
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $def) {
+            $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+            if ($label === '') {
+                continue;
+            }
+            $map[$label] = $label;
+            if (!empty($def['legacy_order_meta_labels']) && is_array($def['legacy_order_meta_labels'])) {
+                foreach ($def['legacy_order_meta_labels'] as $legacy) {
+                    $legacy = (string) $legacy;
+                    if ($legacy !== '') {
+                        $map[$legacy] = $label;
+                    }
+                }
+            }
+        }
+    }
+
+    $map['Remaining Sessions'] = 'Remaining Sessions';
+    $map['Sessions Remaining'] = 'Sessions Remaining';
+    $map['InterSoccer Venues'] = 'Sites InterSoccer';
+
+    $cached = $map;
+
+    return apply_filters('intersoccer_stored_order_meta_display_key_map', $cached);
+}
+
+/**
+ * Weekday names persisted in English on order lines.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_pv_order_meta_weekday_msgids() {
+    return [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+    ];
+}
+
+/**
+ * @param string $label Single token (e.g. weekday).
+ * @return string
+ */
+function intersoccer_pv_translate_order_meta_token_for_display($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return '';
+    }
+
+    if (in_array($label, intersoccer_pv_order_meta_weekday_msgids(), true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    $activity_types = ['Camp', 'Course', 'Birthday Party', 'Tournament', 'Unknown'];
+    if (in_array($label, $activity_types, true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    $seasons = ['Summer', 'Autumn', 'Spring', 'Winter'];
+    if (in_array($label, $seasons, true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    if ($label === 'Full Week') {
+        return __('Full Week', 'intersoccer-product-variations');
+    }
+    if ($label === 'Single Day(s)') {
+        return __('Single Day(s)', 'intersoccer-product-variations');
+    }
+    if ($label === 'Full Term') {
+        return __('Full Term', 'intersoccer-product-variations');
+    }
+    if ($label === 'Yes') {
+        return __('Yes', 'intersoccer-product-variations');
+    }
+    if ($label === 'No') {
+        return __('No', 'intersoccer-product-variations');
+    }
+    if ($label === 'Girls Only') {
+        return __('Girls Only', 'intersoccer-product-variations');
+    }
+
+    return $label;
+}
+
+/**
+ * Translate comma-separated stored order meta values (days, holidays).
+ *
+ * @param string $text Raw stored value.
+ * @return string
+ */
+function intersoccer_pv_translate_comma_separated_order_meta_value($text) {
+    $text = (string) $text;
+    if ($text === '' || strpos($text, ',') === false) {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    $parts = array_map('trim', explode(',', $text));
+    $translated = array_map('intersoccer_pv_translate_order_meta_token_for_display', $parts);
+
+    return implode(', ', $translated);
+}
+
+/**
+ * @param string $text Stored Activity Type value.
+ * @return string
+ */
+function intersoccer_pv_translate_activity_type_order_meta_value($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+
+    $suffix = ' - Girls Only';
+    if (substr($text, -strlen($suffix)) === $suffix) {
+        $base = substr($text, 0, -strlen($suffix));
+        return intersoccer_pv_translate_order_meta_token_for_display($base) . ' - ' . __('Girls Only', 'intersoccer-product-variations');
+    }
+
+    return intersoccer_pv_translate_order_meta_token_for_display($text);
 }
 
 /**
@@ -2285,22 +2420,24 @@ function intersoccer_translate_persisted_discount_label_for_display($label) {
 }
 
 function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
-    if (!intersoccer_is_customer_order_meta_display_context()) {
-        return $value;
-    }
-
     $text = is_scalar($value) ? (string) $value : '';
     if ($text === '') {
         return $value;
     }
 
-    if ($meta_key === 'Late Pickup Type') {
-        if ($text === 'Full Week') {
-            return __('Full Week', 'intersoccer-product-variations');
+    if ($meta_key === 'Attendee Gender') {
+        if (function_exists('intersoccer_pv_is_admin_english_context') && intersoccer_pv_is_admin_english_context()
+            && function_exists('intersoccer_pv_admin_format_player_gender_label')) {
+            return intersoccer_pv_admin_format_player_gender_label($text);
         }
-        if ($text === 'Single Day(s)') {
-            return __('Single Day(s)', 'intersoccer-product-variations');
+        if (intersoccer_is_customer_order_meta_display_context()
+            && function_exists('intersoccer_pv_format_stored_gender_for_display')) {
+            return intersoccer_pv_format_stored_gender_for_display($text);
         }
+    }
+
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $value;
     }
 
     if ($meta_key === 'Discount' || $meta_key === '') {
@@ -2308,6 +2445,34 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
         if ($translated !== $text) {
             return $translated;
         }
+    }
+
+    if ($meta_key === 'Activity Type') {
+        return intersoccer_pv_translate_activity_type_order_meta_value($text);
+    }
+
+    if ($meta_key === 'Booking Type' || $meta_key === 'Late Pickup Type') {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    if ($meta_key === 'Girls Only') {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    if ($meta_key === 'Season') {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    $comma_keys = [
+        'Days Selected',
+        'Late Pickup Days',
+        'Holidays',
+        'Course Day',
+        'Days of Week',
+        'Tournament Day',
+    ];
+    if (in_array($meta_key, $comma_keys, true)) {
+        return intersoccer_pv_translate_comma_separated_order_meta_value($text);
     }
 
     return $value;

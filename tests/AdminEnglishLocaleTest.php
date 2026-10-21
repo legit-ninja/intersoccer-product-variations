@@ -61,6 +61,8 @@ if (!function_exists('admin_url')) {
 }
 
 require_once dirname(__DIR__) . '/includes/admin-english-locale.php';
+require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
+require_once dirname(__DIR__) . '/includes/language-helpers.php';
 
 class AdminEnglishLocaleTest extends TestCase {
     protected function setUp(): void {
@@ -94,5 +96,12 @@ class AdminEnglishLocaleTest extends TestCase {
     public function test_other_domains_untouched() {
         $GLOBALS['intersoccer_test_is_admin'] = true;
         $this->assertSame('[t]Other', intersoccer_pv_filter_gettext('[t]Other', 'Other', 'woocommerce'));
+    }
+
+    public function test_admin_player_gender_label_avoids_player_management_gettext() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $this->assertSame('Male', intersoccer_pv_admin_format_player_gender_label('male'));
+        $this->assertSame('Male', intersoccer_pv_admin_format_player_gender_label('Garçon'));
+        $this->assertSame('Female', intersoccer_pv_admin_format_player_gender_label('female'));
     }
 }
