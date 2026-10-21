@@ -755,6 +755,25 @@ class OrderMetaContractTest extends TestCase {
         $this->assertNotContains('_camp_start_date', $visible_keys);
     }
 
+    public function test_translate_stored_order_meta_display_key_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $translated = intersoccer_translate_stored_order_meta_display_key('Assigned Attendee', 'Assigned Attendee');
+        $this->assertSame('Assigned Attendee', $translated);
+    }
+
+    public function test_translate_stored_order_meta_skipped_in_admin_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $label = intersoccer_translate_stored_order_meta_display_key('Days Selected', 'Days Selected');
+        $this->assertSame('Days Selected', $label);
+    }
+
+    public function test_translate_sibling_discount_value_pattern() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $value = intersoccer_translate_stored_order_meta_display_value('20% Camp Sibling Discount', 'Discount');
+        $this->assertStringContainsString('Camp Sibling Discount', $value);
+    }
+
     public function test_filter_customer_order_item_meta_preserves_order() {
         $formatted_meta = [
             (object) ['key' => 'Activity Type', 'value' => 'Camp'],

@@ -839,3 +839,37 @@ msgstr ""
 # wpml-name: Request failed
 msgid "Request failed"
 msgstr ""
+
+# wpml-name: Please select an attendee.
+msgid "Please select an attendee."
+msgstr ""
+
+msgid "Holidays (No Session)"
+msgstr ""
+
+msgid "Single Day(s)"
+msgstr ""
+
+msgid "Late Pickup"
+msgstr ""
+
+msgid "Late Pickup Days"
+msgstr ""
+
+msgid "Late Pickup Cost"
+msgstr ""
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Camp Sibling Discount"
+msgstr ""
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Course Sibling Discount"
+msgstr ""
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Tournament Sibling Discount"
+msgstr ""

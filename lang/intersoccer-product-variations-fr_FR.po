@@ -17,7 +17,7 @@ msgstr "Vitesse de traitement"
 
 # wpml-name: a908bc2d1b29a3a17c61a7c8e0930ae7
 msgid "Higher numbers find more orders but take longer to scan initially."
-msgstr ""
+msgstr "Des valeurs plus élevées trouvent plus de commandes, mais le premier scan prend plus de temps."
 "Des nombres plus élevés trouvent plus de commandes mais prennent plus de "
 "temps à scanner initialement."
 
@@ -112,7 +112,7 @@ msgstr "Résultats du scan"
 
 # wpml-name: 2c26b519baf5f0809a8e2abbdf97c3c8
 msgid "Great! No orders found that need metadata updates."
-msgstr ""
+msgstr "Parfait ! Aucune commande ne nécessite une mise à jour des métadonnées."
 "Super ! Aucune commande trouvée nécessitant des mises à jour de métadonnées."
 
 # wpml-name: 1c71f1fc7111c577393ed778c26a9026
@@ -149,7 +149,7 @@ msgstr "Nonce invalide."
 
 # wpml-name: 67cac7fbbe3ccda68b696004c64fb24e
 msgid "Allow customers to add late pick up options for this camp variation."
-msgstr ""
+msgstr "Permettre aux clients d'ajouter des options de récupération tardive pour cette variante de camp."
 "Permettre aux clients d'ajouter des options de récupération tardive pour "
 "cette variation de camp."
 
@@ -611,7 +611,7 @@ msgstr "Mettre à jour les commandes sélectionnées"
 
 # wpml-name: 8c28b6177556e66df27d1439ac2307d0
 msgid "Fix Incorrect Attributes (e.g., remove Days-of-week)"
-msgstr ""
+msgstr "Corriger les attributs incorrects (p. ex. supprimer les jours de la semaine)"
 "Corriger les attributs incorrects (par exemple, supprimer les jours de la "
 "semaine)"
 
@@ -882,3 +882,46 @@ msgstr "Âge au début du camp : %d"
 #, php-format
 msgid "Birth year: %s"
 msgstr "Année de naissance : %s"
+
+# wpml-name: Please select an attendee.
+msgid "Please select an attendee."
+msgstr "Veuillez sélectionner un participant."
+
+msgid "Holidays (No Session)"
+msgstr "Jours fériés (pas de séance)"
+
+msgid "Single Day(s)"
+msgstr "Jour(s) unique(s)"
+
+msgid "Late Pickup Days"
+msgstr "Jours de récupération tardive"
+
+msgid "Late Pickup Cost"
+msgstr "Coût de récupération tardive"
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Camp Sibling Discount"
+msgstr "%s%% Réduction fratrie camp"
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Course Sibling Discount"
+msgstr "%s%% Réduction fratrie cours"
+
+#. translators: %s: discount percentage number without percent sign
+#, php-format
+msgid "%s%% Tournament Sibling Discount"
+msgstr "%s%% Réduction fratrie tournoi"
+
+# wpml-name: Please select at least one day.
+msgid "Please select at least one day."
+msgstr "Veuillez sélectionner au moins un jour."
+
+# wpml-name: Please resolve the error to continue.
+msgid "Please resolve the error to continue."
+msgstr "Veuillez corriger l'erreur pour continuer."
+
+# wpml-name: Request failed
+msgid "Request failed"
+msgstr "Échec de la requête"

@@ -125,19 +125,19 @@ class DiscountMetaAndLabelRegressionTest extends TestCase
         // Source templates in discounts.php (must keep %% so sprintf emits a literal %).
         $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
         $this->assertStringContainsString(
-            "intersoccer_translate_string('%s%% Camp Sibling Discount'",
+            "__('%s%% Camp Sibling Discount', 'intersoccer-product-variations')",
             $src
         );
         $this->assertStringContainsString(
-            "intersoccer_translate_string('%s%% Course Sibling Discount'",
+            "__('%s%% Course Sibling Discount', 'intersoccer-product-variations')",
             $src
         );
         $this->assertStringContainsString(
-            "intersoccer_translate_string('%s%% Tournament Sibling Discount'",
+            "__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations')",
             $src
         );
         $this->assertStringNotContainsString(
-            "intersoccer_translate_string('%s Camp Sibling Discount'",
+            "__('%s Camp Sibling Discount', 'intersoccer-product-variations')",
             $src,
             'Unescaped %s without %% would print "20 Camp Sibling Discount"'
         );
