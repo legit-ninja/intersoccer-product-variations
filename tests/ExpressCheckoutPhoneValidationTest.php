@@ -158,4 +158,38 @@ class ExpressCheckoutPhoneValidationTest extends TestCase
         }
         $this->assertNull($thrown);
     }
+
+    public function testExpressOptionalPhoneFieldIncompletePhoneIsRefused()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        try {
+            intersoccer_store_api_require_billing_phone(
+                $this->phoneOrder(''),
+                $this->expressPhoneRequest(['phone' => '079 123'])
+            );
+            $this->fail('Expected the checkout to be refused');
+        } catch (Exception $e) {
+            $this->assertSame(intersoccer_billing_phone_incomplete_message(), $e->getMessage());
+        }
+    }
+
+    public function testExpressOptionalPhoneFieldEmptyPhonePasses()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        intersoccer_store_api_require_billing_phone(
+            $this->phoneOrder(''),
+            $this->expressPhoneRequest(['phone' => ''])
+        );
+        $this->assertTrue(true);
+    }
+
+    public function testExpressOptionalPhoneFieldCompletePhonePasses()
+    {
+        $GLOBALS['intersoccer_test_options']['woocommerce_checkout_phone_field'] = 'optional';
+        intersoccer_store_api_require_billing_phone(
+            $this->phoneOrder(''),
+            $this->expressPhoneRequest(['phone' => '+41 79 123 45 67'])
+        );
+        $this->assertTrue(true);
+    }
 }

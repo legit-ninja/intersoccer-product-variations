@@ -372,7 +372,8 @@ function intersoccer_store_api_billing_country($order, $request = null) {
 
 /**
  * Store API express checkout: the Store API does not validate the billing phone, and express
- * wallets can create an order without one. When the store requires a phone, refuse with a 400.
+ * wallets can create an order without one. When the store requires a phone, refuse empty values;
+ * any non-empty phone must look complete.
  *
  * @param WC_Order        $order
  * @param WP_REST_Request $request
@@ -384,12 +385,12 @@ function intersoccer_store_api_require_billing_phone($order, $request = null) {
     if (!intersoccer_store_api_request_is_express($request)) {
         return;
     }
-    // Follow the store setting: only enforce when the phone field is required.
-    if (function_exists('get_option') && get_option('woocommerce_checkout_phone_field', 'required') !== 'required') {
-        return;
-    }
     $phone = intersoccer_store_api_billing_phone($order, $request);
+    $phone_required = !function_exists('get_option') || get_option('woocommerce_checkout_phone_field', 'required') === 'required';
     if ($phone === '') {
+        if (!$phone_required) {
+            return;
+        }
         intersoccer_warning('Store API checkout refused: no billing phone');
         $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
         if (class_exists($route_exception)) {
