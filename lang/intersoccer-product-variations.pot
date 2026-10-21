@@ -3154,3 +3154,6 @@ msgstr ""
 #, php-format
 msgid "Birth year: %s"
 msgstr ""
+#: includes/woocommerce/cart-calculations.php
+msgid "Late Pickup Days"
+msgstr ""
