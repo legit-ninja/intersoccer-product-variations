@@ -82,6 +82,18 @@ if (!function_exists('wp_doing_ajax')) {
     }
 }
 
+if (!function_exists('get_locale')) {
+    function get_locale() {
+        return $GLOBALS['intersoccer_test_locale'] ?? 'en_US';
+    }
+}
+
+if (!function_exists('determine_locale')) {
+    function determine_locale() {
+        return get_locale();
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__) . '/includes/admin-english-locale.php';
@@ -961,27 +973,62 @@ class OrderMetaContractTest extends TestCase {
         $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Camp-Wochenindex'));
     }
 
-    public function test_note_dash_mojibake_repaired_at_display() {
+    public function test_note_dash_mojibake_repaired_only_in_german_display_locale() {
         $GLOBALS['intersoccer_test_is_admin'] = false;
         $raw = 'Sie können jederzeit einsteigen ? die Preise werden anteilig berechnet';
+        $GLOBALS['intersoccer_test_locale'] = 'de_DE';
         $fixed = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
         $this->assertStringContainsString('–', $fixed);
         $this->assertStringNotContainsString(' ? ', $fixed);
+
+        $GLOBALS['intersoccer_test_locale'] = 'fr_FR';
+        $fr = intersoccer_translate_stored_order_meta_display_value('Des questions ? Contactez-nous', 'Note');
+        $this->assertSame('Des questions ? Contactez-nous', $fr);
+
+        $GLOBALS['intersoccer_test_locale'] = 'en_US';
+        $en = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
+        $this->assertSame($raw, $en);
+        unset($GLOBALS['intersoccer_test_locale']);
     }
 
-    public function test_email_context_translates_order_meta_label() {
+    public function test_course_date_display_localized_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $display = intersoccer_pv_format_stored_order_date_for_display('September 27, 2026');
+        $this->assertNotSame('', $display);
+        $this->assertStringContainsString('2026', $display);
+    }
+
+    public function test_course_date_unchanged_in_admin_context() {
         $GLOBALS['intersoccer_test_is_admin'] = true;
-        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
-        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
-            if ($text === 'Camp Terms') {
-                return 'Semaine de camp';
-            }
-            return $translation;
-        };
-        $label = intersoccer_translate_stored_order_meta_display_key('Camp Terms', 'Camp Terms');
-        $this->assertSame('Semaine de camp', $label);
-        unset($GLOBALS['intersoccer_sensitive_order_meta_email']);
-        MockFilters::reset();
+        $stored = 'September 27, 2026';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Start Date');
+        $this->assertSame($stored, $display);
+    }
+
+    public function test_camp_build_stores_english_camp_schedule_keys() {
+        require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::reset();
+        }
+        $vid = 88002;
+        intersoccer_update_camp_schedule($vid, '2026-10-19', '2026-10-23', 4, true);
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 88003,
+            'variation_id' => $vid,
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+        $updates = $built['updates'];
+        $this->assertArrayHasKey('Camp Start Date', $updates);
+        $this->assertArrayHasKey('Camp End Date', $updates);
+        $this->assertArrayHasKey('Camp Week Index', $updates);
+        $this->assertArrayNotHasKey('Date de début du camp', $updates);
+    }
+
+    public function test_checkout_parent_attributes_use_english_label_keys() {
+        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/checkout-calculations.php');
+        $this->assertStringNotContainsString("icl_t('intersoccer-product-variations', \$english_label", $src);
+        $this->assertStringNotContainsString("icl_t('intersoccer-product-variations', \$label, \$label)", $src);
     }
 
     public function test_medical_none_translated_for_customer() {

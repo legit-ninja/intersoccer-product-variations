@@ -883,15 +883,11 @@ function intersoccer_collect_variation_taxonomy_meta($variation_id) {
  * @return mixed
  */
 function intersoccer_sanitize_order_line_meta_value($value, $meta_key = '') {
-    if (!is_string($value)) {
-        return $value;
+    if (is_string($value)) {
+        return sanitize_text_field($value);
     }
 
-    if ($meta_key === 'Note' || intersoccer_pv_order_meta_key_is($meta_key, 'Note')) {
-        return wp_strip_all_tags($value);
-    }
-
-    return sanitize_text_field($value);
+    return $value;
 }
 
 /**
@@ -1570,7 +1566,6 @@ function intersoccer_order_meta_hidden_customer_keys() {
         'Player Index',
         'intersoccer_player_index',
         'Camp Week Index',
-        'Player DOB',
     ];
 
     return apply_filters('intersoccer_order_meta_hidden_customer_keys', $keys);
@@ -2279,9 +2274,26 @@ function intersoccer_pv_format_stored_order_date_for_display($text) {
  * @param string $text Note body.
  * @return string
  */
+function intersoccer_pv_is_german_display_locale() {
+    $locale = '';
+    if (function_exists('determine_locale')) {
+        $locale = (string) determine_locale();
+    } elseif (function_exists('get_locale')) {
+        $locale = (string) get_locale();
+    }
+
+    return $locale !== '' && strpos(strtolower($locale), 'de') === 0;
+}
+
+/**
+ * Repair DE course Note text where a stored en-dash was saved as "?" between words (DB content).
+ *
+ * @param string $text Note body.
+ * @return string
+ */
 function intersoccer_pv_repair_utf8_dash_mojibake_in_note($text) {
     $text = (string) $text;
-    if ($text === '' || strpos($text, '?') === false) {
+    if ($text === '' || strpos($text, '?') === false || !intersoccer_pv_is_german_display_locale()) {
         return $text;
     }
 
@@ -2290,6 +2302,31 @@ function intersoccer_pv_repair_utf8_dash_mojibake_in_note($text) {
     }
 
     return $text;
+}
+
+/**
+ * Hide PM Player DOB when PV Attendee DOB is also on the line (duplicate).
+ *
+ * @param string            $key  Meta key.
+ * @param WC_Order_Item     $item Order line item.
+ * @return bool
+ */
+function intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item) {
+    if (!intersoccer_pv_order_meta_key_is($key, 'Player DOB')) {
+        return false;
+    }
+
+    if (!($item instanceof WC_Order_Item_Product) && !is_object($item)) {
+        return false;
+    }
+
+    if (!method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $attendee = trim((string) $item->get_meta('Attendee DOB', true));
+
+    return $attendee !== '';
 }
 
 /**
@@ -2664,6 +2701,9 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     foreach ($formatted_meta as $meta) {
         $key = isset($meta->key) ? (string) $meta->key : '';
         if ($key === '' || intersoccer_is_hidden_customer_order_meta_key($key)) {
+            continue;
+        }
+        if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
             continue;
         }
         $filtered[] = intersoccer_translate_order_item_formatted_meta_object($meta);
