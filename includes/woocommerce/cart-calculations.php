@@ -1599,13 +1599,13 @@ add_action('wp_ajax_nopriv_intersoccer_store_selected_player', 'intersoccer_stor
 function intersoccer_store_selected_player_callback() {
     $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        wp_send_json_error(['message' => 'Invalid nonce'], 403);
+        wp_send_json_error(['message' => __('Invalid nonce', 'intersoccer-product-variations')], 403);
     }
     $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
     $player_index = array_key_exists('player_index', $_POST) ? wp_unslash($_POST['player_index']) : null;
     $player_id = isset($_POST['player_id']) ? sanitize_text_field(wp_unslash((string) $_POST['player_id'])) : '';
     if ($product_id <= 0) {
-        wp_send_json_error(['message' => 'Missing product_id']);
+        wp_send_json_error(['message' => __('Missing product_id', 'intersoccer-product-variations')]);
     }
     // Shopper cleared the player: forget the stash so express checkout cannot reuse an old choice.
     $index_empty = ($player_index === null || trim((string) $player_index) === '');
