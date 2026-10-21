@@ -774,6 +774,23 @@ class SiblingDropSessionRaceReproTest extends TestCase
         }
     }
 
+    public function testCasSaveWarningOnlyWhenStaleWritePrevented(): void
+    {
+        $this->addToCartRequest(0);
+        $GLOBALS['intersoccer_test_warnings'] = [];
+        $this->runFragmentLikeDirtySessionAjax($this->startRequest());
+        $this->assertSame([], $GLOBALS['intersoccer_test_warnings'], 'no log without a concurrent cart change');
+        add_action('shutdown', 'intersoccer_pv_wc_session_shutdown_save_router', 20);
+        $ajax = $this->startRequest();
+        $this->addToCartRequest(1);
+        WC()->session = $ajax;
+        $ajax->set('client_currency', 'EUR');
+        $this->finishHandlerShutdown($ajax);
+        $this->assertSame(2, $this->cartLinesNow());
+        $this->assertCount(1, $GLOBALS['intersoccer_test_warnings']);
+        $this->assertMatchesRegularExpression('/^PV session CAS save kind=\S+ prevented_stale=1 attempts=1 fallback=0$/', $GLOBALS['intersoccer_test_warnings'][0]);
+    }
+
     public function testAddCommitsAfterVolatileRefreshBeforeHandlerShutdownSave(): void
     {
         $this->addToCartRequest(0);

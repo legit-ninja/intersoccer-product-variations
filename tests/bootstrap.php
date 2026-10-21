@@ -159,7 +159,7 @@ if (!function_exists('intersoccer_info')) {
 
 if (!function_exists('intersoccer_warning')) {
     function intersoccer_warning($message) {
-        return;
+        $GLOBALS['intersoccer_test_warnings'][] = (string) $message;
     }
 }
 

@@ -356,9 +356,6 @@ function intersoccer_pv_wc_session_cas_persist($session) {
 
     $local_decoded = intersoccer_pv_wc_session_decode_bundle($local_bundle);
     $lines_local = intersoccer_pv_wc_session_cart_line_count($local_decoded['cart'] ?? null);
-    $snapshot_lines = isset($GLOBALS['intersoccer_pv_wc_session_cart_snapshot']['lines'])
-        ? (int) $GLOBALS['intersoccer_pv_wc_session_cart_snapshot']['lines']
-        : $lines_local;
 
     $max_attempts = (int) apply_filters('intersoccer_pv_wc_session_cas_max_attempts', 10);
     $prevented_stale = false;
@@ -375,7 +372,6 @@ function intersoccer_pv_wc_session_cas_persist($session) {
             } elseif (method_exists($session, 'pv_fallback_save_data')) {
                 $session->pv_fallback_save_data();
             }
-            intersoccer_pv_wc_session_log_save_outcome('no_row', false, $snapshot_lines, $lines_local, $lines_local);
             return;
         }
 
@@ -389,7 +385,8 @@ function intersoccer_pv_wc_session_cas_persist($session) {
 
         $merged_decoded = intersoccer_pv_wc_session_merge_local_with_db_cart_keys($local_decoded, $db_decoded);
         $lines_out = intersoccer_pv_wc_session_cart_line_count($merged_decoded['cart'] ?? null);
-        if ($lines_db > $lines_local) {
+        $snap_cart = $GLOBALS['intersoccer_pv_wc_session_cart_snapshot']['cart'] ?? null;
+        if ($lines_db > $lines_local || (is_array($snap_cart) && ($db_decoded['cart'] ?? []) !== $snap_cart)) {
             $prevented_stale = true;
         }
 
@@ -405,7 +402,7 @@ function intersoccer_pv_wc_session_cas_persist($session) {
                 $prefix = WC_Cache_Helper::get_cache_prefix(WC_SESSION_CACHE_GROUP);
                 wp_cache_set($prefix . $customer_id, $merged_bundle, WC_SESSION_CACHE_GROUP, max(1, $expiry - time()));
             }
-            intersoccer_pv_wc_session_log_save_outcome('noop', $prevented_stale, $snapshot_lines, $lines_local, $lines_out);
+            intersoccer_pv_wc_session_log_save_outcome($prevented_stale, $attempt + 1, false);
             return;
         }
 
@@ -416,7 +413,7 @@ function intersoccer_pv_wc_session_cas_persist($session) {
                 $prefix = WC_Cache_Helper::get_cache_prefix(WC_SESSION_CACHE_GROUP);
                 wp_cache_set($prefix . $customer_id, $merged_bundle, WC_SESSION_CACHE_GROUP, max(1, $expiry - time()));
             }
-            intersoccer_pv_wc_session_log_save_outcome('cas', $prevented_stale, $snapshot_lines, $lines_local, $lines_out);
+            intersoccer_pv_wc_session_log_save_outcome($prevented_stale, $attempt + 1, false);
             return;
         }
         $local_decoded = $merged_decoded;
@@ -450,33 +447,19 @@ function intersoccer_pv_wc_session_cas_persist($session) {
     } elseif (method_exists($session, 'pv_fallback_save_data')) {
         $session->pv_fallback_save_data();
     }
-    intersoccer_pv_wc_session_log_save_outcome('fallback_wc', $prevented_stale, $snapshot_lines, $lines_local, $lines_out);
+    intersoccer_pv_wc_session_log_save_outcome($prevented_stale, $max_attempts, true);
 }
 
 /**
- * @param string $mode
- * @param bool   $prevented_stale
- * @param int    $snapshot_lines
- * @param int    $lines_local
- * @param int    $lines_out
- * @return void
+ * Log (warning level: WP_DEBUG only, WC logs) only when a stale cart write was prevented,
+ * a CAS retry happened or the WC fallback save ran. No session key, customer or cart data.
  */
-function intersoccer_pv_wc_session_log_save_outcome($mode, $prevented_stale, $snapshot_lines, $lines_local, $lines_out) {
-    if (!function_exists('intersoccer_debug')) {
+function intersoccer_pv_wc_session_log_save_outcome($prevented_stale, $attempts, $fallback) {
+    if ((!$prevented_stale && $attempts <= 1 && !$fallback) || !function_exists('intersoccer_warning')) {
         return;
     }
-    $user_id = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
-    intersoccer_debug(sprintf(
-        'PV session CAS save kind=%s user=%d mode=%s prevented_stale=%d snapshot_lines=%d local_lines=%d out_lines=%d cart_mutated=%d',
-        intersoccer_pv_wc_session_request_kind(),
-        $user_id,
-        $mode,
-        $prevented_stale ? 1 : 0,
-        $snapshot_lines,
-        $lines_local,
-        $lines_out,
-        intersoccer_pv_wc_session_request_changed_cart() ? 1 : 0
-    ));
+    intersoccer_warning(sprintf('PV session CAS save kind=%s prevented_stale=%d attempts=%d fallback=%d',
+        intersoccer_pv_wc_session_request_kind(), $prevented_stale ? 1 : 0, (int) $attempts, $fallback ? 1 : 0));
 }
 
 /**
