@@ -2125,6 +2125,160 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
 }
 
 /**
+ * Customer-facing order views (thank-you, My Account, customer emails).
+ */
+function intersoccer_is_customer_order_meta_display_context() {
+    if (function_exists('intersoccer_is_sensitive_order_meta_email_context') && intersoccer_is_sensitive_order_meta_email_context()) {
+        return true;
+    }
+
+    if (function_exists('is_admin') && is_admin() && (!function_exists('wp_doing_ajax') || !wp_doing_ajax())) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * English keys/values persisted on order lines — translate at display only.
+ *
+ * @return array<string,string> English key => English msgid for gettext.
+ */
+function intersoccer_stored_order_meta_display_key_map() {
+    $keys = [
+        'Late Pickup Type',
+        'Late Pickup Days',
+        'Late Pickup Cost',
+        'Assigned Attendee',
+        'Holidays',
+        'Days Selected',
+        'Discount',
+        'Start Date',
+        'End Date',
+        'Total Sessions',
+        'Sessions Remaining',
+        'Remaining Sessions',
+    ];
+
+    $map = [];
+    foreach ($keys as $key) {
+        $map[$key] = $key;
+    }
+
+    return apply_filters('intersoccer_stored_order_meta_display_key_map', $map);
+}
+
+/**
+ * @param string $display_key Label shown to the customer.
+ * @param string $meta_key    Raw meta key.
+ * @return string
+ */
+function intersoccer_translate_stored_order_meta_display_key($display_key, $meta_key = '') {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $display_key;
+    }
+
+    $lookup = $meta_key !== '' ? $meta_key : $display_key;
+    $map = intersoccer_stored_order_meta_display_key_map();
+    if (isset($map[$lookup])) {
+        return __($map[$lookup], 'intersoccer-product-variations');
+    }
+
+    return $display_key;
+}
+
+/**
+ * Translate known English values stored on order lines (not keys).
+ *
+ * @param string $value     Stored meta value.
+ * @param string $meta_key  Meta key.
+ * @return string
+ */
+function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $value;
+    }
+
+    $text = is_scalar($value) ? (string) $value : '';
+    if ($text === '') {
+        return $value;
+    }
+
+    if ($meta_key === 'Late Pickup Type') {
+        if ($text === 'Full Week') {
+            return __('Full Week', 'intersoccer-product-variations');
+        }
+        if ($text === 'Single Day(s)') {
+            return __('Single Day(s)', 'intersoccer-product-variations');
+        }
+    }
+
+    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Camp Sibling Discount$/', $text, $matches)) {
+        return sprintf(__('%s%% Camp Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
+    }
+    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Course Sibling Discount$/', $text, $matches)) {
+        return sprintf(__('%s%% Course Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
+    }
+    if (preg_match('/^(\d+(?:\.\d+)?)\s*%?\s*Tournament Sibling Discount$/', $text, $matches)) {
+        return sprintf(__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations'), $matches[1]);
+    }
+
+    return $value;
+}
+
+/**
+ * @param string          $display_key Display label.
+ * @param object          $meta        Meta object.
+ * @param WC_Order_Item   $item        Order item.
+ * @return string
+ */
+function intersoccer_filter_order_item_display_meta_key($display_key, $meta, $item) {
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    return intersoccer_translate_stored_order_meta_display_key((string) $display_key, $meta_key);
+}
+
+/**
+ * @param string          $display_value Display value.
+ * @param object          $meta          Meta object.
+ * @param WC_Order_Item   $item          Order item.
+ * @return string
+ */
+function intersoccer_filter_order_item_display_meta_value($display_value, $meta, $item) {
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    return intersoccer_translate_stored_order_meta_display_value((string) $display_value, $meta_key);
+}
+
+add_filter('woocommerce_order_item_display_meta_key', 'intersoccer_filter_order_item_display_meta_key', 10, 3);
+add_filter('woocommerce_order_item_display_meta_value', 'intersoccer_filter_order_item_display_meta_value', 10, 3);
+
+/**
+ * Apply display-time label translation on formatted meta objects.
+ *
+ * @param object $meta Formatted meta object.
+ * @return object
+ */
+function intersoccer_translate_order_item_formatted_meta_object($meta) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $meta;
+    }
+
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    if (isset($meta->display_key)) {
+        $meta->display_key = intersoccer_translate_stored_order_meta_display_key((string) $meta->display_key, $meta_key);
+    }
+    $raw_value = isset($meta->value) ? $meta->value : '';
+    $translated_value = intersoccer_translate_stored_order_meta_display_value($raw_value, $meta_key);
+    if ($translated_value !== $raw_value) {
+        $meta->value = $translated_value;
+        if (isset($meta->display_value)) {
+            $meta->display_value = $translated_value;
+        }
+    }
+
+    return $meta;
+}
+
+/**
  * Filter order item formatted meta for customer-facing surfaces.
  *
  * Hides internal keys (assigned_player*, attribute_pa_*, underscore-prefixed)
@@ -2153,7 +2307,7 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         if ($key === '' || intersoccer_is_hidden_customer_order_meta_key($key)) {
             continue;
         }
-        $filtered[] = $meta;
+        $filtered[] = intersoccer_translate_order_item_formatted_meta_object($meta);
     }
 
     if (intersoccer_should_mask_sensitive_order_item_meta()) {

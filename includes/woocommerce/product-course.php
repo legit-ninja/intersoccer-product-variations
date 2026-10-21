@@ -781,21 +781,26 @@ function intersoccer_display_course_info_rows() {
         return;
     }
     
-    // JavaScript will populate these rows and control visibility
-    // Using inline script to append to tbody for proper table structure
+    $course_labels = function_exists('intersoccer_get_course_display_strings')
+        ? intersoccer_get_course_display_strings()
+        : [];
     ?>
     <script type="text/javascript">
     jQuery(document).ready(function($) {
+        var courseLabels = <?php echo wp_json_encode($course_labels); ?>;
+        var label = function(key, fallback) {
+            return (courseLabels && courseLabels[key]) ? courseLabels[key] : fallback;
+        };
         // Add course info rows to variations table tbody
         var $variationsTable = $('.variations tbody');
         if ($variationsTable.length) {
             // Add hidden placeholder rows that JavaScript will populate
             // Match exact WooCommerce structure: <th class="label"><label>...</label></th><td class="value">...</td>
-            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-start-date" style="display: none;"><th class="label"><label>Start Date</label></th><td class="value"></td></tr>');
-            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-end-date" style="display: none;"><th class="label"><label>End Date</label></th><td class="value"></td></tr>');
-            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-total-sessions" style="display: none;"><th class="label"><label>Total Sessions</label></th><td class="value"></td></tr>');
-            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-remaining-sessions" style="display: none;"><th class="label"><label>Remaining Sessions</label></th><td class="value"></td></tr>');
-            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-holidays" style="display: none;"><th class="label"><label>Holidays</label></th><td class="value"></td></tr>');
+            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-start-date" style="display: none;"><th class="label"><label>' + label('start_date', 'Start Date') + '</label></th><td class="value"></td></tr>');
+            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-end-date" style="display: none;"><th class="label"><label>' + label('end_date', 'End Date') + '</label></th><td class="value"></td></tr>');
+            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-total-sessions" style="display: none;"><th class="label"><label>' + label('total_sessions', 'Total Sessions') + '</label></th><td class="value"></td></tr>');
+            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-remaining-sessions" style="display: none;"><th class="label"><label>' + label('remaining_sessions', 'Remaining Sessions') + '</label></th><td class="value"></td></tr>');
+            $variationsTable.append('<tr class="intersoccer-course-info-row" id="intersoccer-course-holidays" style="display: none;"><th class="label"><label>' + label('holidays', 'Holidays') + '</label></th><td class="value"></td></tr>');
         }
     });
     </script>

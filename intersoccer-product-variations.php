@@ -6,7 +6,7 @@
  * Version: 2.10.17
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
- * Domain Path: /languages
+ * Domain Path: /lang
  * Update URI: https://plugins.underdogunlimited.com
  */
 
@@ -342,6 +342,7 @@ $includes = [
     'includes/logger.php',
     'includes/helpers.php', // Load early - provides cached player retrieval
     'includes/language-helpers.php',
+    'includes/admin-english-locale.php',
     'includes/elementor-widgets.php',
     'includes/woocommerce/attribute-registry.php',
     'includes/woocommerce/attribute-sync.php',
@@ -389,6 +390,7 @@ add_action('wp_enqueue_scripts', function () {
 
     if (is_product()) {
         $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
+        $course_display_strings = function_exists('intersoccer_get_course_display_strings') ? intersoccer_get_course_display_strings() : [];
 
         wp_enqueue_script(
             'intersoccer-variation-details',
@@ -407,12 +409,12 @@ add_action('wp_enqueue_scripts', function () {
                 'user_id' => get_current_user_id(),
                 'server_time' => current_time('c'),
                 'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
-                'i18n' => [
-                    'start_date' => __('Start Date', 'intersoccer-product-variations'),
-                    'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
-                    'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
-                    'player_assignment' => $player_assignment_strings,
-                ],
+                'i18n' => array_merge(
+                    $course_display_strings,
+                    [
+                        'player_assignment' => $player_assignment_strings,
+                    ]
+                ),
             ]
         );
     }

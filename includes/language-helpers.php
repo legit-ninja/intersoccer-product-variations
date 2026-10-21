@@ -141,6 +141,22 @@ function intersoccer_get_multilingual_plugin() {
  * @param array $args Optional overrides for URLs used in the generated strings.
  * @return array
  */
+/**
+ * Localized course info labels for JS (product page).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_get_course_display_strings() {
+    return [
+        'start_date' => __('Start Date', 'intersoccer-product-variations'),
+        'end_date' => __('End Date', 'intersoccer-product-variations'),
+        'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
+        'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+        'holidays' => __('Holidays', 'intersoccer-product-variations'),
+        'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+    ];
+}
+
 function intersoccer_get_player_assignment_strings($args = []) {
     $defaults = [
         'dashboard_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('dashboard') : '',

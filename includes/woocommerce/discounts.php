@@ -1783,7 +1783,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
                 }
             }
 
-            $template = intersoccer_translate_string('%s%% Camp Sibling Discount', 'intersoccer-product-variations', '%s%% Camp Sibling Discount');
+            /* translators: %s: discount percentage number without percent sign */
+            $template = __('%s%% Camp Sibling Discount', 'intersoccer-product-variations');
             foreach ($camps_by_season as $season => $season_children) {
                 $prior_totals = [];
                 if ($enable_retroactive_siblings && intersoccer_discount_customer_identifiable($customer_id)) {
@@ -1961,7 +1962,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
 
             if (count($child_totals) >= 2) {
                 $sorted_children = intersoccer_rank_sibling_children_for_rates($child_totals, $course_children, $merged['prior_by_key'] ?? []);
-                $template = intersoccer_translate_string('%s%% Course Sibling Discount', 'intersoccer-product-variations', '%s%% Course Sibling Discount');
+                /* translators: %s: discount percentage number without percent sign */
+                $template = __('%s%% Course Sibling Discount', 'intersoccer-product-variations');
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
@@ -2113,7 +2115,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
             if (count($child_totals) >= 2) {
                 arsort($child_totals);
                 $sorted_children = array_keys($child_totals);
-                $template = intersoccer_translate_string('%s%% Tournament Sibling Discount', 'intersoccer-product-variations', '%s%% Tournament Sibling Discount');
+                /* translators: %s: discount percentage number without percent sign */
+                $template = __('%s%% Tournament Sibling Discount', 'intersoccer-product-variations');
                 intersoccer_apply_sibling_rates_to_cart(
                     $cart,
                     $sorted_children,
