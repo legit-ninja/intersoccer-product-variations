@@ -1433,11 +1433,32 @@ function intersoccer_wc_session_volatile_keys_for_product_page_ajax() {
 }
 
 /**
+ * Drop the WooCommerce session row from the object cache so get_session() reads the DB.
+ *
+ * @param string|int $customer_id
+ * @return void
+ */
+function intersoccer_wc_session_store_cache_delete_row($customer_id) {
+    if ($customer_id === '' || $customer_id === null || $customer_id === false) {
+        return;
+    }
+    if (!defined('WC_SESSION_CACHE_GROUP') || !function_exists('wp_cache_delete')) {
+        return;
+    }
+    if (!class_exists('WC_Cache_Helper')) {
+        return;
+    }
+    $prefix = WC_Cache_Helper::get_cache_prefix(WC_SESSION_CACHE_GROUP);
+    wp_cache_delete($prefix . $customer_id, WC_SESSION_CACHE_GROUP);
+}
+
+/**
  * Re-read volatile session keys from the DB row before this request saves the session.
  *
  * Product-page stash handlers load the session (and cart) at request start. A overlapping
  * add-to-cart can commit a newer cart while stash AJAX is still in flight; without this
- * merge, shutdown would write the stale cart back.
+ * merge, shutdown would write the stale cart back. Drops the request-start object-cache
+ * copy first (WC_Session_Handler::get_session uses wp_cache_get before the DB).
  *
  * @return void
  */
@@ -1453,6 +1474,10 @@ function intersoccer_refresh_wc_session_volatile_from_store() {
     if ($customer_id === '' || $customer_id === null || $customer_id === false) {
         return;
     }
+    $skip_cache_delete = apply_filters('intersoccer_skip_wc_session_cache_delete_for_refresh', false);
+    if (!$skip_cache_delete) {
+        intersoccer_wc_session_store_cache_delete_row($customer_id);
+    }
     $fresh = $session->get_session($customer_id);
     if (!is_array($fresh) || $fresh === []) {
         return;
@@ -1462,6 +1487,26 @@ function intersoccer_refresh_wc_session_volatile_from_store() {
             $session->set($key, $fresh[$key]);
         }
     }
+}
+
+/**
+ * Schedule a one-time shutdown merge immediately before WC_Session_Handler::save_data (priority 20).
+ *
+ * Only called from product-page stash/clear handlers — not add-to-cart or checkout.
+ *
+ * @return void
+ */
+function intersoccer_schedule_wc_session_volatile_refresh_before_save() {
+    if (!empty($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'])) {
+        return;
+    }
+    $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'] = true;
+    if (!function_exists('add_action')) {
+        intersoccer_refresh_wc_session_volatile_from_store();
+        unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        return;
+    }
+    add_action('shutdown', 'intersoccer_refresh_wc_session_volatile_from_store', 19);
 }
 
 /**
@@ -1544,7 +1589,7 @@ function intersoccer_stash_selected_player($product_id, array $payload) {
         'stashed_at' => time(),
     ];
     WC()->session->set(intersoccer_selected_player_session_key($product_id), $clean);
-    intersoccer_refresh_wc_session_volatile_from_store();
+    intersoccer_schedule_wc_session_volatile_refresh_before_save();
     return true;
 }
 
@@ -1564,7 +1609,7 @@ function intersoccer_clear_stashed_selected_player($product_id) {
     } else {
         WC()->session->set($key, null);
     }
-    intersoccer_refresh_wc_session_volatile_from_store();
+    intersoccer_schedule_wc_session_volatile_refresh_before_save();
 }
 
 /**

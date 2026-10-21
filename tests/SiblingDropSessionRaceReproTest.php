@@ -27,6 +27,18 @@ $intersoccerPvSrcRoot = getenv('PV_SRC_ROOT') ?: dirname(__DIR__);
 require_once $intersoccerPvSrcRoot . '/includes/woocommerce/cart-calculations.php';
 require_once $intersoccerPvSrcRoot . '/includes/woocommerce/express-checkout-player-gate.php';
 
+if (!defined('WC_SESSION_CACHE_GROUP')) {
+    define('WC_SESSION_CACHE_GROUP', 'wc_session_id');
+}
+
+if (!class_exists('WC_Cache_Helper')) {
+    class WC_Cache_Helper {
+        public static function get_cache_prefix($group) {
+            return 'wc_cache_test_' . $group . '_';
+        }
+    }
+}
+
 if (!function_exists('WC')) {
     function WC() {
         if (!isset($GLOBALS['intersoccer_days_gate_wc'])) {
@@ -39,6 +51,10 @@ if (!function_exists('WC')) {
 /** The woocommerce_sessions table: one row per logged-in customer. */
 final class SiblingDropSessionStore {
     public static $rows = [];
+
+    public static function wcSessionCacheKey($customer): string {
+        return WC_Cache_Helper::get_cache_prefix(WC_SESSION_CACHE_GROUP) . (string) $customer;
+    }
 }
 
 /** Mirrors WC_Session_Handler: read whole row at request start, write whole row at shutdown if dirty. */
@@ -47,6 +63,17 @@ final class SiblingDropRequestSession {
     public function __construct($customer) {
         $this->customer = (string) $customer;
         $this->data = SiblingDropSessionStore::$rows[$this->customer] ?? [];
+        $this->primeSessionObjectCache();
+    }
+
+    /** Same as WC loading session_value into wp_cache_add at request start. */
+    private function primeSessionObjectCache(): void {
+        wp_cache_add(
+            SiblingDropSessionStore::wcSessionCacheKey($this->customer),
+            $this->data,
+            WC_SESSION_CACHE_GROUP,
+            3600
+        );
     }
     public function get($key, $default = null) { return $this->data[$key] ?? $default; }
     public function set($key, $value) { if (($this->data[$key] ?? null) !== $value) { $this->data[$key] = $value; $this->dirty = true; } }
@@ -58,7 +85,14 @@ final class SiblingDropRequestSession {
         if ((string) $customer_id !== $this->customer) {
             return [];
         }
-        return SiblingDropSessionStore::$rows[$this->customer] ?? [];
+        $cache_key = SiblingDropSessionStore::wcSessionCacheKey($this->customer);
+        $cached = wp_cache_get($cache_key, WC_SESSION_CACHE_GROUP);
+        if (false !== $cached && is_array($cached)) {
+            return $cached;
+        }
+        $fresh = SiblingDropSessionStore::$rows[$this->customer] ?? [];
+        wp_cache_add($cache_key, $fresh, WC_SESSION_CACHE_GROUP, 3600);
+        return $fresh;
     }
     public function shutdown_save() { if ($this->dirty) { SiblingDropSessionStore::$rows[$this->customer] = $this->data; $this->dirty = false; } }
 }
@@ -80,12 +114,20 @@ class SiblingDropSessionRaceReproTest extends TestCase
             return ['player_id' => 'player-uuid-' . $idx, 'first_name' => 'Kid ' . $idx];
         };
         $GLOBALS['intersoccer_test_json_capture'] = true;
+        $GLOBALS['intersoccer_test_object_cache'] = [];
+        $GLOBALS['intersoccer_test_actions'] = [];
+        unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
     }
 
     protected function tearDown(): void
     {
         $_POST = [];
         WC()->session = null;
+        $GLOBALS['intersoccer_test_object_cache'] = [];
+        unset($GLOBALS['intersoccer_test_actions'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
         unset(
             $GLOBALS['intersoccer_test_player_by_index'],
             $GLOBALS['intersoccer_test_json_capture'],
@@ -134,6 +176,8 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
         WC()->session = null;
         $s->shutdown_save();
     }
@@ -156,6 +200,8 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
         WC()->session = null;
         $s->shutdown_save();
     }
@@ -183,6 +229,19 @@ class SiblingDropSessionRaceReproTest extends TestCase
         return count($this->startRequest()->get('cart', []));
     }
 
+    /** @return array<string, mixed> */
+    private function seedStaleSessionObjectCache(SiblingDropRequestSession $ajax): array
+    {
+        $snapshot = unserialize(serialize($ajax->get_session_data()), ['allowed_classes' => false]);
+        wp_cache_set(
+            SiblingDropSessionStore::wcSessionCacheKey($ajax->get_customer_id()),
+            $snapshot,
+            WC_SESSION_CACHE_GROUP,
+            3600
+        );
+        return $snapshot;
+    }
+
     private function bookSecondChild(string $discount, bool $overlap): int
     {
         $this->runStashAjax($this->startRequest(), 0);   // pick child 1
@@ -206,6 +265,48 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $this->runStashAjax($s, 1);
         $row = SiblingDropSessionStore::$rows[(string) self::USER_ID] ?? [];
         $this->assertNotEmpty($row[intersoccer_selected_player_session_key(self::CAMP_ID)] ?? null, 'stash AJAX marks the session dirty and saves it');
+    }
+
+    public function testOverlappingStashRequestObjectCacheStillHasStaleCart(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->assertCount(1, (array) $ajax->get('cart'), 'sanity: AJAX request starts with a 1-line cart');
+        $cache_key = SiblingDropSessionStore::wcSessionCacheKey($ajax->get_customer_id());
+        $this->seedStaleSessionObjectCache($ajax);
+        $cached = wp_cache_get($cache_key, WC_SESSION_CACHE_GROUP);
+        $this->assertIsArray($cached);
+        $this->assertCount(1, (array) ($cached['cart'] ?? []), 'stale snapshot is in object cache');
+        $this->addToCartRequest(1);
+        $this->assertCount(1, (array) ($ajax->get_session(self::USER_ID)['cart'] ?? []), 'get_session still serves the cached 1-line cart');
+        $this->assertSame(2, $this->cartLinesNow(), 'DB row already has both children');
+    }
+
+    public function testRefreshMergeWithoutCacheDeleteUsesStaleObjectCache(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->seedStaleSessionObjectCache($ajax);
+        $this->addToCartRequest(1);
+
+        MockFilters::$filters['intersoccer_skip_wc_session_cache_delete_for_refresh'] = static function () {
+            return true;
+        };
+        WC()->session = $ajax;
+        intersoccer_refresh_wc_session_volatile_from_store();
+        $this->assertCount(1, (array) $ajax->get('cart'), 'merge without cache drop keeps the stale 1-line cart');
+    }
+
+    public function testRefreshMergeAfterCacheDeleteReadsCurrentDbCart(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->seedStaleSessionObjectCache($ajax);
+        $this->addToCartRequest(1);
+
+        WC()->session = $ajax;
+        intersoccer_refresh_wc_session_volatile_from_store();
+        $this->assertCount(2, (array) $ajax->get('cart'), 'cache drop + get_session reads the 2-line DB row');
     }
 
     public function testRaceExpressFieldsCouponSecondChildLineIsKept(): void
