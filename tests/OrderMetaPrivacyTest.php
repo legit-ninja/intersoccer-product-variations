@@ -77,7 +77,8 @@ if (!function_exists('has_action')) {
 }
 
 if (!function_exists('unload_textdomain')) {
-    function unload_textdomain($domain) {
+    function unload_textdomain($domain, $reloadable = false) {
+        $GLOBALS['intersoccer_test_textdomain_unload_reloadable'][$domain] = (bool) $reloadable;
         unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
     }
 }
@@ -336,6 +337,32 @@ class OrderMetaPrivacyTest extends TestCase {
         $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
+    public function test_customer_view_hides_player_medical_when_medical_conditions_present(): void {
+        $item = new WC_Order_Item_Product([
+            'Medical Conditions' => 'Peanut allergy',
+        ]);
+        $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertContains('Medical Conditions', $keys);
+        $this->assertNotContains('Player Medical', $keys);
+    }
+
+    public function test_customer_view_shows_player_medical_when_medical_conditions_absent(): void {
+        $GLOBALS['intersoccer_test_is_order_received_page'] = true;
+        $item = new WC_Order_Item_Product([]);
+        $meta = [
+            (object) [
+                'key' => 'Player Medical',
+                'display_key' => 'Player Medical',
+                'value' => 'Peanut allergy',
+                'display_value' => 'Peanut allergy',
+            ],
+        ];
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $map = $this->meta_map($filtered);
+        $this->assertStringContainsString('Medical information: provided', $map['Player Medical']);
+    }
+
     public function test_my_account_shows_player_dob_when_attendee_dob_missing(): void {
         $item = new WC_Order_Item_Product([
             'Player DOB' => '2016-03-15',
@@ -366,13 +393,14 @@ class OrderMetaPrivacyTest extends TestCase {
             'Camp Start Date' => '2026-10-19',
             'Attendee DOB' => '2015-06-20',
             'Player DOB' => '2016-03-15',
+            'Medical Conditions' => 'Peanut allergy',
         ]);
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
         $map = $this->meta_map($filtered);
-        foreach (['Medical Conditions', 'Player Medical'] as $k) {
-            $this->assertStringContainsString('Medical information: provided', $map[$k]);
-            $this->assertStringNotContainsString('Peanut', $map[$k]);
-        }
+        $this->assertArrayHasKey('Medical Conditions', $map);
+        $this->assertArrayNotHasKey('Player Medical', $map);
+        $this->assertStringContainsString('Medical information: provided', $map['Medical Conditions']);
+        $this->assertStringNotContainsString('Peanut', $map['Medical Conditions']);
         $this->assertStringNotContainsString('2015-06-20', $map['Attendee DOB']);
         $this->assertArrayNotHasKey('Player DOB', $map);
     }
@@ -383,11 +411,14 @@ class OrderMetaPrivacyTest extends TestCase {
             'Camp Start Date' => '2026-10-19',
             'Attendee DOB' => '2015-06-20',
             'Player DOB' => '2016-03-15',
+            'Medical Conditions' => 'Peanut allergy',
         ]);
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(false), $item);
         intersoccer_sensitive_order_meta_end_email_context(false, false, false, null);
         $map = $this->meta_map($filtered);
-        $this->assertStringNotContainsString('Peanut', $map['Player Medical']);
+        $this->assertArrayHasKey('Medical Conditions', $map);
+        $this->assertArrayNotHasKey('Player Medical', $map);
+        $this->assertStringNotContainsString('Peanut', $map['Medical Conditions']);
         $this->assertArrayNotHasKey('Player DOB', $map);
     }
 

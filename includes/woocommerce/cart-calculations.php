@@ -1608,16 +1608,23 @@ function intersoccer_store_selected_player_callback() {
     $index_empty = ($player_index === null || trim((string) $player_index) === '');
     if ($index_empty && $player_id === '') {
         intersoccer_clear_stashed_selected_player($product_id);
-        wp_send_json_success(['message' => 'Player cleared', 'product_id' => $product_id, 'cleared' => true]);
+        wp_send_json_success([
+            'message' => __('Player cleared', 'intersoccer-product-variations'),
+            'product_id' => $product_id,
+            'cleared' => true,
+        ]);
     }
     $ok = intersoccer_stash_selected_player($product_id, [
         'player_index' => $player_index,
         'player_id' => $player_id,
     ]);
     if (!$ok) {
-        wp_send_json_error(['message' => 'Unable to store player for this account']);
+        wp_send_json_error(['message' => __('Unable to store player for this account', 'intersoccer-product-variations')]);
     }
-    wp_send_json_success(['message' => 'Player stored', 'product_id' => $product_id]);
+    wp_send_json_success([
+        'message' => __('Player stored', 'intersoccer-product-variations'),
+        'product_id' => $product_id,
+    ]);
 }
 
 /**

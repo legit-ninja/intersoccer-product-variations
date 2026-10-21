@@ -3324,3 +3324,12 @@ msgstr ""
 
 msgid "j F Y"
 msgstr ""
+
+msgid "Player stored"
+msgstr ""
+
+msgid "Player cleared"
+msgstr ""
+
+msgid "Unable to store player for this account"
+msgstr ""

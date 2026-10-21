@@ -2359,6 +2359,31 @@ function intersoccer_pv_repair_utf8_dash_mojibake_in_note($text) {
 }
 
 /**
+ * Hide PM Player Medical when PV Medical Conditions is also on the line (duplicate).
+ *
+ * @param string            $key  Meta key.
+ * @param WC_Order_Item     $item Order line item.
+ * @return bool
+ */
+function intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item) {
+    if (!intersoccer_pv_order_meta_key_is($key, 'Player Medical')) {
+        return false;
+    }
+
+    if (!($item instanceof WC_Order_Item_Product) && !is_object($item)) {
+        return false;
+    }
+
+    if (!method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $pv_medical = trim((string) $item->get_meta('Medical Conditions', true));
+
+    return $pv_medical !== '';
+}
+
+/**
  * Hide PM Player DOB when PV Attendee DOB is also on the line (duplicate).
  *
  * @param string            $key  Meta key.
@@ -2766,6 +2791,9 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
             continue;
         }
         if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
+            continue;
+        }
+        if (intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item)) {
             continue;
         }
         $filtered[] = $meta;
