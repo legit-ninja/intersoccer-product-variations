@@ -687,6 +687,29 @@ function intersoccer_sync_variation_status_to_translations($variation_id, $statu
 }
 
 /**
+ * Customer-facing date format msgid (display only; stored order meta stays English).
+ *
+ * @return string
+ */
+function intersoccer_pv_format_ymd_for_customer_display($ymd) {
+    $ymd = trim((string) $ymd);
+    if ($ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+        return $ymd;
+    }
+
+    $ts = strtotime($ymd);
+    if ($ts === false) {
+        return $ymd;
+    }
+
+    $format = function_exists('intersoccer_pv_customer_display_date_format_msgid')
+        ? intersoccer_pv_customer_display_date_format_msgid()
+        : __('j F Y', 'intersoccer-product-variations');
+
+    return date_i18n($format, $ts);
+}
+
+/**
  * Initialize language functions and validate dependencies
  * Call this during plugin activation or admin_init
  */

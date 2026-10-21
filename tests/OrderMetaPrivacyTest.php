@@ -436,6 +436,89 @@ class OrderMetaPrivacyTest extends TestCase {
         $this->assertSame('Birth year: 2012', $map['Attendee DOB']);
     }
 
+    public function test_thank_you_medical_none_not_shown_as_provided_fr(): void {
+        $GLOBALS['intersoccer_test_is_order_received_page'] = true;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                $map = [
+                    'None' => 'Aucune',
+                    'Medical information: provided (view or update in My Account).' => 'Informations médicales : fournies (consulter ou mettre à jour dans Mon compte).',
+                ];
+                return $map[$text] ?? $translation;
+            };
+        }
+        $item = new WC_Order_Item_Product(['Medical Conditions' => 'None']);
+        $meta = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'None', 'display_value' => 'None'],
+        ];
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $this->assertSame([], $filtered);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_email_medical_none_not_shown_as_provided_de(): void {
+        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                $map = [
+                    'None' => 'Keine',
+                    'Medical information: provided (view or update in My Account).' => 'Medizinische Informationen: angegeben (in Mein Konto ansehen oder aktualisieren).',
+                ];
+                return $map[$text] ?? $translation;
+            };
+        }
+        $order = new WC_Order([]);
+        intersoccer_sensitive_order_meta_begin_email_context($order, false, true, null);
+        $item = new WC_Order_Item_Product(['Medical Conditions' => 'None']);
+        $meta = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'None', 'display_value' => 'None'],
+        ];
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        intersoccer_sensitive_order_meta_end_email_context($order, false, true, null);
+        unset($GLOBALS['intersoccer_sensitive_order_meta_email']);
+        $this->assertSame([], $filtered);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_thank_you_medical_with_value_still_redacted_as_provided(): void {
+        $GLOBALS['intersoccer_test_is_order_received_page'] = true;
+        $item = new WC_Order_Item_Product(['Medical Conditions' => 'Peanut allergy']);
+        $meta = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'Peanut allergy', 'display_value' => 'Peanut allergy'],
+        ];
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $map = $this->meta_map($filtered);
+        $this->assertStringContainsString('Medical information: provided', $map['Medical Conditions']);
+        $this->assertStringNotContainsString('Peanut', $map['Medical Conditions']);
+    }
+
+    public function test_my_account_medical_none_still_shows_translated_none(): void {
+        $GLOBALS['intersoccer_test_is_order_received_page'] = false;
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'None') {
+                    return 'Aucune';
+                }
+                return $translation;
+            };
+        }
+        $item = new WC_Order_Item_Product(['Medical Conditions' => 'None']);
+        $meta = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'None', 'display_value' => 'None'],
+        ];
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $map = $this->meta_map($filtered);
+        $this->assertSame('Aucune', $map['Medical Conditions']);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
     public function test_medical_row_omitted_when_placeholder_none(): void {
         $GLOBALS['intersoccer_test_is_order_received_page'] = true;
         $item = new WC_Order_Item_Product([

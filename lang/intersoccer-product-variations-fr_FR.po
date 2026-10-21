@@ -3171,12 +3171,15 @@ msgstr "%d jours : "
 #: follow-up-3
 msgid "Invalid selection"
 msgstr "Sélection invalide"
+#: follow-up-4
+msgid "Note"
+msgstr "Remarque"
 #: follow-up-3
 msgid "Player DOB"
-msgstr "Date de naissance du joueur"
+msgstr "Date de naissance du participant"
 #: follow-up-3
 msgid "Player Medical"
-msgstr "Informations médicales du joueur"
+msgstr "Informations médicales du participant"
 #: follow-up-3
 msgid "j F Y"
 msgstr "j F Y"

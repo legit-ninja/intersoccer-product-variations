@@ -3313,6 +3313,9 @@ msgstr ""
 msgid "Invalid selection"
 msgstr ""
 
+msgid "Note"
+msgstr ""
+
 msgid "Player DOB"
 msgstr ""
 

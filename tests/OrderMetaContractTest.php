@@ -1005,6 +1005,32 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame($stored, $display);
     }
 
+    public function test_holidays_date_list_localized_for_customer_display() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $stored = 'October 19, 2026, November 2, 2026';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertStringNotContainsString('October 19, 2026', $display);
+        $this->assertStringContainsString('2026', $display);
+        $this->assertStringContainsString(',', $display);
+    }
+
+    public function test_note_display_key_translatable() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'Note') {
+                    return 'Hinweis';
+                }
+                return $translation;
+            };
+        }
+        $label = intersoccer_translate_stored_order_meta_display_key('Note', 'Note');
+        $this->assertSame('Hinweis', $label);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
     public function test_camp_build_stores_english_camp_schedule_keys() {
         require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
         if (class_exists('MockMetaData')) {

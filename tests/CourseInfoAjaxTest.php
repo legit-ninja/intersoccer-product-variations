@@ -173,7 +173,7 @@ class CourseInfoAjaxTest extends TestCase {
 
         // Verify values
         $this->assertTrue($data['is_course']);
-        $this->assertEquals('January 6, 2025', $data['start_date']);
+        $this->assertEquals('6 January 2025', $data['start_date']);
         $this->assertArrayHasKey('end_date', $data);
         $this->assertIsString($data['end_date'], 'end_date must be a string (may be empty without WC schedule context)');
         $this->assertEquals(12, $data['total_weeks']);
@@ -183,9 +183,9 @@ class CourseInfoAjaxTest extends TestCase {
         $this->assertCount(3, $data['holidays'], 'Should return 3 formatted holidays');
         
         // Verify holidays are formatted correctly
-        $this->assertEquals('February 17, 2025', $data['holidays'][0]);
-        $this->assertEquals('March 24, 2025', $data['holidays'][1]);
-        $this->assertEquals('April 21, 2025', $data['holidays'][2]);
+        $this->assertEquals('17 February 2025', $data['holidays'][0]);
+        $this->assertEquals('24 March 2025', $data['holidays'][1]);
+        $this->assertEquals('21 April 2025', $data['holidays'][2]);
     }
 
     /**

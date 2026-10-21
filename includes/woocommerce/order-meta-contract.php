@@ -2252,6 +2252,10 @@ function intersoccer_pv_order_meta_key_is($meta_key, $canonical_english) {
  * @param string $text Stored date string.
  * @return string
  */
+function intersoccer_pv_customer_display_date_format_msgid() {
+    return __('j F Y', 'intersoccer-product-variations');
+}
+
 function intersoccer_pv_format_stored_order_date_for_display($text) {
     $text = trim((string) $text);
     if ($text === '') {
@@ -2263,9 +2267,29 @@ function intersoccer_pv_format_stored_order_date_for_display($text) {
         return $text;
     }
 
-    $format = __('j F Y', 'intersoccer-product-variations');
+    return date_i18n(intersoccer_pv_customer_display_date_format_msgid(), $ts);
+}
 
-    return date_i18n($format, $ts);
+/**
+ * Localize a stored comma-separated list of English date labels (e.g. Holidays).
+ *
+ * @param string $text Stored value.
+ * @return string
+ */
+function intersoccer_pv_format_stored_order_date_list_for_display($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+
+    if (strpos($text, ',') === false) {
+        return intersoccer_pv_format_stored_order_date_for_display($text);
+    }
+
+    $parts = array_map('trim', explode(',', $text));
+    $formatted = array_map('intersoccer_pv_format_stored_order_date_for_display', $parts);
+
+    return implode(', ', $formatted);
 }
 
 /**
@@ -2598,9 +2622,18 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
         return intersoccer_pv_translate_order_meta_token_for_display($text);
     }
 
-    $date_keys = ['Start Date', 'End Date', 'Camp Start Date', 'Camp End Date'];
+    $date_keys = [
+        'Start Date',
+        'End Date',
+        'Camp Start Date',
+        'Camp End Date',
+        'Holidays',
+    ];
     foreach ($date_keys as $date_key) {
         if (intersoccer_pv_order_meta_key_is($meta_key, $date_key)) {
+            if ($date_key === 'Holidays') {
+                return intersoccer_pv_format_stored_order_date_list_for_display($text);
+            }
             return intersoccer_pv_format_stored_order_date_for_display($text);
         }
     }
@@ -2608,7 +2641,6 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
     $comma_keys = [
         'Days Selected',
         'Late Pickup Days',
-        'Holidays',
         'Course Day',
         'Days of Week',
         'Tournament Day',
@@ -2706,14 +2738,19 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
             continue;
         }
-        $filtered[] = intersoccer_translate_order_item_formatted_meta_object($meta);
+        $filtered[] = $meta;
     }
 
     if (intersoccer_should_mask_sensitive_order_item_meta()) {
         $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);
     }
 
-    return $filtered;
+    $translated = [];
+    foreach ($filtered as $meta) {
+        $translated[] = intersoccer_translate_order_item_formatted_meta_object($meta);
+    }
+
+    return $translated;
 }
 
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
