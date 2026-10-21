@@ -27,6 +27,26 @@ $intersoccerPvSrcRoot = getenv('PV_SRC_ROOT') ?: dirname(__DIR__);
 require_once $intersoccerPvSrcRoot . '/includes/woocommerce/cart-calculations.php';
 require_once $intersoccerPvSrcRoot . '/includes/woocommerce/express-checkout-player-gate.php';
 
+if (!function_exists('intersoccer_is_single_day_booking_type')) {
+    function intersoccer_is_single_day_booking_type($booking_type) {
+        return $booking_type === 'single-days' || $booking_type === 'single_days';
+    }
+}
+
+if (!class_exists('InterSoccer_Camp')) {
+    class InterSoccer_Camp {
+        public static function calculate_price($product_id, $variation_id, $camp_days) {
+            return 50.0;
+        }
+    }
+}
+
+if (!function_exists('wc_price')) {
+    function wc_price($price) {
+        return 'CHF ' . number_format((float) $price, 2);
+    }
+}
+
 if (!defined('WC_SESSION_CACHE_GROUP')) {
     define('WC_SESSION_CACHE_GROUP', 'wc_session_id');
 }
@@ -141,8 +161,40 @@ final class SiblingDropRequestSession {
     public function shutdown_save() {
         if ($this->dirty) {
             SiblingDropSessionStore::$rows[$this->customer] = $this->data;
+            wp_cache_set(
+                SiblingDropSessionStore::wcSessionCacheKey($this->customer),
+                $this->data,
+                WC_SESSION_CACHE_GROUP,
+                3600
+            );
             $this->dirty = false;
         }
+    }
+
+    /** @return array<string, mixed> */
+    public function pv_get_data_bundle(): array {
+        return $this->data;
+    }
+
+    /** @param array<string, mixed> $data */
+    public function pv_set_data_bundle(array $data): void {
+        $this->data = $data;
+    }
+
+    public function pv_is_dirty(): bool {
+        return $this->dirty;
+    }
+
+    public function pv_set_dirty(bool $dirty): void {
+        $this->dirty = $dirty;
+    }
+
+    public function pv_get_session_expiration(): int {
+        return time() + 3600;
+    }
+
+    public function pv_fallback_save_data(): void {
+        $this->shutdown_save();
     }
 }
 
@@ -166,6 +218,47 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $GLOBALS['intersoccer_test_object_cache'] = [];
         $GLOBALS['intersoccer_test_actions'] = [];
         unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        unset($GLOBALS['intersoccer_pv_wc_session_cart_mutated'], $GLOBALS['intersoccer_pv_wc_session_cart_snapshot']);
+        MockFilters::$filters['intersoccer_pv_wc_session_persisted_row_read'] = static function ($default, $customer_id) {
+            $cid = (string) $customer_id;
+            if (!isset(SiblingDropSessionStore::$rows[$cid])) {
+                return null;
+            }
+            return [
+                'session_value' => maybe_serialize(SiblingDropSessionStore::$rows[$cid]),
+                'session_expiry' => time() + 3600,
+            ];
+        };
+        MockFilters::$filters['intersoccer_pv_wc_session_persisted_row_cas_write'] = static function ($null, $customer_id, $old_blob, $new_blob, $expiry) {
+            if (!empty($GLOBALS['intersoccer_pv_cas_simulate_write_conflict_once'])) {
+                $GLOBALS['intersoccer_pv_cas_simulate_write_conflict_once'] = false;
+                $GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] = (int) ($GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] ?? 0) + 1;
+                return false;
+            }
+            $cid = (string) $customer_id;
+            if ($old_blob !== '') {
+                $current = isset(SiblingDropSessionStore::$rows[$cid])
+                    ? maybe_serialize(SiblingDropSessionStore::$rows[$cid])
+                    : '';
+                if ($current !== $old_blob) {
+                    return false;
+                }
+            }
+            $bundle = maybe_unserialize($new_blob);
+            if (!is_array($bundle)) {
+                return false;
+            }
+            SiblingDropSessionStore::$rows[$cid] = $bundle;
+            wp_cache_set(
+                SiblingDropSessionStore::wcSessionCacheKey($cid),
+                $bundle,
+                WC_SESSION_CACHE_GROUP,
+                3600
+            );
+            return true;
+        };
+        intersoccer_pv_wc_session_register_cart_mutation_hooks();
+        add_action('shutdown', 'intersoccer_pv_wc_session_shutdown_save_router', 20);
     }
 
     protected function tearDown(): void
@@ -189,12 +282,23 @@ class SiblingDropSessionRaceReproTest extends TestCase
 
     private function startRequest(): SiblingDropRequestSession
     {
-        return new SiblingDropRequestSession(self::USER_ID);
+        $session = new SiblingDropRequestSession(self::USER_ID);
+        intersoccer_pv_wc_session_snapshot_cart_from_session($session);
+        return $session;
+    }
+
+    private function finishHandlerShutdown(SiblingDropRequestSession $s): void
+    {
+        WC()->session = $s;
+        do_action('shutdown');
+        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
+        WC()->session = null;
     }
 
     /** Add-to-cart POST: WC_Cart_Session::set_session() stores the new cart; shutdown saves it. */
     private function addToCartRequest(int $childIndex, int $productId = self::CAMP_ID): void
     {
+        unset($GLOBALS['intersoccer_pv_wc_session_cart_mutated']);
         $s = $this->startRequest();
         $cart = $s->get('cart', []);
         if (!is_array($cart)) {
@@ -203,6 +307,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $cart['line_child_' . $childIndex] = ['product_id' => $productId, 'quantity' => 1, 'assigned_player' => $childIndex, 'unique_key' => 'player_player-uuid-' . $childIndex];
         $s->set('cart', $cart);
         $s->shutdown_save();
+        unset($GLOBALS['intersoccer_pv_wc_session_cart_mutated']);
     }
 
     /** Runs PV after-add clear hooks inside an add-to-cart request (must not schedule volatile refresh). */
@@ -224,8 +329,10 @@ class SiblingDropSessionRaceReproTest extends TestCase
         unset($GLOBALS['intersoccer_test_actions']['shutdown']);
         $this->assertEmpty($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled'] ?? null, 'add-to-cart must not schedule volatile refresh');
         $_REQUEST = [];
-        WC()->session = null;
+        $s->set('cart', $cart);
         $s->shutdown_save();
+        WC()->session = null;
+        unset($GLOBALS['intersoccer_pv_wc_session_cart_mutated']);
     }
 
     /** Coupon applied on /cart/ (applied_coupons in session) or points chosen (CRS session key). */
@@ -251,10 +358,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
-        do_action('shutdown');
-        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
-        WC()->session = null;
-        $s->shutdown_save();
+        $this->finishHandlerShutdown($s);
     }
 
     /** PV express-fields AJAX (camp days / late pickup), same session race as player stash. */
@@ -274,10 +378,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
-        do_action('shutdown');
-        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
-        WC()->session = null;
-        $s->shutdown_save();
+        $this->finishHandlerShutdown($s);
     }
 
     private function runClearSessionDataAjax(SiblingDropRequestSession $s): void
@@ -290,10 +391,34 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
-        do_action('shutdown');
-        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
-        WC()->session = null;
-        $s->shutdown_save();
+        $this->finishHandlerShutdown($s);
+    }
+
+    private function runCalculateCampPriceStashAjax(SiblingDropRequestSession $s, array $campDays): void
+    {
+        $GLOBALS['intersoccer_test_wp_get_post_parent_id_map'] = [self::VAR_ID => self::CAMP_ID];
+        WC()->session = $s;
+        $_POST = [
+            'nonce' => 'valid_nonce',
+            'variation_id' => self::VAR_ID,
+            'camp_days' => $campDays,
+        ];
+        $GLOBALS['intersoccer_test_booking_type'] = 'single-days';
+        try {
+            intersoccer_calculate_camp_price_callback();
+        } catch (Exception $e) {
+            $this->assertSame('AJAX_EXIT', $e->getMessage());
+        }
+        unset($GLOBALS['intersoccer_test_booking_type']);
+        $_POST = [];
+        $this->finishHandlerShutdown($s);
+    }
+
+    private function runFragmentLikeDirtySessionAjax(SiblingDropRequestSession $s): void
+    {
+        WC()->session = $s;
+        $s->set('client_currency', 'CHF');
+        $this->finishHandlerShutdown($s);
     }
 
     private function bookSecondChildClearSessionData(string $discount, bool $overlap): int
@@ -348,10 +473,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
             $this->assertSame('AJAX_EXIT', $e->getMessage());
         }
         $_POST = [];
-        do_action('shutdown');
-        unset($GLOBALS['intersoccer_test_actions']['shutdown'], $GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
-        WC()->session = null;
-        $s->shutdown_save();
+        $this->finishHandlerShutdown($s);
     }
 
     private function bookSecondChildExpressFields(string $discount, bool $overlap): int
@@ -428,6 +550,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $this->assertIsArray($cached);
         $this->assertCount(1, (array) maybe_unserialize($cached['cart'] ?? ''), 'stale snapshot is in object cache');
         $this->addToCartRequest(1);
+        $this->seedStaleSessionObjectCache($ajax);
         $staleRow = $ajax->get_session(self::USER_ID);
         $this->assertCount(1, (array) maybe_unserialize($staleRow['cart'] ?? ''), 'get_session still serves the cached 1-line cart');
         $this->assertSame(2, $this->cartLinesNow(), 'DB row already has both children');
@@ -439,6 +562,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $ajax = $this->startRequest();
         $this->seedStaleSessionObjectCache($ajax);
         $this->addToCartRequest(1);
+        $this->seedStaleSessionObjectCache($ajax);
 
         MockFilters::$filters['intersoccer_skip_wc_session_cache_delete_for_refresh'] = static function () {
             return true;
@@ -454,6 +578,7 @@ class SiblingDropSessionRaceReproTest extends TestCase
         $ajax = $this->startRequest();
         $this->seedStaleSessionObjectCache($ajax);
         $this->addToCartRequest(1);
+        $this->seedStaleSessionObjectCache($ajax);
 
         WC()->session = $ajax;
         intersoccer_refresh_wc_session_volatile_from_store();
@@ -570,5 +695,117 @@ class SiblingDropSessionRaceReproTest extends TestCase
     public function testSequentialPointsKeepsBothChildren(): void
     {
         $this->assertSame(2, $this->bookSecondChild('points', false));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function slowServerHandlerMatrix(): array
+    {
+        return [
+            'store_selected_player' => ['store_selected_player'],
+            'store_express_fields' => ['store_express_fields'],
+            'store_selected_days' => ['store_selected_days'],
+            'calculate_camp_price' => ['calculate_camp_price'],
+            'clear_session_data' => ['clear_session_data'],
+            'fragment_like_dirty' => ['fragment_like_dirty'],
+        ];
+    }
+
+    /**
+     * Handler started before add, add commits fully, handler finishes after (slow-server interleaving).
+     *
+     * @dataProvider slowServerHandlerMatrix
+     */
+    public function testSlowServerHandlerStartedBeforeAddKeepsNewerLine(string $handler): void
+    {
+        MockMetaData::$data[self::VAR_ID]['attribute_pa_booking-type'] = 'single-days';
+        $this->runStashAjax($this->startRequest(), 0);
+        $this->addToCartRequest(0);
+        $this->discountRequest('coupon');
+        $ajax = $this->startRequest();
+        $this->addToCartRequest(1);
+        $this->assertSame(2, $this->cartLinesNow(), 'add committed before slow handler finished');
+
+        switch ($handler) {
+            case 'store_selected_player':
+                $this->runStashAjax($ajax, 1);
+                break;
+            case 'store_express_fields':
+                $this->runExpressFieldsStashAjax($ajax, ['Tuesday']);
+                break;
+            case 'store_selected_days':
+                $this->runSelectedDaysStashAjax($ajax, ['Tuesday']);
+                break;
+            case 'calculate_camp_price':
+                $this->runCalculateCampPriceStashAjax($ajax, ['Tuesday']);
+                break;
+            case 'clear_session_data':
+                $this->runClearSessionDataAjax($ajax);
+                break;
+            case 'fragment_like_dirty':
+                $this->runFragmentLikeDirtySessionAjax($ajax);
+                break;
+            default:
+                $this->fail('Unknown handler');
+        }
+
+        $this->assertSame(2, $this->cartLinesNow(), 'CAS save must not drop the newer cart line');
+        $session = $this->startRequest();
+        $this->assertSame(['repro-sibdrop10'], $session->get('applied_coupons'));
+        if ($handler === 'store_selected_player') {
+            $stash = $session->get(intersoccer_selected_player_session_key(self::CAMP_ID));
+            $this->assertIsArray($stash);
+            $this->assertNotEmpty($stash['player_id'] ?? '');
+        }
+    }
+
+    public function testAddCommitsAfterVolatileRefreshBeforeHandlerShutdownSave(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->seedStaleSessionObjectCache($ajax);
+        WC()->session = $ajax;
+        intersoccer_refresh_wc_session_volatile_from_store();
+        $this->addToCartRequest(1);
+        $_POST = ['nonce' => 'valid_nonce', 'product_id' => self::CAMP_ID, 'player_index' => '1', 'player_id' => ''];
+        try {
+            intersoccer_store_selected_player_callback();
+        } catch (Exception $e) {
+            $this->assertSame('AJAX_EXIT', $e->getMessage());
+        }
+        $_POST = [];
+        $this->finishHandlerShutdown($ajax);
+        $this->assertSame(2, $this->cartLinesNow());
+    }
+
+    public function testCasRetryKeepsNewerCartWhenRowChangesBetweenReads(): void
+    {
+        $this->addToCartRequest(0);
+        $ajax = $this->startRequest();
+        $this->addToCartRequest(1);
+        WC()->session = $ajax;
+        $ajax->set(intersoccer_selected_player_session_key(self::CAMP_ID), [
+            'player_index' => 1,
+            'player_id' => 'player-uuid-1',
+            'user_id' => self::USER_ID,
+            'stashed_at' => time(),
+        ]);
+        $GLOBALS['intersoccer_pv_cas_simulate_write_conflict_once'] = true;
+        $GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] = 0;
+        $this->finishHandlerShutdown($ajax);
+        $this->assertSame(1, (int) ($GLOBALS['intersoccer_pv_cas_simulated_write_conflicts'] ?? 0));
+        $this->assertSame(2, $this->cartLinesNow());
+    }
+
+    public function testGuestNoPersistedRowUsesFallbackSave(): void
+    {
+        $guest = new SiblingDropRequestSession('t_guest123');
+        intersoccer_pv_wc_session_snapshot_cart_from_session($guest);
+        $guest->set('intersoccer_selected_player_' . self::CAMP_ID, ['player_id' => 'x', 'stashed_at' => time()]);
+        WC()->session = $guest;
+        $this->finishHandlerShutdown($guest);
+        $this->assertArrayHasKey('t_guest123', SiblingDropSessionStore::$rows);
+        $this->assertFalse($guest->pv_is_dirty());
     }
 }

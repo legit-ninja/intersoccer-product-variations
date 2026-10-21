@@ -290,7 +290,10 @@ $intersoccer_elementor_product_page_cb = function () {
             window.intersoccerCheckout = $.extend(true, {}, window.intersoccerCheckout || {}, {
                 ajax_url: <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>,
                 nonce: <?php echo wp_json_encode(wp_create_nonce('intersoccer_nonce')); ?>,
-                user_id: <?php echo (int) $user_id; ?>
+                user_id: <?php echo (int) $user_id; ?>,
+                i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
+                    stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>
+                })
             });
             
             // Find the product form, excluding search forms.
@@ -1028,14 +1031,40 @@ $intersoccer_elementor_product_page_cb = function () {
                     });
                 };
             }
+            if (!window.intersoccerPvGetStashWaitTimeoutMessage) {
+                window.intersoccerPvGetStashWaitTimeoutMessage = function () {
+                    var checkout = window.intersoccerCheckout || {};
+                    var i18n = checkout.i18n || {};
+                    return i18n.stash_wait_timeout || 'Booking data is still saving. Please wait a moment, then try Add to cart again.';
+                };
+            }
+            if (!window.intersoccerPvShowStashWaitTimeoutNotice) {
+                window.intersoccerPvShowStashWaitTimeoutNotice = function ($form) {
+                    var message = window.intersoccerPvGetStashWaitTimeoutMessage();
+                    var $notice = $('<div class="woocommerce-error intersoccer-pv-stash-wait-notice" role="alert"></div>').text(message);
+                    var $target = ($form && $form.length) ? $form : $('form.cart').first();
+                    if ($target.length) {
+                        $target.prepend($notice);
+                    } else {
+                        $('body').prepend($notice);
+                    }
+                    $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+                };
+            }
             if (!window.intersoccerPvWaitForProductPageStashAjax) {
-                window.intersoccerPvWaitForProductPageStashAjax = function (timeoutMs) {
-                    var limit = typeof timeoutMs === 'number' ? timeoutMs : 5000;
+                window.intersoccerPvWaitForProductPageStashAjax = function (options) {
+                    var safetyMs = (options && typeof options.safetyMs === 'number')
+                        ? options.safetyMs
+                        : (typeof options === 'number' ? options : 60000);
                     return new Promise(function (resolve) {
-                        var deadline = Date.now() + limit;
+                        var deadline = Date.now() + safetyMs;
                         (function tick() {
-                            if (!intersoccerPvHasPendingProductPageStashAjax() || Date.now() >= deadline) {
-                                resolve();
+                            if (!intersoccerPvHasPendingProductPageStashAjax()) {
+                                resolve({ timedOut: false });
+                                return;
+                            }
+                            if (Date.now() >= deadline) {
+                                resolve({ timedOut: true });
                                 return;
                             }
                             setTimeout(tick, 40);
@@ -2142,7 +2171,14 @@ $intersoccer_elementor_product_page_cb = function () {
                     e.preventDefault();
                     e.stopImmediatePropagation();
                     var $stashWaitForm = $currentForm;
-                    intersoccerPvWaitForProductPageStashAjax(5000).then(function () {
+                    $stashWaitForm.find('.intersoccer-pv-stash-wait-notice').remove();
+                    intersoccerPvWaitForProductPageStashAjax({ safetyMs: 60000 }).then(function (result) {
+                        if (result && result.timedOut) {
+                            if (window.intersoccerPvShowStashWaitTimeoutNotice) {
+                                window.intersoccerPvShowStashWaitTimeoutNotice($stashWaitForm);
+                            }
+                            return;
+                        }
                         window.intersoccerPvResubmitAfterStashWait = true;
                         $stashWaitForm.trigger('submit');
                         window.intersoccerPvResubmitAfterStashWait = false;

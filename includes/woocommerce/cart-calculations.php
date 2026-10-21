@@ -1576,7 +1576,7 @@ function intersoccer_schedule_wc_session_volatile_refresh_before_save() {
         unset($GLOBALS['intersoccer_wc_session_volatile_refresh_scheduled']);
         return;
     }
-    add_action('shutdown', 'intersoccer_refresh_wc_session_volatile_from_store', 19);
+    add_action('shutdown', 'intersoccer_refresh_wc_session_volatile_from_store', 18);
 }
 
 /**
@@ -1802,6 +1802,8 @@ function intersoccer_clear_stashed_player_after_add($cart_item_key, $product_id,
     intersoccer_clear_stashed_selected_player((int) $product_id);
 }
 
+
+require_once dirname(__FILE__) . '/session-cart-safe-save.php';
 
 intersoccer_debug('InterSoccer: Loaded cart-calculations.php');
 // function intersoccer_apply_combo_discounts_to_items($cart) {

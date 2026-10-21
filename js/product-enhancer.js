@@ -50,13 +50,40 @@
         });
     }
 
-    function intersoccerPvWaitForProductPageStashAjax(timeoutMs) {
-        const limit = typeof timeoutMs === 'number' ? timeoutMs : 5000;
+    function intersoccerPvGetStashWaitTimeoutMessage() {
+        const checkout = window.intersoccerCheckout || {};
+        const i18n = checkout.i18n || {};
+        if (i18n.stash_wait_timeout) {
+            return i18n.stash_wait_timeout;
+        }
+        return 'Booking data is still saving. Please wait a moment, then try Add to cart again.';
+    }
+
+    function intersoccerPvShowStashWaitTimeoutNotice($form) {
+        const message = intersoccerPvGetStashWaitTimeoutMessage();
+        const $notice = $('<div class="woocommerce-error intersoccer-pv-stash-wait-notice" role="alert"></div>').text(message);
+        const $target = $form && $form.length ? $form : $('form.cart').first();
+        if ($target.length) {
+            $target.prepend($notice);
+        } else {
+            $('body').prepend($notice);
+        }
+        $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+    }
+
+    function intersoccerPvWaitForProductPageStashAjax(options) {
+        const safetyMs = (options && typeof options.safetyMs === 'number')
+            ? options.safetyMs
+            : (typeof options === 'number' ? options : 60000);
         return new Promise(function (resolve) {
-            const deadline = Date.now() + limit;
+            const deadline = Date.now() + safetyMs;
             (function tick() {
-                if (!intersoccerPvHasPendingProductPageStashAjax() || Date.now() >= deadline) {
-                    resolve();
+                if (!intersoccerPvHasPendingProductPageStashAjax()) {
+                    resolve({ timedOut: false });
+                    return;
+                }
+                if (Date.now() >= deadline) {
+                    resolve({ timedOut: true });
                     return;
                 }
                 setTimeout(tick, 40);
@@ -144,7 +171,12 @@
                 if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingProductPageStashAjax()) {
                     e.preventDefault();
                     const $defer = $form;
-                    intersoccerPvWaitForProductPageStashAjax(5000).then(function () {
+                    $defer.find('.intersoccer-pv-stash-wait-notice').remove();
+                    intersoccerPvWaitForProductPageStashAjax({ safetyMs: 60000 }).then(function (result) {
+                        if (result && result.timedOut) {
+                            intersoccerPvShowStashWaitTimeoutNotice($defer);
+                            return;
+                        }
                         window.intersoccerPvResubmitAfterStashWait = true;
                         $defer.trigger('submit');
                         window.intersoccerPvResubmitAfterStashWait = false;

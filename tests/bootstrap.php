@@ -561,6 +561,20 @@ if (!function_exists('get_post_field')) {
     }
 }
 
+if (!function_exists('wp_get_post_parent_id')) {
+    function wp_get_post_parent_id($post_id) {
+        $post_id = (int) $post_id;
+        $map = $GLOBALS['intersoccer_test_wp_get_post_parent_id_map'] ?? null;
+        if (is_array($map) && array_key_exists($post_id, $map)) {
+            return (int) $map[$post_id];
+        }
+        if (isset($GLOBALS['intersoccer_test_wp_get_post_parent_id_default'])) {
+            return (int) $GLOBALS['intersoccer_test_wp_get_post_parent_id_default'];
+        }
+        return 0;
+    }
+}
+
 if (!function_exists('get_the_terms')) {
     function get_the_terms($post, $taxonomy) {
         return false;

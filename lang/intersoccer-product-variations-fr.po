@@ -882,3 +882,6 @@ msgstr "Âge au début du camp : %d"
 #, php-format
 msgid "Birth year: %s"
 msgstr "Année de naissance : %s"
+
+msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
+msgstr "Les données de réservation sont encore en cours d'enregistrement. Veuillez patienter un instant, puis réessayez d'ajouter au panier."
