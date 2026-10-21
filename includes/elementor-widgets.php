@@ -288,7 +288,7 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Elementor / alternate templates: intersoccer-variation-details may not load, so wp_localize_script never ran — merge PHP-safe defaults.
             window.intersoccerCheckout = $.extend(true, {}, window.intersoccerCheckout || {}, {
-                ajax_url: <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>,
+                ajax_url: <?php echo wp_json_encode(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>,
                 nonce: <?php echo wp_json_encode(wp_create_nonce('intersoccer_nonce')); ?>,
                 user_id: <?php echo (int) $user_id; ?>,
                 latePickupI18n: <?php echo wp_json_encode(function_exists('intersoccer_get_late_pickup_elementor_strings') ? intersoccer_get_late_pickup_elementor_strings() : []); ?>,
@@ -2793,7 +2793,7 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Make AJAX call to get course price
             jQuery.ajax({
-                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                url: '<?php echo esc_url(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>',
                 type: 'POST',
                 data: {
                     action: 'intersoccer_get_course_price',
@@ -2877,7 +2877,7 @@ $intersoccer_elementor_product_page_cb = function () {
             }
 
             debug('InterSoccer: Updating camp price for variation', variationId, 'with days:', selectedDays);
-            debug('InterSoccer: AJAX URL:', '<?php echo admin_url('admin-ajax.php'); ?>');
+            debug('InterSoccer: AJAX URL:', '<?php echo esc_js(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>');
             debug('InterSoccer: Nonce:', '<?php echo wp_create_nonce('intersoccer_nonce'); ?>');
 
             // Set flag to indicate AJAX price update in progress
@@ -2888,7 +2888,7 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Make AJAX call to get updated price (return jqXHR for abort capability)
             return jQuery.ajax({
-                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                url: '<?php echo esc_url(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>',
                 type: 'POST',
                 data: {
                     action: 'intersoccer_calculate_camp_price',

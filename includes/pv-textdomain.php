@@ -122,12 +122,131 @@ function intersoccer_pv_load_textdomain_for_current_locale($locale = null) {
 }
 
 /**
+ * WPML language code for the current request (e.g. fr, de), or empty when unavailable.
+ *
+ * @return string
+ */
+function intersoccer_pv_get_wpml_language_code() {
+    $lang = apply_filters('wpml_current_language', null);
+    if (!is_string($lang)) {
+        return '';
+    }
+    $lang = trim($lang);
+    return $lang === '' ? '' : $lang;
+}
+
+/**
+ * Map a WPML language code to a WordPress locale for .mo loading.
+ *
+ * @param string $code
+ * @return string
+ */
+function intersoccer_pv_locale_from_wpml_code($code) {
+    $code = trim((string) $code);
+    if ($code === '') {
+        return intersoccer_pv_get_request_locale();
+    }
+    if (strpos($code, '_') !== false) {
+        return $code;
+    }
+    $map = [
+        'en' => 'en_US',
+        'fr' => 'fr_FR',
+        'de' => 'de_DE',
+    ];
+    if (isset($map[$code])) {
+        return $map[$code];
+    }
+
+    return $code;
+}
+
+/**
+ * admin-ajax.php URL with optional WPML lang query arg for storefront requests.
+ *
+ * @param array<string, string> $extra_args
+ * @param bool                  $include_wpml_lang
+ * @return string
+ */
+function intersoccer_pv_admin_ajax_url(array $extra_args = [], $include_wpml_lang = true) {
+    $args = $extra_args;
+    if ($include_wpml_lang) {
+        $lang = intersoccer_pv_get_wpml_language_code();
+        if ($lang !== '') {
+            $args['lang'] = $lang;
+        }
+    }
+
+    $url = admin_url('admin-ajax.php');
+    if ($args !== []) {
+        $url = add_query_arg($args, $url);
+    }
+
+    return $url;
+}
+
+/**
+ * Shared ajax_url / nonce_refresh_url (and lang when WPML is active) for customer scripts.
+ *
+ * @param bool $include_wpml_lang
+ * @return array<string, string>
+ */
+function intersoccer_pv_customer_script_localize_base($include_wpml_lang = true) {
+    $data = [
+        'ajax_url' => intersoccer_pv_admin_ajax_url([], $include_wpml_lang),
+        'nonce_refresh_url' => intersoccer_pv_admin_ajax_url(
+            ['action' => 'intersoccer_refresh_nonce'],
+            $include_wpml_lang
+        ),
+    ];
+
+    if ($include_wpml_lang) {
+        $lang = intersoccer_pv_get_wpml_language_code();
+        if ($lang !== '') {
+            $data['lang'] = $lang;
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * Switch WPML + reload PV textdomain on customer admin-ajax when lang is present.
+ */
+function intersoccer_pv_bootstrap_customer_ajax_language() {
+    if (!function_exists('wp_doing_ajax') || !wp_doing_ajax()) {
+        return;
+    }
+
+    if (function_exists('intersoccer_pv_is_admin_english_context')
+        && intersoccer_pv_is_admin_english_context()
+    ) {
+        return;
+    }
+
+    $lang = '';
+    if (isset($_REQUEST['lang'])) {
+        $lang = sanitize_text_field(wp_unslash((string) $_REQUEST['lang']));
+    }
+    if ($lang === '' || !preg_match('/^[a-z]{2,3}(?:[_-][A-Za-z]{2,4})?$/', $lang)) {
+        return;
+    }
+
+    if (has_action('wpml_switch_language')) {
+        do_action('wpml_switch_language', $lang);
+    }
+
+    intersoccer_pv_load_textdomain_for_current_locale(intersoccer_pv_locale_from_wpml_code($lang));
+}
+
+/**
  * Register hooks for storefront/admin locale and WPML switches.
  */
 function intersoccer_pv_register_textdomain_hooks() {
     add_action('init', 'intersoccer_pv_load_textdomain_for_current_locale', 20);
     add_action('wpml_language_has_switched', 'intersoccer_pv_load_textdomain_for_current_locale', 10, 0);
     add_action('change_locale', 'intersoccer_pv_load_textdomain_for_current_locale', 10, 0);
+    add_action('admin_init', 'intersoccer_pv_bootstrap_customer_ajax_language', 0);
 }
 
 intersoccer_pv_register_textdomain_hooks();

@@ -906,6 +906,9 @@ function intersoccer_add_price_update_script() {
     if (!is_product()) return;
     $product_id = get_the_ID();
     $nonce = wp_create_nonce('intersoccer_nonce');
+    $pv_admin_ajax_url = function_exists('intersoccer_pv_admin_ajax_url')
+        ? intersoccer_pv_admin_ajax_url()
+        : admin_url('admin-ajax.php');
     ?>
     <style>
         .intersoccer-loading {
@@ -998,7 +1001,7 @@ function intersoccer_add_price_update_script() {
                 // Fetch price from server
                 console.log('InterSoccer: Making AJAX call for camp price - Variation ID:', currentVariationId, 'Camp Days:', campDays);
                 $.ajax({
-                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                     type: 'POST',
                     data: {
                         action: 'intersoccer_calculate_camp_price',
@@ -1102,7 +1105,7 @@ function intersoccer_add_price_update_script() {
                 // Store selected days in session for price HTML filter (non-blocking)
                 setTimeout(function() {
                     $.ajax({
-                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                         type: 'POST',
                         data: {
                             action: 'intersoccer_store_selected_days',
@@ -1281,7 +1284,7 @@ function intersoccer_add_price_update_script() {
             function clearSessionData() {
                 console.log('InterSoccer: Clearing session data for product ' + <?php echo $product_id; ?>);
                 $.ajax({
-                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                     type: 'POST',
                     data: {
                         action: 'intersoccer_clear_session_data',
