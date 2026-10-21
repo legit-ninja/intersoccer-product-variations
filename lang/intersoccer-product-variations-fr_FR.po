@@ -1,4 +1,16 @@
-
+msgid ""
+msgstr ""
+"Project-Id-Version: WPML_EXPORT_intersoccer-product-variations\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
+"Language-Team: French <>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2025-10-17 10:08-0400\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
 #: includesoocommerce/admin-ui.php:3297
 msgid "Processing Speed"
@@ -10,11 +22,11 @@ msgstr "\"\"Des nombres plus Ã©levÃ©s trouvent plus de commandes mais prenne
 
 #: includesoocommerce/admin-ui.php:3275
 msgid "Orders to Scan"
-msgstr "Commandes à scanner"
+msgstr "Commandes Ã  scanner"
 
 #: includesoocommerce/admin-ui.php:3267
 msgid "Order Statuses to Process"
-msgstr "Statuts de commande à traiter"
+msgstr "Statuts de commande Ã  traiter"
 
 #: includesoocommerce/admin-ui.php:3263
 msgid "1. Configure Scan"
@@ -22,15 +34,15 @@ msgstr "1. Configurer le scan"
 
 #: includesoocommerce/admin-ui.php:3254
 msgid "Automated Order Metadata Update"
-msgstr "Mise à jour automatique des métadonnées de commande"
+msgstr "Mise Ã  jour automatique des mÃ©tadonnÃ©es de commande"
 
 #: includesoocommerce/admin-ui.php:2636
 msgid "Attributes refreshed successfully!"
-msgstr "Attributs actualisés avec succès !"
+msgstr "Attributs actualisÃ©s avec succÃ¨s !"
 
 #: includesoocommerce/admin-ui.php:2617
 msgid "Please select an action and at least one variation."
-msgstr "Veuillez sélectionner une action et au moins une variation."
+msgstr "Veuillez sÃ©lectionner une action et au moins une variation."
 
 #: includesoocommerce/admin-ui.php:2600
 msgid "Filter"
@@ -47,12 +59,12 @@ msgstr "Recalculer les dates de fin de cours"
 
 #: includesoocommerce/admin-ui.php:2562
 msgid "InterSoccer Variation Health Dashboard"
-msgstr "Tableau de bord de santé des variations InterSoccer"
+msgstr "Tableau de bord de santÃ© des variations InterSoccer"
 
 #: includesoocommerce/admin-ui.php:2547
 #: includesoocommerce/program-manager.php:650
 msgid "Course end dates recalculated successfully."
-msgstr "Dates de fin de cours recalculées avec succès."
+msgstr "Dates de fin de cours recalculÃ©es avec succÃ¨s."
 
 #: includesoocommerce/admin-ui.php:2274
 msgid "No attributes"
@@ -64,7 +76,7 @@ msgstr "Actualiser les attributs"
 
 #: includesoocommerce/admin-ui.php:2234
 msgid "Health Status"
-msgstr "État de santé"
+msgstr "Ãtat de santÃ©"
 
 #: includesoocommerce/admin-ui.php:2232
 #: includesoocommerce/program-manager.php:893
@@ -85,15 +97,15 @@ msgstr "Exporter l'analyse vers CSV"
 
 #: includesoocommerce/admin-ui.php:1412
 msgid "Deselect All"
-msgstr "Désélectionner tout"
+msgstr "DÃ©sÃ©lectionner tout"
 
 #: includesoocommerce/admin-ui.php:1408
 msgid "Select All Low Risk"
-msgstr "Sélectionner tout faible risque"
+msgstr "SÃ©lectionner tout faible risque"
 
 #: includesoocommerce/admin-ui.php:1393
 msgid "Scan Results"
-msgstr "Résultats du scan"
+msgstr "RÃ©sultats du scan"
 
 #: includesoocommerce/admin-ui.php:1369
 msgid "Great! No orders found that need metadata updates."
@@ -101,11 +113,11 @@ msgstr "\"\"Super ! Aucune commande trouvÃ©e nÃ©cessitant des mises Ã  jou
 
 #: includesoocommerce/admin-ui.php:1356
 msgid "Update Progress"
-msgstr "Mettre à jour la progression"
+msgstr "Mettre Ã  jour la progression"
 
 #: includesoocommerce/admin-ui.php:1352
 msgid "Orders Missing Metadata"
-msgstr "Commandes manquant de métadonnées"
+msgstr "Commandes manquant de mÃ©tadonnÃ©es"
 
 #: includesoocommerce/admin-ui.php:1343
 msgid "Note:"
@@ -113,11 +125,11 @@ msgstr "Note :"
 
 #: includesoocommerce/admin-ui.php:1340
 msgid "Find Orders Missing Metadata"
-msgstr "Trouver les commandes manquant de métadonnées"
+msgstr "Trouver les commandes manquant de mÃ©tadonnÃ©es"
 
 #: includesoocommerce/admin-ui.php:1296
 msgid "Number of Orders to Scan"
-msgstr "Nombre de commandes à scanner"
+msgstr "Nombre de commandes Ã  scanner"
 
 #: includesoocommerce/admin-ui.php:1292
 #: includesoocommerce/admin-ui.php:3271
@@ -127,7 +139,7 @@ msgstr "En attente"
 #: includesoocommerce/admin-ui.php:1291
 #: includesoocommerce/admin-ui.php:3270
 msgid "Completed"
-msgstr "Terminé"
+msgstr "TerminÃ©"
 
 #: includes/ajax-handlers.php:38
 #: includes/ajax-handlers.php:66
@@ -144,16 +156,16 @@ msgstr "\"\"Permettre aux clients d'ajouter des options de rÃ©cupÃ©ration ta
 
 #: includes/admin-product-fields.php:518
 msgid "Enable Late Pick Up"
-msgstr "Activer la récupération tardive"
+msgstr "Activer la rÃ©cupÃ©ration tardive"
 
 #: includes/admin-product-fields.php:473
 #: includes/elementor-widgets.php:265
 msgid "Late Pick Up Options"
-msgstr "Options de récupération tardive"
+msgstr "Options de rÃ©cupÃ©ration tardive"
 
 #: includes/admin-product-fields.php:111
 msgid "Add Holiday Date"
-msgstr "Ajouter une date de congé"
+msgstr "Ajouter une date de congÃ©"
 
 #: includes/admin-product-fields.php:107
 #: includes/admin-product-fields.php:127
@@ -164,7 +176,7 @@ msgstr "Retirer"
 
 #: includes/admin-product-fields.php:102
 msgid "Holiday/Skip Dates"
-msgstr "Dates de congé/à sauter"
+msgstr "Dates de congÃ©/Ã  sauter"
 
 #: includes/admin-product-fields.php:91
 msgid "Session Rate (CHF per day/session)"
@@ -172,14 +184,14 @@ msgstr "Taux de session (CHF par jour/session)"
 
 #: includes/admin-product-fields.php:72
 msgid "Course Start Date (MM-DD-YYYY)"
-msgstr "Date de début de cours (MM-JJ-AAAA)"
+msgstr "Date de dÃ©but de cours (MM-JJ-AAAA)"
 
 #: includesoocommerce/cart-calculations.php:668
 #: includesoocommerce/cart-calculations.php:669
 #: includesoocommerce/order-meta-contract.php:2219
 #: includesoocommerce/program-manager.php:3147
 msgid "Full Week"
-msgstr "Semaine complète"
+msgstr "Semaine complÃ¨te"
 
 #: includesoocommerce/admin-ui.php:1290
 #: includesoocommerce/admin-ui.php:3269
@@ -188,21 +200,21 @@ msgstr "Traitement"
 
 #: includesoocommerce/admin-ui.php:1288
 msgid "Order Statuses to Check"
-msgstr "Statuts de commande à vérifier"
+msgstr "Statuts de commande Ã  vÃ©rifier"
 
 #: includesoocommerce/admin-ui.php:1271
 msgid "Order Metadata Update Tool"
-msgstr "Outil de mise à jour des métadonnées de commande"
+msgstr "Outil de mise Ã  jour des mÃ©tadonnÃ©es de commande"
 
 #: includesoocommerce/admin-ui.php:1261
 #, php-format
 msgid "Failed to update: %s"
-msgstr "Échec de la mise à jour : %s"
+msgstr "Ãchec de la mise Ã  jour : %s"
 
 #: includesoocommerce/admin-ui.php:1259
 #, php-format
 msgid "Updated metadata for %d orders."
-msgstr "Métadonnées mises à jour pour %d commandes."
+msgstr "MÃ©tadonnÃ©es mises Ã  jour pour %d commandes."
 
 #: includesoocommerce/admin-ui.php:898
 msgid "Risk Level"
@@ -210,7 +222,7 @@ msgstr "Niveau de risque"
 
 #: includesoocommerce/admin-ui.php:897
 msgid "Missing Fields Summary"
-msgstr "Résumé des champs manquants"
+msgstr "RÃ©sumÃ© des champs manquants"
 
 #: includesoocommerce/admin-ui.php:896
 msgid "Items & Types"
@@ -222,15 +234,15 @@ msgstr "Commande"
 
 #: includesoocommerce/admin-ui.php:521
 msgid "Action completed."
-msgstr "Action terminée."
+msgstr "Action terminÃ©e."
 
 #: includesoocommerce/admin-ui.php:499
 msgid "Invalid action or no discounts selected."
-msgstr "Action invalide ou aucune remise sélectionnée."
+msgstr "Action invalide ou aucune remise sÃ©lectionnÃ©e."
 
 #: includesoocommerce/admin-ui.php:478
 msgid "Discount saved."
-msgstr "Remise sauvegardée."
+msgstr "Remise sauvegardÃ©e."
 
 #: includesoocommerce/admin-ui.php:460
 msgid "Name and discount rate are required."
@@ -254,7 +266,7 @@ msgstr "Message panier :"
 
 #: includesoocommerce/admin-ui.php:758
 msgid "3rd+ Child"
-msgstr "3ème+ enfant"
+msgstr "3Ã¨me+ enfant"
 
 #: includesoocommerce/admin-ui.php:734
 msgid "Messages"
@@ -271,21 +283,21 @@ msgstr "Traitement..."
 #: includesoocommerce/admin-ui.php:146
 #: includesoocommerce/admin-ui.php:759
 msgid "Same Season Course (Same Child)"
-msgstr "Cours même saison (même enfant)"
+msgstr "Cours mÃªme saison (mÃªme enfant)"
 
 #: includesoocommerce/admin-ui.php:145
 msgid "3rd or Additional Child"
-msgstr "3ème ou enfant supplémentaire"
+msgstr "3Ã¨me ou enfant supplÃ©mentaire"
 
 #: includesoocommerce/admin-ui.php:144
 #: includesoocommerce/admin-ui.php:757
 msgid "2nd Child"
-msgstr "2ème enfant"
+msgstr "2Ã¨me enfant"
 
 #: includesoocommerce/admin-ui.php:136
 #: includesoocommerce/admin-ui.php:751
 msgid "General"
-msgstr "Général"
+msgstr "GÃ©nÃ©ral"
 
 #: includesoocommerce/admin-ui.php:241
 msgid "Delete"
@@ -293,7 +305,7 @@ msgstr "Supprimer"
 
 #: includesoocommerce/admin-ui.php:240
 msgid "Deactivate"
-msgstr "Désactiver"
+msgstr "DÃ©sactiver"
 
 #: includesoocommerce/admin-ui.php:239
 msgid "Activate"
@@ -313,7 +325,7 @@ msgstr "Oui"
 #: includesoocommerce/product-camp.php:208
 #, php-format
 msgid "%d Day(s) Selected"
-msgstr "%d jour(s) sélectionné(s)"
+msgstr "%d jour(s) sÃ©lectionnÃ©(s)"
 
 #: includesoocommerce/product-course.php:460
 #, php-format
@@ -356,7 +368,7 @@ msgstr "Nom"
 
 #: includesoocommerce/admin-ui.php:2589
 msgid "Variation Health Checker"
-msgstr "Vérificateur de santé de la variation"
+msgstr "VÃ©rificateur de santÃ© de la variation"
 
 #: includesoocommerce/admin-ui.php:39
 msgid "InterSoccer Discounts"
@@ -365,12 +377,12 @@ msgstr "Remises InterSoccer"
 #: includesoocommerce/admin-ui.php:38
 #: includesoocommerce/admin-ui.php:299
 msgid "Manage Discounts"
-msgstr "Gérer les remises"
+msgstr "GÃ©rer les remises"
 
 #: includesoocommerce/discounts.php:2544
 #, php-format
 msgid "50%% Same Season Course Discount (%s)"
-msgstr "Remise de 50%% pour cours même saison (%s)"
+msgstr "Remise de 50%% pour cours mÃªme saison (%s)"
 
 #: includesoocommerce/discounts.php:2451
 #, php-format
@@ -380,7 +392,7 @@ msgstr "%d%% remise multi-enfants pour cours"
 #: includesoocommerce/discounts.php:2449
 #, php-format
 msgid "%d%% Sibling Course Discount"
-msgstr "%d%% remise frère/soeur pour cours"
+msgstr "%d%% remise frÃ¨re/soeur pour cours"
 
 #: includesoocommerce/discounts.php:2400
 #, php-format
@@ -390,31 +402,31 @@ msgstr "%d%% remise multi-enfants pour camp"
 #: includesoocommerce/discounts.php:2398
 #, php-format
 msgid "%d%% Sibling Camp Discount"
-msgstr "%d%% remise frère/soeur pour camp"
+msgstr "%d%% remise frÃ¨re/soeur pour camp"
 
 #: includesoocommerce/discounts.php:2503
 #, php-format
 msgid "%d%% Multi-Child Tournament Discount"
-msgstr "%d%% Réduction Tournoi Multi-Enfants"
+msgstr "%d%% RÃ©duction Tournoi Multi-Enfants"
 
 #: includesoocommerce/discounts.php:2501
 #, php-format
 msgid "%d%% Sibling Tournament Discount"
-msgstr "%d%% Réduction Fratrie Tournoi"
+msgstr "%d%% RÃ©duction Fratrie Tournoi"
 
 #: includes/elementor-widgets.php:2181
 #: includesoocommerce/cart-calculations.php:528
 #: includesoocommerce/product-camp.php:184
 msgid "Please select at least one day for this single-day camp."
-msgstr "Veuillez sélectionner au moins un jour pour ce camp d'un jour."
+msgstr "Veuillez sÃ©lectionner au moins un jour pour ce camp d'un jour."
 
 #: includesoocommerce/admin-ui.php:2210
 msgid "Orders updated successfully."
-msgstr "Commandes mises à jour avec succès."
+msgstr "Commandes mises Ã  jour avec succÃ¨s."
 
 #: includesoocommerce/admin-ui.php:2165
 msgid "No orders selected."
-msgstr "Aucune commande sélectionnée."
+msgstr "Aucune commande sÃ©lectionnÃ©e."
 
 #: includesoocommerce/admin-ui.php:143
 #: includesoocommerce/admin-ui.php:223
@@ -432,7 +444,7 @@ msgstr "Erreur : "
 #: includesoocommerce/admin-ui.php:1710
 #: includesoocommerce/admin-ui.php:1715
 msgid "Update Selected Orders"
-msgstr "Mettre à jour les commandes sélectionnées"
+msgstr "Mettre Ã  jour les commandes sÃ©lectionnÃ©es"
 
 #: includesoocommerce/admin-ui.php:895
 msgid "Customer"
@@ -446,7 +458,7 @@ msgstr "Client"
 #: includesoocommerce/age-restriction-settings.php:57
 #: includesoocommerce/program-manager.php:147
 msgid "You do not have permission to access this page."
-msgstr "Vous n'avez pas la permission d'accéder à cette page."
+msgstr "Vous n'avez pas la permission d'accÃ©der Ã  cette page."
 
 #: includesoocommerce/admin-ui.php:140
 msgid "Birthday"
@@ -472,32 +484,32 @@ msgstr "Date de fin"
 
 #: includes/language-helpers.php:151
 msgid "Start Date"
-msgstr "Date de début"
+msgstr "Date de dÃ©but"
 
 #: includesoocommerce/cart-calculations.php:646
 msgid "Days Selected"
-msgstr "Jours sélectionnés"
+msgstr "Jours sÃ©lectionnÃ©s"
 
 #: includesoocommerce/cart-calculations.php:637
 #: includesoocommerce/checkout-calculations.php:345
 msgid "Assigned Attendee"
-msgstr "Participant assigné"
+msgstr "Participant assignÃ©"
 
 #: includes/ajax-handlers.php:330
 msgid "Missing parameters."
-msgstr "Paramètres manquants."
+msgstr "ParamÃ¨tres manquants."
 
 #: includes/ajax-handlers.php:224
 msgid "You must be logged in."
-msgstr "Vous devez être connecté."
+msgstr "Vous devez Ãªtre connectÃ©."
 
 #: includes/ajax-handlers.php:199
 msgid "Session updated."
-msgstr "Session mise à jour."
+msgstr "Session mise Ã  jour."
 
 #: includes/ajax-handlers.php:135
 msgid "Variation not found."
-msgstr "Variation non trouvée."
+msgstr "Variation non trouvÃ©e."
 
 #: includes/ajax-handlers.php:74
 #: includes/ajax-handlers.php:129
@@ -520,21 +532,21 @@ msgstr "Erreur : impossible de charger les joueurs. Veuillez actualiser la page.
 #: includes/language-helpers.php:177
 #, php-format
 msgid "Error loading players: %s. Please try again."
-msgstr "Erreur lors du chargement des joueurs : %s. Veuillez réessayer."
+msgstr "Erreur lors du chargement des joueurs : %s. Veuillez rÃ©essayer."
 
 #: includes/language-helpers.php:180
 #, php-format
 msgid "Please <a href=\"%1$s\">log in</a> or <a href=\"%2$s\">register</a> to select an attendee."
-msgstr "Veuillez vous <a href=\"%1$s\">connecter</a> ou vous <a href=\"%2$s\">inscrire</a> pour sélectionner un participant."
+msgstr "Veuillez vous <a href=\"%1$s\">connecter</a> ou vous <a href=\"%2$s\">inscrire</a> pour sÃ©lectionner un participant."
 
 #: includes/language-helpers.php:186
 msgid "Please log in or register to select an attendee."
-msgstr "Veuillez vous connecter ou vous inscrire pour sélectionner un participant."
+msgstr "Veuillez vous connecter ou vous inscrire pour sÃ©lectionner un participant."
 
 #: includes/language-helpers.php:189
 #, php-format
 msgid "No players registered. <a href=\"%s\">Add a player</a>."
-msgstr "Aucun joueur enregistré. <a href=\"%s\">Ajoutez un joueur</a>."
+msgstr "Aucun joueur enregistrÃ©. <a href=\"%s\">Ajoutez un joueur</a>."
 
 #: includes/language-helpers.php:194
 msgid "Please add a player to continue."
@@ -542,11 +554,11 @@ msgstr "Veuillez ajouter un joueur pour continuer."
 
 #: includes/language-helpers.php:195
 msgid "Select an Attendee"
-msgstr "Sélectionnez un participant"
+msgstr "SÃ©lectionnez un participant"
 
 #: includes/language-helpers.php:196
 msgid "Please select an attendee to add to cart."
-msgstr "Veuillez sélectionner un participant à ajouter au panier."
+msgstr "Veuillez sÃ©lectionner un participant Ã  ajouter au panier."
 
 #: includes/language-helpers.php:197
 msgid "Please select an attendee."
@@ -939,13 +951,9 @@ msgstr ""
 msgid "Refresh Attributes may apply default course dates only to variations missing values. Active courses with remaining sessions will not receive new start dates. Continue?"
 msgstr ""
 
-#: includesoocommerce/admin-ui.php:2639
-msgid "Error: "
-msgstr ""
-
-#: includesoocommerce/admin-ui.php:2643
-msgid "An error occurred while refreshing attributes: "
-msgstr ""
+# wpml-name: 7b22344fd895e14c47399f85200a2ace
+msgid "An error occurred while refreshing attributes:"
+msgstr "Une erreur s'est produite lors de l'actualisation des attributs : "
 
 #: includesoocommerce/admin-ui.php:2652
 msgid "Are you sure you want to run the course holiday fix? This will modify course data and should only be run once. Make sure you have a backup!"
@@ -2706,10 +2714,6 @@ msgstr ""
 #: includesoocommerce/program-manager.php:3799
 msgid "No programs found. Create one to get started!"
 msgstr ""
-
-# wpml-name: 7b22344fd895e14c47399f85200a2ace
-msgid "An error occurred while refreshing attributes:"
-msgstr "Une erreur s'est produite lors de l'actualisation des attributs : "
 
 # wpml-name: 69925c733ee4daa47023ffc1aec67386
 msgid "Total Weeks Duration"

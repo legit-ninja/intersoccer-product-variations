@@ -1,4 +1,18 @@
-
+# Copyright (C) 2026 Jeremy Lee
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: InterSoccer Product Variations 2.10.17\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/w\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-10-21T11:11:38+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: intersoccer-product-variations\n"
 
 #. Plugin Name of the plugin
 #: intersoccer-product-variations.php
@@ -2794,277 +2808,348 @@ msgstr ""
 msgid "An error occurred while refreshing attributes:"
 msgstr ""
 
+
 # wpml-name: 69925c733ee4daa47023ffc1aec67386
 msgid "Total Weeks Duration"
 msgstr ""
+
 
 # wpml-name: 42b4d0483c08574a5f99032b321a7485
 msgid "An error occurred while processing the action:"
 msgstr ""
 
+
 # wpml-name: c8fdea49d80596005fac81da45cc1763
 msgid "Action completed successfully!"
 msgstr ""
+
 
 # wpml-name: 10842c54ba5faae950c177c4b0c5cdc0
 msgid "Please select an action and at least one discount."
 msgstr ""
 
+
 # wpml-name: 25fed406cb0a88646d8059cad51345a3
 msgid "An error occurred while saving the discount:"
 msgstr ""
+
 
 # wpml-name: 0e8bc5808bec14350b627a5c71fd36de
 msgid "Discount saved successfully!"
 msgstr ""
 
+
 # wpml-name: 575f5f86d2c7ea113c6710c1037c4465
 msgid "Saving..."
 msgstr ""
+
 
 # wpml-name: 7badfbc455735b33283d92ea477996de
 msgid "Add New Discount"
 msgstr ""
 
+
 # wpml-name: 01e2d3610b345cf18df5dc5151ee40fe
 msgid "Late Pickup Cost:"
 msgstr ""
 
+
 msgid "Select Late Pickup Days"
 msgstr ""
+
 
 msgid "Single Day"
 msgstr ""
 
+
 msgid "Late Pickup Type"
 msgstr ""
+
 
 msgid "Friday"
 msgstr ""
 
+
 msgid "Thursday"
 msgstr ""
+
 
 msgid "Wednesday"
 msgstr ""
 
+
 msgid "Tuesday"
 msgstr ""
 
+
 msgid "Monday"
 msgstr ""
+
 
 # wpml-name: 9d638347d4ad0b297ebc3916628086a9
 msgid "Bulk Repair Order"
 msgstr ""
 
+
 # wpml-name: 3075598b69f070f90a6b5937385cadd1
 msgid "Bulk Repair Order Details"
 msgstr ""
+
 
 # wpml-name: ebeb926b91e26d236f491be6a69fcb49
 msgid "Variation Health"
 msgstr ""
 
+
 # wpml-name: 9cc1111acc0c817da26f7fcba3732ab0
 msgid "Find Order Issues"
 msgstr ""
+
 
 # wpml-name: 5c8e16cc479d3640200c558b89e2dec1
 msgid "Scan Orders missing data"
 msgstr ""
 
+
 # wpml-name: 98cb3e604330f6b2df6030c245cf554a
 msgid "Same child, multiple courses in same season"
 msgstr ""
+
 
 # wpml-name: 1a16f21e6041f067495481d41f6160ee
 msgid "50% Same Season Course Discount"
 msgstr ""
 
+
 # wpml-name: fd2f2092d275d1300031a6d6c0bc098a
 msgid "Third or additional child course discount"
 msgstr ""
+
 
 # wpml-name: 7db077256d3f7e63ec6ca63f8e8c4fd8
 msgid "30% Multi-Child Course Discount"
 msgstr ""
 
+
 # wpml-name: 04b5e611f90d20ab1c291e4248254d42
 msgid "Second child course discount"
 msgstr ""
+
 
 # wpml-name: 62aa7b74de55c9aaf1f39d5763fb2aca
 msgid "20% Course Sibling Discount"
 msgstr ""
 
+
 # wpml-name: 9fb5155b9ce71a9393f4e4facee5d4c2
 msgid "Third or additional child camp discount"
 msgstr ""
+
 
 # wpml-name: b42b4793ca0578246755d052e8e60812
 msgid "25% Multi-Child Discount Applied"
 msgstr ""
 
+
 # wpml-name: b9ec5d7b8e696f6df33609fe478a4fbb
 msgid "Second child camp discount"
 msgstr ""
+
 
 # wpml-name: 54f818895232f9d69a713052a8c0c93c
 msgid "20% Sibling Discount Applied"
 msgstr ""
 
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr ""
+
 
 # wpml-name: 3b8dae5b06af017dfd637787d41deb39
 msgid "Discounts Applied"
 msgstr ""
 
+
 # wpml-name: 559239d226fc41ded4a63d71b9aa0993
 msgid "Discount Information"
 msgstr ""
+
 
 # wpml-name: c2e0383f6afcd9efdd1293ae9f01ac89
 msgid "50%% Same Season Course Discount (Child %d, %s)"
 msgstr ""
 
+
 # wpml-name: 44b442f734438b0573e8c349352231d3
 msgid "%d%% Course Multi-Child Discount (Child %d)"
 msgstr ""
+
 
 # wpml-name: edb9be8ad5dbcdf93f068fe7afd2e6bb
 msgid "%d%% Camp Combo Discount (Child %d)"
 msgstr ""
 
+
 # wpml-name: tournament_multi_child_discount_template
 msgid "%d%% Tournament Multi-Child Discount (Child %d)"
 msgstr ""
+
 
 # wpml-name: tournament_2nd_child
 msgid "20% Tournament Sibling Discount"
 msgstr ""
 
+
 # wpml-name: tournament_3rd_plus_child
 msgid "30% Multi-Child Tournament Discount"
 msgstr ""
+
 
 # wpml-name: 6cf2c02baa81eadd3611ca6d743a7c13
 msgid "Use this file"
 msgstr ""
 
+
 # wpml-name: 5682303a0b5c6473d3ddd71e79c112a4
 msgid "Select PDF Document"
 msgstr ""
+
 
 # wpml-name: e31ab336218efacad3be11926a9efe21
 msgid "Add Document"
 msgstr ""
 
+
 # wpml-name: c4909a2de9e853004472a4e7cb4deb74
 msgid "Days Until Expiry"
 msgstr ""
+
 
 # wpml-name: 15b74170f1b82015fa24aab612080573
 msgid "Download Limit"
 msgstr ""
 
+
 # wpml-name: e635032a5f71d809146d3872389f5b0c
 msgid "Choose File"
 msgstr ""
+
 
 # wpml-name: 3d756c429d3a9fe70f5f1ac25a561a9a
 msgid "Document Name"
 msgstr ""
 
+
 # wpml-name: 98c1dacd1bdf262e6df945527dd30cf6
 msgid "Event Documents"
 msgstr ""
+
 
 # wpml-name: 0efaf5aeb4fd4b8bf06fb531f73c1d7d
 msgid "An error occurred while updating orders."
 msgstr ""
 
+
 # wpml-name: 3f585e276d1507f1b90cf0c9da718605
 msgid "Orders updated successfully!"
 msgstr ""
+
 
 # wpml-name: 04f2ad422deb1b827fdc5557646be5b3
 msgid "Updating orders..."
 msgstr ""
 
+
 # wpml-name: 85d69ef5b22c853fca941a170ad1e7e3
 msgid "Please select at least one order."
 msgstr ""
+
 
 # wpml-name: c0323e24f8c607e50ad403b10ea65b02
 msgid "No Processing orders found."
 msgstr ""
 
+
 # wpml-name: 8c28b6177556e66df27d1439ac2307d0
 msgid "Fix Incorrect Attributes (e.g., remove Days-of-week)"
 msgstr ""
+
 
 # wpml-name: 78ef5751ce5cb617f7107c0d5b14484c
 msgid "Remove Assigned Player Field"
 msgstr ""
 
+
 # wpml-name: 96b0141273eabab320119c467cdcaf17
 msgid "Total"
 msgstr ""
+
 
 # wpml-name: 44749712dbec183e983dcd78a7736c41
 msgid "Date"
 msgstr ""
 
+
 # wpml-name: d79cf3f429596f77db95c65074663a54
 msgid "Order ID"
 msgstr ""
+
 
 # wpml-name: 188b6df22ad91edc85495591aef5eccb
 msgid "Update Processing Orders with Parent Attributes"
 msgstr ""
 
+
 # wpml-name: e234276a857df17dc1304850b4637471
 msgid "Update Order Details"
 msgstr ""
+
 
 # wpml-name: bc6c496c92ed440636bf79dec6cc123b
 msgid "Sessions Remaining:"
 msgstr ""
 
+
 # wpml-name: ea9aa7aabff7550810c1515c5a6e0240
 msgid "Discount Applied"
 msgstr ""
+
 
 # wpml-name: eba2ff150cdb47711ad1bc51d19a795f
 msgid "Sessions Remaining"
 msgstr ""
 
+
 # wpml-name: 8e44b2127a4fb456a78feced6731a496
 msgid "%d of %d"
 msgstr ""
+
 
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
 msgstr ""
 
+
 # wpml-name: 01e0d7cc38afaa0ee32c5df46659f52f
 msgid "%d%% Combo Discount (%s Child)"
 msgstr ""
+
 
 # wpml-name: fa580353b0e0ef9d4136355c33dc4e48
 msgid "%d%% Family Discount (%s Child)"
 msgstr ""
 
+
 #, php-format
 msgid "Medical information: provided (view or update in My Account)."
 msgstr ""
 
+
 #, php-format
 msgid "Age at camp start: %d"
 msgstr ""
+
 
 #, php-format
 msgid "Birth year: %s"

@@ -1,4 +1,16 @@
-
+msgid ""
+msgstr ""
+"Project-Id-Version: WPML_EXPORT_intersoccer-product-variations\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
+"Language-Team: German <>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2025-10-17 10:09-0400\n"
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: includesoocommerce/admin-ui.php:3297
 msgid "Processing Speed"
@@ -30,7 +42,7 @@ msgstr "Attribute erfolgreich aktualisiert!"
 
 #: includesoocommerce/admin-ui.php:2617
 msgid "Please select an action and at least one variation."
-msgstr "Bitte wählen Sie eine Aktion und mindestens eine Variation aus."
+msgstr "Bitte wÃ¤hlen Sie eine Aktion und mindestens eine Variation aus."
 
 #: includesoocommerce/admin-ui.php:2600
 msgid "Filter"
@@ -85,11 +97,11 @@ msgstr "Analyse als CSV exportieren"
 
 #: includesoocommerce/admin-ui.php:1412
 msgid "Deselect All"
-msgstr "Alle abwählen"
+msgstr "Alle abwÃ¤hlen"
 
 #: includesoocommerce/admin-ui.php:1408
 msgid "Select All Low Risk"
-msgstr "Alle niedriges Risiko auswählen"
+msgstr "Alle niedriges Risiko auswÃ¤hlen"
 
 #: includesoocommerce/admin-ui.php:1393
 msgid "Scan Results"
@@ -153,7 +165,7 @@ msgstr "Optionen für späte Abholung"
 
 #: includes/admin-product-fields.php:111
 msgid "Add Holiday Date"
-msgstr "Ferientermin hinzufügen"
+msgstr "Ferientermin hinzufÃ¼gen"
 
 #: includes/admin-product-fields.php:107
 #: includes/admin-product-fields.php:127
@@ -164,7 +176,7 @@ msgstr "Entfernen"
 
 #: includes/admin-product-fields.php:102
 msgid "Holiday/Skip Dates"
-msgstr "Ferien/Überspringen-Daten"
+msgstr "Ferien/Ãberspringen-Daten"
 
 #: includes/admin-product-fields.php:91
 msgid "Session Rate (CHF per day/session)"
@@ -188,7 +200,7 @@ msgstr "Verarbeitung"
 
 #: includesoocommerce/admin-ui.php:1288
 msgid "Order Statuses to Check"
-msgstr "Zu prüfende Bestellstatus"
+msgstr "Zu prÃ¼fende Bestellstatus"
 
 #: includesoocommerce/admin-ui.php:1271
 msgid "Order Metadata Update Tool"
@@ -275,7 +287,7 @@ msgstr "Kurs gleiche Saison (gleiches Kind)"
 
 #: includesoocommerce/admin-ui.php:145
 msgid "3rd or Additional Child"
-msgstr "3. oder zusätzliches Kind"
+msgstr "3. oder zusÃ¤tzliches Kind"
 
 #: includesoocommerce/admin-ui.php:144
 #: includesoocommerce/admin-ui.php:757
@@ -313,7 +325,7 @@ msgstr "Ja"
 #: includesoocommerce/product-camp.php:208
 #, php-format
 msgid "%d Day(s) Selected"
-msgstr "%d Tag(e) ausgewählt"
+msgstr "%d Tag(e) ausgewÃ¤hlt"
 
 #: includesoocommerce/product-course.php:460
 #, php-format
@@ -525,36 +537,36 @@ msgstr "Fehler beim Laden der Spieler: %s. Bitte versuchen Sie es erneut."
 #: includes/language-helpers.php:180
 #, php-format
 msgid "Please <a href=\"%1$s\">log in</a> or <a href=\"%2$s\">register</a> to select an attendee."
-msgstr "Bitte <a href=\"%1$s\">melden Sie sich an</a> oder <a href=\"%2$s\">registrieren Sie sich</a>, um einen Teilnehmer auszuwählen."
+msgstr "Bitte <a href=\"%1$s\">melden Sie sich an</a> oder <a href=\"%2$s\">registrieren Sie sich</a>, um einen Teilnehmer auszuwÃ¤hlen."
 
 #: includes/language-helpers.php:186
 msgid "Please log in or register to select an attendee."
-msgstr "Bitte melden Sie sich an oder registrieren Sie sich, um einen Teilnehmer auszuwählen."
+msgstr "Bitte melden Sie sich an oder registrieren Sie sich, um einen Teilnehmer auszuwÃ¤hlen."
 
 #: includes/language-helpers.php:189
 #, php-format
 msgid "No players registered. <a href=\"%s\">Add a player</a>."
-msgstr "Keine Spieler registriert. <a href=\"%s\">Spieler hinzufügen</a>."
+msgstr "Keine Spieler registriert. <a href=\"%s\">Spieler hinzufÃ¼gen</a>."
 
 #: includes/language-helpers.php:194
 msgid "Please add a player to continue."
-msgstr "Bitte fügen Sie einen Spieler hinzu, um fortzufahren."
+msgstr "Bitte fÃ¼gen Sie einen Spieler hinzu, um fortzufahren."
 
 #: includes/language-helpers.php:195
 msgid "Select an Attendee"
-msgstr "Teilnehmer auswählen"
+msgstr "Teilnehmer auswÃ¤hlen"
 
 #: includes/language-helpers.php:196
 msgid "Please select an attendee to add to cart."
-msgstr "Bitte wählen Sie einen Teilnehmer aus, der zum Warenkorb hinzugefügt werden soll."
+msgstr "Bitte wÃ¤hlen Sie einen Teilnehmer aus, der zum Warenkorb hinzugefÃ¼gt werden soll."
 
 #: includes/language-helpers.php:197
 msgid "Please select an attendee."
-msgstr "Bitte wählen Sie einen Teilnehmer aus."
+msgstr "Bitte wÃ¤hlen Sie einen Teilnehmer aus."
 
 #: includes/language-helpers.php:198
 msgid "Please select at least one day."
-msgstr "Bitte wählen Sie mindestens einen Tag aus."
+msgstr "Bitte wÃ¤hlen Sie mindestens einen Tag aus."
 
 #: includes/language-helpers.php:199
 msgid "Please resolve the error to continue."
@@ -992,13 +1004,9 @@ msgstr ""
 msgid "Refresh Attributes may apply default course dates only to variations missing values. Active courses with remaining sessions will not receive new start dates. Continue?"
 msgstr ""
 
-#: includesoocommerce/admin-ui.php:2639
-msgid "Error: "
-msgstr ""
-
-#: includesoocommerce/admin-ui.php:2643
-msgid "An error occurred while refreshing attributes: "
-msgstr ""
+# wpml-name: 7b22344fd895e14c47399f85200a2ace
+msgid "An error occurred while refreshing attributes:"
+msgstr "Ein Fehler ist beim Aktualisieren der Attribute aufgetreten: "
 
 #: includesoocommerce/admin-ui.php:2652
 msgid "Are you sure you want to run the course holiday fix? This will modify course data and should only be run once. Make sure you have a backup!"
@@ -2789,10 +2797,6 @@ msgstr ""
 #: includesoocommerce/program-manager.php:3799
 msgid "No programs found. Create one to get started!"
 msgstr ""
-
-# wpml-name: 7b22344fd895e14c47399f85200a2ace
-msgid "An error occurred while refreshing attributes:"
-msgstr "Ein Fehler ist beim Aktualisieren der Attribute aufgetreten: "
 
 # wpml-name: 42b4d0483c08574a5f99032b321a7485
 msgid "An error occurred while processing the action:"
