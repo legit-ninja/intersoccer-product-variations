@@ -184,7 +184,7 @@ msgstr ""
 
 # wpml-name: 1431360f9839dbc8fc08138211fe7e8f
 msgid "Full Week"
-msgstr ""
+msgstr "Ganze Woche"
 
 # wpml-name: 643562a9ae7099c8aabfdc93478db117
 msgid "Processing"
@@ -680,11 +680,11 @@ msgstr ""
 
 # wpml-name: 59ec68ce0386af0b3298dacf940d767f
 msgid "Days Selected"
-msgstr ""
+msgstr "Ausgewählte Tage"
 
 # wpml-name: 7bfddf530b40af0073fbfb957594d475
 msgid "Assigned Attendee"
-msgstr ""
+msgstr "Zugewiesener Teilnehmer"
 
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
