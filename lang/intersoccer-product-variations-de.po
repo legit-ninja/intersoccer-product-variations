@@ -789,5 +789,11 @@ msgstr "Alter bei Campbeginn: %d"
 msgid "Birth year: %s"
 msgstr "Geburtsjahr: %s"
 
+#, php-format
+# wpml-name: The selected attendee needs a valid date of birth. Update it under Manage Players: %s
+#. translators: %s: URL to Manage Players
+msgid "The selected attendee needs a valid date of birth. Update it under Manage Players: %s"
+msgstr "Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforderlich. Bitte aktualisieren Sie es unter „Teilnehmer verwalten“: %s"
+
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr "Die Buchungsdaten werden noch gespeichert. Bitte warten Sie einen Moment und versuchen Sie es dann erneut."
