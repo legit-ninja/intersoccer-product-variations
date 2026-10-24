@@ -770,20 +770,6 @@ function intersoccer_pv_manage_players_url() {
 }
 
 /**
- * Resolve a plugin string after load_plugin_textdomain() (gettext MO), else __().
- *
- * @param string $msgid Message id.
- * @param string $domain Text domain.
- * @return string
- */
-function intersoccer_pv_gettext($msgid, $domain = 'intersoccer-product-variations') {
-    if (function_exists('translate') && function_exists('is_textdomain_loaded') && is_textdomain_loaded($domain)) {
-        return translate($msgid, $domain);
-    }
-    return __($msgid, $domain);
-}
-
-/**
  * Customer-facing add-to-cart / checkout notice when the assigned player has no valid DOB.
  *
  * @return string Plain text or HTML (anchor only) for wc_add_notice / WP_Error message.
@@ -791,15 +777,17 @@ function intersoccer_pv_gettext($msgid, $domain = 'intersoccer-product-variation
 function intersoccer_pv_age_no_dob_error_message() {
     $url = intersoccer_pv_manage_players_url();
     if ($url === '') {
-        return intersoccer_pv_gettext(
+        return __(
             'The selected attendee needs a valid date of birth. Please update it in your account before booking.',
             'intersoccer-product-variations'
         );
     }
 
-    $msgid = 'The selected attendee needs a valid date of birth. Update it under Manage Players: %s';
     $link = '<a href="' . esc_url($url) . '">' . esc_html($url) . '</a>';
-    $template = esc_html(intersoccer_pv_gettext($msgid, 'intersoccer-product-variations'));
+    $template = esc_html(
+        /* translators: %s: URL to Manage Players */
+        __('The selected attendee needs a valid date of birth. Update it under Manage Players: %s', 'intersoccer-product-variations')
+    );
 
     return sprintf($template, $link);
 }
