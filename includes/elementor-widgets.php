@@ -296,7 +296,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 latePickupI18n: <?php echo wp_json_encode(function_exists('intersoccer_get_late_pickup_elementor_strings') ? intersoccer_get_late_pickup_elementor_strings() : []); ?>,
                 i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
                     stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>,
-                    remaining_sessions_of_total: <?php echo wp_json_encode(__('%1$s of %2$s', 'intersoccer-product-variations')); ?>
+                    remaining_sessions_of_total: <?php echo wp_json_encode(__('%1$s of %2$s', 'intersoccer-product-variations')); ?>,
+                    label_value_separator: <?php echo wp_json_encode(_x(':', 'label/value separator', 'intersoccer-product-variations')); ?>
                 })
             });
             var latePickupI18n = window.intersoccerCheckout.latePickupI18n || {};

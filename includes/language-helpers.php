@@ -220,6 +220,7 @@ function intersoccer_get_course_display_strings() {
         'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
         'holidays' => __('Holidays', 'intersoccer-product-variations'),
         'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+        'label_value_separator' => _x(':', 'label/value separator', 'intersoccer-product-variations'),
     ];
 }
 

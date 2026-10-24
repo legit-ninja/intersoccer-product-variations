@@ -441,6 +441,7 @@ add_action('wp_enqueue_scripts', function () {
                     'remaining_sessions_of_total' => __('%1$s of %2$s', 'intersoccer-product-variations'),
                     'holidays' => __('Holidays', 'intersoccer-product-variations'),
                     'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+                    'label_value_separator' => _x(':', 'label/value separator', 'intersoccer-product-variations'),
                     'player_assignment' => $player_assignment_strings,
                     'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
                 ],

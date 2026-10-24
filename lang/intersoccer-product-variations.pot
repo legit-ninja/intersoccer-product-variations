@@ -910,3 +910,16 @@ msgstr ""
 msgid "Remaining Sessions"
 msgstr ""
 
+#. translators: label/value separator
+msgctxt "label/value separator"
+msgid ":"
+msgstr ""
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr ""
+
+#, php-format
+#. translators: %s: URL to Manage Players
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
+msgstr ""
+

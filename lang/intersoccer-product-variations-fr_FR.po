@@ -40,7 +40,7 @@ msgstr "Mise à jour automatique des métadonnées de commande"
 # wpml-name: 7b22344fd895e14c47399f85200a2ace
 #, fuzzy
 msgid "An error occurred while refreshing attributes:"
-msgstr "Une erreur s'est produite lors de l'actualisation des attributs : "
+msgstr "Une erreur s'est produite lors de l'actualisation des attributs : "
 
 # wpml-name: 66be704bb22e3865e581927acaf82479
 msgid "Attributes refreshed successfully!"
@@ -125,7 +125,7 @@ msgstr "Commandes manquant de métadonnées"
 
 # wpml-name: fc9d3df613063ee57906c461320744e2
 msgid "Note:"
-msgstr "Note :"
+msgstr "Note :"
 
 # wpml-name: 49c6f77c088b172b5412b89dc7a5d79a
 msgid "Find Orders Missing Metadata"
@@ -203,7 +203,7 @@ msgstr "Outil de mise à jour des métadonnées de commande"
 
 # wpml-name: 08df859ccb96b144287fd16b45d49a5f
 msgid "Failed to update: %s"
-msgstr "Échec de la mise à jour : %s"
+msgstr "Échec de la mise à jour : %s"
 
 # wpml-name: 6caa02b462a6ce7918ff042ed3341d94
 msgid "Updated metadata for %d orders."
@@ -248,15 +248,15 @@ msgstr "Sauvegarder tout"
 
 # wpml-name: f4866d959fd759fd3773f608113c2f39
 msgid "Customer Note:"
-msgstr "Note client :"
+msgstr "Note client :"
 
 # wpml-name: c77ccea7438b48166211e77cc146eaab
 msgid "Admin Description:"
-msgstr "Description admin :"
+msgstr "Description admin :"
 
 # wpml-name: f2d0643e56aa625668df08d146208942
 msgid "Cart Message:"
-msgstr "Message panier :"
+msgstr "Message panier :"
 
 # wpml-name: 07223c055c2dca546d7b28bc236c91cf
 msgid "3rd+ Child"
@@ -274,7 +274,7 @@ msgstr "Gérer les remises &amp; messages"
 # wpml-name: 42b4d0483c08574a5f99032b321a7485
 #, fuzzy
 msgid "An error occurred while processing the action:"
-msgstr "Une erreur s'est produite lors du traitement de l'action : "
+msgstr "Une erreur s'est produite lors du traitement de l'action : "
 
 # wpml-name: c8fdea49d80596005fac81da45cc1763
 msgid "Action completed successfully!"
@@ -291,7 +291,7 @@ msgstr "Veuillez sélectionner une action et au moins une remise."
 # wpml-name: 25fed406cb0a88646d8059cad51345a3
 #, fuzzy
 msgid "An error occurred while saving the discount:"
-msgstr "Une erreur s'est produite lors de la sauvegarde de la remise : "
+msgstr "Une erreur s'est produite lors de la sauvegarde de la remise : "
 
 # wpml-name: 0e8bc5808bec14350b627a5c71fd36de
 msgid "Discount saved successfully!"
@@ -587,7 +587,7 @@ msgstr "Une erreur s'est produite lors de la mise à jour des commandes."
 # wpml-name: f97d2eb0a66987899d02bb180936afa3
 #, fuzzy
 msgid "Error:"
-msgstr "Erreur : "
+msgstr "Erreur : "
 
 # wpml-name: 3f585e276d1507f1b90cf0c9da718605
 msgid "Orders updated successfully!"
@@ -661,7 +661,7 @@ msgstr "Camp"
 # wpml-name: bc6c496c92ed440636bf79dec6cc123b
 #, fuzzy
 msgid "Sessions Remaining:"
-msgstr "Sessions restantes : "
+msgstr "Sessions restantes : "
 
 # wpml-name: ea9aa7aabff7550810c1515c5a6e0240
 msgid "Discount Applied"
@@ -733,7 +733,7 @@ msgstr "ID de produit invalide."
 
 # wpml-name: c4716ed2f447aa22072d91c1acbe83e7
 #~ msgid "Late Pick Up Cost: "
-#~ msgstr "Coût de récupération tardive : "
+#~ msgstr "Coût de récupération tardive : "
 
 # #-#-#-#-#  intersoccer-product-variations.pot (WPML_EXPORT_intersoccer-product-variations)  #-#-#-#-#
 # wpml-name: bc817b1e58c7ef645954e21a3fc1872c
@@ -836,12 +836,12 @@ msgstr "Chargement des joueurs..."
 
 # wpml-name: Error: Unable to load players. Please try refreshing the page.
 msgid "Error: Unable to load players. Please try refreshing the page."
-msgstr "Erreur : impossible de charger les joueurs. Veuillez actualiser la page."
+msgstr "Erreur : impossible de charger les joueurs. Veuillez actualiser la page."
 
 #, php-format
 # wpml-name: Error loading players: %s. Please try again.
 msgid "Error loading players: %s. Please try again."
-msgstr "Erreur lors du chargement des joueurs : %s. Veuillez réessayer."
+msgstr "Erreur lors du chargement des joueurs : %s. Veuillez réessayer."
 
 #, php-format
 # wpml-name: Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.
@@ -871,21 +871,21 @@ msgstr "Veuillez sélectionner un participant à ajouter au panier."
 
 #, php-format
 msgid "Medical information: provided (view or update in My Account)."
-msgstr "Informations médicales : fournies (consulter ou mettre à jour dans Mon compte)."
+msgstr "Informations médicales : fournies (consulter ou mettre à jour dans Mon compte)."
 
 #, php-format
 msgid "Age at camp start: %d"
-msgstr "Âge au début du camp : %d"
+msgstr "Âge au début du camp : %d"
 
 #, php-format
 msgid "Birth year: %s"
-msgstr "Année de naissance : %s"
+msgstr "Année de naissance : %s"
 
 #, php-format
 # wpml-name: The selected attendee needs a valid date of birth. Update it under Manage Players: %s
 #. translators: %s: URL to Manage Players
 msgid "The selected attendee needs a valid date of birth. Update it under Manage Players: %s"
-msgstr "Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants : %s"
+msgstr "Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants : %s"
 
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr "Les données de réservation sont encore en cours d'enregistrement. Veuillez patienter un instant, puis réessayez d'ajouter au panier."
@@ -906,7 +906,7 @@ msgid "No late pick up selected"
 msgstr "Aucune récupération tardive sélectionnée"
 
 msgid "Full Week (5 days): "
-msgstr "Semaine complète (5 jours) : "
+msgstr "Semaine complète (5 jours) : "
 
 msgid "Select at least one day"
 msgstr "Sélectionnez au moins un jour"
@@ -914,8 +914,8 @@ msgstr "Sélectionnez au moins un jour"
 #, php-format
 msgid "%d day: "
 msgid_plural "%d days: "
-msgstr[0] "%d jour : "
-msgstr[1] "%d jours : "
+msgstr[0] "%d jour : "
+msgstr[1] "%d jours : "
 
 msgid "Invalid selection"
 msgstr "Sélection invalide"
@@ -945,4 +945,17 @@ msgstr "Échec de la requête"
 
 msgid "Remaining Sessions"
 msgstr "Séances restantes"
+
+#. translators: label/value separator
+msgctxt "label/value separator"
+msgid ":"
+msgstr " :"
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr "Cette séance est réservée aux filles. Le participant sélectionné doit avoir le genre « femme » dans votre compte. Veuillez le mettre à jour dans Gérer les participants avant de réserver."
+
+#, php-format
+#. translators: %s: URL to Manage Players
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
+msgstr "Cette séance est réservée aux filles. Le participant sélectionné doit avoir le genre « femme » dans votre compte. Veuillez le mettre à jour dans <a href=\"%s\">Gérer les participants</a>."
 

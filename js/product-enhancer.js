@@ -110,6 +110,12 @@
         }
         return fallback;
     };
+    const getLabelValueSeparator = () => {
+        if (checkoutI18n && Object.prototype.hasOwnProperty.call(checkoutI18n, 'label_value_separator') && checkoutI18n.label_value_separator !== '') {
+            return checkoutI18n.label_value_separator;
+        }
+        return ':';
+    };
     const formatRemainingSessionsOfTotal = (remaining, total) => {
         const template = checkoutI18n.remaining_sessions_of_total || '%1$s of %2$s';
         return String(template)
@@ -468,21 +474,21 @@
             let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
                 const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}:</strong> ${startDate}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${startDate}</p>`;
             }
             if (courseData.end_date) {
                 const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}:</strong> ${endDate}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${endDate}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
                 const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
-                html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}:</strong> ${holidays}</p>`;
+                html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}${getLabelValueSeparator()}</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
                 const sessionsValue = courseData.total_sessions
                     ? formatRemainingSessionsOfTotal(courseData.remaining_sessions, courseData.total_sessions)
                     : String(courseData.remaining_sessions);
-                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}:</strong> ${sessionsValue}</p>`;
+                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}${getLabelValueSeparator()}</strong> ${sessionsValue}</p>`;
             }
             html += '</div>';
 
