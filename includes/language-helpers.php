@@ -141,6 +141,111 @@ function intersoccer_get_multilingual_plugin() {
  * @param array $args Optional overrides for URLs used in the generated strings.
  * @return array
  */
+/**
+ * Localized course info labels for JS (product page).
+ *
+ * @return array<string,string>
+ */
+/**
+ * Late pickup Elementor / inline JS strings (customer-facing).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_get_late_pickup_elementor_strings() {
+    return [
+        'selectOptional' => __('Select late pick up option (optional)', 'intersoccer-product-variations'),
+        'noLatePickup' => __('No Late Pickup', 'intersoccer-product-variations'),
+        'fullWeek' => __('Full Week', 'intersoccer-product-variations'),
+        'singleDays' => __('Single Days', 'intersoccer-product-variations'),
+        'noSelection' => __('No late pick up selected', 'intersoccer-product-variations'),
+        'fullWeekFiveDays' => __('Full Week (5 days): ', 'intersoccer-product-variations'),
+        'selectAtLeastOneDay' => __('Select at least one day', 'intersoccer-product-variations'),
+        'dayCountSingular' => __('%d day: ', 'intersoccer-product-variations'),
+        'dayCountPlural' => __('%d days: ', 'intersoccer-product-variations'),
+        'invalidSelection' => __('Invalid selection', 'intersoccer-product-variations'),
+    ];
+}
+
+function intersoccer_get_course_display_strings() {
+    return [
+        'start_date' => __('Start Date', 'intersoccer-product-variations'),
+        'end_date' => __('End Date', 'intersoccer-product-variations'),
+        'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
+        'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+        'holidays' => __('Holidays', 'intersoccer-product-variations'),
+        'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+    ];
+}
+
+/**
+ * English gender label for PV admin UI (does not use player-management gettext).
+ *
+ * @param string $raw_gender Stored or profile gender value.
+ * @return string
+ */
+function intersoccer_pv_admin_format_player_gender_label($raw_gender) {
+    $trim = trim((string) $raw_gender);
+    if ($trim === '') {
+        return '';
+    }
+
+    if (function_exists('intersoccer_normalize_player_gender_bucket')) {
+        $bucket = intersoccer_normalize_player_gender_bucket($trim);
+        if ($bucket === 'male') {
+            return 'Male';
+        }
+        if ($bucket === 'female') {
+            return 'Female';
+        }
+        if ($bucket === 'other') {
+            return 'Other';
+        }
+    }
+
+    if (in_array($trim, ['Male', 'Female', 'Other'], true)) {
+        return $trim;
+    }
+
+    return $trim;
+}
+
+/**
+ * Customer-facing gender label from stored/profile values (PV text domain).
+ *
+ * @param string $raw_gender Stored or profile gender value.
+ * @return string
+ */
+function intersoccer_pv_format_stored_gender_for_display($raw_gender) {
+    if (function_exists('intersoccer_pv_is_admin_english_context') && intersoccer_pv_is_admin_english_context()) {
+        return intersoccer_pv_admin_format_player_gender_label($raw_gender);
+    }
+
+    $trim = trim((string) $raw_gender);
+    if ($trim === '') {
+        return '';
+    }
+
+    $bucket = function_exists('intersoccer_normalize_player_gender_bucket')
+        ? intersoccer_normalize_player_gender_bucket($trim)
+        : '';
+
+    if ($bucket === 'male') {
+        return __('Male', 'intersoccer-product-variations');
+    }
+    if ($bucket === 'female') {
+        return __('Female', 'intersoccer-product-variations');
+    }
+    if ($bucket === 'other') {
+        return __('Other', 'intersoccer-product-variations');
+    }
+
+    if (in_array($trim, ['Male', 'Female', 'Other'], true)) {
+        return __($trim, 'intersoccer-product-variations');
+    }
+
+    return $trim;
+}
+
 function intersoccer_get_player_assignment_strings($args = []) {
     $defaults = [
         'dashboard_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('dashboard') : '',
@@ -579,6 +684,29 @@ function intersoccer_sync_variation_status_to_translations($variation_id, $statu
             wc_delete_product_transients($tid);
         }
     }
+}
+
+/**
+ * Customer-facing date format msgid (display only; stored order meta stays English).
+ *
+ * @return string
+ */
+function intersoccer_pv_format_ymd_for_customer_display($ymd) {
+    $ymd = trim((string) $ymd);
+    if ($ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+        return $ymd;
+    }
+
+    $ts = strtotime($ymd);
+    if ($ts === false) {
+        return $ymd;
+    }
+
+    $format = function_exists('intersoccer_pv_customer_display_date_format_msgid')
+        ? intersoccer_pv_customer_display_date_format_msgid()
+        : __('j F Y', 'intersoccer-product-variations');
+
+    return date_i18n($format, $ts);
 }
 
 /**

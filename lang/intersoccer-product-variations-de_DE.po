@@ -1,0 +1,3139 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: WPML_EXPORT_intersoccer-product-variations\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: Jeremy Lee <jlee@underdogunlimited.com>\n"
+"Language-Team: German <>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2025-10-17 10:09-0400\n"
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: includesoocommerce/admin-ui.php:3297
+msgid "Processing Speed"
+msgstr "Verarbeitungsgeschwindigkeit"
+
+#: includesoocommerce/admin-ui.php:3285
+msgid "Higher numbers find more orders but take longer to scan initially."
+msgstr "Höhere Werte finden mehr Bestellungen, der erste Scan dauert jedoch länger.Höhere Zahlen finden mehr Bestellungen, aber dauern länger beim ersten Scannen."
+
+#: includesoocommerce/admin-ui.php:3275
+msgid "Orders to Scan"
+msgstr "Zu scannende Bestellungen"
+
+#: includesoocommerce/admin-ui.php:3267
+msgid "Order Statuses to Process"
+msgstr "Zu verarbeitende Bestellstatus"
+
+#: includesoocommerce/admin-ui.php:3263
+msgid "1. Configure Scan"
+msgstr "1. Scan konfigurieren"
+
+#: includesoocommerce/admin-ui.php:3254
+msgid "Automated Order Metadata Update"
+msgstr "Automatische Aktualisierung der Bestellmetadaten"
+
+#: includesoocommerce/admin-ui.php:2636
+msgid "Attributes refreshed successfully!"
+msgstr "Attribute erfolgreich aktualisiert!"
+
+#: includesoocommerce/admin-ui.php:2617
+msgid "Please select an action and at least one variation."
+msgstr "Bitte wählen Sie eine Aktion und mindestens eine Variation aus."
+
+#: includesoocommerce/admin-ui.php:2600
+msgid "Filter"
+msgstr "Filtern"
+
+#: includesoocommerce/admin-ui.php:2598
+msgid "Show unhealthy variations only"
+msgstr "Nur ungesunde Variationen anzeigen"
+
+#: includesoocommerce/admin-ui.php:2567
+#: includesoocommerce/program-manager.php:1075
+msgid "Recalculate Course End Dates"
+msgstr "Kurs-Enddaten neu berechnen"
+
+#: includesoocommerce/admin-ui.php:2562
+msgid "InterSoccer Variation Health Dashboard"
+msgstr "InterSoccer Variations-Gesundheits-Dashboard"
+
+#: includesoocommerce/admin-ui.php:2547
+#: includesoocommerce/program-manager.php:650
+msgid "Course end dates recalculated successfully."
+msgstr "Kurs-Enddaten wurden erfolgreich neu berechnet."
+
+#: includesoocommerce/admin-ui.php:2274
+msgid "No attributes"
+msgstr "Keine Attribute"
+
+#: includesoocommerce/admin-ui.php:2244
+msgid "Refresh Attributes"
+msgstr "Attribute aktualisieren"
+
+#: includesoocommerce/admin-ui.php:2234
+msgid "Health Status"
+msgstr "Gesundheitsstatus"
+
+#: includesoocommerce/admin-ui.php:2232
+#: includesoocommerce/program-manager.php:893
+msgid "Attributes"
+msgstr "Attribute"
+
+#: includesoocommerce/admin-ui.php:2230
+msgid "Variation ID"
+msgstr "Varianten-ID"
+
+#: includesoocommerce/admin-ui.php:2229
+msgid "Product ID"
+msgstr "Produkt-ID"
+
+#: includesoocommerce/admin-ui.php:1417
+msgid "Export Analysis to CSV"
+msgstr "Analyse als CSV exportieren"
+
+#: includesoocommerce/admin-ui.php:1412
+msgid "Deselect All"
+msgstr "Alle abwählen"
+
+#: includesoocommerce/admin-ui.php:1408
+msgid "Select All Low Risk"
+msgstr "Alle niedriges Risiko auswählen"
+
+#: includesoocommerce/admin-ui.php:1393
+msgid "Scan Results"
+msgstr "Scan-Ergebnisse"
+
+#: includesoocommerce/admin-ui.php:1369
+msgid "Great! No orders found that need metadata updates."
+msgstr "Super! Keine Bestellungen mit fehlenden Metadaten gefunden."
+
+#: includesoocommerce/admin-ui.php:1356
+msgid "Update Progress"
+msgstr "Aktualisierungsfortschritt"
+
+#: includesoocommerce/admin-ui.php:1352
+msgid "Orders Missing Metadata"
+msgstr "Bestellungen mit fehlenden Metadaten"
+
+#: includesoocommerce/admin-ui.php:1343
+msgid "Note:"
+msgstr "Hinweis:"
+
+#: includesoocommerce/admin-ui.php:1340
+msgid "Find Orders Missing Metadata"
+msgstr "Bestellungen mit fehlenden Metadaten finden"
+
+#: includesoocommerce/admin-ui.php:1296
+msgid "Number of Orders to Scan"
+msgstr "Anzahl der zu scannenden Bestellungen"
+
+#: includesoocommerce/admin-ui.php:1292
+#: includesoocommerce/admin-ui.php:3271
+msgid "On Hold"
+msgstr "In Wartestellung"
+
+#: includesoocommerce/admin-ui.php:1291
+#: includesoocommerce/admin-ui.php:3270
+msgid "Completed"
+msgstr "Abgeschlossen"
+
+#: includes/ajax-handlers.php:38
+#: includes/ajax-handlers.php:66
+#: includes/ajax-handlers.php:120
+#: includes/ajax-handlers.php:174
+#: includes/ajax-handlers.php:217
+#: includes/ajax-handlers.php:268
+msgid "Invalid nonce."
+msgstr "Ungültiger Nonce."
+
+#: includes/admin-product-fields.php:520
+msgid "Allow customers to add late pick up options for this camp variation."
+msgstr "Ermöglichen Sie Kunden, Optionen für späte Abholung für diese Camp-Variante hinzuzufügen."
+
+#: includes/admin-product-fields.php:518
+msgid "Enable Late Pick Up"
+msgstr "Späte Abholung aktivieren"
+
+#: includes/admin-product-fields.php:473
+#: includes/elementor-widgets.php:265
+msgid "Late Pick Up Options"
+msgstr "Optionen für späte Abholung"
+
+#: includes/admin-product-fields.php:111
+msgid "Add Holiday Date"
+msgstr "Ferientermin hinzufügen"
+
+#: includes/admin-product-fields.php:107
+#: includes/admin-product-fields.php:127
+#: includesoocommerce/admin-ui.php:163
+#: includesoocommerce/campaign-offers-admin.php:255
+msgid "Remove"
+msgstr "Entfernen"
+
+#: includes/admin-product-fields.php:102
+msgid "Holiday/Skip Dates"
+msgstr "Ferien/Überspringen-Daten"
+
+#: includes/admin-product-fields.php:91
+msgid "Session Rate (CHF per day/session)"
+msgstr "Satz pro Training (CHF pro Tag/Training)"
+
+#: includes/admin-product-fields.php:72
+msgid "Course Start Date (MM-DD-YYYY)"
+msgstr "Kursstartdatum (MM-TT-JJJJ)"
+
+#: includesoocommerce/cart-calculations.php:668
+#: includesoocommerce/cart-calculations.php:669
+#: includesoocommerce/order-meta-contract.php:2219
+#: includesoocommerce/program-manager.php:3147
+msgid "Full Week"
+msgstr "Ganze Woche"
+
+#: includesoocommerce/admin-ui.php:1290
+#: includesoocommerce/admin-ui.php:3269
+msgid "Processing"
+msgstr "Verarbeitung"
+
+#: includesoocommerce/admin-ui.php:1288
+msgid "Order Statuses to Check"
+msgstr "Zu prüfende Bestellstatus"
+
+#: includesoocommerce/admin-ui.php:1271
+msgid "Order Metadata Update Tool"
+msgstr "Tool zur Aktualisierung der Bestellmetadaten"
+
+#: includesoocommerce/admin-ui.php:1261
+#, php-format
+msgid "Failed to update: %s"
+msgstr "Aktualisierung fehlgeschlagen: %s"
+
+#: includesoocommerce/admin-ui.php:1259
+#, php-format
+msgid "Updated metadata for %d orders."
+msgstr "Metadaten für %d Bestellungen aktualisiert."
+
+#: includesoocommerce/admin-ui.php:898
+msgid "Risk Level"
+msgstr "Risikostufe"
+
+#: includesoocommerce/admin-ui.php:897
+msgid "Missing Fields Summary"
+msgstr "Zusammenfassung fehlender Felder"
+
+#: includesoocommerce/admin-ui.php:896
+msgid "Items & Types"
+msgstr "Artikel und Typen"
+
+#: includesoocommerce/admin-ui.php:894
+msgid "Order"
+msgstr "Bestellung"
+
+#: includesoocommerce/admin-ui.php:521
+msgid "Action completed."
+msgstr "Aktion abgeschlossen."
+
+#: includesoocommerce/admin-ui.php:499
+msgid "Invalid action or no discounts selected."
+msgstr "Ungültige Aktion oder keine Rabatte ausgewählt."
+
+#: includesoocommerce/admin-ui.php:478
+msgid "Discount saved."
+msgstr "Rabatt gespeichert."
+
+#: includesoocommerce/admin-ui.php:460
+msgid "Name and discount rate are required."
+msgstr "Name und Rabattsatz sind erforderlich."
+
+#: includesoocommerce/admin-ui.php:797
+msgid "Save All"
+msgstr "Alle speichern"
+
+#: includesoocommerce/admin-ui.php:785
+msgid "Customer Note:"
+msgstr "Kundennotiz:"
+
+#: includesoocommerce/admin-ui.php:782
+msgid "Admin Description:"
+msgstr "Admin-Beschreibung:"
+
+#: includesoocommerce/admin-ui.php:778
+msgid "Cart Message:"
+msgstr "Warenkorb-Nachricht:"
+
+#: includesoocommerce/admin-ui.php:758
+msgid "3rd+ Child"
+msgstr "3. Kind und weitere"
+
+#: includesoocommerce/admin-ui.php:734
+msgid "Messages"
+msgstr "Nachrichten"
+
+#: includesoocommerce/admin-ui.php:721
+msgid "Manage Discounts & Messages"
+msgstr "Rabatte und Nachrichten verwalten"
+
+#: includesoocommerce/admin-ui.php:1636
+msgid "Processing..."
+msgstr "Verarbeitung..."
+
+#: includesoocommerce/admin-ui.php:146
+#: includesoocommerce/admin-ui.php:759
+msgid "Same Season Course (Same Child)"
+msgstr "Kurs gleiche Saison (gleiches Kind)"
+
+#: includesoocommerce/admin-ui.php:145
+msgid "3rd or Additional Child"
+msgstr "3. oder zusätzliches Kind"
+
+#: includesoocommerce/admin-ui.php:144
+#: includesoocommerce/admin-ui.php:757
+msgid "2nd Child"
+msgstr "2. Kind"
+
+#: includesoocommerce/admin-ui.php:136
+#: includesoocommerce/admin-ui.php:751
+msgid "General"
+msgstr "Allgemein"
+
+#: includesoocommerce/admin-ui.php:241
+msgid "Delete"
+msgstr "Löschen"
+
+#: includesoocommerce/admin-ui.php:240
+msgid "Deactivate"
+msgstr "Deaktivieren"
+
+#: includesoocommerce/admin-ui.php:239
+msgid "Activate"
+msgstr "Aktivieren"
+
+#: includesoocommerce/admin-ui.php:227
+#: includesoocommerce/campaign-leads.php:415
+#: includesoocommerce/campaign-leads.php:426
+msgid "No"
+msgstr "Nein"
+
+#: includesoocommerce/admin-ui.php:227
+#: includesoocommerce/campaign-leads.php:421
+msgid "Yes"
+msgstr "Ja"
+
+#: includesoocommerce/product-camp.php:208
+#, php-format
+msgid "%d Day(s) Selected"
+msgstr "%d Tag(e) ausgewählt"
+
+#: includesoocommerce/product-course.php:460
+#, php-format
+msgid "%d Weeks Remaining"
+msgstr "%d Wochen verbleibend"
+
+#: includesoocommerce/admin-ui.php:156
+#: includesoocommerce/admin-ui.php:172
+#: includesoocommerce/admin-ui.php:212
+#: includesoocommerce/admin-ui.php:733
+msgid "Active"
+msgstr "Aktiv"
+
+#: includesoocommerce/admin-ui.php:155
+#: includesoocommerce/admin-ui.php:211
+msgid "Discount Rate (%)"
+msgstr "Rabattsatz (%)"
+
+#: includesoocommerce/admin-ui.php:154
+#: includesoocommerce/admin-ui.php:210
+#: includesoocommerce/admin-ui.php:731
+msgid "Condition"
+msgstr "Bedingung"
+
+#: includesoocommerce/admin-ui.php:153
+#: includesoocommerce/admin-ui.php:209
+#: includesoocommerce/admin-ui.php:730
+#: includesoocommerce/admin-ui.php:2231
+#: includesoocommerce/attribute-admin.php:73
+#: includesoocommerce/program-manager.php:3575
+msgid "Type"
+msgstr "Typ"
+
+#: includesoocommerce/admin-ui.php:152
+#: includesoocommerce/admin-ui.php:208
+#: includesoocommerce/admin-ui.php:729
+#: includesoocommerce/program-manager.php:3766
+msgid "Name"
+msgstr "Name"
+
+#: includesoocommerce/admin-ui.php:2589
+msgid "Variation Health Checker"
+msgstr "Varianten-Gesundheitsprüfung"
+
+#: includesoocommerce/admin-ui.php:39
+msgid "InterSoccer Discounts"
+msgstr "InterSoccer Rabatte"
+
+#: includesoocommerce/admin-ui.php:38
+#: includesoocommerce/admin-ui.php:299
+msgid "Manage Discounts"
+msgstr "Rabatte verwalten"
+
+#: includesoocommerce/discounts.php:2544
+#, php-format
+msgid "50%% Same Season Course Discount (%s)"
+msgstr "50%% Rabatt zweiter Kurs gleiche Saison (%s)"
+
+#: includesoocommerce/discounts.php:2451
+#, php-format
+msgid "%d%% Multi-Child Course Discount"
+msgstr "%d%% Mehrkind-Rabatt Kurs"
+
+#: includesoocommerce/discounts.php:2449
+#, php-format
+msgid "%d%% Sibling Course Discount"
+msgstr "%d%% Geschwister-Rabatt Kurs"
+
+#: includesoocommerce/discounts.php:2400
+#, php-format
+msgid "%d%% Multi-Child Camp Discount"
+msgstr "%d%% Mehrkind-Rabatt Camp"
+
+#: includesoocommerce/discounts.php:2398
+#, php-format
+msgid "%d%% Sibling Camp Discount"
+msgstr "%d%% Geschwister-Rabatt Camp"
+
+#: includesoocommerce/discounts.php:2503
+#, php-format
+msgid "%d%% Multi-Child Tournament Discount"
+msgstr "%d%% Mehrkind-Rabatt Turnier"
+
+#: includesoocommerce/discounts.php:2501
+#, php-format
+msgid "%d%% Sibling Tournament Discount"
+msgstr "%d%% Geschwisterrabatt Turnier"
+
+#: includes/elementor-widgets.php:2181
+#: includesoocommerce/cart-calculations.php:528
+#: includesoocommerce/product-camp.php:184
+msgid "Please select at least one day for this single-day camp."
+msgstr "Bitte wählen Sie mindestens einen Tag für dieses Eintages-Camp aus."
+
+#: includesoocommerce/admin-ui.php:2210
+msgid "Orders updated successfully."
+msgstr "Bestellungen erfolgreich aktualisiert."
+
+#: includesoocommerce/admin-ui.php:2165
+msgid "No orders selected."
+msgstr "Keine Bestellungen ausgewählt."
+
+#: includesoocommerce/admin-ui.php:143
+#: includesoocommerce/admin-ui.php:223
+#: includesoocommerce/admin-ui.php:756
+#: includesoocommerce/admin-ui.php:2268
+msgid "None"
+msgstr "Keine"
+
+#: includesoocommerce/admin-ui.php:2677
+msgid "Error:"
+msgstr "Fehler:"
+
+#: includesoocommerce/admin-ui.php:911
+#: includesoocommerce/admin-ui.php:1414
+#: includesoocommerce/admin-ui.php:1710
+#: includesoocommerce/admin-ui.php:1715
+msgid "Update Selected Orders"
+msgstr "Ausgewählte Bestellungen aktualisieren"
+
+#: includesoocommerce/admin-ui.php:895
+msgid "Customer"
+msgstr "Kunde"
+
+#: includesoocommerce/admin-ui.php:68
+#: includesoocommerce/admin-ui.php:268
+#: includesoocommerce/admin-ui.php:1197
+#: includesoocommerce/admin-ui.php:2541
+#: includesoocommerce/admin-ui.php:3249
+#: includesoocommerce/age-restriction-settings.php:57
+#: includesoocommerce/program-manager.php:147
+msgid "You do not have permission to access this page."
+msgstr "Sie haben keine Berechtigung, diese Seite aufzurufen."
+
+#: includesoocommerce/admin-ui.php:140
+msgid "Birthday"
+msgstr "Geburtstag"
+
+#: includesoocommerce/admin-ui.php:138
+#: includesoocommerce/admin-ui.php:749
+msgid "Course"
+msgstr "Kurs"
+
+#: includesoocommerce/admin-ui.php:137
+#: includesoocommerce/admin-ui.php:748
+msgid "Camp"
+msgstr "Camp"
+
+#: includes/language-helpers.php:155
+msgid "Holidays"
+msgstr "Ferien"
+
+#: includes/language-helpers.php:152
+msgid "End Date"
+msgstr "Enddatum"
+
+#: includes/language-helpers.php:151
+msgid "Start Date"
+msgstr "Startdatum"
+
+#: includesoocommerce/cart-calculations.php:646
+msgid "Days Selected"
+msgstr "Ausgewählte Tage"
+
+#: includesoocommerce/cart-calculations.php:637
+#: includesoocommerce/checkout-calculations.php:345
+msgid "Assigned Attendee"
+msgstr "Zugewiesener Teilnehmer"
+
+#: includes/ajax-handlers.php:330
+msgid "Missing parameters."
+msgstr "Fehlende Parameter."
+
+#: includes/ajax-handlers.php:224
+msgid "You must be logged in."
+msgstr "Sie müssen angemeldet sein."
+
+#: includes/ajax-handlers.php:199
+msgid "Session updated."
+msgstr "Sitzung aktualisiert."
+
+#: includes/ajax-handlers.php:135
+msgid "Variation not found."
+msgstr "Variante nicht gefunden."
+
+#: includes/ajax-handlers.php:74
+#: includes/ajax-handlers.php:129
+msgid "Invalid variation ID."
+msgstr "Ungültige Varianten-ID."
+
+#: includes/ajax-handlers.php:45
+#: includes/ajax-handlers.php:273
+msgid "Invalid product ID."
+msgstr "Ungültige Produkt-ID."
+
+#: includes/language-helpers.php:175
+msgid "Loading players..."
+msgstr "Spieler werden geladen..."
+
+#: includes/language-helpers.php:176
+msgid "Error: Unable to load players. Please try refreshing the page."
+msgstr "Fehler: Spieler konnten nicht geladen werden. Bitte aktualisieren Sie die Seite."
+
+#: includes/language-helpers.php:177
+#, php-format
+msgid "Error loading players: %s. Please try again."
+msgstr "Fehler beim Laden der Spieler: %s. Bitte versuchen Sie es erneut."
+
+#: includes/language-helpers.php:180
+#, php-format
+msgid "Please <a href=\"%1$s\">log in</a> or <a href=\"%2$s\">register</a> to select an attendee."
+msgstr "Bitte <a href=\"%1$s\">melden Sie sich an</a> oder <a href=\"%2$s\">registrieren Sie sich</a>, um einen Teilnehmer auszuwählen."
+
+#: includes/language-helpers.php:186
+msgid "Please log in or register to select an attendee."
+msgstr "Bitte melden Sie sich an oder registrieren Sie sich, um einen Teilnehmer auszuwählen."
+
+#: includes/language-helpers.php:189
+#, php-format
+msgid "No players registered. <a href=\"%s\">Add a player</a>."
+msgstr "Keine Spieler registriert. <a href=\"%s\">Spieler hinzufügen</a>."
+
+#: includes/language-helpers.php:194
+msgid "Please add a player to continue."
+msgstr "Bitte fügen Sie einen Spieler hinzu, um fortzufahren."
+
+#: includes/language-helpers.php:195
+msgid "Select an Attendee"
+msgstr "Teilnehmer auswählen"
+
+#: includes/language-helpers.php:196
+msgid "Please select an attendee to add to cart."
+msgstr "Bitte wählen Sie einen Teilnehmer aus, der zum Warenkorb hinzugefügt werden soll."
+
+#: includes/language-helpers.php:197
+msgid "Please select an attendee."
+msgstr "Bitte wählen Sie einen Teilnehmer aus."
+
+#: includes/language-helpers.php:198
+msgid "Please select at least one day."
+msgstr "Bitte wählen Sie mindestens einen Tag aus."
+
+#: includes/language-helpers.php:199
+msgid "Please resolve the error to continue."
+msgstr "Bitte beheben Sie den Fehler, um fortzufahren."
+
+#: includes/language-helpers.php:200
+msgid "Request failed"
+msgstr "Anfrage fehlgeschlagen"
+
+#: includes/language-helpers.php:156
+msgid "Holidays (No Session)"
+msgstr "Ferien (kein Training)"
+
+#: includesoocommerce/order-meta-contract.php:2222
+#: includesoocommerce/program-manager.php:3148
+msgid "Single Day(s)"
+msgstr "Einzelne Tag(e)"
+
+#: includesoocommerce/cart-calculations.php:667
+msgid "Late Pickup"
+msgstr "Späte Abholung"
+
+#: includesoocommerce/cart-calculations.php:672
+msgid "Late Pickup Cost"
+msgstr "Kosten für späte Abholung"
+
+#: includesoocommerce/order-meta-contract.php:2227
+#, php-format
+msgid "%s%% Camp Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Camp"
+
+#: includesoocommerce/order-meta-contract.php:2230
+#, php-format
+msgid "%s%% Course Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Kurs"
+
+#: includesoocommerce/order-meta-contract.php:2233
+#, php-format
+msgid "%s%% Tournament Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Turnier"
+
+#. Plugin Name of the plugin
+#: intersoccer-product-variations.php
+msgid "InterSoccer Product Variations"
+msgstr ""
+
+#. Description of the plugin
+#: intersoccer-product-variations.php
+msgid "Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses."
+msgstr ""
+
+#. Author of the plugin
+#: intersoccer-product-variations.php
+msgid "Jeremy Lee"
+msgstr ""
+
+#: includes/admin-product-fields.php:80
+#: includes/language-helpers.php:153
+msgid "Total Sessions"
+msgstr "Gesamtzahl Trainings"
+
+#: includes/admin-product-fields.php:81
+msgid "Number of sessions the customer will participate in (holidays will extend the end date)"
+msgstr ""
+
+#: includes/admin-product-fields.php:515
+msgid "Late pick up is available for full-day camps only."
+msgstr ""
+
+#: includes/admin-product-fields.php:567
+msgid "Available Camp Days"
+msgstr ""
+
+#: includes/admin-product-fields.php:568
+msgid "Select which days customers can book for this camp. Unchecked days will not be displayed as options."
+msgstr ""
+
+#: includes/admin-product-fields.php:586
+msgid "Available Late Pickup Days"
+msgstr ""
+
+#: includes/admin-product-fields.php:587
+msgid "Select which days late pickup is available. Unchecked days will not be displayed as late pickup options."
+msgstr ""
+
+#: includes/admin-product-fields.php:1023
+#: includesoocommerce/late-pickup-settings.php:22
+msgid "Late Pick Up"
+msgstr ""
+
+#. translators: 1: enabled count, 2: total variation count
+#: includes/admin-product-fields.php:1027
+#, php-format
+msgid "Enabled on %1$d of %2$d variations."
+msgstr ""
+
+#: includes/admin-product-fields.php:1034
+msgid "Re-enable late pick up on all variations"
+msgstr ""
+
+#: includes/admin-product-fields.php:1048
+msgid "Late pick up repair could not run (invalid or expired link). Open the camp product in admin and use the \"Re-enable late pick up on all variations\" button on the General tab."
+msgstr ""
+
+#: includes/admin-product-fields.php:1063
+msgid "No camp variations were updated. Confirm this is a variable camp product."
+msgstr ""
+
+#. translators: %d: number of camp variations updated
+#: includes/admin-product-fields.php:1072
+#, php-format
+msgid "Late pick up re-enabled on %d camp variations."
+msgstr ""
+
+#: includes/elementor-widgets.php:120
+msgid "Select Days"
+msgstr "Tage auswählen"
+
+#: includes/elementor-widgets.php:2166
+msgid "Please select a variation."
+msgstr "Bitte wählen Sie eine Variante aus."
+
+#: includes/language-helpers.php:154
+msgid "Remaining Sessions"
+msgstr "Verbleibende Trainings"
+
+#: includesoocommerce/admin-ui.php:47
+#: includesoocommerce/admin-ui.php:48
+#: includesoocommerce/admin-ui.php:79
+msgid "Order Meta Repair"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:80
+msgid "Scan orders for missing or twin metadata, then repair selected rows or run an automated batch. Scan and Automated batch use the same need-repair criteria — re-run Scan after a batch to confirm leftovers. After repair, run Reports → Reconcile Rosters if needed."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:83
+#: includesoocommerce/admin-ui.php:1274
+msgid "Scan &amp; preview"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:86
+#: includesoocommerce/admin-ui.php:3257
+msgid "Automated batch"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:139
+#: includesoocommerce/admin-ui.php:750
+msgid "Tournament"
+msgstr "Turnier"
+
+#: includesoocommerce/admin-ui.php:147
+#: includesoocommerce/admin-ui.php:760
+msgid "Progressive Week 2 (Camp)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:148
+#: includesoocommerce/admin-ui.php:761
+msgid "Progressive Week 3+ (Camp)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:149
+#: includesoocommerce/admin-ui.php:762
+msgid "Same Child Multiple Days (Tournament)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:157
+#: includesoocommerce/program-manager.php:3581
+msgid "Actions"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:160
+#: includesoocommerce/admin-ui.php:423
+msgid "Loading discount rules…"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:161
+msgid "Unable to load discount rules. Please refresh and try again."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:162
+msgid "Add Discount"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:164
+#: includesoocommerce/age-restriction-settings.php:136
+#: includesoocommerce/late-pickup-settings.php:57
+msgid "Save Changes"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:165
+msgid "Saving changes…"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:166
+#: includesoocommerce/admin-ui.php:4014
+msgid "Discount rules saved successfully."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:167
+msgid "Unable to save discount rules. Please try again."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:168
+msgid "No discount rules configured yet. Use \"Add Discount\" to create one."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:169
+msgid "Each discount must have a name."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:170
+msgid "Discount rates must be numbers between 0 and 100."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:171
+msgid "You have unsaved changes."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:173
+msgid "e.g., Sibling Discount"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:289
+#: includesoocommerce/age-restriction-settings.php:82
+#: includesoocommerce/late-pickup-settings.php:37
+msgid "Settings saved."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:300
+msgid "Add, edit, or delete discount rules for Camps, Courses, Tournaments, or other products. These rules apply automatically based on cart conditions (e.g., sibling bookings). For manual coupons, use <a href=\""
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:302
+msgid "Discount Settings"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:309
+msgid "Disable Sibling Discounts with Coupons"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:319
+msgid "Disable sibling discounts when WooCommerce discount codes are applied to the cart."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:322
+msgid "When enabled, sibling discounts (camp, course, and tournament multi-child discounts) and same-season course discounts will not be applied if any WooCommerce coupon codes are active in the cart."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:329
+msgid "Enable Retroactive Course Discounts"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:339
+msgid "Apply same-season course discounts based on previous orders."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:342
+msgid "When enabled, customers who previously purchased a course in the same season (same parent product) will receive the same-season discount on additional courses, even if purchased in separate orders."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:349
+msgid "Enable Retroactive Camp Discounts"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:359
+msgid "Apply progressive camp discounts based on previous orders."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:362
+msgid "When enabled, customers will receive progressive discounts on camp weeks based on total weeks purchased (including previous orders): Week 1 full price, Week 2: 10% off, Week 3+: 20% off."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:369
+msgid "Enable Retroactive Sibling Discounts"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:379
+msgid "Count children from previous orders when applying sibling/multi-child discounts."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:382
+msgid "When enabled, camp and course sibling discounts use children booked in previous orders within the lookback period (not only children in the current cart). Tournament sibling discounts apply in the current cart only. Birthday products are not eligible for InterSoccer sibling or progressive discounts. Discounts apply only to the current cart."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:389
+msgid "Advanced: Absolute Order Scan Window (Months)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:402
+msgid "Advanced only. Same-season matching is the primary look-back window for retroactive sibling, camp week, and course discounts. This setting only caps how far back orders are scanned (1–24 months). Season-scoped paths always use a 24-month scan so an older same-season order is not dropped."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:411
+msgid "Save Settings"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:421
+msgid "Discount Rules"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:452
+#: includesoocommerce/admin-ui.php:491
+#: includesoocommerce/admin-ui.php:853
+#: includesoocommerce/admin-ui.php:2156
+#: includesoocommerce/admin-ui.php:2701
+#: includesoocommerce/admin-ui.php:2815
+#: includesoocommerce/admin-ui.php:3974
+#: includesoocommerce/admin-ui.php:3995
+msgid "You do not have permission to perform this action."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:732
+msgid "Rate (%)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:877
+msgid "Discounts and messages saved successfully."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1264
+msgid "Run Reports → Reconcile Rosters to refresh roster rows for repaired orders."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1272
+msgid "Find and update orders that are missing metadata fields needed for accurate rosters and reports."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1275
+msgid "Find orders with missing metadata or label twins, preview proposed fixes, then update selected orders. Uses the same need-repair criteria as Automated batch — re-run this scan after a batch to confirm leftovers."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1307
+msgid "Higher numbers may take longer to process but will find more orders with missing data."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1311
+msgid "Update Options"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1315
+msgid "Fix Activity Type Only"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1318
+msgid "When checked, only updates Activity Type (incorrect or missing). Useful for girls-only camps saved as plain \"Camp\"."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1322
+#: includesoocommerce/admin-ui.php:3291
+msgid "Strip Deprecated Metadata"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1325
+msgid "Removes Variation ID, Remaining Sessions, and Player Index keys when assigned_player is present. Base Price is retained for historical/reporting."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1329
+#: includesoocommerce/admin-ui.php:3292
+msgid "Prune legacy label twins"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1332
+msgid "Removes WC/FR/DE label twins when the English canonical key is present (e.g. InterSoccer Venues when Sites InterSoccer exists). Does not remove pa_* slug twins."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1344
+msgid "This will scan your selected orders and show which ones are missing metadata fields like player details, seasons, activity types, etc."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1409
+msgid "Select All Medium Risk"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1410
+msgid "Select All High Risk"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1548
+#: includesoocommerce/admin-ui.php:1614
+msgid "Please select at least one order to update."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:1556
+#: includesoocommerce/admin-ui.php:1629
+msgid "You have selected high-risk orders. These may have unexpected results. Continue?"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2233
+msgid "Course Info"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2563
+msgid "Use this dashboard to check and fix variation issues, such as recalculating course end dates."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2576
+#: includesoocommerce/program-manager.php:1080
+msgid "Course Holiday Fix (One-time)"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2577
+#: includesoocommerce/program-manager.php:1081
+msgid "Fix existing courses that were created with inflated session counts to work around the old holiday calculation bug."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2579
+msgid "Course holiday fix has been completed."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2580
+msgid "Fix Already Completed"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2582
+msgid "This should only be run once after deploying the fixed course logic."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2584
+#: includesoocommerce/admin-ui.php:2678
+#: includesoocommerce/admin-ui.php:2683
+#: includesoocommerce/program-manager.php:1083
+msgid "Run Course Holiday Fix"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2590
+msgid "Catalog tool only: checks and fixes product variation attributes. Does not update existing order metadata. After catalog fixes, use Find Order Issues and Reconcile Rosters for order and roster data."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2591
+msgid "Scan and check health of product variations. Use the filter to show only unhealthy ones."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2621
+msgid "Refresh Attributes may apply default course dates only to variations missing values. Active courses with remaining sessions will not receive new start dates. Continue?"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2639
+msgid "Error: "
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2643
+msgid "An error occurred while refreshing attributes: "
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2652
+msgid "Are you sure you want to run the course holiday fix? This will modify course data and should only be run once. Make sure you have a backup!"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2659
+msgid "Running..."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2660
+msgid "Running course holiday fix..."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2682
+msgid "An error occurred:"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2709
+msgid "Invalid action or no variations selected."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:2803
+msgid "Attributes refreshed."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3255
+msgid "Automatically find and update orders missing metadata using the same need-repair criteria as Scan & preview. Re-run Scan after a batch to confirm leftovers. This tool can process hundreds or thousands of orders efficiently."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3258
+msgid "Scan for orders needing updates (same criteria as Scan & preview), then process them in batches. Re-run Scan after completion to confirm leftovers. Confirm before running with prune/strip enabled."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3289
+msgid "Repair Options"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3293
+msgid "Prune removes WC/FR/DE twin labels when English canonical keys exist. Confirm before mass runs."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3305
+msgid "Conservative is safer for slower servers. Fast processes more orders per batch but may timeout."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3312
+msgid "▶ Start Automated Update"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3315
+msgid "■ Stop Processing"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3322
+msgid "2. Processing Progress"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3345
+msgid "3. Results"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3349
+msgid "↓ Download Results Log"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3352
+msgid "↻ Process More Orders"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3760
+#: includesoocommerce/admin-ui.php:3773
+msgid "Player Assignment:"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3761
+msgid "Guest order - no registered players available."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3774
+msgid "Customer has no registered players."
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3776
+msgid "Add players in customer profile"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3796
+msgid "Assigned Player:"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3806
+msgid "-- Select Player --"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:3844
+msgid "Current:"
+msgstr ""
+
+#: includesoocommerce/admin-ui.php:4006
+msgid "Invalid discounts payload."
+msgstr ""
+
+#: includesoocommerce/age-group-verification.php:773
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr "Die Altersgruppe für dieses Programm konnte nicht gelesen werden. Bitte kontaktieren Sie uns oder wählen Sie eine andere Session."
+
+#: includesoocommerce/age-group-verification.php:797
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr "Das Programmstartdatum konnte nicht ermittelt werden; das Alter kann nicht geprüft werden. Bitte kontaktieren Sie uns oder wählen Sie eine andere Option."
+
+#. translators: %s: URL to Manage Players
+#: includesoocommerce/age-group-verification.php:822
+#, php-format
+msgid "The selected attendee needs a valid date of birth. Update it under Manage Players: %s"
+msgstr "Der ausgewählte Teilnehmer benötigt ein gültiges Geburtsdatum. Aktualisieren Sie es unter Spieler verwalten: %s"
+
+#: includesoocommerce/age-group-verification.php:825
+msgid "The selected attendee needs a valid date of birth. Please update it in your account before booking."
+msgstr "Der ausgewählte Teilnehmer benötigt ein gültiges Geburtsdatum. Bitte aktualisieren Sie es in Ihrem Konto vor der Buchung."
+
+#: includesoocommerce/age-group-verification.php:841
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr "Das Geburtsdatum des Teilnehmers ist ungültig oder liegt nach dem Programmstart."
+
+#. translators: 1: child age on program start, 2: allowed age range description
+#: includesoocommerce/age-group-verification.php:882
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr "Dieser Teilnehmer ist am Programmstart %1$d Jahre alt und liegt ausserhalb der erlaubten Altersspanne (%2$s) für diese Session."
+
+#: includesoocommerce/age-restriction-settings.php:28
+#: includesoocommerce/age-restriction-settings.php:79
+msgid "Age Restriction Settings"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:29
+msgid "Age Restrictions"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:80
+msgid "Configure grace periods for age-group validation at checkout. Limits still come from each product's Age Group attribute; these settings control how strictly ages are enforced near the minimum and maximum."
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:88
+msgid "Enable age grace"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:92
+msgid "Use month-precision grace near minimum and maximum ages"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:94
+msgid "When disabled, validation uses completed whole years only (strict)."
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:99
+msgid "Months below minimum"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:103
+msgid "Example: minimum age 3 with grace 2 allows children who are 2 years 10 or 11 months old on the program start date."
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:108
+msgid "Months above maximum"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:112
+msgid "Example: maximum age 12 with grace 1 allows a child who is 12 years and 1 month old on the program start date."
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:117
+msgid "Half-day months above maximum"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:121
+msgid "Additional months above the listed maximum age for half-day camp variations only. Requires age grace to be enabled. Example: max age 5 with 96 months allows a child up to 13 years on the program start date."
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:125
+msgid "Strict missing start date"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:129
+msgid "Block checkout when the program start date cannot be determined"
+msgstr ""
+
+#: includesoocommerce/age-restriction-settings.php:131
+msgid "By default, bookings proceed when start date metadata is missing. Enable this to reject those bookings."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:33
+msgid "InterSoccer Attribute Setup"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:37
+#, php-format
+msgid "Contract v%d — %1$d of %2$d attributes registered in WooCommerce. Legacy meta hits: %3$d."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:51
+msgid "Missing:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:58
+#: includesoocommerce/attribute-admin.php:120
+msgid "Sync InterSoccer Attributes"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:61
+msgid "Run Audit"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:64
+msgid "Variation Health Dashboard"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:69
+msgid "Product type attribute templates"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:74
+msgid "Parent"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:75
+msgid "Variation"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:76
+msgid "Meta"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:106
+msgid "Syncing…"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:118
+msgid "Sync request failed."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:136
+msgid "Audit request failed."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:151
+#: includesoocommerce/attribute-admin.php:206
+#: includesoocommerce/program-manager.php:1431
+#: includesoocommerce/program-manager.php:1668
+#: includesoocommerce/program-manager.php:1755
+#: includesoocommerce/program-manager.php:1770
+#: includesoocommerce/program-manager.php:1848
+#: includesoocommerce/program-manager.php:1866
+#: includesoocommerce/program-manager.php:1899
+#: includesoocommerce/program-manager.php:1963
+#: includesoocommerce/program-manager.php:2023
+#: includesoocommerce/program-manager.php:2053
+#: includesoocommerce/program-manager.php:2105
+#: includesoocommerce/program-manager.php:2134
+#: includesoocommerce/program-manager.php:2223
+#: includesoocommerce/program-manager.php:2251
+#: includesoocommerce/program-manager.php:2286
+#: includesoocommerce/program-manager.php:2530
+#: includesoocommerce/program-manager.php:2852
+#: includesoocommerce/program-manager.php:2890
+#: includesoocommerce/program-manager.php:2969
+msgid "Permission denied."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:159
+#, php-format
+msgid "Created attributes: %s"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:165
+#, php-format
+msgid "Already registered: %d"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:171
+#, php-format
+msgid "Resolved via legacy slug: %s"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:177
+#, php-format
+msgid "Reconciled orphaned taxonomies: %s"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:183
+#, php-format
+msgid "Terms seeded: %s"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:188
+msgid "Errors: "
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:192
+msgid "Sync completed with no changes."
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:214
+msgid "Audit:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:226
+msgid "Registry aliases in WooCommerce:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:235
+msgid "Orphaned taxonomies (run Sync to reconcile):"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:240
+msgid "Missing WC attributes:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:245
+msgid "Missing default terms:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:254
+msgid "Legacy taxonomy meta in use:"
+msgstr ""
+
+#: includesoocommerce/attribute-admin.php:263
+msgid "Legacy meta keys in use:"
+msgstr ""
+
+#. translators: %s: attribute slug
+#: includesoocommerce/attribute-enforcement.php:101
+#, php-format
+msgid "Attribute \"%s\" is not part of the InterSoccer contract. Use Products → Attributes → Sync InterSoccer Attributes."
+msgstr ""
+
+#. translators: 1: product type, 2: comma-separated attribute slugs
+#: includesoocommerce/attribute-enforcement.php:147
+#, php-format
+msgid "Product has attributes outside the %1$s template: %2$s. Remove them or contact an administrator."
+msgstr ""
+
+#. translators: %s: semicolon-separated term-shape errors
+#: includesoocommerce/attribute-enforcement.php:162
+#, php-format
+msgid "Term-shape violations (taxonomy standard): %s"
+msgstr ""
+
+#. translators: %s: comma-separated attribute taxonomies
+#: includesoocommerce/attribute-enforcement.php:177
+#, php-format
+msgid "Missing required parent attributes: %s."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:182
+msgid "Assigned terms violate the taxonomy standard."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:187
+msgid "Publish blocked."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:235
+msgid "This product uses a girls-only Activity Type term. Prefer the dedicated Girls Only attribute for new and edited products."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:263
+msgid "WooCommerce has global attributes outside the InterSoccer contract:"
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:268
+msgid "Remove unused attributes or register them in the attribute registry before use on program products."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:450
+#: includesoocommerce/program-manager.php:2983
+msgid "Term name is required."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:460
+#: includesoocommerce/program-manager.php:2978
+msgid "Taxonomy is not registered."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:476
+#: includesoocommerce/program-manager.php:2760
+msgid "Do not use year-qualified season terms (e.g. Autumn 2027). Use evergreen seasons and pa_program-year."
+msgstr ""
+
+#: includesoocommerce/attribute-enforcement.php:490
+#: includesoocommerce/attribute-enforcement.php:496
+msgid "Program year must be a bare calendar year (e.g. 2026). Year is pa_program-year only."
+msgstr ""
+
+#. translators: 1: attribute slug, 2: allowed term slugs
+#: includesoocommerce/attribute-enforcement.php:515
+#, php-format
+msgid "\"%1$s\" terms must be one of: %2$s."
+msgstr ""
+
+#: includesoocommerce/attribute-sync.php:175
+msgid "WooCommerce is not available."
+msgstr ""
+
+#: includesoocommerce/camp-schedule-migrate.php:31
+#: includesoocommerce/camp-schedule-migrate.php:35
+#: includesoocommerce/program-manager.php:655
+msgid "Invalid or non-variable product."
+msgstr ""
+
+#: includesoocommerce/camp-schedule-migrate.php:43
+msgid "Product is not a camp."
+msgstr ""
+
+#: includesoocommerce/campaign-checkout-field.php:242
+#: includesoocommerce/campaign-offers-admin.php:216
+#: includesoocommerce/campaign-offers.php:50
+msgid "Who is your child joining?"
+msgstr "Zu wem kommt Ihr Kind dazu?"
+
+#: includesoocommerce/campaign-checkout-field.php:243
+#: includesoocommerce/campaign-offers-admin.php:217
+#: includesoocommerce/campaign-offers.php:51
+msgid "Friend or sibling name"
+msgstr "Name von Freund(in) oder Geschwister"
+
+#: includesoocommerce/campaign-checkout-field.php:244
+msgid "Guardian's email"
+msgstr "E-Mail des Elternteils"
+
+#: includesoocommerce/campaign-checkout-field.php:245
+msgid "parent@example.com"
+msgstr ""
+
+#: includesoocommerce/campaign-checkout-field.php:403
+#: includesoocommerce/campaign-offers-admin.php:218
+#: includesoocommerce/campaign-offers.php:52
+msgid "Please enter who your child is joining."
+msgstr "Bitte geben Sie an, zu wem Ihr Kind dazukommt."
+
+#: includesoocommerce/campaign-checkout-field.php:418
+msgid "Please enter the other guardian's email address."
+msgstr "Bitte geben Sie die E-Mail-Adresse des anderen Elternteils ein."
+
+#: includesoocommerce/campaign-checkout-field.php:488
+msgid "Joining With"
+msgstr "Dabei mit"
+
+#: includesoocommerce/campaign-checkout-field.php:495
+#: includesoocommerce/campaign-leads.php:387
+msgid "Guardian email"
+msgstr "E-Mail des Elternteils"
+
+#: includesoocommerce/campaign-leads.php:377
+msgid "Campaign leads"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:378
+msgid "Families named on group-offer checkouts. Existing customer is a matching WordPress user (never created here). Converted means a later paid order used the same billing email."
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:381
+msgid "Download CSV"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:388
+msgid "Child name"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:389
+msgid "Source order"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:390
+msgid "Existing customer"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:391
+msgid "Converted"
+msgstr ""
+
+#: includesoocommerce/campaign-leads.php:397
+msgid "No campaign leads yet."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:107
+msgid "Campaign offers saved."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:121
+msgid "Reports & Rosters distressed API is not available (intersoccer_reports_distressed_variation_ids). The distressed snapshot stays empty, so restricted offers will not apply until Reports & Rosters is updated and you refresh the list."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:155
+msgid "Camp sibling"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:156
+msgid "Camp progressive"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:157
+msgid "Course sibling"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:158
+msgid "Course same-season"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:159
+msgid "Tournament sibling"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:160
+msgid "Tournament multi-day"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:161
+msgid "First-order referral (CRS)"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:164
+msgid "Campaign Offers"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:165
+msgid "Time-boxed promotional discounts. The coupon code is the customer-facing entry; the percent is applied in the InterSoccer discount pipeline (higher percent wins, then the cap). Native WooCommerce coupon amount is always 0% so it cannot stack. Seeded Autumn codes are disabled until you enable them."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:172
+msgid "Enable campaign offers"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:177
+msgid "Kill switch: uncheck to invalidate all campaign coupons immediately."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:194
+msgid "Add campaign offer"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:195
+msgid "Save campaign offers"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:253
+#: includesoocommerce/program-manager.php:892
+#: includesoocommerce/program-manager.php:984
+msgid "Enabled"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:259
+msgid "Internal name"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:263
+msgid "Coupon code"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:267
+msgid "Discount %"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:270
+msgid "Max cap %"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:276
+msgid "Start / end (site timezone)"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:283
+msgid "Eligible product IDs"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:285
+msgid "Comma-separated; blank = all"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:286
+msgid "Blank still means all products unless Restrict to distressed events is on."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:290
+msgid "Distressed events"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:294
+msgid "Restrict to distressed events"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:296
+msgid "Uses Final Numbers Critical/Low variation IDs from Reports & Rosters. Snapshot is frozen until you refresh — counts rising later do not yank the discount."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:298
+#: includesoocommerce/program-manager.php:623
+#: includesoocommerce/program-manager.php:3576
+#: includesoocommerce/program-manager.php:3773
+msgid "Season"
+msgstr "Saison"
+
+#: includesoocommerce/campaign-offers-admin.php:301
+msgid "Program year"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:310
+msgid "Refresh list"
+msgstr ""
+
+#. translators: 1: variation count, 2: timestamp
+#: includesoocommerce/campaign-offers-admin.php:318
+#, php-format
+msgid "Snapshot: %1$d variation IDs%2$s."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:323
+msgid "Snapshot is empty."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:329
+msgid "Reports & Rosters distressed API is not available. Snapshot stays empty until intersoccer_reports_distressed_variation_ids() is present, then refresh."
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:335
+msgid "Excluded product IDs"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:341
+msgid "Category / tag term IDs"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:343
+msgid "Categories"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:346
+msgid "Excluded categories"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:349
+msgid "Tags"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:355
+msgid "Group field"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:359
+msgid "Require “who is your child joining?” when this code is applied"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:362
+msgid "Label"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:365
+msgid "Placeholder"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:368
+msgid "Error message"
+msgstr ""
+
+#: includesoocommerce/campaign-offers-admin.php:373
+msgid "Cannot stack with"
+msgstr ""
+
+#: includesoocommerce/campaign-offers.php:58
+msgid "Autumn 2026 — AUTUMN15 (solo)"
+msgstr ""
+
+#: includesoocommerce/campaign-offers.php:85
+msgid "Autumn 2026 — TOGETHER20 (with friend/sibling)"
+msgstr ""
+
+#. translators: %s: login/register URL
+#: includesoocommerce/cart-calculations.php:472
+#, php-format
+msgid "Please <a href=\"%s\">log in or register</a> to book this product."
+msgstr "Bitte <a href=\"%s\">melden Sie sich an oder registrieren Sie sich</a>, um dieses Produkt zu buchen."
+
+#: includesoocommerce/cart-calculations.php:658
+#: includesoocommerce/checkout-calculations.php:353
+msgid "Discount"
+msgstr "Rabatt"
+
+#: includesoocommerce/discount-messages.php:692
+msgid "10% Camp Week 2 Discount"
+msgstr ""
+
+#: includesoocommerce/discount-messages.php:693
+msgid "You received a 10% discount on your second week of camp!"
+msgstr "Sie haben 10 % Rabatt auf Ihre zweite Camp-Woche erhalten!"
+
+#: includesoocommerce/discount-messages.php:694
+msgid "Message shown when customer receives 10% discount on their second week of camp (progressive discount)."
+msgstr ""
+
+#: includesoocommerce/discount-messages.php:697
+msgid "20% Camp Week 3+ Discount"
+msgstr ""
+
+#: includesoocommerce/discount-messages.php:698
+msgid "You received a 20% discount on your additional week of camp!"
+msgstr "Sie haben 20 % Rabatt auf Ihre zusätzliche Camp-Woche erhalten!"
+
+#: includesoocommerce/discount-messages.php:699
+msgid "Message shown when customer receives 20% discount on their third or additional week of camp (progressive discount)."
+msgstr ""
+
+#: includesoocommerce/discount-messages.php:702
+msgid "33% Tournament Multiple Days Discount"
+msgstr ""
+
+#: includesoocommerce/discount-messages.php:703
+msgid "You received a discount on your second tournament day! 2 days for 50 CHF."
+msgstr "Sie haben Rabatt auf Ihren zweiten Turniertag erhalten! 2 Tage für 50 CHF."
+
+#: includesoocommerce/discount-messages.php:704
+msgid "Message shown when customer receives 33% discount on their second or additional tournament day for the same child."
+msgstr ""
+
+#: includesoocommerce/discounts.php:41
+msgid "Camp Sibling Discount (2nd Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:49
+msgid "Camp Sibling Discount (3rd+ Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:57
+msgid "Course Sibling Discount (2nd Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:65
+msgid "Course Sibling Discount (3rd+ Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:73
+msgid "Course Same Season Discount"
+msgstr ""
+
+#: includesoocommerce/discounts.php:81
+msgid "Tournament Sibling Discount (2nd Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:89
+msgid "Tournament Sibling Discount (3rd+ Child)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:97
+msgid "Camp Progressive Discount (Week 2)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:105
+msgid "Camp Progressive Discount (Week 3+)"
+msgstr ""
+
+#: includesoocommerce/discounts.php:113
+msgid "Tournament Same Child Multiple Days Discount"
+msgstr ""
+
+#: includesoocommerce/discounts.php:1931
+#, php-format
+msgid "%d%% Camp Week 2 Discount"
+msgstr "%d%% Camp-Rabatt Woche 2"
+
+#: includesoocommerce/discounts.php:1934
+#, php-format
+msgid "%d%% Camp Week %d+ Discount"
+msgstr "%d%% Camp-Rabatt Woche %d+"
+
+#: includesoocommerce/discounts.php:2050
+#: includesoocommerce/discounts.php:2109
+#: includesoocommerce/discounts.php:2346
+#, php-format
+msgid "%d%% Same Season Course Discount"
+msgstr "%d%% Rabatt zweiter Kurs gleiche Saison"
+
+#: includesoocommerce/discounts.php:2228
+#, php-format
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr "%d%% Turnier-Mehrtages-Rabatt"
+
+#: includesoocommerce/express-checkout-player-gate.php:123
+msgid "We could not complete this payment. Please go back to the product page and try again."
+msgstr "Wir konnten diese Zahlung nicht abschliessen. Bitte gehen Sie zurück zur Produktseite und versuchen Sie es erneut."
+
+#: includesoocommerce/express-checkout-player-gate.php:280
+msgid "Please add a phone number to your billing details so we can reach you about this booking."
+msgstr "Bitte fügen Sie Ihrer Rechnungsadresse eine Telefonnummer hinzu, damit wir Sie zu dieser Buchung erreichen können."
+
+#. translators: %s: URL to Manage Players
+#: includesoocommerce/girls-only-verification.php:431
+#, php-format
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s"
+msgstr "Diese Session ist nur für Mädchen. Der ausgewählte Teilnehmer muss als weiblich hinterlegt sein. Aktualisieren Sie unter Spieler verwalten: %s"
+
+#: includesoocommerce/girls-only-verification.php:434
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr "Diese Session ist nur für Mädchen. Der ausgewählte Teilnehmer muss in Ihrem Konto als weiblich hinterlegt sein. Bitte aktualisieren Sie Spieler verwalten vor der Buchung."
+
+#: includesoocommerce/girls-only-verification.php:445
+msgid "This session is for girls only. Please choose a female attendee or pick a different session."
+msgstr "Diese Session ist nur für Mädchen. Bitte wählen Sie eine Teilnehmerin oder eine andere Session."
+
+#: includesoocommerce/late-pickup-settings.php:21
+#: includesoocommerce/late-pickup-settings.php:44
+msgid "Late Pick Up Settings"
+msgstr ""
+
+#: includesoocommerce/late-pickup-settings.php:49
+msgid "Per Day Cost (CHF)"
+msgstr ""
+
+#: includesoocommerce/late-pickup-settings.php:53
+msgid "Full Week Cost (CHF)"
+msgstr ""
+
+#: includesoocommerce/late-pickup.php:92
+msgid "Late pick up is not available for this camp option."
+msgstr "Späte Abholung ist für diese Camp-Option nicht verfügbar."
+
+#: includesoocommerce/late-pickup.php:112
+msgid "Invalid day selected for late pick up."
+msgstr "Ungültiger Tag für die Spätabholung ausgewählt."
+
+#: includesoocommerce/pm-wpml-sync.php:426
+#: includesoocommerce/program-manager.php:2265
+msgid "WPML is not available."
+msgstr ""
+
+#: includesoocommerce/pm-wpml-sync.php:437
+#: includesoocommerce/program-manager.php:2063
+#: includesoocommerce/program-manager.php:2142
+#: includesoocommerce/program-manager.php:2262
+#: includesoocommerce/program-manager.php:2268
+#: includesoocommerce/program-manager.php:2540
+#: includesoocommerce/program-manager.php:2902
+msgid "Invalid product."
+msgstr ""
+
+#: includesoocommerce/pm-wpml-sync.php:444
+msgid "Product must be a variable product."
+msgstr ""
+
+#: includesoocommerce/pm-wpml-sync.php:451
+msgid "No active WPML languages found."
+msgstr ""
+
+#. translators: 1: parents created, 2: parents refreshed, 3: variation siblings synced
+#: includesoocommerce/pm-wpml-sync.php:539
+#, php-format
+msgid "WPML sync: %1$d language(s) created, %2$d refreshed, %3$d variation sibling(s) updated."
+msgstr ""
+
+#: includesoocommerce/product-camp.php:188
+msgid "The number of selected days must match the quantity."
+msgstr "Die Anzahl der ausgewählten Tage muss der Menge entsprechen."
+
+#: includesoocommerce/product-course.php:660
+#: includesoocommerce/product-course.php:714
+msgid "Course Information"
+msgstr "Kursinformationen"
+
+#: includesoocommerce/product-course.php:711
+msgid "Course Information:"
+msgstr "Kursinformationen:"
+
+#: includesoocommerce/product-course.php:722
+msgid "Start Date:"
+msgstr "Startdatum:"
+
+#: includesoocommerce/product-course.php:728
+msgid "End Date:"
+msgstr "Enddatum:"
+
+#: includesoocommerce/product-course.php:732
+msgid "Total Sessions:"
+msgstr "Gesamtzahl Trainings:"
+
+#: includesoocommerce/product-course.php:736
+msgid "Remaining Sessions:"
+msgstr "Verbleibende Trainings:"
+
+#: includesoocommerce/product-course.php:741
+msgid "Holidays:"
+msgstr "Ferien:"
+
+#: includesoocommerce/program-manager.php:57
+#: includesoocommerce/program-manager.php:58
+#: includesoocommerce/program-manager.php:542
+msgid "Program Manager"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:95
+msgid "Create this program as a Draft product?"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:96
+msgid "Duplicate this program? A new Draft product will be created."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:97
+msgid "Refresh attributes on all unhealthy variations? This applies default values for missing fields."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:98
+msgid "Sync all languages (WPML)? This creates or refreshes FR/DE product and variation translations from English, copying shared attribute slugs, schedule, prices, and course meta."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:99
+msgid "Saving…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:100
+msgid "Saved"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:101
+msgid "Error"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:102
+msgid "Creating program…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:103
+msgid "Refreshing…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:104
+msgid "Syncing WPML languages…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:105
+msgid "Please select a program type."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:106
+msgid "Please enter a program name."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:107
+msgid "Select or enter a target program year before applying Duplicate to year."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:108
+msgid "Select one or more programs in the list before applying Duplicate to year."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:109
+#, php-format
+msgid "Processing %1$d of %2$d: %3$s"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:110
+#, php-format
+msgid "Processed: %1$d · Skipped: %2$d · Failed: %3$d"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:111
+#: includesoocommerce/program-manager.php:784
+#: includesoocommerce/program-manager.php:3784
+msgid "Cancel"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:112
+msgid "Stopping after current…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:113
+msgid "Bulk action complete."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:114
+msgid "Bulk action stopped."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:115
+msgid "Reloading…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:116
+msgid "Select one or more programs before applying a bulk action."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:117
+#: includesoocommerce/program-manager.php:3591
+msgid "Refresh Variation Attributes"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:118
+#: includesoocommerce/program-manager.php:3592
+msgid "Auto-scaffold Missing Variations"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:119
+#: includesoocommerce/program-manager.php:3593
+msgid "Duplicate to year…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:120
+#: includesoocommerce/program-manager.php:696
+#: includesoocommerce/program-manager.php:3596
+msgid "Sync all languages (WPML)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:121
+msgid "Disable the selected variations? They will no longer be purchasable on the storefront."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:122
+msgid "Select one or more variations first."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:123
+#, php-format
+msgid "Disabled %d variation(s)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:124
+msgid "Next steps for your Drafts:"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:125
+msgid "Edit dates &amp; prices"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:126
+#: includesoocommerce/program-manager.php:724
+msgid "Sync WPML"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:127
+#: includesoocommerce/program-manager.php:709
+#: includesoocommerce/program-manager.php:725
+msgid "Publish"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:128
+msgid "Drafts created:"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:129
+#, php-format
+msgid "%1$d Drafts created."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:130
+msgid "Reload list"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:131
+msgid "Open first Draft"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:132
+#, php-format
+msgid "%1$d variation(s) missing"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:133
+msgid "Scaffold?"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:134
+msgid "Scaffolding…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:135
+#, php-format
+msgid "Scaffolding %1$d of %2$d…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:136
+#, php-format
+msgid "Scaffolded %1$d of %2$d"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:375
+#, php-format
+msgid "%d products processed — variation attributes refreshed."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:383
+#, php-format
+msgid "%d products processed — variations scaffolded."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:395
+#: includesoocommerce/program-manager.php:2305
+#: includesoocommerce/program-manager.php:2440
+msgid "Bulk Duplicate requires a target program year (e.g. 2027)."
+msgstr ""
+
+#. translators: 1: count, 2: year
+#: includesoocommerce/program-manager.php:433
+#, php-format
+msgid "Duplicated %1$d programs to Draft (year %2$s). Update dates/terms/prices, then Sync WPML before publishing."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:445
+msgid "Some programs could not be duplicated:"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:449
+msgid "No programs were duplicated."
+msgstr ""
+
+#. translators: 1: products processed, 2: languages created, 3: languages refreshed, 4: failures
+#: includesoocommerce/program-manager.php:478
+#, php-format
+msgid "%1$d products processed — WPML: %2$d language(s) created, %3$d refreshed, %4$d with errors."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:496
+msgid "Bulk action could not be verified (security check failed). Please reload the Program Manager page and try again."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:543
+#: includesoocommerce/program-manager.php:1119
+msgid "Create New Program"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:545
+msgid "Manage InterSoccer programs. Green = complete, yellow = partially complete, red = missing required attributes."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:548
+msgid "All"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:549
+#: includesoocommerce/program-manager.php:674
+msgid "Published"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:550
+msgid "Drafts"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:551
+#: includesoocommerce/program-manager.php:675
+#: includesoocommerce/program-manager.php:710
+#: includesoocommerce/program-manager.php:3690
+msgid "Private"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:569
+msgid "Include drafts"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:573
+msgid "Show only programs with issues"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:576
+msgid "Drafts-only view — use Published or All to change."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:578
+msgid "Private (retired) catalogue — sold years kept for order history."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:589
+msgid "Search by name…"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:590
+msgid "Search Programs"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:592
+msgid "Clear"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:611
+#: includesoocommerce/program-manager.php:3577
+msgid "Year"
+msgstr "Jahr"
+
+#: includesoocommerce/program-manager.php:613
+#: includesoocommerce/program-manager.php:771
+#: includesoocommerce/program-manager.php:1179
+msgid "— Select —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:620
+msgid "or 2027"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:620
+msgid "New program year"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:625
+msgid "— Keep source —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:632
+msgid "Creates Draft clones. Then edit dates & prices, Sync WPML, Publish."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:673
+#: includesoocommerce/program-manager.php:708
+#: includesoocommerce/program-manager.php:3688
+msgid "Draft"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:687
+#: includesoocommerce/program-manager.php:1120
+#: includesoocommerce/program-manager.php:1375
+msgid "Back to Program List"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:689
+msgid "Edit in WooCommerce"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:691
+#: includesoocommerce/program-manager.php:1374
+msgid "Duplicate Program"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:700
+msgid "Creates or refreshes FR/DE translations from the default language (EN), copying shared attribute slugs, camp schedule, prices, and course meta. Edit the catalogue in English first."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:705
+#: includesoocommerce/program-manager.php:753
+#: includesoocommerce/program-manager.php:3767
+msgid "Status"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:713
+msgid "Update status"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:721
+msgid "Year-roll lifecycle:"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:723
+msgid "Edit schedule/prices"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:731
+msgid "Parent Attributes"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:751
+msgid "Attribute"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:752
+msgid "Value"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:780
+msgid "+ Add new"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:782
+msgid "Term name"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:783
+msgid "Add"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:796
+msgid "Select Course Day(s) here, then Save Attributes. Assign Course Times on each variation below (times differ per SKU). Use Auto-generate Variations to create missing day × age × venue SKUs."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:801
+msgid "Save Attributes"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:806
+#: includesoocommerce/program-manager.php:3580
+msgid "Variations"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:807
+msgid "healthy"
+msgstr ""
+
+#. translators: 1: variations missing venue, 2: parent venue count
+#: includesoocommerce/program-manager.php:829
+#, php-format
+msgid "Parent has %2$d venue(s), but %1$d variation(s) still need a venue assigned below. Parent venue terms alone do not fill variation SKUs on multi-venue programs."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:841
+msgid "Auto-generate Variations"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:848
+msgid "Camp Schedule"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:849
+msgid "Store start/end dates and week index on each variation. Labels in Camp Terms stay for storefront display."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:852
+msgid "Week 1 start"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:857
+msgid "Duration (days)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:862
+msgid "Propose remaining weeks"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:865
+msgid "Apply parsed dates from camp-terms"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:868
+msgid "Propose times from age"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:871
+msgid "Repair Venue / Camp Term on variations"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:874
+msgid "Propose fills empty rows only (+7 days per week index). Apply parsed uses the deprecated camp-terms parser once to seed meta. Propose times fills empty pa_camp-times from age (Half Day → 1000-1230, Full Day → 1000-1700). Repair promotes Venue and Camp Term to variation attributes and backfills Camp Term from week meta (single-venue products also get Venue)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:881
+msgid "Disable selected"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:884
+msgid "Camps past their end date stay Enabled until you disable them. Select rows then use Disable selected."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:890
+msgid "Select all"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:891
+msgid "ID"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:895
+#: includesoocommerce/program-manager.php:3578
+msgid "Venue"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:898
+msgid "Course Time"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:900
+msgid "Price (CHF)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:902
+msgid "Week"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:903
+msgid "Start"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:904
+msgid "End"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:906
+msgid "Health"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:907
+#: includesoocommerce/program-manager.php:1038
+msgid "Issues"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:987
+msgid "Ended"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:995
+msgid "— Select venue —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1008
+msgid "— Select time —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1036
+msgid "Healthy"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1057
+msgid "Variation Health Tools"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1058
+msgid "Refresh attributes on unhealthy variations to apply default values for missing fields."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1062
+#, php-format
+msgid "Refresh Attributes (%d unhealthy)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1070
+msgid "Course Tools"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1074
+msgid "Recalculate end dates for all course variations based on start date, sessions, and holidays."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1132
+msgid "Step 1: Select Program Type"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1143
+#, php-format
+msgid "%d parent attrs, %d variation attrs"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1152
+#: includesoocommerce/program-manager.php:1213
+#: includesoocommerce/program-manager.php:1226
+msgid "Next"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1157
+msgid "Step 2: Program Details"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1160
+msgid "Program Name *"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1189
+msgid "Course start date"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1193
+msgid "Total weeks / sessions"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1197
+msgid "Holiday dates"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1199
+msgid "One Y-m-d per line, e.g. 2026-12-25"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1200
+msgid "Applied to each variation as _course_holiday_dates before generation."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1204
+msgid "Regular price (CHF)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1207
+msgid "Optional. Applied to all generated variations."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1212
+#: includesoocommerce/program-manager.php:1225
+#: includesoocommerce/program-manager.php:1235
+msgid "Back"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1219
+msgid "Step 3: Variation Matrix"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1220
+msgid "The following variations will be created. Uncheck any you do not need."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1232
+msgid "Step 4: Review & Create"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1236
+msgid "Create as Draft"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1363
+#: includesoocommerce/program-manager.php:2729
+msgid "Invalid source product."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1376
+msgid "Creates a Draft clone. Set program year for catalogue roll-over; seasons stay evergreen (Autumn/Winter/Spring/Summer). Update dates, terms, and prices after duplicating, then Sync WPML."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1380
+msgid "Source Program"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1384
+msgid "New Program Name"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1388
+msgid "Program Year"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1391
+msgid "— Keep same year —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1396
+msgid "or type e.g. 2027"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1397
+msgid "Required attribute for camps/courses. Titles should carry the year; do not create year-qualified season terms."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1401
+msgid "New Season"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1404
+msgid "— Keep same season —"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1415
+msgid "Duplicate as Draft"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1438
+msgid "Name and type are required."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1443
+msgid "Invalid program type."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1570
+msgid "Failed to create product."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1675
+msgid "Missing product ID or type."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1680
+msgid "Invalid variable product."
+msgstr ""
+
+#. translators: 1: created count, 2: skipped count
+#: includesoocommerce/program-manager.php:1744
+#, php-format
+msgid "%1$d variations created, %2$d already present."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1760
+msgid "Missing product ID."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1777
+#: includesoocommerce/program-manager.php:1808
+#: includesoocommerce/program-manager.php:1906
+#: includesoocommerce/program-manager.php:1970
+msgid "Missing variation ID."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1782
+#: includesoocommerce/program-manager.php:1816
+#: includesoocommerce/program-manager.php:1911
+#: includesoocommerce/program-manager.php:1975
+#: includesoocommerce/program-manager.php:2037
+msgid "Invalid variation."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1919
+msgid "Venue assignment is only supported for camps and courses."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1929
+msgid "Venue is not assigned on the parent product."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1983
+msgid "Course time assignment is only supported for courses."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:1989
+msgid "Invalid course time."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2032
+#: includesoocommerce/program-manager.php:2897
+msgid "Invalid request."
+msgstr ""
+
+#. translators: 1: updated count, 2: skipped count
+#: includesoocommerce/program-manager.php:2209
+#, php-format
+msgid "Updated %1$d, skipped %2$d."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2229
+msgid "Not a camp variable product."
+msgstr ""
+
+#. translators: 1: updated variations, 2: venue rows still needing manual venue
+#: includesoocommerce/program-manager.php:2237
+#, php-format
+msgid "Camp facets repaired: %1$d variations updated. %2$d still need a venue (multi-venue products)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2255
+#: includesoocommerce/program-manager.php:2504
+msgid "WPML sync is not available."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2275
+msgid "WPML sync complete."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2356
+msgid "Unknown bulk action."
+msgstr ""
+
+#. translators: %d: product ID
+#: includesoocommerce/program-manager.php:2366
+#, php-format
+msgid "Skipped #%d (not a variable product)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2396
+msgid "Variation attributes refreshed."
+msgstr ""
+
+#. translators: %d: product ID
+#: includesoocommerce/program-manager.php:2406
+#, php-format
+msgid "Skipped #%d (variations already exist)."
+msgstr ""
+
+#. translators: %d: product ID
+#: includesoocommerce/program-manager.php:2419
+#: includesoocommerce/program-manager.php:2451
+#, php-format
+msgid "Skipped #%d (unknown program type)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2429
+msgid "Variations scaffolded."
+msgstr ""
+
+#. translators: 1: product ID, 2: error message
+#: includesoocommerce/program-manager.php:2468
+#, php-format
+msgid "#%1$d: %2$s"
+msgstr ""
+
+#. translators: 1: source product ID, 2: new product ID, 3: year
+#: includesoocommerce/program-manager.php:2491
+#, php-format
+msgid "Duplicated #%1$d → #%2$d (year %3$s)."
+msgstr ""
+
+#. translators: %s: comma-separated attribute slugs
+#: includesoocommerce/program-manager.php:2592
+#, php-format
+msgid "Publish blocked. Required parent attributes are missing: %s. Drafts may be incomplete."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2604
+msgid "Publish blocked. Assigned terms violate the taxonomy standard."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2659
+msgid "A valid program year (e.g. 2027) is required."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2685
+msgid "Could not create program year term."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2721
+#: includesoocommerce/program-manager.php:2861
+msgid "Source ID and name are required."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2739
+msgid "Source product has no InterSoccer program type."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2771
+msgid "Season term not found. Use an evergreen season (Autumn, Winter, Spring, Summer)."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2802
+msgid "Failed to create duplicate."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2960
+msgid "Attributes saved."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:2974
+msgid "Invalid taxonomy."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3015
+msgid "Term created but could not be loaded."
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3048
+msgid "Regular price"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3049
+msgid "Camp start date"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3050
+msgid "Camp end date"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3051
+msgid "Camp week"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3574
+msgid "Program Name"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3579
+msgid "Completeness"
+msgstr ""
+
+#. translators: %d: number of enabled camp variations past end date
+#: includesoocommerce/program-manager.php:3697
+#, php-format
+msgid "Ended (%d)"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3763
+msgid "Quick Edit"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3774
+msgid "Venues"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3776
+msgid "Cities"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3779
+msgid "Camp Terms"
+msgstr "Camp-Woche"
+
+#: includesoocommerce/program-manager.php:3780
+msgid "Camp Times"
+msgstr "Camp-Zeiten"
+
+#: includesoocommerce/program-manager.php:3783
+msgid "Update"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3788
+msgid "Manage"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3789
+msgid "Duplicate"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3790
+msgid "WC Edit"
+msgstr ""
+
+#: includesoocommerce/program-manager.php:3799
+msgid "No programs found. Create one to get started!"
+msgstr ""
+
+# wpml-name: 7b22344fd895e14c47399f85200a2ace
+msgid "An error occurred while refreshing attributes:"
+msgstr "Ein Fehler ist beim Aktualisieren der Attribute aufgetreten: "
+
+# wpml-name: 42b4d0483c08574a5f99032b321a7485
+msgid "An error occurred while processing the action:"
+msgstr "Ein Fehler ist bei der Verarbeitung der Aktion aufgetreten: "
+
+# wpml-name: c8fdea49d80596005fac81da45cc1763
+msgid "Action completed successfully!"
+msgstr "Aktion erfolgreich abgeschlossen!"
+
+# wpml-name: 10842c54ba5faae950c177c4b0c5cdc0
+msgid "Please select an action and at least one discount."
+msgstr "Bitte wählen Sie eine Aktion und mindestens einen Rabatt aus."
+
+# wpml-name: 25fed406cb0a88646d8059cad51345a3
+msgid "An error occurred while saving the discount:"
+msgstr "Ein Fehler ist beim Speichern des Rabatts aufgetreten: "
+
+# wpml-name: 0e8bc5808bec14350b627a5c71fd36de
+msgid "Discount saved successfully!"
+msgstr "Rabatt erfolgreich gespeichert!"
+
+# wpml-name: 575f5f86d2c7ea113c6710c1037c4465
+msgid "Saving..."
+msgstr "Speichern..."
+
+# wpml-name: 7badfbc455735b33283d92ea477996de
+msgid "Add New Discount"
+msgstr "Neuen Rabatt hinzufügen"
+
+# wpml-name: c4716ed2f447aa22072d91c1acbe83e7
+msgid "Late Pickup Cost:"
+msgstr "Kosten für späte Abholung: "
+
+msgid "Select Late Pickup Days"
+msgstr "Spätabholtage auswählen"
+
+msgid "Single Day"
+msgstr "Einzelner Tag"
+
+msgid "Late Pickup Type"
+msgstr "Art der Spätabholung"
+
+msgid "Friday"
+msgstr "Freitag"
+
+msgid "Thursday"
+msgstr "Donnerstag"
+
+msgid "Wednesday"
+msgstr "Mittwoch"
+
+msgid "Tuesday"
+msgstr "Dienstag"
+
+msgid "Monday"
+msgstr "Montag"
+
+# wpml-name: 98cb3e604330f6b2df6030c245cf554a
+msgid "Same child, multiple courses in same season"
+msgstr "Gleiches Kind, mehrere Kurse in derselben Saison"
+
+# wpml-name: 1a16f21e6041f067495481d41f6160ee
+msgid "50% Same Season Course Discount"
+msgstr "50% Rabatt für Kurs gleiche Saison"
+
+# wpml-name: fd2f2092d275d1300031a6d6c0bc098a
+msgid "Third or additional child course discount"
+msgstr "Drittes oder zusätzliches Kind Kurs-Rabatt"
+
+# wpml-name: 7db077256d3f7e63ec6ca63f8e8c4fd8
+msgid "30% Multi-Child Course Discount"
+msgstr "30% Mehrkind-Kurs-Rabatt"
+
+# wpml-name: 04b5e611f90d20ab1c291e4248254d42
+msgid "Second child course discount"
+msgstr "Zweites Kind Kurs-Rabatt"
+
+# wpml-name: 62aa7b74de55c9aaf1f39d5763fb2aca
+msgid "20% Course Sibling Discount"
+msgstr "20% Kurs-Geschwister-Rabatt"
+
+# wpml-name: 9fb5155b9ce71a9393f4e4facee5d4c2
+msgid "Third or additional child camp discount"
+msgstr "Drittes oder zusätzliches Kind Camp-Rabatt"
+
+# wpml-name: b42b4793ca0578246755d052e8e60812
+msgid "25% Multi-Child Discount Applied"
+msgstr "25% Mehrkind-Rabatt angewendet"
+
+# wpml-name: b9ec5d7b8e696f6df33609fe478a4fbb
+msgid "Second child camp discount"
+msgstr "Zweites Kind Camp-Rabatt"
+
+# wpml-name: 54f818895232f9d69a713052a8c0c93c
+msgid "20% Sibling Discount Applied"
+msgstr "20% Geschwister-Rabatt angewendet"
+
+# wpml-name: tournament_multi_child_discount_template
+msgid "%d%% Tournament Multi-Child Discount (Child %d)"
+msgstr "%d%% Turnier Mehrkind-Rabatt (Kind %d)"
+
+# wpml-name: tournament_2nd_child
+msgid "20% Tournament Sibling Discount"
+msgstr "20% Turnier Geschwisterrabatt"
+
+# wpml-name: tournament_3rd_plus_child
+msgid "30% Multi-Child Tournament Discount"
+msgstr "30% Mehrkind-Rabatt Turnier"
+
+msgid "Sessions Remaining:"
+msgstr "Verbleibende Sitzungen: "
+
+#, php-format
+msgid "Medical information: provided (view or update in My Account)."
+msgstr "Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktualisieren)."
+
+#, php-format
+msgid "Age at camp start: %d"
+msgstr "Alter bei Campbeginn: %d"
+
+#, php-format
+msgid "Birth year: %s"
+msgstr "Geburtsjahr: %s"
+
+
+#: includes/woocommerce/cart-calculations.php
+msgid "Late Pickup Days"
+msgstr "Tage für späte Abholung"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Male"
+msgstr "Junge"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Female"
+msgstr "Mädchen"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Other"
+msgstr "Andere"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Attendee DOB"
+msgstr "Geburtsdatum des Teilnehmers"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Attendee Gender"
+msgstr "Geschlecht des Teilnehmers"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Medical Conditions"
+msgstr "Medizinische Angaben"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Activity Type"
+msgstr "Aktivitätstyp"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Discount Amount"
+msgstr "Rabattbetrag"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Campaign Code"
+msgstr "Kampagnencode"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Campaign Discount %"
+msgstr "Kampagnenrabatt %"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Girls Only"
+msgstr "Nur Mädchen"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp Start Date"
+msgstr "Camp-Startdatum"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp End Date"
+msgstr "Camp-Enddatum"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Camp Week Index"
+msgstr "Camp-Wochenindex"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Sites InterSoccer"
+msgstr "InterSoccer-Standorte"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Age Group"
+msgstr "Altersgruppe"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Canton / Region"
+msgstr "Kanton / Region"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "City"
+msgstr "Stadt"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Booking Type"
+msgstr "Buchungstyp"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Days of Week"
+msgstr "Wochentage"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Course Day"
+msgstr "Kurstag"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Course Times"
+msgstr "Kurszeiten"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Date"
+msgstr "Datum"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Tournament Day"
+msgstr "Turniertag"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Sessions Remaining"
+msgstr "Verbleibende Sitzungen"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Full Term"
+msgstr "Ganzes Semester"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Birthday Party"
+msgstr "Geburtstagsfeier"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Unknown"
+msgstr "Unbekannt"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Summer"
+msgstr "Sommer"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Autumn"
+msgstr "Herbst"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Spring"
+msgstr "Frühling"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Winter"
+msgstr "Winter"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Saturday"
+msgstr "Samstag"
+
+#: includes/woocommerce/order-meta-contract.php
+msgid "Sunday"
+msgstr "Sonntag"
+
+#: follow-up-3
+msgid "Select late pick up option (optional)"
+msgstr "Wählen Sie eine Option für die Spätabholung (optional)"
+
+#: follow-up-3
+msgid "No Late Pickup"
+msgstr "Keine Spätabholung"
+
+#: follow-up-3
+msgid "Single Days"
+msgstr "Einzelne Tage"
+
+#: follow-up-3
+msgid "No late pick up selected"
+msgstr "Keine Spätabholung ausgewählt"
+
+#: follow-up-3
+msgid "Full Week (5 days): "
+msgstr "Ganze Woche (5 Tage): "
+
+#: follow-up-3
+msgid "Select at least one day"
+msgstr "Wählen Sie mindestens einen Tag"
+
+#: follow-up-3
+msgid "%d day: "
+msgstr "%d Tag: "
+
+#: follow-up-3
+msgid "%d days: "
+msgstr "%d Tage: "
+
+#: follow-up-3
+msgid "Invalid selection"
+msgstr "Ungültige Auswahl"
+
+#: follow-up-4
+msgid "Note"
+msgstr "Hinweis"
+
+#: follow-up-3
+msgid "Player DOB"
+msgstr "Geburtsdatum des Teilnehmers"
+
+#: follow-up-3
+msgid "Player Medical"
+msgstr "Medizinische Angaben des Teilnehmers"
+
+#: follow-up-3
+msgid "j F Y"
+msgstr "j. F Y"
+
+#: follow-up-6
+msgid "Player stored"
+msgstr "Teilnehmer gespeichert"
+
+#: follow-up-6
+msgid "Player cleared"
+msgstr "Teilnehmer entfernt"
+
+#: follow-up-6
+msgid "Unable to store player for this account"
+msgstr "Teilnehmer konnte für dieses Konto nicht gespeichert werden"
+
+#: merge master #105
+msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
+msgstr "Die Buchungsdaten werden noch gespeichert. Bitte warten Sie einen Moment und versuchen Sie es dann erneut."

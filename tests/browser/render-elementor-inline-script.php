@@ -34,6 +34,32 @@ if (!function_exists('admin_url')) {
     }
 }
 
+if (!function_exists('add_query_arg')) {
+    function add_query_arg($args, $url)
+    {
+        if ($args === [] || !is_array($args)) {
+            return $url;
+        }
+        $glue = strpos($url, '?') === false ? '?' : '&';
+        return $url . $glue . http_build_query($args);
+    }
+}
+
+if (!function_exists('esc_url')) {
+    function esc_url($url)
+    {
+        return (string) $url;
+    }
+}
+
+if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+    define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', dirname(__DIR__, 2) . '/');
+}
+
+if (!function_exists('intersoccer_pv_admin_ajax_url')) {
+    require_once dirname(__DIR__, 2) . '/includes/pv-textdomain.php';
+}
+
 if (!function_exists('home_url')) {
     function home_url($path = '')
     {

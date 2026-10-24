@@ -6,7 +6,7 @@
  * Version: 2.10.23
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
- * Domain Path: /languages
+ * Domain Path: /lang
  * Update URI: https://plugins.underdogunlimited.com
  */
 
@@ -19,14 +19,7 @@ if (!defined('ABSPATH')) {
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Load plugin text domain for translations
-add_action('plugins_loaded', function () {
-    load_plugin_textdomain(
-        'intersoccer-product-variations',
-        false,
-        dirname(plugin_basename(__FILE__)) . '/lang'
-    );
-});
+require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/pv-textdomain.php';
 
 // Register strings for WPML translation on init to ensure WPML is loaded
 add_action('init', function () {
@@ -342,6 +335,7 @@ $includes = [
     'includes/logger.php',
     'includes/helpers.php', // Load early - provides cached player retrieval
     'includes/language-helpers.php',
+    'includes/admin-english-locale.php',
     'includes/elementor-widgets.php',
     'includes/woocommerce/attribute-registry.php',
     'includes/woocommerce/attribute-sync.php',
@@ -389,6 +383,7 @@ add_action('wp_enqueue_scripts', function () {
 
     if (is_product()) {
         $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
+        $course_display_strings = function_exists('intersoccer_get_course_display_strings') ? intersoccer_get_course_display_strings() : [];
 
         wp_enqueue_script(
             'intersoccer-variation-details',
@@ -398,23 +393,31 @@ add_action('wp_enqueue_scripts', function () {
             true
         );
 
+        $checkout_ajax = function_exists('intersoccer_pv_customer_script_localize_base')
+            ? intersoccer_pv_customer_script_localize_base(true)
+            : [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
+            ];
+
         wp_localize_script(
             'intersoccer-variation-details',
             'intersoccerCheckout',
-            [
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => $nonce,
-                'user_id' => get_current_user_id(),
-                'server_time' => current_time('c'),
-                'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
-                'i18n' => [
-                    'start_date' => __('Start Date', 'intersoccer-product-variations'),
-                    'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
-                    'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
-                    'player_assignment' => $player_assignment_strings,
-                    'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
-                ],
-            ]
+            array_merge(
+                $checkout_ajax,
+                [
+                    'nonce' => $nonce,
+                    'user_id' => get_current_user_id(),
+                    'server_time' => current_time('c'),
+                    'i18n' => array_merge(
+                        $course_display_strings,
+                        [
+                            'player_assignment' => $player_assignment_strings,
+                            'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
+                        ]
+                    ),
+                ]
+            )
         );
     }
 
@@ -439,7 +442,9 @@ add_action('wp_enqueue_scripts', function () {
             'groupCodes' => function_exists('intersoccer_campaign_group_codes_requiring_field')
                 ? intersoccer_campaign_group_codes_requiring_field()
                 : [],
-            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'ajaxUrl' => function_exists('intersoccer_pv_admin_ajax_url')
+                ? intersoccer_pv_admin_ajax_url()
+                : admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('intersoccer_campaign_joining'),
         ]);
     }

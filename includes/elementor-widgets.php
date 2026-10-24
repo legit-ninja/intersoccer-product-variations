@@ -288,13 +288,23 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Elementor / alternate templates: intersoccer-variation-details may not load, so wp_localize_script never ran — merge PHP-safe defaults.
             window.intersoccerCheckout = $.extend(true, {}, window.intersoccerCheckout || {}, {
-                ajax_url: <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>,
+                ajax_url: <?php echo wp_json_encode(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>,
                 nonce: <?php echo wp_json_encode(wp_create_nonce('intersoccer_nonce')); ?>,
                 user_id: <?php echo (int) $user_id; ?>,
+                latePickupI18n: <?php echo wp_json_encode(function_exists('intersoccer_get_late_pickup_elementor_strings') ? intersoccer_get_late_pickup_elementor_strings() : []); ?>,
+                weekdays: <?php echo wp_json_encode([
+                    'Monday' => __('Monday', 'intersoccer-product-variations'),
+                    'Tuesday' => __('Tuesday', 'intersoccer-product-variations'),
+                    'Wednesday' => __('Wednesday', 'intersoccer-product-variations'),
+                    'Thursday' => __('Thursday', 'intersoccer-product-variations'),
+                    'Friday' => __('Friday', 'intersoccer-product-variations'),
+                ]); ?>,
                 i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
                     stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>
                 })
             });
+            var latePickupI18n = window.intersoccerCheckout.latePickupI18n || {};
+            var weekdayI18n = window.intersoccerCheckout.weekdays || {};
             
             // Find the product form, excluding search forms.
             // Do not blindly use .first(): sticky/duplicate Elementor layouts can register multiple
@@ -1626,13 +1636,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 var preloadedDays = JSON.parse($daySelection.attr('data-preloaded-days') || '[]');
 
                 // Translation map for days - English to current language
-                var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : {
-                    'Monday': 'Monday',
-                    'Tuesday': 'Tuesday',
-                    'Wednesday': 'Wednesday',
-                    'Thursday': 'Thursday',
-                    'Friday': 'Friday'
-                };
+                var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : weekdayI18n;
                 if (Object.keys(latePickupVariationSettings).length === 0) {
                     var $settingsRow = $form.find('.intersoccer-late-pickup-row');
                     if ($settingsRow.length) {
@@ -1731,7 +1735,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     if (isSubmitting) {
                         $dayNotification.hide().css('display', 'none');
                     } else if (actuallyCheckedCount === 0) {
-                        $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                        $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                     } else {
                         $dayNotification.hide();
                     }
@@ -1755,7 +1759,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         var $dayNotification = $daySelection.find('.intersoccer-day-notification');
                         if (!isSubmitting) {
                             if (selectedDays.length === 0) {
-                                $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                                $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                             } else {
                                 $dayNotification.hide();
                             }
@@ -1889,20 +1893,14 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 debug('InterSoccer Late Pickup: Available late pickup days from settings:', days);
                 
-                var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : {
-                    'Monday': 'Monday',
-                    'Tuesday': 'Tuesday',
-                    'Wednesday': 'Wednesday',
-                    'Thursday': 'Thursday',
-                    'Friday': 'Friday'
-                };
+                var dayTranslations = typeof intersoccerDayTranslations !== 'undefined' ? intersoccerDayTranslations : weekdayI18n;
                 
                 $daysContainer.empty();
                 
                 // Add optional note
                 $daysContainer.append(`
                     <div style="margin-bottom: 10px; font-style: italic; color: #666;">
-                        Select late pick up option (optional)
+                        ${latePickupI18n.selectOptional || 'Select late pick up option (optional)'}
                     </div>
                 `);
                 
@@ -1914,7 +1912,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 $optionsContainer.append(`
                     <label style="display: block; margin-bottom: 8px;">
                         <input type="radio" name="late_pickup_option" value="none" class="intersoccer-late-pickup-radio" ${noneChecked}> 
-                        <strong>No Late Pickup</strong>
+                        <strong>${latePickupI18n.noLatePickup || 'No Late Pickup'}</strong>
                     </label>
                 `);
                 
@@ -1923,7 +1921,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 $optionsContainer.append(`
                     <label style="display: block; margin-bottom: 8px;">
                         <input type="radio" name="late_pickup_option" value="full-week" class="intersoccer-late-pickup-radio" ${fullWeekChecked}> 
-                        <strong>Full Week</strong>
+                        <strong>${latePickupI18n.fullWeek || 'Full Week'}</strong>
                     </label>
                 `);
                 
@@ -1932,7 +1930,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 $optionsContainer.append(`
                     <label style="display: block; margin-bottom: 8px;">
                         <input type="radio" name="late_pickup_option" value="single-days" class="intersoccer-late-pickup-radio" ${singleDaysChecked}> 
-                        <strong>Single Days</strong>
+                        <strong>${latePickupI18n.singleDays || 'Single Days'}</strong>
                     </label>
                 `);
                 
@@ -2016,7 +2014,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Handle radio button selection
                 if (selectedLatePickupOption === 'none') {
-                    $costContainer.html('<span style="color: #666;">No late pick up selected</span>');
+                    $costContainer.html('<span style="color: #666;">' + (latePickupI18n.noSelection || 'No late pick up selected') + '</span>');
                     debug('InterSoccer Late Pickup: No option selected');
                     
                     // Update main price display to remove late pickup cost
@@ -2029,13 +2027,13 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 if (selectedLatePickupOption === 'full-week') {
                     cost = settings.full_week_cost;
-                    costText = 'Full Week (5 days): ';
+                    costText = latePickupI18n.fullWeekFiveDays || 'Full Week (5 days): ';
                 } else if (selectedLatePickupOption === 'single-days') {
                     // Calculate based on number of days selected
                     var dayCount = selectedLatePickupDays.length;
                     
                     if (dayCount === 0) {
-                        $costContainer.html('<span style="color: #666;">Select at least one day</span>');
+                        $costContainer.html('<span style="color: #666;">' + (latePickupI18n.selectAtLeastOneDay || 'Select at least one day') + '</span>');
                         debug('InterSoccer Late Pickup: Single days selected but no days checked');
                         
                         // Update main price display to remove late pickup cost
@@ -2046,14 +2044,16 @@ $intersoccer_elementor_product_page_cb = function () {
                     // Use full week price if 5 days selected
                     if (dayCount === 5) {
                         cost = settings.full_week_cost;
-                        costText = 'Full Week (5 days): ';
+                        costText = latePickupI18n.fullWeekFiveDays || 'Full Week (5 days): ';
                     } else {
                         cost = dayCount * settings.per_day_cost;
-                        costText = dayCount + ' day' + (dayCount > 1 ? 's' : '') + ': ';
+                        costText = (dayCount === 1
+                            ? (latePickupI18n.dayCountSingular || '%d day: ').replace('%d', dayCount)
+                            : (latePickupI18n.dayCountPlural || '%d days: ').replace('%d', dayCount));
                     }
                 } else {
                     // Fallback (shouldn't happen)
-                    $costContainer.html('<span style="color: #666;">Invalid selection</span>');
+                    $costContainer.html('<span style="color: #666;">' + (latePickupI18n.invalidSelection || 'Invalid selection') + '</span>');
                     updateMainPriceWithLatePickup(0);
                     return;
                 }
@@ -2248,7 +2248,7 @@ $intersoccer_elementor_product_page_cb = function () {
                             $dayNotification.hide();
                         } else if (isSingleDayBooking && !daysSelected) {
                             $attendeeNotification.hide();
-                            $dayNotification.text('Please select at least one day.').css('color', 'red').show();
+                            $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
                         } else {
                             // Variation not selected or other issue
                             $attendeeNotification.hide();
@@ -3002,7 +3002,7 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Make AJAX call to get course price
             jQuery.ajax({
-                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                url: '<?php echo esc_url(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>',
                 type: 'POST',
                 data: {
                     action: 'intersoccer_get_course_price',
@@ -3086,7 +3086,7 @@ $intersoccer_elementor_product_page_cb = function () {
             }
 
             debug('InterSoccer: Updating camp price for variation', variationId, 'with days:', selectedDays);
-            debug('InterSoccer: AJAX URL:', '<?php echo admin_url('admin-ajax.php'); ?>');
+            debug('InterSoccer: AJAX URL:', '<?php echo esc_js(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>');
             debug('InterSoccer: Nonce:', '<?php echo wp_create_nonce('intersoccer_nonce'); ?>');
 
             // Set flag to indicate AJAX price update in progress
@@ -3097,7 +3097,7 @@ $intersoccer_elementor_product_page_cb = function () {
 
             // Make AJAX call to get updated price (return jqXHR for abort capability)
             return jQuery.ajax({
-                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                url: '<?php echo esc_url(function_exists('intersoccer_pv_admin_ajax_url') ? intersoccer_pv_admin_ajax_url() : admin_url('admin-ajax.php')); ?>',
                 type: 'POST',
                 data: {
                     action: 'intersoccer_calculate_camp_price',

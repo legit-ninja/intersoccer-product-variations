@@ -95,7 +95,7 @@ function intersoccer_ajax_get_course_metadata() {
     }
 
     $metadata = [
-        'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
+        'start_date' => $start_date ? intersoccer_pv_format_ymd_for_customer_display($start_date) : '',
         'total_weeks' => $total_weeks,
         'weekly_discount' => $weekly_discount,
         'remaining_weeks' => $remaining_weeks
@@ -370,13 +370,13 @@ function intersoccer_get_course_info() {
 
     $response = [
         'is_course' => true,
-        'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
-        'end_date' => $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '',
+        'start_date' => $start_date ? intersoccer_pv_format_ymd_for_customer_display($start_date) : '',
+        'end_date' => $end_date ? intersoccer_pv_format_ymd_for_customer_display($end_date) : '',
         'total_weeks' => $total_weeks,
         'remaining_sessions' => $remaining_sessions,
-        'holidays' => array_map(function($holiday) {
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                return date_i18n('F j, Y', strtotime($holiday));
+        'holidays' => array_map(static function ($holiday) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $holiday)) {
+                return intersoccer_pv_format_ymd_for_customer_display((string) $holiday);
             }
             return $holiday;
         }, $holidays)

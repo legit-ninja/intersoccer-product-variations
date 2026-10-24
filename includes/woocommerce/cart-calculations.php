@@ -642,28 +642,47 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
 
         // Days Selected (for single-day camps)
         if ($product_type === 'camp' && isset($cart_item['camp_days']) && is_array($cart_item['camp_days']) && !empty($cart_item['camp_days'])) {
+            $day_labels = array_map(static function ($day) {
+                return function_exists('intersoccer_pv_translate_order_meta_token_for_display')
+                    ? intersoccer_pv_translate_order_meta_token_for_display((string) $day)
+                    : (string) $day;
+            }, $cart_item['camp_days']);
+            $days_display = implode(', ', $day_labels);
             $item_data[] = [
                 'key' => __('Days Selected', 'intersoccer-product-variations'),
-                'value' => implode(', ', $cart_item['camp_days']),
-                'display' => '<span class="intersoccer-cart-meta">' . esc_html(implode(', ', $cart_item['camp_days'])) . '</span>'
+                'value' => $days_display,
+                'display' => '<span class="intersoccer-cart-meta">' . esc_html($days_display) . '</span>',
             ];
         }
 
         // Discount Note
         if (isset($cart_item['discount_note']) && !empty($cart_item['discount_note'])) {
+            $discount_display = function_exists('intersoccer_translate_stored_discount_label_for_display')
+                ? intersoccer_translate_stored_discount_label_for_display($cart_item['discount_note'])
+                : $cart_item['discount_note'];
             $item_data[] = [
                 'key' => __('Discount', 'intersoccer-product-variations'),
-                'value' => esc_html($cart_item['discount_note']),
-                'display' => '<span class="intersoccer-cart-meta intersoccer-discount">' . esc_html($cart_item['discount_note']) . '</span>'
+                'value' => esc_html($discount_display),
+                'display' => '<span class="intersoccer-cart-meta intersoccer-discount">' . esc_html($discount_display) . '</span>'
             ];
         }
 
         // Late Pickup Details
         if ($product_type === 'camp' && isset($cart_item['late_pickup_type']) && $cart_item['late_pickup_type'] !== 'none') {
+            if ($cart_item['late_pickup_type'] === 'full-week') {
+                $late_value = __('Full Week', 'intersoccer-product-variations');
+            } else {
+                $late_days = is_array($cart_item['late_pickup_days'] ?? null) ? $cart_item['late_pickup_days'] : [];
+                $late_value = implode(', ', array_map(static function ($day) {
+                    return function_exists('intersoccer_pv_translate_order_meta_token_for_display')
+                        ? intersoccer_pv_translate_order_meta_token_for_display((string) $day)
+                        : (string) $day;
+                }, $late_days));
+            }
             $item_data[] = [
                 'key' => __('Late Pickup', 'intersoccer-product-variations'),
-                'value' => $cart_item['late_pickup_type'] === 'full-week' ? __('Full Week', 'intersoccer-product-variations') : implode(', ', $cart_item['late_pickup_days']),
-                'display' => '<span class="intersoccer-cart-meta">' . esc_html($cart_item['late_pickup_type'] === 'full-week' ? __('Full Week', 'intersoccer-product-variations') : implode(', ', $cart_item['late_pickup_days'])) . '</span>'
+                'value' => $late_value,
+                'display' => '<span class="intersoccer-cart-meta">' . esc_html($late_value) . '</span>',
             ];
             $item_data[] = [
                 'key' => __('Late Pickup Cost', 'intersoccer-product-variations'),
@@ -845,13 +864,13 @@ function intersoccer_inject_course_prorated_price($variation_data, $product, $va
     // Inject course info into variation data
     $variation_data['course_info'] = [
         'is_course' => true,
-        'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
-        'end_date' => $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '',
+        'start_date' => $start_date ? intersoccer_pv_format_ymd_for_customer_display($start_date) : '',
+        'end_date' => $end_date ? intersoccer_pv_format_ymd_for_customer_display($end_date) : '',
         'total_weeks' => $total_weeks,
         'remaining_sessions' => $remaining_sessions,
-        'holidays' => array_map(function($holiday) {
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                return date_i18n('F j, Y', strtotime($holiday));
+        'holidays' => array_map(static function ($holiday) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $holiday)) {
+                return intersoccer_pv_format_ymd_for_customer_display((string) $holiday);
             }
             return $holiday;
         }, $holidays)
@@ -887,6 +906,9 @@ function intersoccer_add_price_update_script() {
     if (!is_product()) return;
     $product_id = get_the_ID();
     $nonce = wp_create_nonce('intersoccer_nonce');
+    $pv_admin_ajax_url = function_exists('intersoccer_pv_admin_ajax_url')
+        ? intersoccer_pv_admin_ajax_url()
+        : admin_url('admin-ajax.php');
     ?>
     <style>
         .intersoccer-loading {
@@ -979,7 +1001,7 @@ function intersoccer_add_price_update_script() {
                 // Fetch price from server
                 console.log('InterSoccer: Making AJAX call for camp price - Variation ID:', currentVariationId, 'Camp Days:', campDays);
                 $.ajax({
-                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                     type: 'POST',
                     data: {
                         action: 'intersoccer_calculate_camp_price',
@@ -1088,7 +1110,7 @@ function intersoccer_add_price_update_script() {
                     }
                     setTimeout(function() {
                         var stashXhr = $.ajax({
-                            url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                            url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                             type: 'POST',
                             data: {
                                 action: 'intersoccer_store_selected_days',
@@ -1274,7 +1296,7 @@ function intersoccer_add_price_update_script() {
             function clearSessionData() {
                 console.log('InterSoccer: Clearing session data for product ' + <?php echo $product_id; ?>);
                 $.ajax({
-                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    url: '<?php echo esc_url($pv_admin_ajax_url); ?>',
                     type: 'POST',
                     data: {
                         action: 'intersoccer_clear_session_data',
@@ -1749,30 +1771,37 @@ add_action('wp_ajax_nopriv_intersoccer_store_selected_player', 'intersoccer_stor
 function intersoccer_store_selected_player_callback() {
     $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
     if (!$nonce || !wp_verify_nonce($nonce, 'intersoccer_nonce')) {
-        wp_send_json_error(['message' => 'Invalid nonce'], 403);
+        wp_send_json_error(['message' => __('Invalid nonce', 'intersoccer-product-variations')], 403);
     }
     $product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
     $player_index = array_key_exists('player_index', $_POST) ? wp_unslash($_POST['player_index']) : null;
     $player_id = isset($_POST['player_id']) ? sanitize_text_field(wp_unslash((string) $_POST['player_id'])) : '';
     if ($product_id <= 0) {
-        wp_send_json_error(['message' => 'Missing product_id']);
+        wp_send_json_error(['message' => __('Missing product_id', 'intersoccer-product-variations')]);
     }
     // Shopper cleared the player: forget the stash so express checkout cannot reuse an old choice.
     $index_empty = ($player_index === null || trim((string) $player_index) === '');
     if ($index_empty && $player_id === '') {
         intersoccer_clear_stashed_selected_player($product_id);
         intersoccer_schedule_wc_session_volatile_refresh_before_save();
-        wp_send_json_success(['message' => 'Player cleared', 'product_id' => $product_id, 'cleared' => true]);
+        wp_send_json_success([
+            'message' => __('Player cleared', 'intersoccer-product-variations'),
+            'product_id' => $product_id,
+            'cleared' => true,
+        ]);
     }
     $ok = intersoccer_stash_selected_player($product_id, [
         'player_index' => $player_index,
         'player_id' => $player_id,
     ]);
     if (!$ok) {
-        wp_send_json_error(['message' => 'Unable to store player for this account']);
+        wp_send_json_error(['message' => __('Unable to store player for this account', 'intersoccer-product-variations')]);
     }
     intersoccer_schedule_wc_session_volatile_refresh_before_save();
-    wp_send_json_success(['message' => 'Player stored', 'product_id' => $product_id]);
+    wp_send_json_success([
+        'message' => __('Player stored', 'intersoccer-product-variations'),
+        'product_id' => $product_id,
+    ]);
 }
 
 /**

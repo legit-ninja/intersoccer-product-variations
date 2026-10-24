@@ -3817,10 +3817,8 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
                 
                 $player_dob = $player['dob'] ?? '';
                 $player_gender = $player['gender'] ?? '';
-                
-                // Use gender translation helper if available
-                if ($player_gender && function_exists('intersoccer_translate_gender')) {
-                    $player_gender = intersoccer_translate_gender($player_gender);
+                if ($player_gender && function_exists('intersoccer_pv_admin_format_player_gender_label')) {
+                    $player_gender = intersoccer_pv_admin_format_player_gender_label($player_gender);
                 }
                 
                 $display_info = $player_name;
