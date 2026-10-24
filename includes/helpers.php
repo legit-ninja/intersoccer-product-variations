@@ -716,3 +716,107 @@ function intersoccer_discount_normalize_season_key($key) {
     return intersoccer_discount_compose_season_key($canonical_label, $year_part);
 }
 
+/**
+ * Localized WooCommerce My Account endpoint slug for Manage Players (WPML + fallbacks).
+ *
+ * @return string Endpoint slug (no leading/trailing slashes).
+ */
+function intersoccer_pv_manage_players_endpoint_slug() {
+    $default = 'manage-players';
+    $slug = apply_filters('wpml_translate_single_string', $default, 'WordPress', 'URL manage-players slug');
+    if (!is_string($slug) || $slug === '') {
+        $slug = $default;
+    }
+
+    $lang = apply_filters('wpml_current_language', null);
+    $lang_code = is_string($lang) && $lang !== '' ? substr(strtolower($lang), 0, 2) : 'en';
+    if ($slug === $default && $lang_code !== 'en') {
+        $map = [
+            'fr' => 'gerer-participants',
+            'de' => 'teilnehmer-verwalten',
+        ];
+        if (isset($map[$lang_code])) {
+            $slug = $map[$lang_code];
+        }
+    }
+
+    return $slug;
+}
+
+/**
+ * Absolute URL to the localized Manage Players My Account endpoint.
+ *
+ * @return string Empty when WooCommerce account URL helpers are unavailable.
+ */
+function intersoccer_pv_manage_players_url() {
+    $slug = intersoccer_pv_manage_players_endpoint_slug();
+    if ($slug === '') {
+        return '';
+    }
+
+    if (function_exists('wc_get_endpoint_url') && function_exists('wc_get_page_permalink')) {
+        $account = wc_get_page_permalink('myaccount');
+        if (is_string($account) && $account !== '') {
+            return wc_get_endpoint_url($slug, '', $account);
+        }
+    }
+
+    if (function_exists('wc_get_account_endpoint_url')) {
+        $url = wc_get_account_endpoint_url($slug);
+        return is_string($url) ? $url : '';
+    }
+
+    return '';
+}
+
+/**
+ * Two-letter language code for the no-DOB notice WPML/locale fallback.
+ *
+ * @return string
+ */
+function intersoccer_pv_age_no_dob_notice_lang_code() {
+    $lang = apply_filters('wpml_current_language', null);
+    if (is_string($lang) && $lang !== '') {
+        return substr(strtolower($lang), 0, 2);
+    }
+    if (function_exists('determine_locale')) {
+        $locale = determine_locale();
+        if (is_string($locale) && $locale !== '') {
+            return substr(strtolower($locale), 0, 2);
+        }
+    }
+
+    return 'en';
+}
+
+/**
+ * Customer-facing add-to-cart / checkout notice when the assigned player has no valid DOB.
+ *
+ * @return string Plain text or HTML (anchor only) for wc_add_notice / WP_Error message.
+ */
+function intersoccer_pv_age_no_dob_error_message() {
+    $url = intersoccer_pv_manage_players_url();
+    if ($url === '') {
+        return __(
+            'The selected attendee needs a valid date of birth. Please update it in your account before booking.',
+            'intersoccer-product-variations'
+        );
+    }
+
+    $link = '<a href="' . esc_url($url) . '">' . esc_html($url) . '</a>';
+    $english_template = 'The selected attendee needs a valid date of birth. Update it under Manage Players: %s';
+    /* translators: %s: URL to Manage Players */
+    $template_string = __('The selected attendee needs a valid date of birth. Update it under Manage Players: %s', 'intersoccer-product-variations');
+    if ($template_string === $english_template) {
+        $lang_code = intersoccer_pv_age_no_dob_notice_lang_code();
+        if ($lang_code === 'fr') {
+            $template_string = 'Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants : %s';
+        } elseif ($lang_code === 'de') {
+            $template_string = 'Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforderlich. Bitte aktualisieren Sie es unter „Teilnehmer verwalten“: %s';
+        }
+    }
+    $template = esc_html($template_string);
+
+    return sprintf($template, $link);
+}
+
