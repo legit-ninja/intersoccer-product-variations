@@ -27,14 +27,14 @@ if ! command -v msgfmt &> /dev/null; then
     exit 1
 fi
 
-# Check if languages directory exists
-if [ ! -d "languages" ]; then
-    echo -e "${YELLOW}⚠️  No languages directory found${NC}"
+# Check if lang directory exists
+if [ ! -d "lang" ]; then
+    echo -e "${YELLOW}⚠️  No lang directory found${NC}"
     echo "Nothing to compile."
     exit 0
 fi
 
-cd languages
+cd lang
 
 # Count .po files
 PO_COUNT=$(ls -1 *.po 2>/dev/null | wc -l)
@@ -50,12 +50,12 @@ echo ""
 COMPILED=0
 ERRORS=0
 
-# Compile each .po file
+# Compile each .po file (and locale-specific .mo copies WordPress loads)
 for po_file in *.po; do
     mo_file="${po_file%.po}.mo"
-    
+
     echo -n "Compiling $po_file → $mo_file ... "
-    
+
     if msgfmt -o "$mo_file" "$po_file" 2>/dev/null; then
         echo -e "${GREEN}✓${NC}"
         COMPILED=$((COMPILED + 1))
@@ -64,7 +64,35 @@ for po_file in *.po; do
         echo "  Error compiling $po_file"
         msgfmt -o "$mo_file" "$po_file"  # Show error
         ERRORS=$((ERRORS + 1))
+        continue
     fi
+
+    case "$po_file" in
+        *-de.po)
+            locale_mo="${po_file%.po}_DE.mo"
+            echo -n "Compiling $po_file → $(basename "$locale_mo") ... "
+            if msgfmt -o "$locale_mo" "$po_file" 2>/dev/null; then
+                echo -e "${GREEN}✓${NC}"
+                COMPILED=$((COMPILED + 1))
+            else
+                echo -e "${RED}✗ FAILED${NC}"
+                msgfmt -o "$locale_mo" "$po_file"
+                ERRORS=$((ERRORS + 1))
+            fi
+            ;;
+        *-fr.po)
+            locale_mo="${po_file%.po}_FR.mo"
+            echo -n "Compiling $po_file → $(basename "$locale_mo") ... "
+            if msgfmt -o "$locale_mo" "$po_file" 2>/dev/null; then
+                echo -e "${GREEN}✓${NC}"
+                COMPILED=$((COMPILED + 1))
+            else
+                echo -e "${RED}✗ FAILED${NC}"
+                msgfmt -o "$locale_mo" "$po_file"
+                ERRORS=$((ERRORS + 1))
+            fi
+            ;;
+    esac
 done
 
 echo ""
@@ -86,4 +114,3 @@ else
     echo "Fix the .po file syntax errors and try again."
     exit 1
 fi
-
