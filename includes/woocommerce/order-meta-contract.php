@@ -1652,6 +1652,41 @@ function intersoccer_privacy_redaction_string_i18n_map() {
 }
 
 /**
+ * Fingerprint of privacy redaction msgids and FR/DE seed map (gates WPML seeding).
+ *
+ * @return string
+ */
+function intersoccer_pv_privacy_redaction_strings_seed_fingerprint() {
+    $payload = [
+        'msgids' => intersoccer_privacy_redaction_string_msgids(),
+        'map' => intersoccer_privacy_redaction_string_i18n_map(),
+    ];
+    $json = function_exists('wp_json_encode') ? wp_json_encode($payload) : json_encode($payload);
+
+    return hash('sha256', (string) $json);
+}
+
+/**
+ * Whether a WPML string translation row should be seeded from the static map.
+ *
+ * @param array<string,mixed> $lang_row        Existing translation row for one language.
+ * @param int                 $complete_status ICL_TM_COMPLETE (or 10).
+ * @return bool
+ */
+function intersoccer_pv_privacy_redaction_translation_needs_seed(array $lang_row, $complete_status) {
+    if ($lang_row === []) {
+        return true;
+    }
+    $value = isset($lang_row['value']) ? (string) $lang_row['value'] : '';
+    if ($value === '' || $value === '10') {
+        return true;
+    }
+    $status = isset($lang_row['status']) ? (int) $lang_row['status'] : 0;
+
+    return $status !== (int) $complete_status;
+}
+
+/**
  * Register privacy redaction strings with WPML and seed FR/DE translations from the .po map.
  *
  * @return void
@@ -1661,20 +1696,54 @@ function intersoccer_register_privacy_redaction_wpml_strings() {
         return;
     }
 
+    $fingerprint = intersoccer_pv_privacy_redaction_strings_seed_fingerprint();
+    $stored = get_option('intersoccer_pv_privacy_strings_seed', '');
+    if (is_string($stored) && $stored === $fingerprint) {
+        return;
+    }
+
     $map = intersoccer_privacy_redaction_string_i18n_map();
+    $status = defined('ICL_TM_COMPLETE') ? (int) ICL_TM_COMPLETE : 10;
+    $can_read_existing = function_exists('icl_get_string_translations_by_id');
+    $can_seed_translations = function_exists('icl_get_string_id') && function_exists('icl_add_string_translation');
+    $complete = $can_seed_translations;
+
     foreach (intersoccer_privacy_redaction_string_msgids() as $msgid) {
         icl_register_string('intersoccer-product-variations', $msgid, $msgid);
-        if (!function_exists('icl_get_string_id') || !function_exists('icl_add_string_translation')) {
+        if (!$can_seed_translations) {
             continue;
         }
         $string_id = icl_get_string_id($msgid, 'intersoccer-product-variations');
         if (!$string_id) {
+            $complete = false;
             continue;
         }
-        $status = defined('ICL_TM_COMPLETE') ? ICL_TM_COMPLETE : 10;
-        foreach ($map[$msgid] ?? [] as $lang => $translation) {
-            icl_add_string_translation($string_id, $lang, $status, $translation);
+        $existing_by_lang = [];
+        if ($can_read_existing) {
+            $raw = icl_get_string_translations_by_id($string_id);
+            if (is_array($raw)) {
+                foreach ($map[$msgid] ?? [] as $lang => $_translation) {
+                    if (isset($raw[$lang]) && is_array($raw[$lang])) {
+                        $existing_by_lang[$lang] = $raw[$lang];
+                    } elseif (isset($raw['translations'][$lang]) && is_array($raw['translations'][$lang])) {
+                        $existing_by_lang[$lang] = $raw['translations'][$lang];
+                    }
+                }
+            }
         }
+        foreach ($map[$msgid] ?? [] as $lang => $translation) {
+            if ($can_read_existing) {
+                $row = $existing_by_lang[$lang] ?? [];
+                if (!intersoccer_pv_privacy_redaction_translation_needs_seed($row, $status)) {
+                    continue;
+                }
+            }
+            icl_add_string_translation($string_id, $lang, $translation, $status);
+        }
+    }
+
+    if ($complete) {
+        update_option('intersoccer_pv_privacy_strings_seed', $fingerprint, false);
     }
 }
 
