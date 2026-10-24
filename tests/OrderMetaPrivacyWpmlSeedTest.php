@@ -41,6 +41,9 @@ if (!function_exists('icl_get_string_id')) {
     function icl_get_string_id($name, $context) {
         static $ids = [];
         $key = $context . "\0" . $name;
+        if (isset($GLOBALS['intersoccer_test_wpml_privacy_get_string_id_overrides'][$key])) {
+            return $GLOBALS['intersoccer_test_wpml_privacy_get_string_id_overrides'][$key];
+        }
         if (!isset($ids[$key])) {
             $ids[$key] = count($ids) + 1;
         }
@@ -53,6 +56,16 @@ if (!function_exists('icl_add_string_translation')) {
         $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation'][] = [
             'string_id' => $string_id,
             'language' => $language,
+            'value' => $value,
+            'status' => $status,
+        ];
+        if (!isset($GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id'])) {
+            $GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id'] = [];
+        }
+        if (!isset($GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id'][$string_id])) {
+            $GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id'][$string_id] = [];
+        }
+        $GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id'][$string_id][$language] = [
             'value' => $value,
             'status' => $status,
         ];
@@ -76,6 +89,7 @@ class OrderMetaPrivacyWpmlSeedTest extends TestCase {
         intersoccer_test_wpml_privacy_seed_reset_recorder();
         $GLOBALS['intersoccer_test_options'] = [];
         unset($GLOBALS['intersoccer_test_wpml_privacy_string_translations_by_id']);
+        unset($GLOBALS['intersoccer_test_wpml_privacy_get_string_id_overrides']);
     }
 
     private function expected_map(): array {
@@ -180,5 +194,59 @@ class OrderMetaPrivacyWpmlSeedTest extends TestCase {
 
         $this->assertCount(6, $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation']);
         $this->assertSame($this->seed_fingerprint(), get_option('intersoccer_pv_privacy_strings_seed'));
+    }
+
+    public function test_missing_string_id_skips_seed_option_until_all_ids_available(): void {
+        $context = 'intersoccer-product-variations';
+        $missing_msgid = 'Birth year: %s';
+        $missing_key = $context . "\0" . $missing_msgid;
+        $GLOBALS['intersoccer_test_wpml_privacy_get_string_id_overrides'] = [
+            $missing_key => 0,
+        ];
+
+        intersoccer_register_privacy_redaction_wpml_strings();
+
+        $this->assertFalse(array_key_exists('intersoccer_pv_privacy_strings_seed', $GLOBALS['intersoccer_test_options'] ?? []));
+        $calls = $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation'];
+        $this->assertCount(4, $calls);
+        foreach ($calls as $row) {
+            $this->assertNotSame(0, (int) $row['string_id']);
+        }
+        $birth_year_writes = array_values(array_filter(
+            $calls,
+            static fn(array $row): bool => (int) $row['string_id'] === 3
+        ));
+        $this->assertSame([], $birth_year_writes);
+
+        unset($GLOBALS['intersoccer_test_wpml_privacy_get_string_id_overrides']);
+        intersoccer_test_wpml_privacy_seed_reset_recorder();
+
+        intersoccer_register_privacy_redaction_wpml_strings();
+
+        $this->assertSame($this->seed_fingerprint(), get_option('intersoccer_pv_privacy_strings_seed'));
+        $second_calls = $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation'];
+        $this->assertCount(2, $second_calls);
+        foreach ($second_calls as $row) {
+            $this->assertSame(3, (int) $row['string_id']);
+        }
+    }
+
+    public function test_complete_seed_option_saved_once_then_no_writes_or_option_updates(): void {
+        intersoccer_register_privacy_redaction_wpml_strings();
+
+        $this->assertSame($this->seed_fingerprint(), get_option('intersoccer_pv_privacy_strings_seed'));
+        $options_after_first = $GLOBALS['intersoccer_test_options'];
+
+        intersoccer_test_wpml_privacy_seed_reset_recorder();
+        intersoccer_register_privacy_redaction_wpml_strings();
+
+        $this->assertSame([], $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation']);
+        $this->assertSame($options_after_first, $GLOBALS['intersoccer_test_options']);
+
+        intersoccer_test_wpml_privacy_seed_reset_recorder();
+        intersoccer_register_privacy_redaction_wpml_strings();
+
+        $this->assertSame([], $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation']);
+        $this->assertSame($options_after_first, $GLOBALS['intersoccer_test_options']);
     }
 }

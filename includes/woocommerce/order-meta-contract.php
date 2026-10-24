@@ -1705,14 +1705,17 @@ function intersoccer_register_privacy_redaction_wpml_strings() {
     $map = intersoccer_privacy_redaction_string_i18n_map();
     $status = defined('ICL_TM_COMPLETE') ? (int) ICL_TM_COMPLETE : 10;
     $can_read_existing = function_exists('icl_get_string_translations_by_id');
+    $can_seed_translations = function_exists('icl_get_string_id') && function_exists('icl_add_string_translation');
+    $complete = $can_seed_translations;
 
     foreach (intersoccer_privacy_redaction_string_msgids() as $msgid) {
         icl_register_string('intersoccer-product-variations', $msgid, $msgid);
-        if (!function_exists('icl_get_string_id') || !function_exists('icl_add_string_translation')) {
+        if (!$can_seed_translations) {
             continue;
         }
         $string_id = icl_get_string_id($msgid, 'intersoccer-product-variations');
         if (!$string_id) {
+            $complete = false;
             continue;
         }
         $existing_by_lang = [];
@@ -1739,7 +1742,9 @@ function intersoccer_register_privacy_redaction_wpml_strings() {
         }
     }
 
-    update_option('intersoccer_pv_privacy_strings_seed', $fingerprint, false);
+    if ($complete) {
+        update_option('intersoccer_pv_privacy_strings_seed', $fingerprint, false);
+    }
 }
 
 add_action('init', 'intersoccer_register_privacy_redaction_wpml_strings', 20);
