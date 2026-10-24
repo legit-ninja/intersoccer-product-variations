@@ -55,11 +55,16 @@ class CartItemInfoNoteRecalcTest extends TestCase
     private const CAMP_PARENT = 71001;
     private const CAMP_VARIATION = 71002;
     private const COURSE_PARENT = 72001;
-    private const COURSE_VARIATION = 72002;
+    public const COURSE_VARIATION = 72002;
+    public const COURSE_VARIATION_TUE = 72003;
     private const SEASON_TERM = 88001;
     private const BASE_PRICE = 525.0;
+    private const COURSE_PRICE_LOW = 400.0;
+    private const COURSE_PRICE_HIGH = 600.0;
     private const SIBLING_RATE = 0.20;
+    private const SAME_SEASON_RATE = 0.50;
     private const MASTER_SIBLING_NOTE = '20% Camp Sibling Discount';
+    private const SAME_SEASON_DISCOUNT_NOTE = '50% Same Season Course Discount';
 
     protected function setUp(): void
     {
@@ -74,6 +79,7 @@ class CartItemInfoNoteRecalcTest extends TestCase
         );
         MockMetaData::$data = [];
         MockFilters::reset();
+        add_filter('woocommerce_get_cart_item_from_session', 'intersoccer_restore_cart_item_info_note_from_session', 10, 3);
 
         $GLOBALS['intersoccer_test_terms'] = [
             self::SEASON_TERM => [
@@ -96,49 +102,7 @@ class CartItemInfoNoteRecalcTest extends TestCase
         MockMetaData::$data[self::COURSE_VARIATION]['_course_holiday_dates'] = [];
 
         $GLOBALS['intersoccer_wc_get_product_callback'] = static function ($id) {
-            $id = (int) $id;
-            $parents = [
-                self::CAMP_VARIATION => self::CAMP_PARENT,
-                self::COURSE_VARIATION => self::COURSE_PARENT,
-            ];
-            $parent = $parents[$id] ?? 0;
-            return new class($id, $parent) {
-                private $id;
-                private $parent;
-                public function __construct($id, $parent)
-                {
-                    $this->id = $id;
-                    $this->parent = $parent;
-                }
-                public function get_id()
-                {
-                    return $this->id;
-                }
-                public function get_parent_id()
-                {
-                    return $this->parent;
-                }
-                public function get_price()
-                {
-                    return CartItemInfoNoteRecalcTest::BASE_PRICE;
-                }
-                public function get_attributes()
-                {
-                    return [];
-                }
-                public function get_attribute($n)
-                {
-                    return '';
-                }
-                public function is_type($t)
-                {
-                    return false;
-                }
-                public function get_name()
-                {
-                    return 'Fixture product';
-                }
-            };
+            return CartItemInfoNoteRecalcTest::fixtureProduct((int) $id);
         };
     }
 
@@ -196,15 +160,92 @@ class CartItemInfoNoteRecalcTest extends TestCase
 
     private function courseLine(string $key = 'line-course'): array
     {
+        return $this->courseLineWithVariation(self::COURSE_VARIATION, self::BASE_PRICE, $key);
+    }
+
+    private function courseLineWithVariation(int $variation_id, float $base_price, string $key = 'line-course'): array
+    {
         return [
             'product_id' => self::COURSE_PARENT,
-            'variation_id' => self::COURSE_VARIATION,
+            'variation_id' => $variation_id,
             'quantity' => 1,
             'assigned_player_id' => 'uuid-' . $key,
             'assigned_attendee' => 'Student',
-            'base_price' => self::BASE_PRICE,
-            'data' => $this->makePriceData(self::BASE_PRICE),
+            'base_price' => $base_price,
+            'data' => $this->makePriceData($base_price),
         ];
+    }
+
+    private static function fixtureProduct(int $id): object
+    {
+        $parents = [
+            self::CAMP_VARIATION => self::CAMP_PARENT,
+            self::COURSE_VARIATION => self::COURSE_PARENT,
+            self::COURSE_VARIATION_TUE => self::COURSE_PARENT,
+        ];
+        $prices = [
+            self::COURSE_VARIATION => self::BASE_PRICE,
+            self::COURSE_VARIATION_TUE => self::COURSE_PRICE_HIGH,
+        ];
+        $parent = $parents[$id] ?? 0;
+        $base_price = $prices[$id] ?? self::BASE_PRICE;
+
+        return new class($id, $parent, $base_price) {
+            private $id;
+            private $parent;
+            private $base_price;
+
+            public function __construct($id, $parent, $base_price)
+            {
+                $this->id = $id;
+                $this->parent = $parent;
+                $this->base_price = $base_price;
+            }
+
+            public function get_id()
+            {
+                return $this->id;
+            }
+
+            public function get_parent_id()
+            {
+                return $this->parent;
+            }
+
+            public function get_price()
+            {
+                return $this->base_price;
+            }
+
+            public function get_attributes()
+            {
+                return [];
+            }
+
+            public function get_attribute($n)
+            {
+                if ($n === 'pa_course-day' || $n === 'course-day') {
+                    if ($this->id === CartItemInfoNoteRecalcTest::COURSE_VARIATION) {
+                        return 'monday';
+                    }
+                    if ($this->id === CartItemInfoNoteRecalcTest::COURSE_VARIATION_TUE) {
+                        return 'tuesday';
+                    }
+                }
+
+                return '';
+            }
+
+            public function is_type($t)
+            {
+                return false;
+            }
+
+            public function get_name()
+            {
+                return 'Fixture product';
+            }
+        };
     }
 
     private function makeCart(array $lines): object
@@ -230,6 +271,13 @@ class CartItemInfoNoteRecalcTest extends TestCase
     {
         for ($i = 0; $i < $times; $i++) {
             intersoccer_apply_combo_discounts_to_items($cart);
+        }
+    }
+
+    private function runBeforeCalculateTotals(object $cart, int $times = 2): void
+    {
+        for ($i = 0; $i < $times; $i++) {
+            do_action('woocommerce_before_calculate_totals', $cart);
         }
     }
 
@@ -342,15 +390,87 @@ class CartItemInfoNoteRecalcTest extends TestCase
         $this->assertSame('1 Day(s) Selected', $cart->cart_contents['line-sibling']['intersoccer_info_note'] ?? '');
     }
 
-    public function testInfoNoteSurivesSessionStyleRoundTrip(): void
+    public function testSessionFilterBackfillsMissingInfoNoteWithoutTouchingPrices(): void
     {
+        $GLOBALS['intersoccer_test_product_type'] = 'camp';
         $line = $this->deriveItem($this->campLine(['Friday']), 'camp');
-        $this->assertSame('1 Day(s) Selected', $line['intersoccer_info_note'] ?? '');
+        unset($line['intersoccer_info_note']);
 
-        unset($line['intersoccer_info_note'], $line['discount_note']);
-        $restored = $this->deriveItem($line, 'camp');
+        $backfilled = apply_filters('woocommerce_get_cart_item_from_session', $line, $line, 'line-sess');
+        $this->assertSame('1 Day(s) Selected', $backfilled['intersoccer_info_note'] ?? '');
+        $this->assertEqualsWithDelta(self::BASE_PRICE, (float) $backfilled['base_price'], 0.001);
+        $this->assertEqualsWithDelta(self::BASE_PRICE, $backfilled['data']->get_price(), 0.001);
+        $this->assertSame('', $backfilled['discount_note'] ?? '');
 
-        $this->assertSame('1 Day(s) Selected', $restored['intersoccer_info_note'] ?? '');
+        $existing = $line;
+        $existing['intersoccer_info_note'] = 'Keep this note';
+        $existing['discount_note'] = '20% Camp Sibling Discount';
+        $existing['base_price'] = 111.0;
+        $existing['data']->set_price(222.0);
+
+        $preserved = apply_filters('woocommerce_get_cart_item_from_session', $existing, $existing, 'line-keep');
+        $this->assertSame('Keep this note', $preserved['intersoccer_info_note']);
+        $this->assertSame('20% Camp Sibling Discount', $preserved['discount_note']);
+        $this->assertEqualsWithDelta(111.0, (float) $preserved['base_price'], 0.001);
+        $this->assertEqualsWithDelta(222.0, $preserved['data']->get_price(), 0.001);
+    }
+
+    public function testCourseSameSeasonComboViaBeforeCalculateTotalsPreservesInfoNote(): void
+    {
+        $GLOBALS['intersoccer_test_product_type'] = 'course';
+        MockMetaData::$data[self::COURSE_VARIATION_TUE] = [
+            'attribute_pa_course-day' => 'tuesday',
+            '_course_start_date' => date('Y-m-d', strtotime('+4 weeks')),
+            '_course_total_weeks' => 10,
+            '_course_weekly_discount' => 0,
+            '_course_holiday_dates' => [],
+        ];
+
+        $child = 'uuid-same-season';
+        $line_mon = $this->deriveItem(
+            $this->courseLineWithVariation(self::COURSE_VARIATION, self::COURSE_PRICE_LOW, $child),
+            'course'
+        );
+        $line_tue = $this->deriveItem(
+            $this->courseLineWithVariation(self::COURSE_VARIATION_TUE, self::COURSE_PRICE_HIGH, $child),
+            'course'
+        );
+        $line_mon['assigned_attendee'] = 'Student';
+        $line_tue['assigned_attendee'] = 'Student';
+
+        $cart = $this->makeCart([
+            'line-mon' => $line_mon,
+            'line-tue' => $line_tue,
+        ]);
+        $this->runBeforeCalculateTotals($cart, 2);
+
+        $mon = $cart->cart_contents['line-mon'];
+        $tue = $cart->cart_contents['line-tue'];
+
+        $this->assertSame('', $mon['discount_note'] ?? '');
+        $this->assertEqualsWithDelta(self::COURSE_PRICE_LOW, $mon['data']->get_price(), 0.001);
+        $this->assertNotSame('', $mon['intersoccer_info_note'] ?? '');
+
+        $this->assertSame(self::SAME_SEASON_DISCOUNT_NOTE, $tue['discount_note']);
+        $this->assertEqualsWithDelta(
+            self::COURSE_PRICE_HIGH * (1 - self::SAME_SEASON_RATE),
+            $tue['data']->get_price(),
+            0.001
+        );
+        $this->assertEqualsWithDelta(
+            self::COURSE_PRICE_HIGH * self::SAME_SEASON_RATE,
+            (float) $tue['discount_amount'],
+            0.001
+        );
+        $this->assertNotSame('', $tue['intersoccer_info_note'] ?? '');
+
+        $frSameSeasonNote = $this->msgstrFromPo(
+            dirname(__DIR__) . '/lang/intersoccer-product-variations-fr.po',
+            '50% Same Season Course Discount'
+        );
+        $this->assertStringContainsString('même saison', $frSameSeasonNote);
+        $tue['discount_note'] = $frSameSeasonNote;
+        $this->assertContains($frSameSeasonNote, $this->displayValues($tue, 'course'));
     }
 
     public function testFrenchInfoAndSiblingDiscountNotes(): void

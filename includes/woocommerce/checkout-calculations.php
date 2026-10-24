@@ -346,7 +346,7 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
         }
 
         if (!empty($cart_item['intersoccer_info_note'])) {
-            $meta_output .= '<div class="intersoccer-checkout-meta intersoccer-info">' . esc_html($cart_item['intersoccer_info_note']) . '</div>';
+            $meta_output .= '<div class="intersoccer-checkout-meta intersoccer-info"><strong>' . esc_html__('Booking details', 'intersoccer-product-variations') . ':</strong> ' . esc_html($cart_item['intersoccer_info_note']) . '</div>';
         }
 
         // Discount Note

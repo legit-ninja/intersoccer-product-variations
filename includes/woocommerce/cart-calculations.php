@@ -595,6 +595,27 @@ function intersoccer_fix_validation_fail_redirect($referer) {
 }
 
 /**
+ * Camp day-count / course weeks-remaining note (not cleared by discount recalculation).
+ */
+function intersoccer_compute_cart_item_info_note(array $cart_item) {
+    $product_id = $cart_item['product_id'] ?? 0;
+    $variation_id = $cart_item['variation_id'] ?? 0;
+    $product_type = intersoccer_get_product_type($product_id);
+
+    if ($product_type === 'camp') {
+        return InterSoccer_Camp::calculate_discount_note($variation_id, $cart_item['camp_days'] ?? []);
+    }
+    if ($product_type === 'course') {
+        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+        $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+
+        return InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
+    }
+
+    return '';
+}
+
+/**
  * Add derived data to cart item
  */
 add_filter('woocommerce_add_cart_item', 'intersoccer_add_derived_cart_item_data', 10, 1);
@@ -610,13 +631,34 @@ function intersoccer_add_derived_cart_item_data($cart_item) {
     $cart_item['data']->set_price($calculated_price);
     $cart_item['base_price'] = $calculated_price;
 
-    if ($product_type === 'camp') {
-        $cart_item['intersoccer_info_note'] = InterSoccer_Camp::calculate_discount_note($variation_id, $cart_item['camp_days'] ?? []);
-    } elseif ($product_type === 'course') {
-        $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
-        $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
-        $cart_item['intersoccer_info_note'] = InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
-        $cart_item['remaining_sessions'] = $remaining_sessions;
+    if ($product_type === 'camp' || $product_type === 'course') {
+        $cart_item['intersoccer_info_note'] = intersoccer_compute_cart_item_info_note($cart_item);
+        if ($product_type === 'course') {
+            $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
+            $cart_item['remaining_sessions'] = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
+        }
+    }
+
+    return $cart_item;
+}
+
+/**
+ * Backfill info note when loading legacy session carts (pre-deploy had no intersoccer_info_note).
+ */
+add_filter('woocommerce_get_cart_item_from_session', 'intersoccer_restore_cart_item_info_note_from_session', 10, 3);
+function intersoccer_restore_cart_item_info_note_from_session($cart_item, $values, $cart_item_key) {
+    if (!empty($cart_item['intersoccer_info_note'])) {
+        return $cart_item;
+    }
+
+    $product_type = intersoccer_get_product_type($cart_item['product_id'] ?? 0);
+    if ($product_type !== 'camp' && $product_type !== 'course') {
+        return $cart_item;
+    }
+
+    $note = intersoccer_compute_cart_item_info_note($cart_item);
+    if ($note !== '') {
+        $cart_item['intersoccer_info_note'] = $note;
     }
 
     return $cart_item;
@@ -653,7 +695,7 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
         if (!empty($cart_item['intersoccer_info_note'])) {
             $info_note = $cart_item['intersoccer_info_note'];
             $item_data[] = [
-                'key' => '',
+                'key' => __('Booking details', 'intersoccer-product-variations'),
                 'value' => esc_html($info_note),
                 'display' => '<span class="intersoccer-cart-meta intersoccer-info">' . esc_html($info_note) . '</span>',
             ];

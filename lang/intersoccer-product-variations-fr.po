@@ -695,6 +695,9 @@ msgstr "Jours sélectionnés"
 msgid "Assigned Attendee"
 msgstr "Participant assigné"
 
+msgid "Booking details"
+msgstr "Détails de la réservation"
+
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
 msgstr "Remise de 50% pour cours même saison"
