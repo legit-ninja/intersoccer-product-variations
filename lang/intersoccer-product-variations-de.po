@@ -500,11 +500,11 @@ msgstr ""
 
 # wpml-name: 3b8dae5b06af017dfd637787d41deb39
 msgid "Discounts Applied"
-msgstr ""
+msgstr "Angewendete Rabatte"
 
 # wpml-name: 559239d226fc41ded4a63d71b9aa0993
 msgid "Discount Information"
-msgstr ""
+msgstr "Rabattinformationen"
 
 # wpml-name: c2e0383f6afcd9efdd1293ae9f01ac89
 msgid "50%% Same Season Course Discount (Child %d, %s)"
