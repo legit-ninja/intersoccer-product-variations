@@ -424,12 +424,12 @@ function intersoccer_validate_line_player_girls_only($user_id, $player_index, $p
     $gender_raw = isset($player['gender']) ? trim((string) $player['gender']) : '';
 
     if ($gender_raw === '') {
-        $manage = function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('manage-players') : '';
+        $manage = function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '';
         $msg = $manage
             ? sprintf(
                 /* translators: %s: URL to Manage Players */
                 __('This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s', 'intersoccer-product-variations'),
-                $manage
+                esc_url($manage)
             )
             : __('This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking.', 'intersoccer-product-variations');
         return new WP_Error('intersoccer_girls_only_gender_required', $msg);
