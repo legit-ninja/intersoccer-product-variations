@@ -806,10 +806,6 @@ msgstr "ID de produit invalide."
 #~ "Veuillez sélectionner au moins un jour pour la récupération tardive "
 #~ "lorsque vous choisissez Jour(s) unique(s)."
 
-# wpml-name: 0e2bee26cc1140f922ba50c40e6b6473
-#~ msgid "Late Pickup"
-#~ msgstr "Récupération tardive"
-
 # wpml-name: 585f617ecc56b8abba20acfb2e53ce81
 #~ msgid "The number of selected days must match the quantity."
 #~ msgstr "Le nombre de jours sélectionnés doit correspondre à la quantité."
@@ -825,10 +821,6 @@ msgstr "ID de produit invalide."
 # wpml-name: 50c76258af04f26fec99b2c7dc8ffd9b
 #~ msgid "Late Pick Up Settings"
 #~ msgstr "Paramètres de récupération tardive"
-
-# wpml-name: 104d9898c04874d0fbac36e125fa1369
-#~ msgid "Discount"
-#~ msgstr "Remise"
 
 # wpml-name: Loading players...
 msgid "Loading players..."
@@ -989,6 +981,9 @@ msgstr "Anniversaire"
 msgid "Camp Terms"
 msgstr "Semaine de camp"
 
+msgid "Discount"
+msgstr "Remise"
+
 msgid "Female"
 msgstr "Fille"
 
@@ -997,6 +992,9 @@ msgstr "Trimestre complet"
 
 msgid "Girls Only"
 msgstr "Filles uniquement"
+
+msgid "Late Pickup"
+msgstr "Récupération tardive"
 
 msgid "Male"
 msgstr "Garçon"
