@@ -167,27 +167,7 @@ function intersoccer_attr_validate_product_on_save($product) {
     }
 
     $missing_parent = intersoccer_attr_missing_required_parent_facets_from_product($product, $product_type);
-    $wants_publish = ($product->get_status() === 'publish');
-    if ($wants_publish && (!empty($missing_parent) || !empty($shape_errors))) {
-        $product->set_status('draft');
-        $parts = [];
-        if (!empty($missing_parent)) {
-            $parts[] = sprintf(
-                /* translators: %s: comma-separated attribute taxonomies */
-                __('Missing required parent attributes: %s.', 'intersoccer-product-variations'),
-                implode(', ', $missing_parent)
-            );
-        }
-        if (!empty($shape_errors)) {
-            $parts[] = __('Assigned terms violate the taxonomy standard.', 'intersoccer-product-variations');
-        }
-        add_settings_error(
-            'intersoccer_attr_enforcement',
-            'intersoccer_attr_publish_blocked_' . $product_id,
-            __('Publish blocked.', 'intersoccer-product-variations') . ' ' . implode(' ', $parts),
-            'error'
-        );
-    }
+    intersoccer_attr_apply_publish_block($product, $missing_parent, $shape_errors);
 
     if (in_array($product_type, ['camp', 'course'], true)) {
         intersoccer_attr_recommend_girls_only_attribute($product, $product_type);
@@ -270,6 +250,156 @@ function intersoccer_attr_enforcement_drift_notice() {
         'intersoccer-product-variations'
     );
     echo '</p></div>';
+}
+
+/**
+ * Force Draft and persist a staff-visible reason when publish is blocked.
+ *
+ * @param WC_Product           $product        Product being saved.
+ * @param array<int,string>    $missing_parent Missing required parent taxonomies.
+ * @param array<int,string>    $shape_errors   Term-shape violation messages.
+ * @return bool True when the product was forced back to draft.
+ */
+function intersoccer_attr_apply_publish_block($product, array $missing_parent, array $shape_errors) {
+    if (!is_object($product) || !method_exists($product, 'get_status') || !method_exists($product, 'set_status')) {
+        return false;
+    }
+    if ($product->get_status() !== 'publish') {
+        return false;
+    }
+    if (empty($missing_parent) && empty($shape_errors)) {
+        return false;
+    }
+
+    $product->set_status('draft');
+
+    $product_id = method_exists($product, 'get_id') ? (int) $product->get_id() : 0;
+    $parts = [];
+    if (!empty($missing_parent)) {
+        $parts[] = sprintf(
+            /* translators: %s: comma-separated attribute taxonomies */
+            __('Missing required parent attributes: %s.', 'intersoccer-product-variations'),
+            implode(', ', $missing_parent)
+        );
+    }
+    if (!empty($shape_errors)) {
+        $parts[] = sprintf(
+            /* translators: %s: semicolon-separated term-shape errors */
+            __('Term-shape violations (taxonomy standard): %s', 'intersoccer-product-variations'),
+            implode('; ', $shape_errors)
+        );
+    }
+    $notice = __('Publish blocked.', 'intersoccer-product-variations') . ' ' . implode(' ', $parts);
+
+    if (function_exists('add_settings_error') && $product_id > 0) {
+        add_settings_error(
+            'intersoccer_attr_enforcement',
+            'intersoccer_attr_publish_blocked_' . $product_id,
+            $notice,
+            'error'
+        );
+    }
+    // settings_errors() does not survive the post-save redirect; persist for the next edit load.
+    intersoccer_attr_store_publish_block_notice($product_id, $notice);
+
+    return true;
+}
+
+/**
+ * Transient key for a publish-block notice (user + product scoped).
+ *
+ * @param int $product_id Product ID.
+ * @param int $user_id    Optional user ID; defaults to the current user.
+ * @return string
+ */
+function intersoccer_attr_publish_block_transient_key($product_id, $user_id = 0) {
+    $product_id = (int) $product_id;
+    $user_id = (int) $user_id;
+    if ($user_id <= 0 && function_exists('get_current_user_id')) {
+        $user_id = (int) get_current_user_id();
+    }
+    return 'intersoccer_attr_publish_block_' . $product_id . '_' . $user_id;
+}
+
+/**
+ * Persist a publish-block reason so it survives the post-save redirect.
+ *
+ * @param int    $product_id Product ID.
+ * @param string $message    Plain-text notice for staff.
+ * @return void
+ */
+function intersoccer_attr_store_publish_block_notice($product_id, $message) {
+    $product_id = (int) $product_id;
+    $message = trim((string) $message);
+    if ($product_id <= 0 || $message === '' || !function_exists('set_transient')) {
+        return;
+    }
+    $ttl = defined('MINUTE_IN_SECONDS') ? 15 * MINUTE_IN_SECONDS : 900;
+    set_transient(intersoccer_attr_publish_block_transient_key($product_id), $message, $ttl);
+}
+
+/**
+ * Read and clear a stored publish-block notice for the current user.
+ *
+ * @param int $product_id Product ID.
+ * @return string Empty when none is stored.
+ */
+function intersoccer_attr_consume_publish_block_notice($product_id) {
+    $product_id = (int) $product_id;
+    if ($product_id <= 0 || !function_exists('get_transient')) {
+        return '';
+    }
+    $key = intersoccer_attr_publish_block_transient_key($product_id);
+    $message = get_transient($key);
+    if ($message === false || $message === null || $message === '') {
+        return '';
+    }
+    if (function_exists('delete_transient')) {
+        delete_transient($key);
+    }
+    return (string) $message;
+}
+
+/**
+ * Show a stored publish-block reason on the product edit screen after redirect.
+ */
+add_action('admin_notices', 'intersoccer_attr_publish_block_admin_notice');
+function intersoccer_attr_publish_block_admin_notice() {
+    if (!function_exists('is_admin') || !is_admin() || !function_exists('get_current_screen')) {
+        return;
+    }
+
+    $screen = get_current_screen();
+    if (!$screen || ($screen->base ?? '') !== 'post' || ($screen->post_type ?? '') !== 'product') {
+        return;
+    }
+
+    $product_id = 0;
+    if (isset($_GET['post'])) {
+        $product_id = function_exists('absint')
+            ? absint(wp_unslash($_GET['post']))
+            : (int) $_GET['post'];
+    }
+    if ($product_id <= 0 && isset($GLOBALS['post']) && is_object($GLOBALS['post'])) {
+        $product_id = (int) ($GLOBALS['post']->ID ?? 0);
+    }
+    if ($product_id <= 0) {
+        return;
+    }
+
+    if (function_exists('current_user_can') && !current_user_can('edit_product', $product_id)) {
+        return;
+    }
+
+    $message = intersoccer_attr_consume_publish_block_notice($product_id);
+    if ($message === '') {
+        return;
+    }
+
+    printf(
+        '<div class="notice notice-error is-dismissible"><p>%s</p></div>',
+        esc_html($message)
+    );
 }
 
 /**
@@ -559,7 +689,13 @@ function intersoccer_attr_product_term_shape_violations($product) {
             $term_slug = is_object($term) ? (string) ($term->slug ?? '') : '';
             $result = intersoccer_attr_validate_new_term($taxonomy, $term_name, $term_slug);
             if (is_wp_error($result)) {
-                $violations[] = $taxonomy . ': ' . $result->get_error_message();
+                $term_label = $term_slug !== '' ? $term_slug : $term_name;
+                $violations[] = sprintf(
+                    '%s "%s": %s',
+                    $taxonomy,
+                    $term_label,
+                    $result->get_error_message()
+                );
             }
         }
     }
