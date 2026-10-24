@@ -15,7 +15,7 @@ if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
 
 const INTERSOCCER_PV_NO_DOB_MSGID = 'The selected attendee needs a valid date of birth. Update it under Manage Players: %s';
 
-const INTERSOCCER_PV_NO_DOB_MSGSTR_FR = 'Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants : %s';
+const INTERSOCCER_PV_NO_DOB_MSGSTR_FR = "Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants\u{00A0}: %s";
 
 const INTERSOCCER_PV_NO_DOB_MSGSTR_DE = 'Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforderlich. Bitte aktualisieren Sie es unter „Teilnehmer verwalten“: %s';
 
@@ -45,8 +45,11 @@ if (!function_exists('trailingslashit')) {
 if (!function_exists('wc_get_page_permalink')) {
     function wc_get_page_permalink($page) {
         global $intersoccer_test_myaccount_permalink;
-        if ($page === 'myaccount' && is_string($intersoccer_test_myaccount_permalink) && $intersoccer_test_myaccount_permalink !== '') {
-            return $intersoccer_test_myaccount_permalink;
+        if ($page === 'myaccount') {
+            if (is_string($intersoccer_test_myaccount_permalink)) {
+                return $intersoccer_test_myaccount_permalink;
+            }
+            return 'https://example.test/my-account/';
         }
         return 'https://example.test/my-account/';
     }

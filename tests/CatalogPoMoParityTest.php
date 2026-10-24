@@ -15,6 +15,7 @@ class CatalogPoMoParityTest extends TestCase {
 
         $entries = [];
         $state = null;
+        $msgctxt = '';
         $msgid = '';
         $msgid_plural = '';
         $msgstr = '';
@@ -22,16 +23,21 @@ class CatalogPoMoParityTest extends TestCase {
         $msgstr_plural = [];
         $fuzzy = false;
 
-        $flush = static function () use (&$entries, &$msgid, &$msgid_plural, &$msgstr, &$msgstr_plural, &$fuzzy): void {
+        $flush = static function () use (&$entries, &$msgctxt, &$msgid, &$msgid_plural, &$msgstr, &$msgstr_plural, &$fuzzy): void {
+            $lookup_id = $msgid;
+            if ($msgctxt !== '' && $lookup_id !== '') {
+                $lookup_id = $msgctxt . "\4" . $lookup_id;
+            }
             if ($msgid_plural !== '' && $msgid !== '' && $msgstr_plural !== [] && !$fuzzy) {
                 ksort($msgstr_plural);
                 $forms = array_values($msgstr_plural);
                 if ($forms !== [] && !in_array('', $forms, true)) {
-                    $entries[$msgid . "\0" . $msgid_plural] = implode("\0", $forms);
+                    $entries[$lookup_id . "\0" . $msgid_plural] = implode("\0", $forms);
                 }
             } elseif ($msgid !== '' && $msgstr !== '' && !$fuzzy) {
-                $entries[$msgid] = $msgstr;
+                $entries[$lookup_id] = $msgstr;
             }
+            $msgctxt = '';
             $msgid = '';
             $msgid_plural = '';
             $msgstr = '';
@@ -51,6 +57,16 @@ class CatalogPoMoParityTest extends TestCase {
                     $flush();
                     $state = null;
                 }
+                continue;
+            }
+
+            if (str_starts_with($line, 'msgctxt ')) {
+                if ($state === 'msgstr' && $msgid !== '') {
+                    $flush();
+                } elseif ($state === 'msgstr_plural' && $msgid !== '' && $msgid_plural !== '') {
+                    $flush();
+                }
+                $msgctxt = $this->po_parse_quoted($line, 'msgctxt');
                 continue;
             }
 
