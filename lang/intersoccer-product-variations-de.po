@@ -156,7 +156,7 @@ msgstr ""
 
 # wpml-name: 8e94739ec5562cbc3a903c0df96a4d6e
 msgid "Late Pick Up Options"
-msgstr ""
+msgstr "Optionen für späte Abholung"
 
 # wpml-name: 1226e88daa97ef3dea92bf96656b344a
 msgid "Add Holiday Date"
@@ -260,7 +260,7 @@ msgstr ""
 
 # wpml-name: 41de6d6cfb8953c021bbe4ba0701c8a1
 msgid "Messages"
-msgstr ""
+msgstr "Nachrichten"
 
 # wpml-name: Manage Discounts & Messages
 msgid "Manage Discounts & Messages"
@@ -381,11 +381,11 @@ msgstr ""
 
 # wpml-name: 9e2941b3c81256fac10392aaca4ccfde
 msgid "Condition"
-msgstr ""
+msgstr "Bedingung"
 
 # wpml-name: a1fa27779242b4902f7ae3bdd5c6d508
 msgid "Type"
-msgstr ""
+msgstr "Typ"
 
 # wpml-name: 49ee3087348e8d44e1feda1917443987
 msgid "Name"
@@ -613,11 +613,11 @@ msgstr ""
 
 # wpml-name: 96b0141273eabab320119c467cdcaf17
 msgid "Total"
-msgstr ""
+msgstr "Total"
 
 # wpml-name: 44749712dbec183e983dcd78a7736c41
 msgid "Date"
-msgstr ""
+msgstr "Datum"
 
 # wpml-name: ce26601dac0dea138b7295f02b7620a7
 msgid "Customer"
@@ -644,11 +644,11 @@ msgstr "Geburtstag"
 
 # wpml-name: 3730c9866421d81473613698c0c0ac4f
 msgid "Course"
-msgstr ""
+msgstr "Kurs"
 
 # wpml-name: a32c011e43f79a0b7b9337bc183c2dd1
 msgid "Camp"
-msgstr ""
+msgstr "Camp"
 
 #, fuzzy
 msgid "Sessions Remaining:"
@@ -660,15 +660,15 @@ msgstr ""
 
 # wpml-name: 1d53c54b671a42c3c108eb0147ebefd5
 msgid "Holidays"
-msgstr ""
+msgstr "Ferien"
 
 # wpml-name: 3c1429dca1ae285353b112dfacae5fe5
 msgid "End Date"
-msgstr ""
+msgstr "Enddatum"
 
 # wpml-name: db3794c7d704611ce61c9d8cc09cd806
 msgid "Start Date"
-msgstr ""
+msgstr "Startdatum"
 
 # wpml-name: eba2ff150cdb47711ad1bc51d19a795f
 msgid "Sessions Remaining"
@@ -797,3 +797,45 @@ msgstr "Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforde
 
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr "Die Buchungsdaten werden noch gespeichert. Bitte warten Sie einen Moment und versuchen Sie es dann erneut."
+
+msgid "Select Days"
+msgstr "Tage auswählen"
+
+msgid "Select late pick up option (optional)"
+msgstr "Wählen Sie eine Option für die Spätabholung (optional)"
+
+msgid "No Late Pickup"
+msgstr "Keine Spätabholung"
+
+msgid "Single Days"
+msgstr "Einzelne Tage"
+
+msgid "No late pick up selected"
+msgstr "Keine Spätabholung ausgewählt"
+
+msgid "Full Week (5 days): "
+msgstr "Ganze Woche (5 Tage): "
+
+msgid "Select at least one day"
+msgstr "Wählen Sie mindestens einen Tag"
+
+#, php-format
+msgid "%d day: "
+msgstr "%d Tag: "
+
+#, php-format
+msgid "%d days: "
+msgstr "%d Tage: "
+
+msgid "Invalid selection"
+msgstr "Ungültige Auswahl"
+
+msgid "Total Sessions"
+msgstr "Gesamtzahl Trainings"
+
+msgid "Holidays (No Session)"
+msgstr "Ferien (kein Training)"
+
+msgid "Remaining Sessions"
+msgstr "Verbleibende Trainings"
+

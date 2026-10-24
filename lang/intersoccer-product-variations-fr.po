@@ -757,8 +757,6 @@ msgstr "ID de produit invalide."
 #~ msgstr "Sauvegarder les modifications"
 
 # wpml-name: c96e5ac477f66073f9c5861a09294805
-#~ msgid "Select Days"
-#~ msgstr "Sélectionner les jours"
 
 # wpml-name: b1dea53c7166792e924e11ccd8b98417
 #~ msgid "Please select at least one order to update."
@@ -891,3 +889,57 @@ msgstr "Le participant sélectionné doit avoir une date de naissance valide. Me
 
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr "Les données de réservation sont encore en cours d'enregistrement. Veuillez patienter un instant, puis réessayez d'ajouter au panier."
+
+msgid "Select Days"
+msgstr "Sélectionner les jours"
+
+msgid "Select late pick up option (optional)"
+msgstr "Sélectionnez une option de récupération tardive (facultatif)"
+
+msgid "No Late Pickup"
+msgstr "Pas de récupération tardive"
+
+msgid "Single Days"
+msgstr "Jours isolés"
+
+msgid "No late pick up selected"
+msgstr "Aucune récupération tardive sélectionnée"
+
+msgid "Full Week (5 days): "
+msgstr "Semaine complète (5 jours) : "
+
+msgid "Select at least one day"
+msgstr "Sélectionnez au moins un jour"
+
+#, php-format
+msgid "%d day: "
+msgstr "%d jour : "
+
+#, php-format
+msgid "%d days: "
+msgstr "%d jours : "
+
+msgid "Invalid selection"
+msgstr "Sélection invalide"
+
+msgid "Total Sessions"
+msgstr "Nombre total de séances"
+
+msgid "Holidays (No Session)"
+msgstr "Jours fériés (pas de séance)"
+
+msgid "Please select an attendee."
+msgstr "Veuillez sélectionner un participant."
+
+msgid "Please select at least one day."
+msgstr "Veuillez sélectionner au moins un jour."
+
+msgid "Please resolve the error to continue."
+msgstr "Veuillez corriger l'erreur pour continuer."
+
+msgid "Request failed"
+msgstr "Échec de la requête"
+
+msgid "Remaining Sessions"
+msgstr "Séances restantes"
+

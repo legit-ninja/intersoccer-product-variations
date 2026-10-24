@@ -848,3 +848,62 @@ msgstr ""
 
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr ""
+
+# wpml-name: Select Days
+msgid "Select Days"
+msgstr ""
+
+# wpml-name: Select late pick up option (optional)
+msgid "Select late pick up option (optional)"
+msgstr ""
+
+# wpml-name: No Late Pickup
+msgid "No Late Pickup"
+msgstr ""
+
+# wpml-name: Single Days
+msgid "Single Days"
+msgstr ""
+
+# wpml-name: No late pick up selected
+msgid "No late pick up selected"
+msgstr ""
+
+# wpml-name: Full Week (5 days): 
+msgid "Full Week (5 days): "
+msgstr ""
+
+# wpml-name: Select at least one day
+msgid "Select at least one day"
+msgstr ""
+
+# wpml-name: %d day: 
+#, php-format
+msgid "%d day: "
+msgstr ""
+
+# wpml-name: %d days: 
+#, php-format
+msgid "%d days: "
+msgstr ""
+
+# wpml-name: Invalid selection
+msgid "Invalid selection"
+msgstr ""
+
+# wpml-name: Total Sessions
+msgid "Total Sessions"
+msgstr ""
+
+# wpml-name: Holidays (No Session)
+msgid "Holidays (No Session)"
+msgstr ""
+
+# wpml-name: Please select an attendee.
+msgid "Please select an attendee."
+msgstr ""
+
+
+msgid "Remaining Sessions"
+msgstr ""
+
