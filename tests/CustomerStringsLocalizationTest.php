@@ -3,6 +3,7 @@
  * FR/DE customer-facing PV strings: catalogs, helpers, localized Manage Players URLs.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 if (!defined('ABSPATH')) {
@@ -189,9 +190,7 @@ class CustomerStringsLocalizationTest extends TestCase {
         ];
     }
 
-    /**
-     * @dataProvider localeMoProvider
-     */
+    #[DataProvider('localeMoProvider')]
     public function test_required_msgids_present_in_mo_files(string $short, string $locale): void {
         foreach ([$short, $locale] as $fileLocale) {
             $mo = $this->readMo($fileLocale);
