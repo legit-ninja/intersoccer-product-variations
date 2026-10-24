@@ -201,8 +201,8 @@ function intersoccer_get_late_pickup_elementor_strings() {
         'noSelection' => __('No late pick up selected', 'intersoccer-product-variations'),
         'fullWeekFiveDays' => __('Full Week (5 days): ', 'intersoccer-product-variations'),
         'selectAtLeastOneDay' => __('Select at least one day', 'intersoccer-product-variations'),
-        'dayCountSingular' => __('%d day: ', 'intersoccer-product-variations'),
-        'dayCountPlural' => __('%d days: ', 'intersoccer-product-variations'),
+        'dayCountSingular' => _n('%d day: ', '%d days: ', 1, 'intersoccer-product-variations'),
+        'dayCountPlural' => _n('%d day: ', '%d days: ', 2, 'intersoccer-product-variations'),
         'invalidSelection' => __('Invalid selection', 'intersoccer-product-variations'),
     ];
 }

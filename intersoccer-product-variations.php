@@ -338,8 +338,8 @@ add_action('init', function () {
             'Full Week (5 days): ',
             'Select at least one day',
             '%d day: ',
-            '%d days: ',
             'Invalid selection',
+            '%1$s of %2$s',
             'Total Sessions',
             'Holidays (No Session)',
             'Remaining Sessions',
@@ -437,6 +437,8 @@ add_action('wp_enqueue_scripts', function () {
                     'end_date' => __('End Date', 'intersoccer-product-variations'),
                     'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
                     'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+                    /* translators: 1: remaining session count, 2: total session count */
+                    'remaining_sessions_of_total' => __('%1$s of %2$s', 'intersoccer-product-variations'),
                     'holidays' => __('Holidays', 'intersoccer-product-variations'),
                     'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
                     'player_assignment' => $player_assignment_strings,

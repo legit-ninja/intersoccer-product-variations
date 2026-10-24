@@ -913,11 +913,9 @@ msgstr "Sélectionnez au moins un jour"
 
 #, php-format
 msgid "%d day: "
-msgstr "%d jour : "
-
-#, php-format
-msgid "%d days: "
-msgstr "%d jours : "
+msgid_plural "%d days: "
+msgstr[0] "%d jour : "
+msgstr[1] "%d jours : "
 
 msgid "Invalid selection"
 msgstr "Sélection invalide"
@@ -926,7 +924,12 @@ msgid "Total Sessions"
 msgstr "Nombre total de séances"
 
 msgid "Holidays (No Session)"
-msgstr "Jours fériés (pas de séance)"
+msgstr "Vacances (pas de séance)"
+
+#. Translators: 1: remaining session count, 2: total session count.
+#, php-format
+msgid "%1$s of %2$s"
+msgstr "%1$s sur %2$s"
 
 msgid "Please select an attendee."
 msgstr "Veuillez sélectionner un participant."

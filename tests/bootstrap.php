@@ -120,6 +120,23 @@ if (!function_exists('__')) {
     }
 }
 
+if (!function_exists('_n')) {
+    function _n($single, $plural, $number, $domain = 'default') {
+        $index = (int) $number === 1 ? 0 : 1;
+        if (function_exists('translate')) {
+            $key = $single . "\0" . $plural;
+            $translated = translate($key, $domain);
+            if ($translated !== $key && str_contains($translated, "\0")) {
+                $parts = explode("\0", $translated);
+                if (isset($parts[$index])) {
+                    return $parts[$index];
+                }
+            }
+        }
+        return $index === 0 ? $single : $plural;
+    }
+}
+
 if (!function_exists('_e')) {
     function _e($text, $domain = 'default') {
         echo $text;

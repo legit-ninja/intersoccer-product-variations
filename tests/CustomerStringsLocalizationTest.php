@@ -94,8 +94,8 @@ class CustomerStringsLocalizationTest extends TestCase {
         'No late pick up selected',
         'Full Week (5 days): ',
         'Select at least one day',
-        '%d day: ',
-        '%d days: ',
+        "%d day: \0%d days: ",
+        '%1$s of %2$s',
         'Invalid selection',
         'Total Sessions',
         'Holidays (No Session)',
@@ -109,16 +109,15 @@ class CustomerStringsLocalizationTest extends TestCase {
         'Select Days' => 'Sélectionner les jours',
         'Please select an attendee.' => 'Veuillez sélectionner un participant.',
         'Select late pick up option (optional)' => 'Sélectionnez une option de récupération tardive (facultatif)',
-        '%d day: ' => '%d jour : ',
-        '%d days: ' => '%d jours : ',
+        'Holidays (No Session)' => 'Vacances (pas de séance)',
+        '%1$s of %2$s' => '%1$s sur %2$s',
     ];
 
     private const DE_EXPECTED = [
         'Select Days' => 'Tage auswählen',
         'Late Pick Up Options' => 'Optionen für späte Abholung',
         'Please select an attendee.' => 'Bitte wählen Sie einen Teilnehmer aus.',
-        '%d day: ' => '%d Tag: ',
-        '%d days: ' => '%d Tage: ',
+        '%1$s of %2$s' => '%1$s von %2$s',
     ];
 
     /** @var array<string,array<string,string>> */
@@ -212,9 +211,12 @@ class CustomerStringsLocalizationTest extends TestCase {
         $this->assertSame('Sélectionnez une option de récupération tardive (facultatif)', $late['selectOptional']);
         $this->assertSame('%d jour : ', $late['dayCountSingular']);
         $this->assertSame('%d jours : ', $late['dayCountPlural']);
+        $this->assertSame('%d jour : ', _n('%d day: ', '%d days: ', 1, 'intersoccer-product-variations'));
+        $this->assertSame('%d jours : ', _n('%d day: ', '%d days: ', 2, 'intersoccer-product-variations'));
         $course = intersoccer_get_course_display_strings();
         $this->assertSame('Date de début', $course['start_date']);
-        $this->assertSame('Jours fériés (pas de séance)', $course['holidays_no_session']);
+        $this->assertSame('Vacances (pas de séance)', $course['holidays_no_session']);
+        $this->assertSame('3 sur 10', sprintf(__('%1$s of %2$s', 'intersoccer-product-variations'), '3', '10'));
     }
 
     public function test_late_pickup_and_course_helpers_localized_de(): void {
@@ -223,9 +225,12 @@ class CustomerStringsLocalizationTest extends TestCase {
         $this->assertSame('Keine Spätabholung', $late['noLatePickup']);
         $this->assertSame('%d Tag: ', $late['dayCountSingular']);
         $this->assertSame('%d Tage: ', $late['dayCountPlural']);
+        $this->assertSame('%d Tag: ', _n('%d day: ', '%d days: ', 1, 'intersoccer-product-variations'));
+        $this->assertSame('%d Tage: ', _n('%d day: ', '%d days: ', 2, 'intersoccer-product-variations'));
         $course = intersoccer_get_course_display_strings();
         $this->assertSame('Startdatum', $course['start_date']);
         $this->assertSame('Ferien (kein Training)', $course['holidays_no_session']);
+        $this->assertSame('3 von 10', sprintf(__('%1$s of %2$s', 'intersoccer-product-variations'), '3', '10'));
     }
 
     public function test_player_assignment_strings_include_day_validation_fr_de(): void {

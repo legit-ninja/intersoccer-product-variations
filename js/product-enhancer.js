@@ -110,6 +110,12 @@
         }
         return fallback;
     };
+    const formatRemainingSessionsOfTotal = (remaining, total) => {
+        const template = checkoutI18n.remaining_sessions_of_total || '%1$s of %2$s';
+        return String(template)
+            .replace(/%1\$s/g, String(remaining))
+            .replace(/%2\$s/g, String(total));
+    };
 
     function intersoccerIsSingleDayBookingType(bt) {
         if (bt == null || bt === '') return false;
@@ -473,11 +479,10 @@
                 html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}:</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
-                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}:</strong> ${courseData.remaining_sessions}`;
-                if (courseData.total_sessions) {
-                    html += ` of ${courseData.total_sessions}`;
-                }
-                html += `</p>`;
+                const sessionsValue = courseData.total_sessions
+                    ? formatRemainingSessionsOfTotal(courseData.remaining_sessions, courseData.total_sessions)
+                    : String(courseData.remaining_sessions);
+                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}:</strong> ${sessionsValue}</p>`;
             }
             html += '</div>';
 

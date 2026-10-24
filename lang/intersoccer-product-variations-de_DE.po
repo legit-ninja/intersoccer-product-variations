@@ -821,11 +821,9 @@ msgstr "Wählen Sie mindestens einen Tag"
 
 #, php-format
 msgid "%d day: "
-msgstr "%d Tag: "
-
-#, php-format
-msgid "%d days: "
-msgstr "%d Tage: "
+msgid_plural "%d days: "
+msgstr[0] "%d Tag: "
+msgstr[1] "%d Tage: "
 
 msgid "Invalid selection"
 msgstr "Ungültige Auswahl"
@@ -835,6 +833,11 @@ msgstr "Gesamtzahl Trainings"
 
 msgid "Holidays (No Session)"
 msgstr "Ferien (kein Training)"
+
+#. Translators: 1: remaining session count, 2: total session count.
+#, php-format
+msgid "%1$s of %2$s"
+msgstr "%1$s von %2$s"
 
 msgid "Remaining Sessions"
 msgstr "Verbleibende Trainings"

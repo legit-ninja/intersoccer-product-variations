@@ -16,15 +16,26 @@ class CatalogPoMoParityTest extends TestCase {
         $entries = [];
         $state = null;
         $msgid = '';
+        $msgid_plural = '';
         $msgstr = '';
+        /** @var array<int,string> */
+        $msgstr_plural = [];
         $fuzzy = false;
 
-        $flush = static function () use (&$entries, &$msgid, &$msgstr, &$fuzzy): void {
-            if ($msgid !== '' && $msgstr !== '' && !$fuzzy) {
+        $flush = static function () use (&$entries, &$msgid, &$msgid_plural, &$msgstr, &$msgstr_plural, &$fuzzy): void {
+            if ($msgid_plural !== '' && $msgid !== '' && $msgstr_plural !== [] && !$fuzzy) {
+                ksort($msgstr_plural);
+                $forms = array_values($msgstr_plural);
+                if ($forms !== [] && !in_array('', $forms, true)) {
+                    $entries[$msgid . "\0" . $msgid_plural] = implode("\0", $forms);
+                }
+            } elseif ($msgid !== '' && $msgstr !== '' && !$fuzzy) {
                 $entries[$msgid] = $msgstr;
             }
             $msgid = '';
+            $msgid_plural = '';
             $msgstr = '';
+            $msgstr_plural = [];
             $fuzzy = false;
         };
 
@@ -36,6 +47,9 @@ class CatalogPoMoParityTest extends TestCase {
                 if ($state === 'msgstr' && $msgid !== '') {
                     $flush();
                     $state = null;
+                } elseif ($state === 'msgstr_plural' && $msgid !== '' && $msgid_plural !== '') {
+                    $flush();
+                    $state = null;
                 }
                 continue;
             }
@@ -43,10 +57,26 @@ class CatalogPoMoParityTest extends TestCase {
             if (str_starts_with($line, 'msgid ')) {
                 if ($state === 'msgstr' && $msgid !== '') {
                     $flush();
+                } elseif ($state === 'msgstr_plural' && $msgid !== '' && $msgid_plural !== '') {
+                    $flush();
                 }
                 $state = 'msgid';
                 $msgid = $this->po_parse_quoted($line);
+                $msgid_plural = '';
                 $msgstr = '';
+                $msgstr_plural = [];
+                continue;
+            }
+
+            if (str_starts_with($line, 'msgid_plural ')) {
+                $state = 'msgid_plural';
+                $msgid_plural = $this->po_parse_quoted($line, 'msgid_plural');
+                continue;
+            }
+
+            if (preg_match('/^msgstr\[(\d+)\]\s+/', $line, $index_match)) {
+                $state = 'msgstr_plural';
+                $msgstr_plural[(int) $index_match[1]] = $this->po_parse_quoted($line, 'msgstr');
                 continue;
             }
 
@@ -61,23 +91,42 @@ class CatalogPoMoParityTest extends TestCase {
                 continue;
             }
 
+            if ($state === 'msgid_plural' && str_starts_with($line, '"')) {
+                $msgid_plural .= $this->po_parse_quoted($line);
+                continue;
+            }
+
             if ($state === 'msgstr' && str_starts_with($line, '"')) {
                 $msgstr .= $this->po_parse_quoted($line);
+                continue;
+            }
+
+            if ($state === 'msgstr_plural' && str_starts_with($line, '"')) {
+                $last_index = array_key_last($msgstr_plural);
+                if ($last_index !== null) {
+                    $msgstr_plural[$last_index] .= $this->po_parse_quoted($line);
+                }
             }
         }
 
         if ($state === 'msgstr' && $msgid !== '') {
+            $flush();
+        } elseif ($state === 'msgstr_plural' && $msgid !== '' && $msgid_plural !== '') {
             $flush();
         }
 
         return $entries;
     }
 
-    private function po_parse_quoted(string $line): string {
-        if (!preg_match('/^msg(id|str)\s+(.+)$/', $line, $m)) {
-            $quoted = $line;
+    private function po_parse_quoted(string $line, string $prefix = 'msgid'): string {
+        if (!preg_match('/^' . $prefix . '(?:\[\d+\])?\s+(.+)$/', $line, $m)) {
+            if (!preg_match('/^msg(id|str)\s+(.+)$/', $line, $m)) {
+                $quoted = $line;
+            } else {
+                $quoted = $m[2];
+            }
         } else {
-            $quoted = $m[2];
+            $quoted = $m[1];
         }
         if (!preg_match('/^"((?:\\\\.|[^"\\\\])*)"/s', trim($quoted), $match)) {
             return '';

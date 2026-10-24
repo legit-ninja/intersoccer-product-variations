@@ -878,14 +878,12 @@ msgid "Select at least one day"
 msgstr ""
 
 # wpml-name: %d day: 
+#. Translators: %d is the day count for late pickup cost display.
 #, php-format
 msgid "%d day: "
-msgstr ""
-
-# wpml-name: %d days: 
-#, php-format
-msgid "%d days: "
-msgstr ""
+msgid_plural "%d days: "
+msgstr[0] ""
+msgstr[1] ""
 
 # wpml-name: Invalid selection
 msgid "Invalid selection"
@@ -897,6 +895,11 @@ msgstr ""
 
 # wpml-name: Holidays (No Session)
 msgid "Holidays (No Session)"
+msgstr ""
+
+#. Translators: 1: remaining session count, 2: total session count.
+#, php-format
+msgid "%1$s of %2$s"
 msgstr ""
 
 # wpml-name: Please select an attendee.
