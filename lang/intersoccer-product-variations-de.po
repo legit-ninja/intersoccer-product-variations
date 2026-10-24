@@ -156,7 +156,7 @@ msgstr ""
 
 # wpml-name: 8e94739ec5562cbc3a903c0df96a4d6e
 msgid "Late Pick Up Options"
-msgstr "Optionen für späte Abholung"
+msgstr "Optionen für Spätabholung"
 
 # wpml-name: 1226e88daa97ef3dea92bf96656b344a
 msgid "Add Holiday Date"
@@ -339,10 +339,10 @@ msgstr ""
 # wpml-name: c4716ed2f447aa22072d91c1acbe83e7
 #, fuzzy
 msgid "Late Pickup Cost:"
-msgstr "Kosten für späte Abholung: "
+msgstr "Kosten für Spätabholung: "
 
 msgid "Select Late Pickup Days"
-msgstr "Spätabholtage auswählen"
+msgstr "Spätabholung auswählen"
 
 msgid "Single Day"
 msgstr "Einzelner Tag"
@@ -796,7 +796,7 @@ msgid "The selected attendee needs a valid date of birth. Update it under Manage
 msgstr "Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforderlich. Bitte aktualisieren Sie es unter „Teilnehmer verwalten“: %s"
 
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
-msgstr "Die Buchungsdaten werden noch gespeichert. Bitte warten Sie einen Moment und versuchen Sie es dann erneut."
+msgstr "Die Buchungsdaten werden noch gespeichert. Bitte warten Sie einen Moment und legen Sie es dann erneut in den Warenkorb."
 
 msgid "Select Days"
 msgstr "Tage auswählen"
@@ -841,4 +841,17 @@ msgstr "%1$s von %2$s"
 
 msgid "Remaining Sessions"
 msgstr "Verbleibende Trainings"
+
+#. translators: label/value separator
+msgctxt "label/value separator"
+msgid ":"
+msgstr ":"
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr "Diese Veranstaltung ist nur für Mädchen. Für den ausgewählten Teilnehmer muss im Konto das Geschlecht „weiblich“ hinterlegt sein. Bitte aktualisieren Sie die Angaben unter „Teilnehmer verwalten“, bevor Sie buchen."
+
+#, php-format
+#. translators: %s: URL to Manage Players
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
+msgstr "Diese Veranstaltung ist nur für Mädchen. Für den ausgewählten Teilnehmer muss im Konto das Geschlecht „weiblich“ hinterlegt sein. Bitte aktualisieren Sie dies unter <a href=\"%s\">Teilnehmer verwalten</a>."
 
