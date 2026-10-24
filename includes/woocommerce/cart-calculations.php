@@ -611,11 +611,11 @@ function intersoccer_add_derived_cart_item_data($cart_item) {
     $cart_item['base_price'] = $calculated_price;
 
     if ($product_type === 'camp') {
-        $cart_item['discount_note'] = InterSoccer_Camp::calculate_discount_note($variation_id, $cart_item['camp_days'] ?? []);
+        $cart_item['intersoccer_info_note'] = InterSoccer_Camp::calculate_discount_note($variation_id, $cart_item['camp_days'] ?? []);
     } elseif ($product_type === 'course') {
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $remaining_sessions = InterSoccer_Course::calculate_remaining_sessions($variation_id, $total_weeks);
-        $cart_item['discount_note'] = InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
+        $cart_item['intersoccer_info_note'] = InterSoccer_Course::calculate_discount_note($variation_id, $remaining_sessions);
         $cart_item['remaining_sessions'] = $remaining_sessions;
     }
 
@@ -646,6 +646,16 @@ function intersoccer_display_cart_item_metadata($item_data, $cart_item) {
                 'key' => __('Days Selected', 'intersoccer-product-variations'),
                 'value' => implode(', ', $cart_item['camp_days']),
                 'display' => '<span class="intersoccer-cart-meta">' . esc_html(implode(', ', $cart_item['camp_days'])) . '</span>'
+            ];
+        }
+
+        // Camp day-count / course weeks-remaining (not cleared by discount recalculation).
+        if (!empty($cart_item['intersoccer_info_note'])) {
+            $info_note = $cart_item['intersoccer_info_note'];
+            $item_data[] = [
+                'key' => '',
+                'value' => esc_html($info_note),
+                'display' => '<span class="intersoccer-cart-meta intersoccer-info">' . esc_html($info_note) . '</span>',
             ];
         }
 
