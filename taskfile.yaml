@@ -8,26 +8,19 @@ tasks:
     preconditions:
       - test -f vendor/bin/phpunit || { echo "PHPUnit not installed. Run composer install."; exit 1; }
 
-  headers:
-    desc: Add/update PHP file headers (e.g., license)
-    cmds:
-      - php bin/update-headers.php
-    summary: |
-      Runs a custom script to ensure all PHP files have consistent headers.
-      Create bin/update-headers.php if not present (see setup notes).
-
   lint:
     desc: Lint PHP files for syntax errors
     cmds:
       - find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;
 
   build:
-    desc: Build plugin/theme zip for deployment
+    desc: Build plugin zip (runtime allowlist; matches deploy.sh)
     cmds:
-      - rm -f ../{{.REPO_NAME}}.zip
-      - zip -r ../{{.REPO_NAME}}.zip . -x "*.git*" "*Taskfile.yml" "*composer.*" "*vendor*" "*tests*" "*cypress*"
-    vars:
-      REPO_NAME: '{{.TASK}}'  # Replace with repo name, e.g., intersoccer-product-variations
+      - rm -f ../intersoccer-product-variations.zip
+      - >-
+        zip -r ../intersoccer-product-variations.zip
+        intersoccer-product-variations.php wpml-config.xml README.md
+        includes css js lang
 
   hooks:
     desc: Install Git pre-commit hook to run tests automatically
@@ -41,5 +34,5 @@ tasks:
       - chmod +x .git/hooks/pre-commit
 
   all:
-    desc: Run all checks (lint, headers, test)
-    deps: [lint, headers, test]
+    desc: Run all checks (lint, test)
+    deps: [lint, test]

@@ -93,7 +93,7 @@
 │  │    Location: ../intersoccer-ui-tests/                │  │
 │  │    • Wait 3 seconds for server to stabilize          │  │
 │  │    • Run Cypress tests against deployed site         │  │
-│  │    • Target: https://intersoccer.legit.ninja         │  │
+│  │    • Target: https://test-site.example         │  │
 │  │                                                       │  │
 │  │    If FAIL → ⚠️  WARNING (code already deployed)     │  │
 │  │    If PASS → ✅ Full deployment success              │  │
@@ -278,7 +278,7 @@ You may need to fix issues and redeploy.
 ### After Running `./deploy.sh`
 
 1. **✅ Verify Deployment**
-   - Visit: https://intersoccer.legit.ninja/shop/
+   - Visit: https://test-site.example/shop/
    - Hard refresh: Ctrl+Shift+R (or Cmd+Shift+R on Mac)
    - Test critical features
 
@@ -346,7 +346,7 @@ npm install
 # Cancel with Ctrl+C
 
 # Check SSH connection
-ssh -p 22 -i ~/.ssh/id_rsa user@intersoccer.legit.ninja
+ssh -p 22 -i ~/.ssh/id_rsa user@test-site.example
 
 # Try dry-run first
 ./deploy.sh --dry-run
@@ -387,7 +387,7 @@ $ ./deploy.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Configuration:
-  Server: user@intersoccer.legit.ninja
+  Server: user@test-site.example
   Path: /var/www/html/wp-content/plugins/intersoccer-product-variations
   SSH Port: 22
 
@@ -409,7 +409,7 @@ OK (9 tests, 45 assertions)
   Deploying to Server
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Target: user@intersoccer.legit.ninja:/var/www/html/...
+Target: user@test-site.example:/var/www/html/...
 Uploading files...
 
 sent 145.23K bytes  received 1.54K bytes  98.51K bytes/sec
@@ -421,11 +421,11 @@ total size is 1.23M  speedup is 8.39
   Deployment Complete
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Plugin successfully deployed to intersoccer.legit.ninja
+✓ Plugin successfully deployed to test-site.example
 
 Next steps:
   1. Clear browser cache and hard refresh (Ctrl+Shift+R)
-  2. Test the changes on: https://intersoccer.legit.ninja/shop/
+  2. Test the changes on: https://test-site.example/shop/
   3. Check browser console for any errors
 
 Tip: Run with --test flag to run Cypress E2E tests:
@@ -459,7 +459,7 @@ Waiting 3 seconds for server to stabilize...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Running tests from: ../intersoccer-ui-tests
-Target server: https://intersoccer.legit.ninja
+Target server: https://test-site.example
 
 Running:  camp-booking.cy.js                              (1 of 3)
   ✓ Should load camp product page (1234ms)
@@ -474,12 +474,12 @@ Running:  camp-booking.cy.js                              (1 of 3)
   Deployment Complete
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Plugin successfully deployed to intersoccer.legit.ninja
+✓ Plugin successfully deployed to test-site.example
 ✓ All Cypress E2E tests passed
 
 Next steps:
   1. Clear browser cache and hard refresh (Ctrl+Shift+R)
-  2. Test the changes on: https://intersoccer.legit.ninja/shop/
+  2. Test the changes on: https://test-site.example/shop/
   3. Check browser console for any errors
 ```
 

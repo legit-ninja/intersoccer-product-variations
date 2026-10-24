@@ -28,15 +28,17 @@ NC='\033[0m' # No Color
 # IMPORTANT: Copy this file to deploy.local.sh and set your credentials there
 # deploy.local.sh is in .gitignore and won't be committed
 
-# Default configuration (override in deploy.local.sh)
-SERVER_USER="your-username"
-SERVER_HOST="intersoccer.legit.ninja"
-SERVER_PATH="/path/to/wordpress/wp-content/plugins/intersoccer-product-variations"
+# Set in deploy.local.sh (see deploy.local.sh.example)
+SERVER_USER=""
+SERVER_HOST=""
+SERVER_PATH=""
+TEST_SITE_URL=""
 SSH_PORT="22"
 SSH_KEY="~/.ssh/id_rsa"
 
 # Load local configuration if it exists
 if [ -f "deploy.local.sh" ]; then
+    # shellcheck source=/dev/null
     source deploy.local.sh
     echo -e "${GREEN}✓ Loaded local configuration${NC}"
 fi
@@ -79,22 +81,39 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if configuration is set
-if [ "$SERVER_USER" = "your-username" ]; then
-    echo -e "${RED}✗ Configuration not set!${NC}"
-    echo ""
-    echo "Please create a deploy.local.sh file with your server credentials:"
-    echo ""
-    echo "cat > deploy.local.sh << 'EOF'"
-    echo "SERVER_USER=\"your-ssh-username\""
-    echo "SERVER_HOST=\"intersoccer.legit.ninja\""
-    echo "SERVER_PATH=\"/var/www/html/wp-content/plugins/intersoccer-product-variations\""
-    echo "SSH_PORT=\"22\""
-    echo "SSH_KEY=\"~/.ssh/id_rsa\""
-    echo "EOF"
-    echo ""
-    exit 1
-fi
+# Require deploy.local.sh variables (no hardcoded host defaults)
+validate_deploy_config() {
+    local config_ok=true
+
+    if [ -z "$SERVER_USER" ] || [ "$SERVER_USER" = "your-username" ] || [ "$SERVER_USER" = "your-ssh-username" ]; then
+        echo -e "${RED}✗ SERVER_USER is not set.${NC}"
+        config_ok=false
+    fi
+    if [ -z "$SERVER_HOST" ]; then
+        echo -e "${RED}✗ SERVER_HOST is not set.${NC}"
+        config_ok=false
+    fi
+    if [ -z "$SERVER_PATH" ] || [[ "$SERVER_PATH" == *"/path/to/"* ]]; then
+        echo -e "${RED}✗ SERVER_PATH is not set.${NC}"
+        config_ok=false
+    fi
+
+    if [ "$config_ok" = false ]; then
+        echo ""
+        echo "Copy deploy.local.sh.example to deploy.local.sh and set SERVER_USER, SERVER_HOST, and SERVER_PATH."
+        echo "Optional: TEST_SITE_URL (public site base URL; defaults to https://\${SERVER_HOST} if unset)."
+        exit 1
+    fi
+
+    if [ -z "$TEST_SITE_URL" ]; then
+        TEST_SITE_URL="https://${SERVER_HOST}"
+    fi
+
+    SSH_PORT="${SSH_PORT:-22}"
+    SSH_KEY="${SSH_KEY:-~/.ssh/id_rsa}"
+}
+
+validate_deploy_config
 
 ###############################################################################
 # Functions
@@ -127,6 +146,20 @@ run_phpunit_tests() {
     fi
 }
 
+# Rsync allowlist: runtime plugin files only (no deploy scripts, dev tree, or dotfiles).
+intersoccer_pv_deploy_rsync_filters() {
+    RSYNC_FILTERS=(
+        --include='/intersoccer-product-variations.php'
+        --include='/wpml-config.xml'
+        --include='/README.md'
+        --include='/includes/***'
+        --include='/css/***'
+        --include='/js/***'
+        --include='/lang/***'
+        --exclude='*'
+    )
+}
+
 run_cypress_tests() {
     print_header "Running Cypress E2E Tests"
     
@@ -143,7 +176,7 @@ run_cypress_tests() {
     fi
     
     echo "Running tests from: $CYPRESS_REPO"
-    echo "Target server: https://${SERVER_HOST}"
+    echo "Target server: ${TEST_SITE_URL}"
     echo ""
     
     # Change to Cypress repo directory
@@ -228,55 +261,22 @@ deploy_to_server() {
         echo ""
     fi
     
-    # Build rsync command WITHOUT --delete flag
-    # Using --delete is dangerous - could delete other plugins if path is wrong!
-    RSYNC_CMD="rsync -avz"
-    
-    # Add dry-run flag if requested
+    intersoccer_pv_deploy_rsync_filters
+
+    local -a rsync_args=(rsync -avz)
+
     if [ "$DRY_RUN" = true ]; then
-        RSYNC_CMD="$RSYNC_CMD --dry-run"
+        rsync_args+=(--dry-run)
         echo -e "${YELLOW}DRY RUN MODE - No files will be uploaded${NC}"
         echo ""
     fi
-    
-    # Add SSH options
-    RSYNC_CMD="$RSYNC_CMD -e 'ssh -p ${SSH_PORT} -i ${SSH_KEY}'"
-    
-    # Important: Include rules must come BEFORE exclude rules in rsync
-    # Include README.md before excluding other *.md files
-    RSYNC_CMD="$RSYNC_CMD --include='README.md'"
-    
-    # Exclude files/directories
-    RSYNC_CMD="$RSYNC_CMD \
-        --exclude='.git' \
-        --exclude='.gitignore' \
-        --exclude='node_modules' \
-        --exclude='vendor' \
-        --exclude='tests' \
-        --exclude='cypress' \
-        --exclude='docs' \
-        --exclude='.phpunit.result.cache' \
-        --exclude='composer.json' \
-        --exclude='composer.lock' \
-        --exclude='package.json' \
-        --exclude='package-lock.json' \
-        --exclude='phpunit.xml' \
-        --exclude='*.log' \
-        --exclude='debug.log' \
-        --exclude='*.sh' \
-        --exclude='*.md' \
-        --exclude='*.list' \
-        --exclude='run-*.php' \
-        --exclude='.DS_Store' \
-        --exclude='*.swp' \
-        --exclude='*~'"
-    
-    # Add source and destination
-    RSYNC_CMD="$RSYNC_CMD ./ ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/"
-    
-    # Execute rsync
+
+    rsync_args+=(-e "ssh -p ${SSH_PORT} -i ${SSH_KEY}")
+    rsync_args+=("${RSYNC_FILTERS[@]}")
+    rsync_args+=(./ "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/")
+
     echo "Uploading files..."
-    eval $RSYNC_CMD
+    "${rsync_args[@]}"
     
     if [ $? -eq 0 ]; then
         if [ "$DRY_RUN" = false ]; then
@@ -409,7 +409,7 @@ if [ "$DRY_RUN" = false ]; then
     echo ""
     echo "Next steps:"
     echo "  1. Clear browser cache and hard refresh (Ctrl+Shift+R)"
-    echo "  2. Test the changes on: https://${SERVER_HOST}/shop/"
+    echo "  2. Test the changes on: ${TEST_SITE_URL}/shop/"
     echo "  3. Check browser console for any errors"
     
     if [ "$RUN_CYPRESS_TESTS" = false ]; then

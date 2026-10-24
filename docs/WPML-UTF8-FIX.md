@@ -6,7 +6,7 @@
 
 ## Problem
 
-When activating the plugin on `staging.intersoccer.ch`, WPML encountered this error:
+When activating the plugin on `staging.example`, WPML encountered this error:
 
 ```
 We have detected a problem with some tables in the database. Please contact WPML support to get this fixed.

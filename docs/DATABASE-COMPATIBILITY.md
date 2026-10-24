@@ -170,7 +170,7 @@ Create this file in your plugin:
 
 environments:
   staging:
-    url: "staging.intersoccer.ch"
+    url: "staging.example"
     database:
       name: "staging_wp_db"
       prefix: "wp_1244388_"
@@ -193,7 +193,7 @@ environments:
       - Emojis OK in error_log() and console.log()
       
   production:
-    url: "intersoccer.legit.ninja"
+    url: "test-site.example"
     database:
       name: "production_wp_db"
       prefix: "wp_"

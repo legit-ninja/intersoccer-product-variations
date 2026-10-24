@@ -6,7 +6,7 @@
 
 environments:
   staging:
-    url: "staging.intersoccer.ch"
+    url: "staging.example"
     
     database:
       name: "staging_database"           # Update with actual name
@@ -42,7 +42,7 @@ environments:
       If it works on staging, it will work on production.
       
   production:
-    url: "intersoccer.legit.ninja"
+    url: "test-site.example"
     
     database:
       name: "production_database"        # Update with actual name
