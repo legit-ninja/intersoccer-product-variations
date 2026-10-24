@@ -321,6 +321,15 @@ class NoDobNoticeLocalizationTest extends TestCase {
         $this->assertSame('teilnehmer-verwalten', intersoccer_pv_manage_players_endpoint_slug());
     }
 
+    public function testHelpersPhpContainsLiteralNoDobGettextCall(): void {
+        $helpers = file_get_contents(dirname(__DIR__) . '/includes/helpers.php');
+        $this->assertNotFalse($helpers);
+        $this->assertStringContainsString(
+            "__('The selected attendee needs a valid date of birth. Update it under Manage Players: %s', 'intersoccer-product-variations')",
+            $helpers
+        );
+    }
+
     public function testPoFilesContainExactNoDobPairs(): void {
         $lang_dir = dirname(__DIR__) . '/lang/';
         $fr = file_get_contents($lang_dir . 'intersoccer-product-variations-fr.po');

@@ -806,7 +806,7 @@ function intersoccer_pv_age_no_dob_error_message() {
     $link = '<a href="' . esc_url($url) . '">' . esc_html($url) . '</a>';
     $english_template = 'The selected attendee needs a valid date of birth. Update it under Manage Players: %s';
     /* translators: %s: URL to Manage Players */
-    $template_string = __($english_template, 'intersoccer-product-variations');
+    $template_string = __('The selected attendee needs a valid date of birth. Update it under Manage Players: %s', 'intersoccer-product-variations');
     if ($template_string === $english_template) {
         $lang_code = intersoccer_pv_age_no_dob_notice_lang_code();
         if ($lang_code === 'fr') {
