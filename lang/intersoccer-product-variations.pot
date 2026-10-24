@@ -923,3 +923,83 @@ msgstr ""
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr ""
 
+msgid "%d%% Camp Week %d+ Discount"
+msgstr ""
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr ""
+
+msgid "%d%% Same Season Course Discount"
+msgstr ""
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr ""
+
+msgid "%s%% Camp Sibling Discount"
+msgstr ""
+
+msgid "%s%% Course Sibling Discount"
+msgstr ""
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr ""
+
+msgid "Autumn"
+msgstr ""
+
+msgid "Birthday Party"
+msgstr ""
+
+msgid "Camp Terms"
+msgstr ""
+
+msgid "Discount"
+msgstr ""
+
+msgid "Female"
+msgstr ""
+
+msgid "Full Term"
+msgstr ""
+
+msgid "Girls Only"
+msgstr ""
+
+msgid "Late Pickup"
+msgstr ""
+
+msgid "Male"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Single Day(s)"
+msgstr ""
+
+msgid "Spring"
+msgstr ""
+
+msgid "Summer"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
+msgid "Tournament"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Winter"
+msgstr ""
+
+msgid "j F Y"
+msgstr ""

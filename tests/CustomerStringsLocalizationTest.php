@@ -15,13 +15,6 @@ if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
     define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', dirname(__DIR__) . '/');
 }
 
-if (!function_exists('is_textdomain_loaded')) {
-    function is_textdomain_loaded($domain) {
-        global $intersoccer_pv_test_textdomain_loaded;
-        return !empty($intersoccer_pv_test_textdomain_loaded[$domain]);
-    }
-}
-
 if (!function_exists('translate')) {
     function translate($text, $domain = 'default') {
         global $intersoccer_pv_test_textdomain_strings;
