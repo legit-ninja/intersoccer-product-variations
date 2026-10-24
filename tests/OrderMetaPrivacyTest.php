@@ -76,18 +76,6 @@ if (!function_exists('has_action')) {
     }
 }
 
-if (!function_exists('unload_textdomain')) {
-    function unload_textdomain($domain) {
-        unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
-    }
-}
-
-if (!function_exists('load_plugin_textdomain')) {
-    function load_plugin_textdomain($domain, $deprecated, $path) {
-        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = true;
-    }
-}
-
 if (!function_exists('plugin_basename')) {
     function plugin_basename($file) {
         return 'intersoccer-product-variations/intersoccer-product-variations.php';

@@ -959,3 +959,77 @@ msgstr "Cette séance est réservée aux filles. Le participant sélectionné do
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr "Cette séance est réservée aux filles. Le participant sélectionné doit avoir le genre « femme » dans votre compte. Veuillez le mettre à jour dans <a href=\"%s\">Gérer les participants</a>."
 
+msgid "%d%% Camp Week %d+ Discount"
+msgstr "%d%% Réduction camp semaine %d+"
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr "%d%% Réduction camp semaine 2"
+
+msgid "%d%% Same Season Course Discount"
+msgstr "%d%% Réduction cours même saison"
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr "%d%% Réduction tournoi plusieurs jours"
+
+msgid "%s%% Camp Sibling Discount"
+msgstr "%s%% Réduction fratrie camp"
+
+msgid "%s%% Course Sibling Discount"
+msgstr "%s%% Réduction fratrie cours"
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr "%s%% Réduction fratrie tournoi"
+
+msgid "Autumn"
+msgstr "Automne"
+
+msgid "Birthday Party"
+msgstr "Anniversaire"
+
+msgid "Camp Terms"
+msgstr "Semaine de camp"
+
+msgid "Female"
+msgstr "Fille"
+
+msgid "Full Term"
+msgstr "Trimestre complet"
+
+msgid "Girls Only"
+msgstr "Filles uniquement"
+
+msgid "Male"
+msgstr "Garçon"
+
+msgid "Note"
+msgstr "Remarque"
+
+msgid "Other"
+msgstr "Autre"
+
+msgid "Saturday"
+msgstr "Samedi"
+
+msgid "Single Day(s)"
+msgstr "Jour(s) unique(s)"
+
+msgid "Spring"
+msgstr "Printemps"
+
+msgid "Summer"
+msgstr "Été"
+
+msgid "Sunday"
+msgstr "Dimanche"
+
+msgid "Tournament"
+msgstr "Tournoi"
+
+msgid "Unknown"
+msgstr "Inconnu"
+
+msgid "Winter"
+msgstr "Hiver"
+
+msgid "j F Y"
+msgstr "j F Y"

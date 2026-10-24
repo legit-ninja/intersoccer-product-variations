@@ -173,7 +173,6 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             }
             if (!empty($girls_values)) {
                 $label = intersoccer_attr_order_meta_label('girls-only');
-                $label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', $label, $label) : $label;
                 $attributes[$label] = implode(', ', array_unique($girls_values));
             }
             continue;
@@ -282,7 +281,9 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
             }
             // Use registered English label for translation if available
             $english_label = $label_map[$attribute_name] ?? $label;
-            $label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', $english_label, $english_label) : $english_label;
+            if ($english_label !== '') {
+                $label = $english_label;
+            }
             $attributes[$label] = $value;
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Including parent attribute: ' . $label . ' = ' . $value . ' (from: ' . $attribute_name . ')');
@@ -347,7 +348,10 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
 
         // Discount Note
         if (isset($cart_item['discount_note']) && !empty($cart_item['discount_note'])) {
-            $meta_output .= '<div class="intersoccer-checkout-meta intersoccer-discount"><strong>' . esc_html__('Discount', 'intersoccer-product-variations') . ':</strong> ' . esc_html($cart_item['discount_note']) . '</div>';
+            $discount_display = function_exists('intersoccer_translate_stored_discount_label_for_display')
+                ? intersoccer_translate_stored_discount_label_for_display($cart_item['discount_note'])
+                : $cart_item['discount_note'];
+            $meta_output .= '<div class="intersoccer-checkout-meta intersoccer-discount"><strong>' . esc_html__('Discount', 'intersoccer-product-variations') . ':</strong> ' . esc_html($discount_display) . '</div>';
         }
 
         if ($meta_output) {

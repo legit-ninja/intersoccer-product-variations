@@ -136,6 +136,75 @@ function intersoccer_get_multilingual_plugin() {
 }
 
 /**
+ * English gender label for PV admin UI (does not use player-management gettext).
+ *
+ * @param string $raw_gender Stored or profile gender value.
+ * @return string
+ */
+function intersoccer_pv_admin_format_player_gender_label($raw_gender) {
+    $trim = trim((string) $raw_gender);
+    if ($trim === '') {
+        return '';
+    }
+
+    if (function_exists('intersoccer_normalize_player_gender_bucket')) {
+        $bucket = intersoccer_normalize_player_gender_bucket($trim);
+        if ($bucket === 'male') {
+            return 'Male';
+        }
+        if ($bucket === 'female') {
+            return 'Female';
+        }
+        if ($bucket === 'other') {
+            return 'Other';
+        }
+    }
+
+    if (in_array($trim, ['Male', 'Female', 'Other'], true)) {
+        return $trim;
+    }
+
+    return $trim;
+}
+
+/**
+ * Customer-facing gender label from stored/profile values (PV text domain).
+ *
+ * @param string $raw_gender Stored or profile gender value.
+ * @return string
+ */
+function intersoccer_pv_format_stored_gender_for_display($raw_gender) {
+    if (function_exists('intersoccer_pv_is_admin_english_context') && intersoccer_pv_is_admin_english_context()) {
+        return intersoccer_pv_admin_format_player_gender_label($raw_gender);
+    }
+
+    $trim = trim((string) $raw_gender);
+    if ($trim === '') {
+        return '';
+    }
+
+    $bucket = function_exists('intersoccer_normalize_player_gender_bucket')
+        ? intersoccer_normalize_player_gender_bucket($trim)
+        : '';
+
+    if ($bucket === 'male') {
+        return __('Male', 'intersoccer-product-variations');
+    }
+    if ($bucket === 'female') {
+        return __('Female', 'intersoccer-product-variations');
+    }
+    if ($bucket === 'other') {
+        return __('Other', 'intersoccer-product-variations');
+    }
+
+    if (in_array($trim, ['Male', 'Female', 'Other'], true)) {
+        return __($trim, 'intersoccer-product-variations');
+    }
+
+    return $trim;
+}
+
+/**
  * Get localized strings for the player assignment workflow.
  *
  * @param array $args Optional overrides for URLs used in the generated strings.
