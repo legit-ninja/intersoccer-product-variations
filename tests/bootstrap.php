@@ -113,7 +113,103 @@ if (!function_exists('esc_attr')) {
 
 if (!function_exists('__')) {
     function __($text, $domain = 'default') {
-        return $text;
+        $translation = $text;
+        if (class_exists('MockFilters') && isset(MockFilters::$filters['gettext_' . $domain])) {
+            return call_user_func(MockFilters::$filters['gettext_' . $domain], $translation, $text, $domain);
+        }
+        if (function_exists('translate')) {
+            return translate($text, $domain);
+        }
+        return $translation;
+    }
+}
+
+if (!function_exists('is_textdomain_loaded')) {
+    function is_textdomain_loaded($domain) {
+        global $intersoccer_pv_test_textdomain_loaded;
+        return !empty($intersoccer_pv_test_textdomain_loaded[$domain])
+            || !empty($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+    }
+}
+
+if (!function_exists('unload_textdomain')) {
+    function unload_textdomain($domain, $reloadable = false) {
+        $GLOBALS['intersoccer_test_textdomain_unload_reloadable'][$domain] = (bool) $reloadable;
+        unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+        global $intersoccer_pv_test_textdomain_loaded;
+        unset($intersoccer_pv_test_textdomain_loaded[$domain]);
+    }
+}
+
+if (!function_exists('load_plugin_textdomain')) {
+    function load_plugin_textdomain($domain, $deprecated, $path) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'path' => $path,
+            'locale' => function_exists('determine_locale') ? determine_locale() : 'en_US',
+            'via' => 'load_plugin_textdomain',
+        ];
+        return true;
+    }
+}
+
+if (!function_exists('load_textdomain')) {
+    function load_textdomain($domain, $mofile, $locale = null) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'mofile' => $mofile,
+            'locale' => $locale ?: (function_exists('determine_locale') ? determine_locale() : 'en_US'),
+            'via' => 'load_textdomain',
+        ];
+        return true;
+    }
+}
+
+if (!function_exists('_n')) {
+    function _n($single, $plural, $number, $domain = 'default') {
+        $index = (int) $number === 1 ? 0 : 1;
+        if (function_exists('translate')) {
+            $key = $single . "\0" . $plural;
+            $translated = translate($key, $domain);
+            if ($translated !== $key && str_contains($translated, "\0")) {
+                $parts = explode("\0", $translated);
+                if (isset($parts[$index])) {
+                    return $parts[$index];
+                }
+            }
+        }
+        return $index === 0 ? $single : $plural;
+    }
+}
+
+if (!function_exists('_x')) {
+    function _x($text, $context, $domain = 'default') {
+        if (function_exists('translate')) {
+            $key = $context . "\4" . $text;
+            $translated = translate($key, $domain);
+            if ($translated !== $key) {
+                return $translated;
+            }
+        }
+        return __($text, $domain);
+    }
+}
+
+if (!function_exists('wp_kses')) {
+    function wp_kses($string, $allowed_html, $allowed_protocols = []) {
+        $string = (string) $string;
+        if ($allowed_html === [] || $allowed_html === null) {
+            return wp_strip_all_tags($string);
+        }
+        if (isset($allowed_html['a']['href']) && preg_match_all('/<a\\s+[^>]*href=(["\'])([^"\']*)\\1[^>]*>(.*?)<\\/a>/is', $string, $matches, PREG_SET_ORDER)) {
+            $out = $string;
+            foreach ($matches as $match) {
+                $href = esc_url($match[2]);
+                $inner = $match[3];
+                $replacement = '<a href="' . $href . '">' . $inner . '</a>';
+                $out = str_replace($match[0], $replacement, $out);
+            }
+            return preg_replace('/<(?!\/?a\b)[^>]+>/', '', $out);
+        }
+        return wp_strip_all_tags($string);
     }
 }
 
@@ -608,6 +704,10 @@ if (!function_exists('wc_add_notice')) {
 
 if (!function_exists('wc_get_account_endpoint_url')) {
     function wc_get_account_endpoint_url($endpoint) {
+        global $intersoccer_test_myaccount_permalink;
+        if (isset($intersoccer_test_myaccount_permalink) && $intersoccer_test_myaccount_permalink === '') {
+            return '';
+        }
         return 'http://example.com/my-account/' . $endpoint . '/';
     }
 }

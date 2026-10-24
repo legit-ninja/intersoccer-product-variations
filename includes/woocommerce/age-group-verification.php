@@ -350,12 +350,33 @@ function intersoccer_parse_loose_date_to_ymd($value) {
     if ($value === '') {
         return null;
     }
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
-        $ts = strtotime($value . ' 00:00:00');
-        return $ts ? date('Y-m-d', $ts) : null;
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $ymd_match)) {
+        $year = (int) $ymd_match[1];
+        $month = (int) $ymd_match[2];
+        $day = (int) $ymd_match[3];
+        if (!checkdate($month, $day, $year)) {
+            return null;
+        }
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+    if (preg_match('/^\d+$/', $value)) {
+        return null;
+    }
+    if (preg_match('/^\d{1,2}[\/\.]\d{4}$/', $value)) {
+        return null;
+    }
+    if (preg_match('/^\d{4}-\d{1,2}$/', $value)) {
+        return null;
+    }
+    if (!preg_match('/\d/', $value)) {
+        return null;
     }
     $t = strtotime($value);
     if ($t === false) {
+        return null;
+    }
+    $year = (int) date('Y', $t);
+    if ($year < 1900 || $year > 2100) {
         return null;
     }
     return date('Y-m-d', $t);
@@ -815,15 +836,7 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
     }
 
     if (!$dob_ymd) {
-        $manage = function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('manage-players') : '';
-        $msg = $manage
-            ? sprintf(
-                /* translators: %s: URL to Manage Players */
-                __('The selected attendee needs a valid date of birth. Update it under Manage Players: %s', 'intersoccer-product-variations'),
-                $manage
-            )
-            : __('The selected attendee needs a valid date of birth. Please update it in your account before booking.', 'intersoccer-product-variations');
-        return new WP_Error('intersoccer_age_no_dob', $msg);
+        return new WP_Error('intersoccer_age_no_dob', intersoccer_pv_age_no_dob_error_message());
     }
 
     $settings = intersoccer_get_age_restriction_settings();

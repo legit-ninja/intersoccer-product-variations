@@ -19,20 +19,13 @@ if (!defined('ABSPATH')) {
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Load plugin text domain for translations
-add_action('plugins_loaded', function () {
-    load_plugin_textdomain(
-        'intersoccer-product-variations',
-        false,
-        dirname(plugin_basename(__FILE__)) . '/lang'
-    );
-});
+require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/pv-textdomain.php';
 
 // Register strings for WPML translation on init to ensure WPML is loaded
 add_action('init', function () {
     if (function_exists('icl_register_string')) {
         // Day names
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         foreach ($days as $day) {
             icl_register_string('intersoccer-product-variations', $day, $day);
         }
@@ -66,6 +59,7 @@ add_action('init', function () {
             '%d%% Combo Discount (%s Child)',
             '50% Same-Season Course Discount',
             'Assigned Attendee',
+            'Booking details',
             'Days Selected',
             '%d of %d',
             'Sessions Remaining',
@@ -317,12 +311,63 @@ add_action('init', function () {
             '50% Same Season Course Discount',
             '%s Camp Sibling Discount',
             '%s Course Sibling Discount',
+            'Camp Terms',
+            'Note',
+            'j F Y',
+            'Birthday Party',
+            'Tournament',
+            'Unknown',
+            'Single Day(s)',
+            'Full Term',
+            'Girls Only',
+            'Summer',
+            'Autumn',
+            'Spring',
+            'Winter',
+            'Male',
+            'Female',
+            'Other',
+            'Attendee Gender',
+            '%d%% Camp Sibling Discount',
+            '%d%% Course Sibling Discount',
+            '%d%% Tournament Sibling Discount',
+            '%d%% Camp Week 2 Discount',
+            '%d%% Camp Week %d+ Discount',
+            '%d%% Same Season Course Discount',
+            '%d%% Tournament Multiple Days Discount',
+            '%d%% Sibling Camp Discount',
+            '%d%% Multi-Child Camp Discount',
+            '%d%% Sibling Course Discount',
+            '%d%% Multi-Child Course Discount',
+            '%d%% Sibling Tournament Discount',
+            '%d%% Multi-Child Tournament Discount',
+            '%d%% Sibling Discount Applied',
             'Coach',
             'Organizer',
             'Manage Players',
             'Medical information: provided (view or update in My Account).',
             'Age at camp start: %d',
             'Birth year: %s',
+            'Select Days',
+            'Please select at least one day.',
+            'Please select an attendee.',
+            'Please resolve the error to continue.',
+            'Request failed',
+            'Booking data is still saving. Please wait a moment, then try Add to cart again.',
+            '20% Tournament Sibling Discount',
+            '30% Multi-Child Tournament Discount',
+            'Select late pick up option (optional)',
+            'No Late Pickup',
+            'Single Days',
+            'No late pick up selected',
+            'Full Week (5 days): ',
+            'Select at least one day',
+            '%d day: ',
+            'Invalid selection',
+            '%1$s of %2$s',
+            'Total Sessions',
+            'Holidays (No Session)',
+            'Remaining Sessions',
         ];
 
         foreach ($strings as $string) {
@@ -388,7 +433,11 @@ add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
 
     if (is_product()) {
-        $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
+        $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings')
+            ? intersoccer_get_player_assignment_strings([
+                'manage_players_url' => function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '',
+            ])
+            : [];
 
         wp_enqueue_script(
             'intersoccer-variation-details',
@@ -407,10 +456,17 @@ add_action('wp_enqueue_scripts', function () {
                 'user_id' => get_current_user_id(),
                 'server_time' => current_time('c'),
                 'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
+                'manage_players_url' => function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '',
                 'i18n' => [
                     'start_date' => __('Start Date', 'intersoccer-product-variations'),
+                    'end_date' => __('End Date', 'intersoccer-product-variations'),
                     'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
                     'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+                    /* translators: 1: remaining session count, 2: total session count */
+                    'remaining_sessions_of_total' => __('%1$s of %2$s', 'intersoccer-product-variations'),
+                    'holidays' => __('Holidays', 'intersoccer-product-variations'),
+                    'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+                    'label_value_separator' => _x(':', 'label/value separator', 'intersoccer-product-variations'),
                     'player_assignment' => $player_assignment_strings,
                     'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
                 ],
