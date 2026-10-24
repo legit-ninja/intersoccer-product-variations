@@ -58,6 +58,15 @@ if (!function_exists('wc_get_endpoint_url')) {
     }
 }
 
+if (!function_exists('determine_locale')) {
+    function determine_locale() {
+        global $intersoccer_pv_test_determine_locale;
+        return is_string($intersoccer_pv_test_determine_locale) && $intersoccer_pv_test_determine_locale !== ''
+            ? $intersoccer_pv_test_determine_locale
+            : 'en_US';
+    }
+}
+
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 
@@ -65,18 +74,20 @@ class NoDobNoticeLocalizationTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
         MockFilters::reset();
-        global $intersoccer_test_myaccount_permalink, $intersoccer_pv_test_textdomain_loaded, $intersoccer_pv_test_textdomain_strings;
+        global $intersoccer_test_myaccount_permalink, $intersoccer_pv_test_textdomain_loaded, $intersoccer_pv_test_textdomain_strings, $intersoccer_pv_test_determine_locale;
         $intersoccer_test_myaccount_permalink = '';
         $intersoccer_pv_test_textdomain_loaded = [];
         $intersoccer_pv_test_textdomain_strings = [];
+        $intersoccer_pv_test_determine_locale = 'en_US';
     }
 
     protected function tearDown(): void {
         MockFilters::reset();
-        global $intersoccer_test_myaccount_permalink, $intersoccer_pv_test_textdomain_loaded, $intersoccer_pv_test_textdomain_strings;
+        global $intersoccer_test_myaccount_permalink, $intersoccer_pv_test_textdomain_loaded, $intersoccer_pv_test_textdomain_strings, $intersoccer_pv_test_determine_locale;
         $intersoccer_test_myaccount_permalink = '';
         $intersoccer_pv_test_textdomain_loaded = [];
         $intersoccer_pv_test_textdomain_strings = [];
+        $intersoccer_pv_test_determine_locale = 'en_US';
         parent::tearDown();
     }
 
@@ -153,11 +164,55 @@ class NoDobNoticeLocalizationTest extends TestCase {
         $this->assertSame($expected_url, $url);
 
         $message = intersoccer_pv_age_no_dob_error_message();
+        $this->assertNoDobMessageMatchesTemplate($message, $url, $expected_url, $template);
+    }
+
+    private function assertNoDobMessageMatchesTemplate(string $message, string $url, string $expected_url, string $template): void {
         $link = '<a href="' . esc_url($url) . '">' . esc_html($url) . '</a>';
         $expected = sprintf(esc_html($template), $link);
         $this->assertSame($expected, $message);
         $this->assertStringContainsString('<a href="', $message);
         $this->assertStringContainsString($expected_url, $message);
+        $this->assertSame(1, preg_match('/<a href="[^"]+">[^<]+<\/a>/', $message));
+        $this->assertStringNotContainsString('<a ', substr($message, strpos($message, '</a>') + 4) ?: '');
+    }
+
+    /**
+     * @param array<string,string>|null $gettextOverrides msgid => msgstr for intersoccer-product-variations
+     */
+    private function expectNoDobNoticeWithoutMo(
+        string $lang,
+        string $slug,
+        string $template,
+        string $accountBase,
+        ?array $gettextOverrides = null,
+        ?string $determineLocale = null
+    ): void {
+        global $intersoccer_test_myaccount_permalink, $intersoccer_pv_test_textdomain_strings, $intersoccer_pv_test_determine_locale;
+        $intersoccer_test_myaccount_permalink = $accountBase;
+        $intersoccer_pv_test_textdomain_strings = [];
+        if ($gettextOverrides !== null) {
+            $intersoccer_pv_test_textdomain_strings['intersoccer-product-variations'] = $gettextOverrides;
+        }
+        if ($determineLocale !== null) {
+            $intersoccer_pv_test_determine_locale = $determineLocale;
+        }
+
+        if ($lang !== '') {
+            MockFilters::$filters['wpml_current_language'] = static function () use ($lang) {
+                return $lang;
+            };
+        }
+        MockFilters::$filters['wpml_translate_single_string'] = static function ($slug_in) {
+            return $slug_in;
+        };
+
+        $url = intersoccer_pv_manage_players_url();
+        $expected_url = trailingslashit($accountBase) . $slug . '/';
+        $this->assertSame($expected_url, $url);
+
+        $message = intersoccer_pv_age_no_dob_error_message();
+        $this->assertNoDobMessageMatchesTemplate($message, $url, $expected_url, $template);
     }
 
     public function testFrenchNoticeUsesLocalizedSlugAndTranslation(): void {
@@ -186,6 +241,55 @@ class NoDobNoticeLocalizationTest extends TestCase {
             'manage-players',
             INTERSOCCER_PV_NO_DOB_MSGID,
             'https://example.test/my-account/'
+        );
+    }
+
+    public function testFrenchFallbackWhenGettextReturnsEnglish(): void {
+        $this->expectNoDobNoticeWithoutMo(
+            'fr',
+            'gerer-participants',
+            INTERSOCCER_PV_NO_DOB_MSGSTR_FR,
+            'https://example.test/fr/mon-compte/'
+        );
+    }
+
+    public function testGermanFallbackWhenGettextReturnsEnglish(): void {
+        $this->expectNoDobNoticeWithoutMo(
+            'de',
+            'teilnehmer-verwalten',
+            INTERSOCCER_PV_NO_DOB_MSGSTR_DE,
+            'https://example.test/de/mein-konto/'
+        );
+    }
+
+    public function testFrenchUsesRealTranslationWhenAvailableNotFallback(): void {
+        $custom = 'Traduction personnalisée pour les tests : %s';
+        $this->expectNoDobNoticeWithoutMo(
+            'fr',
+            'gerer-participants',
+            $custom,
+            'https://example.test/fr/mon-compte/',
+            [INTERSOCCER_PV_NO_DOB_MSGID => $custom]
+        );
+    }
+
+    public function testItalianShowsEnglishWhenGettextUnavailable(): void {
+        $this->expectNoDobNoticeWithoutMo(
+            'it',
+            'manage-players',
+            INTERSOCCER_PV_NO_DOB_MSGID,
+            'https://example.test/it/il-mio-account/'
+        );
+    }
+
+    public function testDetermineLocaleFallbackForFrenchWhenWpmlMissing(): void {
+        $this->expectNoDobNoticeWithoutMo(
+            '',
+            'manage-players',
+            INTERSOCCER_PV_NO_DOB_MSGSTR_FR,
+            'https://example.test/fr/mon-compte/',
+            null,
+            'fr_FR'
         );
     }
 
