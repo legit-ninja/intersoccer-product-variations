@@ -372,7 +372,6 @@ $includes = [
     'includes/ajax-handlers.php',
     'includes/woocommerce/late-pickup-settings.php',
     'includes/woocommerce/late-pickup.php',
-    'utils/fix-course-holidays.php',
 ];
 
 foreach ($includes as $file) {

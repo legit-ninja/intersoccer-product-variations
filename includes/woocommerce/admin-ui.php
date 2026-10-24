@@ -2567,25 +2567,6 @@ function intersoccer_render_variation_health_page() {
             <input type="submit" name="intersoccer_recalc_end_dates" class="button button-primary" value="<?php _e('Recalculate Course End Dates', 'intersoccer-product-variations'); ?>">
         </form>
 
-        <?php
-        // Include course holiday fix functionality
-        // require_once plugin_dir_path(dirname(dirname(dirname(__FILE__)))) . 'fix-course-holidays.php';
-        $fix_completed = intersoccer_course_holiday_fix_has_run();
-        ?>
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
-            <h3><?php _e('Course Holiday Fix (One-time)', 'intersoccer-product-variations'); ?></h3>
-            <p><?php _e('Fix existing courses that were created with inflated session counts to work around the old holiday calculation bug.', 'intersoccer-product-variations'); ?></p>
-            <?php if ($fix_completed): ?>
-                <p style="color: #28a745;"><strong>✓ <?php _e('Course holiday fix has been completed.', 'intersoccer-product-variations'); ?></strong></p>
-                <button type="button" class="button button-secondary" disabled><?php _e('Fix Already Completed', 'intersoccer-product-variations'); ?></button>
-            <?php else: ?>
-                <p style="color: #856404;"><strong>⚠ <?php _e('This should only be run once after deploying the fixed course logic.', 'intersoccer-product-variations'); ?></strong></p>
-                <button type="button" id="intersoccer-run-course-holiday-fix" class="button button-warning">
-                    <?php _e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>
-                </button>
-                <div id="course-holiday-fix-results" style="margin-top: 10px; display: none;"></div>
-            <?php endif; ?>
-        </div>
         <h1><?php _e('Variation Health Checker', 'intersoccer-product-variations'); ?></h1>
         <p class="description"><?php _e('Catalog tool only: checks and fixes product variation attributes. Does not update existing order metadata. After catalog fixes, use Find Order Issues and Reconcile Rosters for order and roster data.', 'intersoccer-product-variations'); ?></p>
         <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-product-variations'); ?></p>
@@ -2641,46 +2622,6 @@ function intersoccer_render_variation_health_page() {
                     },
                     error: function(xhr, status, error) {
                         alert('<?php _e('An error occurred while refreshing attributes: ', 'intersoccer-product-variations'); ?>' + error);
-                    }
-                });
-            });
-
-            // Course Holiday Fix functionality
-            $('#intersoccer-run-course-holiday-fix').on('click', function(e) {
-                e.preventDefault();
-
-                if (!confirm('<?php _e('Are you sure you want to run the course holiday fix? This will modify course data and should only be run once. Make sure you have a backup!', 'intersoccer-product-variations'); ?>')) {
-                    return;
-                }
-
-                var $button = $(this);
-                var $results = $('#course-holiday-fix-results');
-
-                $button.prop('disabled', true).text('<?php _e('Running...', 'intersoccer-product-variations'); ?>');
-                $results.show().html('<p><?php _e('Running course holiday fix...', 'intersoccer-product-variations'); ?></p>');
-
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'intersoccer_run_course_holiday_fix',
-                        nonce: '<?php echo wp_create_nonce('intersoccer_course_holiday_fix_nonce'); ?>'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            $results.html('<div class="notice notice-success"><p>' + response.data.message + '</p><div style="margin-top: 10px;">' + response.data.output + '</div></div>');
-                            // Reload page after 3 seconds to show the disabled state
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 3000);
-                        } else {
-                            $results.html('<div class="notice notice-error"><p><?php _e('Error:', 'intersoccer-product-variations'); ?> ' + (response.data.message || 'Unknown error') + '</p></div>');
-                            $button.prop('disabled', false).text('<?php _e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        $results.html('<div class="notice notice-error"><p><?php _e('An error occurred:', 'intersoccer-product-variations'); ?> ' + error + '</p></div>');
-                        $button.prop('disabled', false).text('<?php _e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>');
                     }
                 });
             });
