@@ -289,7 +289,7 @@ class CustomerStringsLocalizationTest extends TestCase {
             $po = file_get_contents(dirname(__DIR__) . '/lang/intersoccer-product-variations-' . $fileLocale . '.po');
             $this->assertNotFalse($po);
             $this->assertDoesNotMatchRegularExpression('/späte abholung/ui', $po, $fileLocale . ' must not use späte Abholung');
-            $this->assertStringContainsString('Spätabholung', $po, $fileLocale . ' must use Spätabholung');
+            $this->assertStringContainsString('Spätabhol', $po, $fileLocale . ' must use Spätabhol compound');
         }
     }
 

@@ -342,7 +342,7 @@ msgid "Late Pickup Cost:"
 msgstr "Kosten für Spätabholung: "
 
 msgid "Select Late Pickup Days"
-msgstr "Spätabholung auswählen"
+msgstr "Spätabholtage auswählen"
 
 msgid "Single Day"
 msgstr "Einzelner Tag"
