@@ -323,6 +323,26 @@ add_action('init', function () {
             'Medical information: provided (view or update in My Account).',
             'Age at camp start: %d',
             'Birth year: %s',
+            'Select Days',
+            'Please select at least one day.',
+            'Please select an attendee.',
+            'Please resolve the error to continue.',
+            'Request failed',
+            'Booking data is still saving. Please wait a moment, then try Add to cart again.',
+            '20% Tournament Sibling Discount',
+            '30% Multi-Child Tournament Discount',
+            'Select late pick up option (optional)',
+            'No Late Pickup',
+            'Single Days',
+            'No late pick up selected',
+            'Full Week (5 days): ',
+            'Select at least one day',
+            '%d day: ',
+            'Invalid selection',
+            '%1$s of %2$s',
+            'Total Sessions',
+            'Holidays (No Session)',
+            'Remaining Sessions',
         ];
 
         foreach ($strings as $string) {
@@ -388,7 +408,11 @@ add_action('wp_enqueue_scripts', function () {
     $nonce = wp_create_nonce('intersoccer_nonce');
 
     if (is_product()) {
-        $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings') ? intersoccer_get_player_assignment_strings() : [];
+        $player_assignment_strings = function_exists('intersoccer_get_player_assignment_strings')
+            ? intersoccer_get_player_assignment_strings([
+                'manage_players_url' => function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '',
+            ])
+            : [];
 
         wp_enqueue_script(
             'intersoccer-variation-details',
@@ -407,10 +431,17 @@ add_action('wp_enqueue_scripts', function () {
                 'user_id' => get_current_user_id(),
                 'server_time' => current_time('c'),
                 'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
+                'manage_players_url' => function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '',
                 'i18n' => [
                     'start_date' => __('Start Date', 'intersoccer-product-variations'),
+                    'end_date' => __('End Date', 'intersoccer-product-variations'),
                     'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
                     'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+                    /* translators: 1: remaining session count, 2: total session count */
+                    'remaining_sessions_of_total' => __('%1$s of %2$s', 'intersoccer-product-variations'),
+                    'holidays' => __('Holidays', 'intersoccer-product-variations'),
+                    'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+                    'label_value_separator' => _x(':', 'label/value separator', 'intersoccer-product-variations'),
                     'player_assignment' => $player_assignment_strings,
                     'stash_wait_timeout' => __('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations'),
                 ],
