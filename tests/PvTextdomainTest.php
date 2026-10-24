@@ -147,9 +147,6 @@ class PvTextdomainTest extends TestCase {
         if (!function_exists('intersoccer_pv_load_textdomain_for_current_locale')) {
             require_once dirname(__DIR__) . '/includes/pv-textdomain.php';
         }
-        if (!function_exists('intersoccer_pv_filter_gettext')) {
-            require_once dirname(__DIR__) . '/includes/admin-english-locale.php';
-        }
         $GLOBALS['intersoccer_test_textdomain_loaded'] = [];
         $GLOBALS['intersoccer_test_textdomain_unload_reloadable'] = [];
         $GLOBALS['intersoccer_test_mo_translations'] = [];
@@ -217,16 +214,6 @@ class PvTextdomainTest extends TestCase {
         $this->assertTrue(intersoccer_pv_load_textdomain_for_current_locale('de_DE'));
         $this->assertSame('de_DE', $GLOBALS['intersoccer_pv_textdomain_locale']);
         $this->assertStringEndsWith('de_DE.mo', $GLOBALS['intersoccer_test_textdomain_loaded']['intersoccer-product-variations']['mofile']);
-    }
-
-    public function test_admin_english_still_forces_english_after_reload(): void {
-        $GLOBALS['intersoccer_test_locale'] = 'de_DE';
-        intersoccer_pv_load_textdomain_for_current_locale('de_DE');
-        $GLOBALS['intersoccer_test_is_admin'] = true;
-        $this->assertSame(
-            'Start Date',
-            intersoccer_pv_filter_gettext('Startdatum', 'Start Date', 'intersoccer-product-variations')
-        );
     }
 
     public function test_email_locale_path_reloads_textdomain_via_helper(): void {

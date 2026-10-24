@@ -425,23 +425,23 @@ msgstr ""
 
 # wpml-name: 3a37dedbdc456a5a048974930a867b7d
 msgid "50%% Same Season Course Discount (%s)"
-msgstr ""
+msgstr "50%% Rabatt für Kurs gleiche Saison (%s)"
 
 # wpml-name: bc77e703b6554ab3671c124db7c48589
 msgid "%d%% Multi-Child Course Discount"
-msgstr ""
+msgstr "%d%% Mehrkind-Kurs-Rabatt"
 
 # wpml-name: f093ad31cc309a075892ae12365d0a4a
 msgid "%d%% Sibling Course Discount"
-msgstr ""
+msgstr "%d%% Kurs-Geschwister-Rabatt"
 
 # wpml-name: fd6cefad6ac3f0c59e9813b1851d12da
 msgid "%d%% Multi-Child Camp Discount"
-msgstr ""
+msgstr "%d%% Mehrkind-Camp-Rabatt"
 
 # wpml-name: 26bae96a3db17d6b0aacec91e7a6e5b1
 msgid "%d%% Sibling Camp Discount"
-msgstr ""
+msgstr "%d%% Camp-Geschwister-Rabatt"
 
 # wpml-name: tournament_multi_child_discount
 msgid "%d%% Multi-Child Tournament Discount"
@@ -491,6 +491,9 @@ msgstr "Zweites Kind Camp-Rabatt"
 msgid "20% Sibling Discount Applied"
 msgstr "20% Geschwister-Rabatt angewendet"
 
+msgid "%d%% Sibling Discount Applied"
+msgstr "%d%% Geschwister-Rabatt angewendet"
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr ""
@@ -505,15 +508,15 @@ msgstr ""
 
 # wpml-name: c2e0383f6afcd9efdd1293ae9f01ac89
 msgid "50%% Same Season Course Discount (Child %d, %s)"
-msgstr ""
+msgstr "50%% Rabatt für Kurs gleiche Saison (Kind %d, %s)"
 
 # wpml-name: 44b442f734438b0573e8c349352231d3
 msgid "%d%% Course Multi-Child Discount (Child %d)"
-msgstr ""
+msgstr "%d%% Mehrkind-Kurs-Rabatt (Kind %d)"
 
 # wpml-name: edb9be8ad5dbcdf93f068fe7afd2e6bb
 msgid "%d%% Camp Combo Discount (Child %d)"
-msgstr ""
+msgstr "%d%% Camp-Kombinations-Rabatt (Kind %d)"
 
 # wpml-name: tournament_multi_child_discount_template
 msgid "%d%% Tournament Multi-Child Discount (Child %d)"
@@ -656,7 +659,7 @@ msgstr "%d Wochen verbleibend"
 
 # wpml-name: ea9aa7aabff7550810c1515c5a6e0240
 msgid "Discount Applied"
-msgstr ""
+msgstr "Rabatt angewendet"
 
 # wpml-name: 1d53c54b671a42c3c108eb0147ebefd5
 msgid "Holidays"
@@ -688,15 +691,15 @@ msgstr "Zugewiesener Teilnehmer"
 
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
-msgstr ""
+msgstr "50% Rabatt für Kurs gleiche Saison"
 
 # wpml-name: 01e0d7cc38afaa0ee32c5df46659f52f
 msgid "%d%% Combo Discount (%s Child)"
-msgstr ""
+msgstr "%d%% Kombinations-Rabatt (%s Kind)"
 
 # wpml-name: fa580353b0e0ef9d4136355c33dc4e48
 msgid "%d%% Family Discount (%s Child)"
-msgstr ""
+msgstr "%d%% Familien-Rabatt (%s Kind)"
 
 # wpml-name: 0ebb26492fc4da57d7bd30d0936bec74
 msgid "Missing parameters."

@@ -218,12 +218,6 @@ function intersoccer_pv_bootstrap_customer_ajax_language() {
         return;
     }
 
-    if (function_exists('intersoccer_pv_is_admin_english_context')
-        && intersoccer_pv_is_admin_english_context()
-    ) {
-        return;
-    }
-
     $lang = '';
     if (isset($_REQUEST['lang'])) {
         $lang = sanitize_text_field(wp_unslash((string) $_REQUEST['lang']));

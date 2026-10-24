@@ -553,6 +553,9 @@ msgstr ""
 msgid "20% Sibling Discount Applied"
 msgstr ""
 
+msgid "%d%% Sibling Discount Applied"
+msgstr ""
+
 # wpml-name: saved
 msgid "saved"
 msgstr ""

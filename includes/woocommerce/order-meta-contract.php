@@ -2610,10 +2610,6 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
     }
 
     if (intersoccer_pv_order_meta_key_is($meta_key, 'Attendee Gender')) {
-        if (function_exists('intersoccer_pv_is_admin_english_context') && intersoccer_pv_is_admin_english_context()
-            && function_exists('intersoccer_pv_admin_format_player_gender_label')) {
-            return intersoccer_pv_admin_format_player_gender_label($text);
-        }
         if (intersoccer_is_customer_order_meta_display_context()
             && function_exists('intersoccer_pv_format_stored_gender_for_display')) {
             return intersoccer_pv_format_stored_gender_for_display($text);

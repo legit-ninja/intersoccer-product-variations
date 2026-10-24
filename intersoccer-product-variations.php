@@ -20,7 +20,6 @@ define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/pv-textdomain.php';
-require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/admin-english-locale.php';
 
 // Register strings for WPML translation on init to ensure WPML is loaded
 add_action('init', function () {

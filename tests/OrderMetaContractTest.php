@@ -96,7 +96,6 @@ if (!function_exists('determine_locale')) {
 
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
-require_once dirname(__DIR__) . '/includes/admin-english-locale.php';
 require_once dirname(__DIR__) . '/includes/language-helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
@@ -899,13 +898,13 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('Age Group', $map["Groupe d'âge"]);
     }
 
-    public function test_attendee_gender_stays_english_in_admin_order_context() {
+    public function test_attendee_gender_unchanged_in_admin_order_context() {
         $GLOBALS['intersoccer_test_is_admin'] = true;
         $GLOBALS['intersoccer_test_doing_ajax'] = false;
         $display = intersoccer_translate_stored_order_meta_display_value('female', 'Attendee Gender');
-        $this->assertSame('Female', $display);
+        $this->assertSame('female', $display);
         $display_male = intersoccer_translate_stored_order_meta_display_value('Garçon', 'Attendee Gender');
-        $this->assertSame('Male', $display_male);
+        $this->assertSame('Garçon', $display_male);
     }
 
     public function test_attendee_gender_translated_in_customer_context() {

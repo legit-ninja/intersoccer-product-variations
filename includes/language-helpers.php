@@ -174,10 +174,6 @@ function intersoccer_pv_admin_format_player_gender_label($raw_gender) {
  * @return string
  */
 function intersoccer_pv_format_stored_gender_for_display($raw_gender) {
-    if (function_exists('intersoccer_pv_is_admin_english_context') && intersoccer_pv_is_admin_english_context()) {
-        return intersoccer_pv_admin_format_player_gender_label($raw_gender);
-    }
-
     $trim = trim((string) $raw_gender);
     if ($trim === '') {
         return '';
