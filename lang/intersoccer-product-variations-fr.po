@@ -496,6 +496,9 @@ msgstr "Remise pour deuxième enfant pour camp"
 msgid "20% Sibling Discount Applied"
 msgstr "20% de réduction appliquée pour frère/soeur"
 
+msgid "%d%% Sibling Discount Applied"
+msgstr "%d%% de réduction appliquée pour frère/soeur"
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr "sauvegardé"
