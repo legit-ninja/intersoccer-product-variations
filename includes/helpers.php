@@ -508,11 +508,7 @@ function intersoccer_discount_compose_season_key($season, $program_year = '', $s
     $season = trim((string) $season);
     $year   = intersoccer_pm_normalize_program_year((string) $program_year);
     $season_term_id = (int) $season_term_id;
-    if (
-        $season_term_id > 0
-        && $year !== ''
-        && empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])
-    ) {
+    if ($season_term_id > 0 && $year !== '') {
         $taxonomy = function_exists('intersoccer_attr_taxonomy')
             ? intersoccer_attr_taxonomy('program-season')
             : 'pa_program-season';
@@ -720,15 +716,227 @@ function intersoccer_discount_normalize_season_label_for_lookup($label) {
 }
 
 /**
+ * Raw label variants for season lookup (entities and apostrophe forms).
+ *
+ * @param string $label
+ * @return array<int,string>
+ */
+function intersoccer_pv_discount_season_label_raw_variants($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return [];
+    }
+    $variants = [$label];
+    $decoded = html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($decoded !== $label) {
+        $variants[] = $decoded;
+    }
+    $curly = str_replace("'", "\u{2019}", $decoded);
+    if ($curly !== $decoded) {
+        $variants[] = $curly;
+    }
+    return array_values(array_unique($variants));
+}
+
+/**
+ * @param string $label
+ * @return array<int,string>
+ */
+function intersoccer_pv_discount_season_name_match_candidates($label) {
+    $candidates = [];
+    foreach (intersoccer_pv_discount_season_label_raw_variants($label) as $variant) {
+        $norm = intersoccer_discount_normalize_season_label_for_lookup($variant);
+        if ($norm !== '') {
+            $candidates[] = $norm;
+        }
+    }
+    return array_values(array_unique($candidates));
+}
+
+/**
+ * @param string $label
+ * @return array<int,string>
+ */
+function intersoccer_pv_discount_season_slug_match_candidates($label) {
+    $candidates = [];
+    foreach (intersoccer_pv_discount_season_label_raw_variants($label) as $variant) {
+        if (!function_exists('sanitize_title')) {
+            continue;
+        }
+        $slug = sanitize_title($variant);
+        if ($slug === '') {
+            continue;
+        }
+        $norm = intersoccer_discount_normalize_season_label_for_lookup($slug);
+        if ($norm !== '') {
+            $candidates[] = $norm;
+        }
+    }
+    return array_values(array_unique($candidates));
+}
+
+/**
+ * Whether the WPML icl_translations table exists (cached for the request).
+ *
+ * @return bool
+ */
+/**
+ * @return bool|null
+ */
+function &intersoccer_pv_wpml_icl_translations_table_exists_storage() {
+    static $exists = null;
+    return $exists;
+}
+
+function intersoccer_pv_wpml_icl_translations_table_reset_exists_cache() {
+    $exists = &intersoccer_pv_wpml_icl_translations_table_exists_storage();
+    $exists = null;
+}
+
+function intersoccer_pv_wpml_icl_translations_table_exists() {
+    $exists = &intersoccer_pv_wpml_icl_translations_table_exists_storage();
+    if ($exists !== null) {
+        return (bool) $exists;
+    }
+    global $wpdb;
+    if (!$wpdb || !is_object($wpdb) || !isset($wpdb->prefix)) {
+        return false;
+    }
+    $table = $wpdb->prefix . 'icl_translations';
+    if (!method_exists($wpdb, 'get_var') || !method_exists($wpdb, 'prepare') || !method_exists($wpdb, 'esc_like')) {
+        return false;
+    }
+    $like = $wpdb->esc_like($table);
+    $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $like));
+    $exists = is_string($found) && $found === $table;
+    return (bool) $exists;
+}
+
+/**
+ * Clear per-request season term-id resolution caches (tests).
+ *
+ * @return void
+ */
+function intersoccer_pv_discount_season_term_id_clear_request_cache() {
+    $cache = &intersoccer_pv_discount_season_term_id_request_cache();
+    $cache = [];
+    if (function_exists('intersoccer_pv_wpml_icl_translations_table_reset_exists_cache')) {
+        intersoccer_pv_wpml_icl_translations_table_reset_exists_cache();
+    }
+}
+
+/**
+ * @return array<string,int>
+ */
+function &intersoccer_pv_discount_season_term_id_request_cache() {
+    static $cache = [];
+    return $cache;
+}
+
+/**
+ * Persistent cache TTL for resolved season term IDs (seconds).
+ */
+function intersoccer_pv_discount_season_term_id_persistent_ttl() {
+    $day = defined('DAY_IN_SECONDS') ? (int) DAY_IN_SECONDS : 86400;
+    return $day;
+}
+
+/**
+ * @param string $taxonomy
+ * @param string $label
+ * @return string
+ */
+function intersoccer_pv_discount_season_term_id_persistent_cache_key($taxonomy, $label) {
+    $needle = intersoccer_discount_normalize_season_label_for_lookup($label);
+    return 'intersoccer_pv_season_tid_' . md5($taxonomy . "\0" . $needle);
+}
+
+/**
+ * SQL lookup: season label/slug (any language) → default-language term_id.
+ *
+ * @param string $taxonomy
+ * @param string $label
+ * @return int
+ */
+function intersoccer_pv_discount_season_term_id_sql_lookup($taxonomy, $label) {
+    global $wpdb;
+    if (!$wpdb || !is_object($wpdb) || !method_exists($wpdb, 'prepare') || !method_exists($wpdb, 'get_row')) {
+        return 0;
+    }
+    $taxonomy = (string) $taxonomy;
+    if ($taxonomy === '') {
+        return 0;
+    }
+    $name_candidates = intersoccer_pv_discount_season_name_match_candidates($label);
+    $slug_candidates = intersoccer_pv_discount_season_slug_match_candidates($label);
+    if ($name_candidates === [] && $slug_candidates === []) {
+        return 0;
+    }
+
+    $name_ph = implode(',', array_fill(0, count($name_candidates), '%s'));
+    $slug_ph = implode(',', array_fill(0, count($slug_candidates), '%s'));
+    $match_sql = '';
+    if ($name_candidates !== [] && $slug_candidates !== []) {
+        $match_sql = "(LOWER(t.name) IN ($name_ph) OR LOWER(t.slug) IN ($slug_ph))";
+    } elseif ($name_candidates !== []) {
+        $match_sql = "LOWER(t.name) IN ($name_ph)";
+    } else {
+        $match_sql = "LOWER(t.slug) IN ($slug_ph)";
+    }
+
+    $terms_table = isset($wpdb->terms) ? $wpdb->terms : $wpdb->prefix . 'terms';
+    $tt_table    = isset($wpdb->term_taxonomy) ? $wpdb->term_taxonomy : $wpdb->prefix . 'term_taxonomy';
+
+    if (intersoccer_pv_wpml_icl_translations_table_exists()) {
+        $element_type = 'tax_' . $taxonomy;
+        $default_lang = function_exists('apply_filters')
+            ? (string) (apply_filters('wpml_default_language', null) ?: 'en')
+            : 'en';
+        $icl = $wpdb->prefix . 'icl_translations';
+        $sql = "
+            SELECT def_t.term_id AS term_id
+            FROM {$terms_table} t
+            INNER JOIN {$tt_table} tt ON t.term_id = tt.term_id
+            INNER JOIN {$icl} icl ON icl.element_id = tt.term_taxonomy_id AND icl.element_type = %s
+            INNER JOIN {$icl} icl_def ON icl_def.trid = icl.trid AND icl_def.language_code = %s
+            INNER JOIN {$tt_table} def_tt ON def_tt.term_taxonomy_id = icl_def.element_id
+            INNER JOIN {$terms_table} def_t ON def_t.term_id = def_tt.term_id
+            WHERE tt.taxonomy = %s
+            AND {$match_sql}
+            LIMIT 1
+        ";
+        $args = array_merge(
+            [$element_type, $default_lang, $taxonomy],
+            $name_candidates,
+            $slug_candidates
+        );
+    } else {
+        $sql = "
+            SELECT t.term_id AS term_id
+            FROM {$terms_table} t
+            INNER JOIN {$tt_table} tt ON t.term_id = tt.term_id
+            WHERE tt.taxonomy = %s
+            AND {$match_sql}
+            LIMIT 1
+        ";
+        $args = array_merge([$taxonomy], $name_candidates, $slug_candidates);
+    }
+
+    $prepared = $wpdb->prepare($sql, ...$args);
+    $row = $wpdb->get_row($prepared);
+    if (!$row || empty($row->term_id)) {
+        return 0;
+    }
+    return (int) $row->term_id;
+}
+
+/**
  * Resolve a pa_program-season term ID from a stored label (any WPML language).
  *
  * @param string $label Season term name or slug fragment from order meta.
  * @return int Default-language term ID, or 0 when unresolved.
  */
 function intersoccer_discount_season_term_id_from_label($label) {
-    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
-        return 0;
-    }
     $label = trim((string) $label);
     if ($label === '') {
         return 0;
@@ -741,76 +949,51 @@ function intersoccer_discount_season_term_id_from_label($label) {
         return 0;
     }
 
-    $restore_term_suppress = false;
-    if (array_key_exists('intersoccer_test_wpml_suppress_term_filters', $GLOBALS)) {
-        $restore_term_suppress = true;
-        $prior_term_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'];
-        $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+    $cache_key = $taxonomy . "\0" . $needle;
+    $request_cache = &intersoccer_pv_discount_season_term_id_request_cache();
+    if (array_key_exists($cache_key, $request_cache)) {
+        return (int) $request_cache[$cache_key];
     }
 
-    try {
-        if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
-            foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
-                if (!is_array($row) || ($row['taxonomy'] ?? '') !== $taxonomy) {
-                    continue;
-                }
-                $name_norm = intersoccer_discount_normalize_season_label_for_lookup($row['name'] ?? '');
-                $slug_norm = intersoccer_discount_normalize_season_label_for_lookup(
-                    $row['slug'] ?? (function_exists('sanitize_title') ? sanitize_title((string) ($row['name'] ?? '')) : '')
-                );
-                if ($name_norm === $needle || $slug_norm === $needle) {
-                    return intersoccer_discount_wpml_canonical_term_id((int) $term_id, $taxonomy);
-                }
-            }
-        }
-
-        if (function_exists('get_terms')) {
-            $terms = get_terms([
-                'taxonomy'   => $taxonomy,
-                'hide_empty' => false,
-            ]);
-            if (is_array($terms)) {
-                foreach ($terms as $term) {
-                    if (!is_object($term) || empty($term->term_id)) {
-                        continue;
-                    }
-                    $name_norm = intersoccer_discount_normalize_season_label_for_lookup($term->name ?? '');
-                    $slug_norm = intersoccer_discount_normalize_season_label_for_lookup($term->slug ?? '');
-                    if ($name_norm === $needle || $slug_norm === $needle) {
-                        return intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy);
-                    }
-                }
-            }
-        }
-
-        if (function_exists('get_term_by')) {
-            $term = get_term_by('name', $label, $taxonomy);
-            if (!$term && function_exists('sanitize_title')) {
-                $term = get_term_by('slug', sanitize_title($label), $taxonomy);
-            }
-            if ($term && !is_wp_error($term) && !empty($term->term_id)) {
-                return intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy);
-            }
-        }
-    } finally {
-        if ($restore_term_suppress) {
-            $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prior_term_suppress;
+    $object_key = 'season_tid_' . md5($cache_key);
+    if (function_exists('wp_cache_get')) {
+        $cached = wp_cache_get($object_key, 'intersoccer_pv');
+        if ($cached !== false) {
+            $request_cache[$cache_key] = (int) $cached;
+            return (int) $cached;
         }
     }
 
-    return 0;
+    $transient_key = intersoccer_pv_discount_season_term_id_persistent_cache_key($taxonomy, $label);
+    if (function_exists('get_transient')) {
+        $transient_val = get_transient($transient_key);
+        if ($transient_val !== false) {
+            $term_id = (int) $transient_val;
+            $request_cache[$cache_key] = $term_id;
+            if (function_exists('wp_cache_set')) {
+                wp_cache_set($object_key, $term_id, 'intersoccer_pv');
+            }
+            return $term_id;
+        }
+    }
+
+    $term_id = intersoccer_pv_discount_season_term_id_sql_lookup($taxonomy, $label);
+
+    $request_cache[$cache_key] = $term_id;
+    if (function_exists('wp_cache_set')) {
+        wp_cache_set($object_key, $term_id, 'intersoccer_pv');
+    }
+    if (function_exists('set_transient')) {
+        set_transient($transient_key, $term_id, intersoccer_pv_discount_season_term_id_persistent_ttl());
+    }
+
+    return $term_id;
 }
 
 function intersoccer_discount_canonicalize_season_label($label) {
     $label = trim((string) $label);
     if ($label === '') {
         return '';
-    }
-    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
-        return $label;
-    }
-    if (!empty($GLOBALS['intersoccer_test_season_label_to_canonical'][$label])) {
-        return (string) $GLOBALS['intersoccer_test_season_label_to_canonical'][$label];
     }
     $taxonomy = function_exists('intersoccer_attr_taxonomy')
         ? intersoccer_attr_taxonomy('program-season')
