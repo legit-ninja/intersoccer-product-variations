@@ -334,13 +334,12 @@ class SiblingDiscountCrossLanguageTest extends TestCase
 
     public function testNormalizeSeasonKeyMapsTranslatedStoredMetaToCanonical(): void
     {
-        $this->assertSame(
-            'autumn camps 2026|2026',
-            intersoccer_discount_normalize_season_key('herbst camps 2026|2026')
-        );
-        $this->assertSame(
-            'autumn camps 2026|2026',
-            intersoccer_discount_normalize_season_key("camps d'automne 2026|2026")
-        );
+        $en = intersoccer_discount_normalize_season_key('autumn camps 2026|2026');
+        $de = intersoccer_discount_normalize_season_key('herbst camps 2026|2026');
+        $fr = intersoccer_discount_normalize_season_key("camps d'automne 2026|2026");
+        $this->assertSame($en, $de);
+        $this->assertSame($en, $fr);
+        $this->assertStringStartsWith('ps:', $en);
+        $this->assertStringContainsString('|2026', $en);
     }
 }

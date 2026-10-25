@@ -52,10 +52,36 @@ function intersoccer_is_single_day_booking_type($booking_type) {
  * @return bool
  */
 function intersoccer_is_half_day_age_group($label, $slug = '') {
-    foreach ([$label, $slug] as $hay) {
+    static $needles = null;
+    if ($needles === null) {
+        $needles = [
+            'half-day',
+            'half day',
+            'halber-tag',
+            'halber tag',
+            'halbtag',
+            'demi-journee',
+            'demi-journée',
+            'demi-jour',
+            'demi journee',
+            'demi journée',
+        ];
+    }
+
+    foreach ([$slug, $label] as $hay) {
         $h = function_exists('mb_strtolower') ? mb_strtolower(trim((string) $hay), 'UTF-8') : strtolower(trim((string) $hay));
-        if ($h !== '' && (strpos($h, 'half-day') !== false || strpos($h, 'half day') !== false)) {
-            return true;
+        if ($h === '') {
+            continue;
+        }
+        if (function_exists('remove_accents')) {
+            $h = remove_accents($h);
+        }
+        $h = str_replace(['_', ' '], '-', $h);
+        foreach ($needles as $needle) {
+            $n = function_exists('remove_accents') ? remove_accents($needle) : $needle;
+            if (strpos($h, $n) !== false) {
+                return true;
+            }
         }
     }
 
@@ -478,9 +504,23 @@ function intersoccer_pm_is_year_qualified_season_label($label) {
  * @param string $program_year Raw year (normalized internally).
  * @return string
  */
-function intersoccer_discount_compose_season_key($season, $program_year = '') {
+function intersoccer_discount_compose_season_key($season, $program_year = '', $season_term_id = 0) {
     $season = trim((string) $season);
     $year   = intersoccer_pm_normalize_program_year((string) $program_year);
+    $season_term_id = (int) $season_term_id;
+    if (
+        $season_term_id > 0
+        && $year !== ''
+        && empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])
+    ) {
+        $taxonomy = function_exists('intersoccer_attr_taxonomy')
+            ? intersoccer_attr_taxonomy('program-season')
+            : 'pa_program-season';
+        $canonical_id = intersoccer_discount_wpml_canonical_term_id($season_term_id, $taxonomy);
+        if ($canonical_id > 0) {
+            return 'ps:' . $canonical_id . '|' . $year;
+        }
+    }
     if ($year !== '') {
         return strtolower($season) . '|' . $year;
     }
@@ -667,6 +707,30 @@ function intersoccer_discount_wpml_canonical_camp_booking_id($variation_id, $pro
  * @param string $label Season term name (any language).
  * @return string Canonical season name, or the original label when unresolved.
  */
+function intersoccer_discount_season_term_id_from_label($label) {
+    if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
+        return 0;
+    }
+    $label = trim((string) $label);
+    if ($label === '') {
+        return 0;
+    }
+    $taxonomy = function_exists('intersoccer_attr_taxonomy')
+        ? intersoccer_attr_taxonomy('program-season')
+        : 'pa_program-season';
+    if (!function_exists('get_term_by')) {
+        return 0;
+    }
+    $term = get_term_by('name', $label, $taxonomy);
+    if (!$term && function_exists('sanitize_title')) {
+        $term = get_term_by('slug', sanitize_title($label), $taxonomy);
+    }
+    if (!$term || is_wp_error($term) || empty($term->term_id)) {
+        return 0;
+    }
+    return intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy);
+}
+
 function intersoccer_discount_canonicalize_season_label($label) {
     $label = trim((string) $label);
     if ($label === '') {
@@ -712,7 +776,20 @@ function intersoccer_discount_normalize_season_key($key) {
     $parts = explode('|', $key, 2);
     $season_label = $parts[0];
     $year_part    = isset($parts[1]) ? $parts[1] : '';
+    if (preg_match('/^ps:(\d+)$/i', $season_label, $id_match)) {
+        $term_id = (int) $id_match[1];
+        if ($term_id > 0 && $year_part !== '') {
+            return intersoccer_discount_compose_season_key('', $year_part, $term_id);
+        }
+    }
     $canonical_label = intersoccer_discount_canonicalize_season_label($season_label);
+    $term_id = intersoccer_discount_season_term_id_from_label($season_label);
+    if ($term_id <= 0 && $canonical_label !== $season_label) {
+        $term_id = intersoccer_discount_season_term_id_from_label($canonical_label);
+    }
+    if ($term_id > 0 && $year_part !== '') {
+        return intersoccer_discount_compose_season_key('', $year_part, $term_id);
+    }
     return intersoccer_discount_compose_season_key($canonical_label, $year_part);
 }
 

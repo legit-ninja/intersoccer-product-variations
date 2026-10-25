@@ -368,6 +368,20 @@ add_action('init', function () {
             'Total Sessions',
             'Holidays (No Session)',
             'Remaining Sessions',
+            'Late Pickup Days',
+            'Activity Type',
+            'Attendee DOB',
+            'Camp Start Date',
+            'Camp End Date',
+            'Camp Times',
+            'Canton/Region',
+            'City',
+            'Booking Type',
+            'Discount Amount',
+            'Sites InterSoccer',
+            'Medical Conditions',
+            'Days Selected',
+            'Season',
         ];
 
         foreach ($strings as $string) {

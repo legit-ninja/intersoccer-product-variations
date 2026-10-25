@@ -52,6 +52,7 @@ function intersoccer_order_meta_checkout_extras() {
         'Holidays',
         'Discount',
         'Discount Amount',
+        'Booking details',
         'Campaign Code',
         'Campaign Discount %',
         'Girls Only',
@@ -505,6 +506,10 @@ function intersoccer_build_order_line_meta($args) {
 
     if (!empty($cart_values['discount_note'])) {
         $updates['Discount'] = sanitize_text_field($cart_values['discount_note']);
+    }
+
+    if (!empty($cart_values['intersoccer_info_note'])) {
+        $updates['Booking details'] = sanitize_text_field((string) $cart_values['intersoccer_info_note']);
     }
 
     if (isset($cart_values['discount_amount']) && floatval($cart_values['discount_amount']) > 0) {
@@ -1567,9 +1572,12 @@ function intersoccer_order_meta_hidden_customer_keys() {
     $keys = [
         'assigned_player',
         'assigned_player_id',
+        'assigned_attendee',
         'Player Index',
         'intersoccer_player_index',
         'Camp Week Index',
+        'Base Price',
+        'Variation ID',
     ];
 
     return apply_filters('intersoccer_order_meta_hidden_customer_keys', $keys);
@@ -2784,6 +2792,83 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
     return $out;
 }
 
+/**
+ * Dedupe customer-facing formatted meta (e.g. legacy assigned_attendee + Assigned Attendee).
+ *
+ * @param array<int,object> $formatted_meta
+ * @return array<int,object>
+ */
+function intersoccer_pv_dedupe_customer_order_formatted_meta(array $formatted_meta) {
+    $seen_canonical = [];
+    $out = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+            ? intersoccer_pv_canonical_stored_order_meta_key($key)
+            : $key;
+        if ($canonical === 'Assigned Attendee') {
+            if (isset($seen_canonical[$canonical])) {
+                continue;
+            }
+            $seen_canonical[$canonical] = true;
+        }
+        $out[] = $meta;
+    }
+
+    return $out;
+}
+
+/**
+ * Hide underscore-prefixed internal keys in admin order item meta (display only).
+ *
+ * @param array<int,object> $formatted_meta
+ * @param WC_Order_Item     $item
+ * @return array<int,object>
+ */
+function intersoccer_pv_filter_admin_order_item_formatted_meta($formatted_meta, $item) {
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+    if (!is_admin() || intersoccer_is_sensitive_order_meta_email_context()) {
+        return $formatted_meta;
+    }
+
+    $filtered = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        if ($key !== '' && $key[0] === '_') {
+            continue;
+        }
+        $filtered[] = $meta;
+    }
+
+    return $filtered;
+}
+
+/**
+ * Register internal order-line keys with WooCommerce admin hidden meta list.
+ *
+ * @param array<int,string> $hidden
+ * @return array<int,string>
+ */
+function intersoccer_pv_admin_hidden_order_itemmeta($hidden) {
+    $extra = function_exists('intersoccer_canonical_order_meta_keys')
+        ? intersoccer_canonical_order_meta_keys()
+        : [];
+    $extra = array_merge($extra, [
+        '_intersoccer_discount_season_key',
+        '_intersoccer_total_item_discount',
+        '_intersoccer_item_discounts',
+        '_camp_start_date',
+        '_camp_end_date',
+        '_camp_week_index',
+        '_assigned_player',
+        '_assigned_player_id',
+    ]);
+
+    return array_values(array_unique(array_merge($hidden, $extra)));
+}
+
 function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     if (!is_array($formatted_meta)) {
         return $formatted_meta;
@@ -2802,6 +2887,8 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         $filtered[] = $meta;
     }
 
+    $filtered = intersoccer_pv_dedupe_customer_order_formatted_meta($filtered);
+
     if (intersoccer_should_mask_sensitive_order_item_meta()) {
         $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);
     }
@@ -2814,6 +2901,8 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     return $translated;
 }
 
+add_filter('woocommerce_hidden_order_itemmeta', 'intersoccer_pv_admin_hidden_order_itemmeta', 20);
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_pv_filter_admin_order_item_formatted_meta', 5, 2);
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
 add_action('woocommerce_email_before_order_table', 'intersoccer_sensitive_order_meta_begin_email_context', 0, 4);
 add_action('woocommerce_email_after_order_table', 'intersoccer_sensitive_order_meta_end_email_context', 9999, 4);

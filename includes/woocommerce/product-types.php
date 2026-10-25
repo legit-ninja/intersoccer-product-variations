@@ -528,6 +528,7 @@ function intersoccer_discount_season_key($product_id) {
     $product_id = (int) $product_id;
     $season = '';
     $year   = (string) (intersoccer_get_product_program_year($product_id) ?: '');
+    $resolved_season_term_id = 0;
 
     if (!empty($GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'])) {
         $season = (string) (intersoccer_get_product_season($product_id) ?: '');
@@ -554,6 +555,7 @@ function intersoccer_discount_season_key($product_id) {
     $season_term_id = function_exists('intersoccer_get_product_program_season_term_id')
         ? intersoccer_get_product_program_season_term_id($product_id)
         : 0;
+    $resolved_season_term_id = $season_term_id;
     if ($season_term_id > 0 && function_exists('intersoccer_discount_canonical_term_name')) {
         $taxonomy = intersoccer_attr_taxonomy('program-season');
         $season   = (string) intersoccer_discount_canonical_term_name($season_term_id, $taxonomy);
@@ -577,6 +579,9 @@ function intersoccer_discount_season_key($product_id) {
                     $parent_term_id = function_exists('intersoccer_get_product_program_season_term_id')
                         ? intersoccer_get_product_program_season_term_id($parent_id)
                         : 0;
+                    if ($parent_term_id > 0) {
+                        $resolved_season_term_id = $parent_term_id;
+                    }
                     if ($parent_term_id > 0 && function_exists('intersoccer_discount_canonical_term_name')) {
                         $taxonomy = intersoccer_attr_taxonomy('program-season');
                         $season   = (string) intersoccer_discount_canonical_term_name($parent_term_id, $taxonomy);
@@ -596,7 +601,7 @@ function intersoccer_discount_season_key($product_id) {
     }
 
     if (function_exists('intersoccer_discount_compose_season_key')) {
-        $composed = intersoccer_discount_compose_season_key($season, $year);
+        $composed = intersoccer_discount_compose_season_key($season, $year, $resolved_season_term_id);
         if (function_exists('intersoccer_discount_normalize_season_key')) {
             return intersoccer_discount_normalize_season_key($composed);
         }

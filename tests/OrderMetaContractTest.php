@@ -1103,4 +1103,92 @@ class OrderMetaContractTest extends TestCase {
         MockFilters::reset();
     }
 
+    public function test_checkout_persists_booking_details_from_cart_info_note() {
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'intersoccer_info_note' => '3 Day(s) Selected',
+            ],
+        ]);
+        $this->assertSame('3 Day(s) Selected', $built['updates']['Booking details'] ?? null);
+        $allowed = intersoccer_order_meta_allowed_keys('camp');
+        $this->assertContains('Booking details', $allowed);
+    }
+
+    public function test_customer_formatted_meta_hides_base_price_and_variation_id() {
+        $meta = [
+            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => 'Base Price', 'display_key' => 'Base Price', 'value' => '525'],
+            (object) ['key' => 'Variation ID', 'display_key' => 'Variation ID', 'value' => '51724'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertContains('Activity Type', $keys);
+        $this->assertNotContains('Base Price', $keys);
+        $this->assertNotContains('Variation ID', $keys);
+    }
+
+    public function test_admin_formatted_meta_hides_underscore_internal_keys() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $meta = [
+            (object) ['key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => '_intersoccer_canonical_age_group', 'value' => '3-5y'],
+            (object) ['key' => '_intersoccer_discount_season_key', 'value' => 'ps:88001|2026'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_pv_filter_admin_order_item_formatted_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertSame(['Activity Type'], $keys);
+    }
+
+    public function test_dedupe_assigned_attendee_customer_meta() {
+        $meta = [
+            (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Child A'],
+            (object) ['key' => 'assigned_attendee', 'display_key' => 'assigned_attendee', 'value' => 'Child A'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $attendee_rows = array_filter($filtered, static function ($m) {
+            $canonical = intersoccer_pv_canonical_stored_order_meta_key((string) $m->key);
+            return $canonical === 'Assigned Attendee';
+        });
+        $this->assertCount(1, $attendee_rows);
+    }
+
+    public static function tessOrderMetaLabelTranslations(): array
+    {
+        return [
+            'fr Activity Type' => ['fr', 'Activity Type', 'Type d\'activité'],
+            'de Late Pickup Days' => ['de', 'Late Pickup Days', 'Tage für Spätabholung'],
+            'fr Discount Amount' => ['fr', 'Discount Amount', 'Montant de la remise'],
+            'de Booking details' => ['de', 'Booking details', 'Buchungsdetails'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('tessOrderMetaLabelTranslations')]
+    public function test_order_meta_label_translated_in_customer_context(string $locale, string $msgid, string $expected): void
+    {
+        global $intersoccer_pv_test_determine_locale, $intersoccer_pv_test_textdomain_strings;
+        $intersoccer_pv_test_determine_locale = $locale === 'fr' ? 'fr_FR' : 'de_DE';
+        $intersoccer_pv_test_textdomain_strings = [
+            'intersoccer-product-variations' => [
+                $msgid => $expected,
+            ],
+        ];
+        $GLOBALS['intersoccer_pv_test_textdomain_loaded'] = ['intersoccer-product-variations' => true];
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+
+        $label = intersoccer_translate_stored_order_meta_display_key($msgid, $msgid);
+        $this->assertSame($expected, $label);
+
+        $meta = (object) ['key' => $msgid, 'display_key' => $msgid, 'value' => 'x'];
+        $formatted = intersoccer_translate_order_item_formatted_meta_object($meta);
+        $this->assertSame($expected, $formatted->display_key);
+    }
+
 }

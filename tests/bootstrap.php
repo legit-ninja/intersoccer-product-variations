@@ -289,6 +289,21 @@ if (!class_exists('WP_Error')) {
                 }
             }
         }
+
+        public function get_error_code() {
+            $codes = array_keys($this->errors);
+            return $codes[0] ?? '';
+        }
+
+        public function get_error_message($code = '') {
+            if ($code === '') {
+                $code = $this->get_error_code();
+            }
+            if ($code === '' || empty($this->errors[$code])) {
+                return '';
+            }
+            return (string) $this->errors[$code][0];
+        }
     }
 }
 
