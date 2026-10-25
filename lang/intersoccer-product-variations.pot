@@ -771,6 +771,14 @@ msgstr ""
 msgid "Attendee DOB"
 msgstr ""
 
+# wpml-name: Attendee Gender
+msgid "Attendee Gender"
+msgstr ""
+
+# wpml-name: Late Pickup Cost
+msgid "Late Pickup Cost"
+msgstr ""
+
 # wpml-name: Camp Start Date
 msgid "Camp Start Date"
 msgstr ""
@@ -785,6 +793,10 @@ msgstr ""
 
 # wpml-name: Canton/Region
 msgid "Canton/Region"
+msgstr ""
+
+# wpml-name: Canton / Region
+msgid "Canton / Region"
 msgstr ""
 
 # wpml-name: City

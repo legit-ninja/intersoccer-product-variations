@@ -132,7 +132,10 @@ class OrderMetaPrivacyTest extends TestCase {
             $GLOBALS['intersoccer_test_is_order_received_page'],
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
             $GLOBALS['intersoccer_sensitive_order_meta_email_depth'],
-            $GLOBALS['intersoccer_test_wpml_language']
+            $GLOBALS['intersoccer_test_wpml_language'],
+            $GLOBALS['intersoccer_test_textdomain_loaded'],
+            $GLOBALS['intersoccer_pv_test_textdomain_loaded'],
+            $GLOBALS['intersoccer_pv_test_textdomain_strings']
         );
     }
 

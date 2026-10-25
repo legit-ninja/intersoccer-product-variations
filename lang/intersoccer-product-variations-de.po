@@ -701,6 +701,12 @@ msgstr "Aktivitätstyp"
 msgid "Attendee DOB"
 msgstr "Geburtsdatum des Teilnehmers"
 
+msgid "Attendee Gender"
+msgstr "Geschlecht des Teilnehmers"
+
+msgid "Late Pickup Cost"
+msgstr "Kosten für Spätabholung"
+
 msgid "Camp Start Date"
 msgstr "Camp-Startdatum"
 
@@ -711,6 +717,9 @@ msgid "Camp Times"
 msgstr "Camp-Zeiten"
 
 msgid "Canton/Region"
+msgstr "Kanton / Region"
+
+msgid "Canton / Region"
 msgstr "Kanton / Region"
 
 msgid "City"

@@ -8,7 +8,23 @@ use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
+require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/age-group-verification.php';
+
+if (!defined('ICL_SITEPRESS_VERSION')) {
+    define('ICL_SITEPRESS_VERSION', 'test');
+}
+
+if (!function_exists('translate')) {
+    function translate($text, $domain = 'default')
+    {
+        global $intersoccer_pv_test_textdomain_strings;
+        if (is_array($intersoccer_pv_test_textdomain_strings) && isset($intersoccer_pv_test_textdomain_strings[$domain][$text])) {
+            return $intersoccer_pv_test_textdomain_strings[$domain][$text];
+        }
+        return $text;
+    }
+}
 
 class AgeGateCrossLanguageTest extends TestCase
 {
@@ -85,25 +101,35 @@ class AgeGateCrossLanguageTest extends TestCase
         ];
         foreach ($slug_map as $vid => $slug) {
             MockMetaData::$data[$vid]['attribute_pa_age-group'] = $slug;
+            MockMetaData::$data[$vid]['_camp_start_date'] = self::REF_DATE;
+            MockMetaData::$data[$vid]['_camp_end_date'] = '2026-07-10';
         }
 
         MockFilters::$filters['wpml_default_language'] = static function () {
             return 'en';
         };
         MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) {
-            $map = [
+            $term_map = [
                 self::TERM_FULL_FR => self::TERM_FULL_EN,
                 self::TERM_FULL_DE => self::TERM_FULL_EN,
                 self::TERM_HALF_FR => self::TERM_HALF_EN,
                 self::TERM_HALF_DE => self::TERM_HALF_EN,
             ];
-            if ($lang === 'en' && isset($map[(int) $id])) {
-                return $map[(int) $id];
+            $variation_map = [
+                self::VAR_FULL_FR => self::VAR_FULL_EN,
+                self::VAR_FULL_DE => self::VAR_FULL_EN,
+                self::VAR_HALF_FR => self::VAR_HALF_EN,
+                self::VAR_HALF_DE => self::VAR_HALF_EN,
+            ];
+            if ($lang === 'en') {
+                if ($type === 'product_variation' && isset($variation_map[(int) $id])) {
+                    return $variation_map[(int) $id];
+                }
+                if (isset($term_map[(int) $id])) {
+                    return $term_map[(int) $id];
+                }
             }
             return $id;
-        };
-        MockFilters::$filters['intersoccer_program_reference_date'] = static function () {
-            return self::REF_DATE;
         };
     }
 
@@ -116,6 +142,7 @@ class AgeGateCrossLanguageTest extends TestCase
             $GLOBALS['intersoccer_test_user_id'],
             $GLOBALS['intersoccer_test_options'],
             $GLOBALS['intersoccer_test_terms'],
+            $GLOBALS['intersoccer_test_product_terms'],
             $GLOBALS['intersoccer_test_player_details'],
             $GLOBALS['intersoccer_pv_test_determine_locale'],
             $GLOBALS['intersoccer_pv_test_textdomain_strings']
@@ -221,9 +248,9 @@ class AgeGateCrossLanguageTest extends TestCase
 
     public function test_missing_reference_date_strict_blocks_fr_line(): void
     {
-        MockFilters::$filters['intersoccer_program_reference_date'] = static function () {
-            return null;
-        };
+        foreach ([self::VAR_FULL_EN, self::VAR_FULL_FR, self::VAR_FULL_DE] as $vid) {
+            unset(MockMetaData::$data[$vid]['_camp_start_date'], MockMetaData::$data[$vid]['_camp_end_date']);
+        }
         MockFilters::$filters['intersoccer_age_group_strict_missing_reference_date'] = static function () {
             return true;
         };
@@ -231,5 +258,22 @@ class AgeGateCrossLanguageTest extends TestCase
         $result = intersoccer_validate_line_player_age(77, 0, self::PARENT_ID, self::VAR_FULL_FR);
         $this->assertInstanceOf(WP_Error::class, $result);
         $this->assertSame('intersoccer_age_no_reference_date', $result->get_error_code());
+    }
+
+    /**
+     * At 9254e02: empty FR variation pa_age-group + ambiguous parent terms skipped validation (return true).
+     * Fix: resolve slug from default-language WPML variation before line_has / bounds.
+     */
+    public function test_fr_full_day_without_local_age_slug_resolves_wpml_default_and_rejects_age_8(): void
+    {
+        unset(MockMetaData::$data[self::VAR_FULL_FR]['attribute_pa_age-group']);
+        $GLOBALS['intersoccer_test_product_terms'][self::PARENT_ID] = [
+            'pa_age-group' => ['3-5 ans', '6-8 ans'],
+        ];
+
+        $this->setPlayerDob('2018-07-05');
+        $result = intersoccer_validate_line_player_age(77, 0, self::PARENT_ID, self::VAR_FULL_FR);
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('intersoccer_age_out_of_range', $result->get_error_code());
     }
 }

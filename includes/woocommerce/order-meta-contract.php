@@ -2829,7 +2829,11 @@ function intersoccer_pv_filter_admin_order_item_formatted_meta($formatted_meta, 
     if (!is_array($formatted_meta)) {
         return $formatted_meta;
     }
-    if (!is_admin() || intersoccer_is_sensitive_order_meta_email_context()) {
+    if (!is_admin()
+        || intersoccer_is_sensitive_order_meta_email_context()
+        || (function_exists('intersoccer_is_customer_order_meta_display_context')
+            && intersoccer_is_customer_order_meta_display_context())
+        || (function_exists('wp_doing_ajax') && wp_doing_ajax())) {
         return $formatted_meta;
     }
 

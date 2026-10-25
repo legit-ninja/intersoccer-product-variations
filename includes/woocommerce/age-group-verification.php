@@ -85,7 +85,7 @@ function intersoccer_pv_default_language_variation_id($variation_id) {
  * @return int
  */
 function intersoccer_pv_resolve_pa_age_group_term_id($variation_id) {
-    $slug = intersoccer_get_variation_age_group_slug((int) $variation_id);
+    $slug = intersoccer_get_variation_age_group_slug_for_gate((int) $variation_id);
     if ($slug === '') {
         return 0;
     }
@@ -109,7 +109,7 @@ function intersoccer_pv_resolve_pa_age_group_term_id($variation_id) {
  */
 function intersoccer_pv_age_group_bounds_for_line($product_id, $variation_id) {
     $variation_id = (int) $variation_id;
-    $slug = $variation_id > 0 ? intersoccer_get_variation_age_group_slug($variation_id) : '';
+    $slug = $variation_id > 0 ? intersoccer_get_variation_age_group_slug_for_gate($variation_id) : '';
     if ($slug !== '') {
         $bounds = intersoccer_parse_age_group_bounds($slug);
         if ($bounds !== null) {
@@ -188,6 +188,28 @@ function intersoccer_get_variation_age_group_slug($variation_id) {
 }
 
 /**
+ * Age-group slug for validation (WPML: empty translation meta → default-language variation).
+ *
+ * @param int $variation_id
+ * @return string
+ */
+function intersoccer_get_variation_age_group_slug_for_gate($variation_id) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0) {
+        return '';
+    }
+    $slug = intersoccer_get_variation_age_group_slug($variation_id);
+    if ($slug !== '') {
+        return $slug;
+    }
+    $default_id = intersoccer_pv_default_language_variation_id($variation_id);
+    if ($default_id > 0 && $default_id !== $variation_id) {
+        return intersoccer_get_variation_age_group_slug($default_id);
+    }
+    return '';
+}
+
+/**
  * Whether the line has pa_age-group (variation first, else unambiguous parent).
  *
  * @param int $product_id   Parent product ID.
@@ -200,7 +222,7 @@ function intersoccer_line_has_age_group_attribute($product_id, $variation_id) {
         return false;
     }
     $variation_id = (int) $variation_id;
-    if ($variation_id > 0 && intersoccer_get_variation_age_group_slug($variation_id) !== '') {
+    if ($variation_id > 0 && intersoccer_get_variation_age_group_slug_for_gate($variation_id) !== '') {
         return true;
     }
     $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
@@ -897,7 +919,7 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
         ? intersoccer_get_product_type($product_id)
         : null;
 
-    $slug = $variation_id ? intersoccer_get_variation_age_group_slug((int) $variation_id) : '';
+    $slug = $variation_id ? intersoccer_get_variation_age_group_slug_for_gate((int) $variation_id) : '';
     $bounds = intersoccer_pv_age_group_bounds_for_line($product_id, (int) $variation_id);
     $label = intersoccer_pv_localized_age_group_display_label($product_id, (int) $variation_id);
 
