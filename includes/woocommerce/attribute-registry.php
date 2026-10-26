@@ -120,6 +120,7 @@ function intersoccer_attr_registry() {
             'wc_label' => 'Canton / Region',
             'order_meta_label' => 'Canton / Region',
             'legacy_order_meta_labels' => [
+                'Canton/Region',
                 'Canton / Région',
                 'Canton Region',
                 'Kanton Region',

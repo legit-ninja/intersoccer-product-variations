@@ -5,6 +5,16 @@
 
 use PHPUnit\Framework\TestCase;
 
+if (!function_exists('icl_t')) {
+    function icl_t($context, $name, $default = false) {
+        $map = $GLOBALS['intersoccer_test_icl_t_map'] ?? null;
+        if (is_array($map) && array_key_exists($name, $map)) {
+            return $map[$name];
+        }
+        return $default !== false ? $default : $name;
+    }
+}
+
 if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__ . '/../');
 }
@@ -82,8 +92,21 @@ if (!function_exists('wp_doing_ajax')) {
     }
 }
 
+if (!function_exists('get_locale')) {
+    function get_locale() {
+        return $GLOBALS['intersoccer_test_locale'] ?? 'en_US';
+    }
+}
+
+if (!function_exists('determine_locale')) {
+    function determine_locale() {
+        return get_locale();
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
+require_once dirname(__DIR__) . '/includes/language-helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
 if (!class_exists('WC_Order')) {
@@ -854,6 +877,435 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame($updates['assigned_player'], $updates['_assigned_player']);
 
         unset($GLOBALS['intersoccer_test_player_details']);
+    }
+
+    public function test_translate_stored_order_meta_display_key_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $translated = intersoccer_translate_stored_order_meta_display_key('Assigned Attendee', 'Assigned Attendee');
+        $this->assertSame('Assigned Attendee', $translated);
+    }
+
+    public function test_translate_stored_order_meta_skipped_in_admin_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $label = intersoccer_translate_stored_order_meta_display_key('Days Selected', 'Days Selected');
+        $this->assertSame('Days Selected', $label);
+    }
+
+    public function test_translate_sibling_discount_value_pattern() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $value = intersoccer_translate_stored_order_meta_display_value('20% Camp Sibling Discount', 'Discount');
+        $this->assertStringContainsString('Camp Sibling Discount', $value);
+    }
+
+    public function test_stored_order_meta_display_key_map_covers_booking_labels() {
+        $map = intersoccer_stored_order_meta_display_key_map();
+        $this->assertArrayHasKey('Assigned Attendee', $map);
+        $this->assertArrayHasKey('Camp Terms', $map);
+        $this->assertArrayHasKey('Age Group', $map);
+        $this->assertArrayHasKey('Attendee Gender', $map);
+        $this->assertSame('Camp Start Date', $map['Date de début du camp']);
+        $this->assertSame('Age Group', $map["Groupe d'âge"]);
+    }
+
+    public function test_attendee_gender_unchanged_in_admin_order_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $display = intersoccer_translate_stored_order_meta_display_value('female', 'Attendee Gender');
+        $this->assertSame('female', $display);
+        $display_male = intersoccer_translate_stored_order_meta_display_value('Garçon', 'Attendee Gender');
+        $this->assertSame('Garçon', $display_male);
+    }
+
+    public function test_attendee_gender_translated_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Male') {
+                return 'Garçon';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Male', 'Attendee Gender');
+        $this->assertSame('Garçon', $display);
+        MockFilters::reset();
+    }
+
+    public function test_days_selected_weekdays_translate_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Monday') {
+                return 'Lundi';
+            }
+            if ($text === 'Tuesday') {
+                return 'Mardi';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Monday, Tuesday', 'Days Selected');
+        $this->assertSame('Lundi, Mardi', $display);
+        MockFilters::reset();
+    }
+
+    public function test_order_meta_labels_unchanged_in_admin_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = false;
+        $label = intersoccer_translate_stored_order_meta_display_key('Camp Terms', 'Camp Terms');
+        $this->assertSame('Camp Terms', $label);
+    }
+
+    public function test_build_order_line_meta_stores_english_activity_type_key() {
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'course',
+            'cart_values' => [],
+        ]);
+        $this->assertArrayHasKey('Activity Type', $built['updates']);
+        $this->assertArrayNotHasKey("Type d'activité", $built['updates']);
+    }
+
+    public function test_activity_type_value_translates_with_localized_meta_key() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Course') {
+                return 'Cours';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('Course', "Type d'activité");
+        $this->assertSame('Cours', $display);
+        MockFilters::reset();
+    }
+
+    public function test_localized_camp_week_index_hidden_from_customer_meta() {
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Index de semaine du camp'));
+        $this->assertTrue(intersoccer_is_hidden_customer_order_meta_key('Camp-Wochenindex'));
+    }
+
+    public function test_note_dash_mojibake_repaired_only_in_german_display_locale() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $raw = 'Sie können jederzeit einsteigen ? die Preise werden anteilig berechnet';
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'de_DE';
+        $fixed = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
+        $this->assertStringContainsString('–', $fixed);
+        $this->assertStringNotContainsString(' ? ', $fixed);
+
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'fr_FR';
+        $fr = intersoccer_translate_stored_order_meta_display_value('Des questions ? Contactez-nous', 'Note');
+        $this->assertSame('Des questions ? Contactez-nous', $fr);
+
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'en_US';
+        $en = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
+        $this->assertSame($raw, $en);
+        unset($GLOBALS['intersoccer_pv_test_determine_locale']);
+    }
+
+    public function test_course_date_display_localized_in_customer_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $display = intersoccer_pv_format_stored_order_date_for_display('September 27, 2026');
+        $this->assertNotSame('', $display);
+        $this->assertStringContainsString('2026', $display);
+    }
+
+    public function test_course_date_unchanged_in_admin_context() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $stored = 'September 27, 2026';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Start Date');
+        $this->assertSame($stored, $display);
+    }
+
+    public function test_holidays_date_list_localized_with_distinct_years() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'Y-m-d';
+                }
+                return $translation;
+            };
+        }
+        $stored = 'October 19, 2027, November 2, 2028';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertSame('2027-10-19, 2028-11-02', $display);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_holidays_single_english_date_localized() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'Y-m-d';
+                }
+                return $translation;
+            };
+        }
+        $stored = 'October 19, 2027';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertSame('2027-10-19', $display);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_holidays_unparseable_mixed_text_unchanged() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $stored = 'School break, October 19, 2027';
+        $display = intersoccer_translate_stored_order_meta_display_value($stored, 'Holidays');
+        $this->assertSame($stored, $display);
+    }
+
+    public function test_note_display_key_translatable() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'Note') {
+                    return 'Hinweis';
+                }
+                return $translation;
+            };
+        }
+        $label = intersoccer_translate_stored_order_meta_display_key('Note', 'Note');
+        $this->assertSame('Hinweis', $label);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
+    public function test_camp_build_stores_english_camp_schedule_keys() {
+        require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::reset();
+        }
+        $vid = 88002;
+        intersoccer_update_camp_schedule($vid, '2026-10-19', '2026-10-23', 4, true);
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 88003,
+            'variation_id' => $vid,
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+        $updates = $built['updates'];
+        $this->assertArrayHasKey('Camp Start Date', $updates);
+        $this->assertArrayHasKey('Camp End Date', $updates);
+        $this->assertArrayHasKey('Camp Week Index', $updates);
+        $this->assertArrayNotHasKey('Date de début du camp', $updates);
+    }
+
+    public function test_checkout_parent_attributes_use_english_label_keys() {
+        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/checkout-calculations.php');
+        $this->assertStringNotContainsString("icl_t('intersoccer-product-variations', \$english_label", $src);
+        $this->assertStringNotContainsString("icl_t('intersoccer-product-variations', \$label, \$label)", $src);
+    }
+
+    public function test_medical_none_translated_for_customer() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'None') {
+                return 'Aucune';
+            }
+            return $translation;
+        };
+        $display = intersoccer_translate_stored_order_meta_display_value('None', 'Medical Conditions');
+        $this->assertSame('Aucune', $display);
+        MockFilters::reset();
+    }
+
+    public function test_checkout_persists_booking_details_from_cart_info_note() {
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'camp',
+            'cart_values' => [
+                'intersoccer_info_note' => '3 Day(s) Selected',
+            ],
+        ]);
+        $this->assertSame('3 Day(s) Selected', $built['updates']['Booking details'] ?? null);
+        $allowed = intersoccer_order_meta_allowed_keys('camp');
+        $this->assertContains('Booking details', $allowed);
+    }
+
+    public function test_customer_formatted_meta_hides_base_price_and_variation_id() {
+        $meta = [
+            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => 'Base Price', 'display_key' => 'Base Price', 'value' => '525'],
+            (object) ['key' => 'Variation ID', 'display_key' => 'Variation ID', 'value' => '51724'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertContains('Activity Type', $keys);
+        $this->assertNotContains('Base Price', $keys);
+        $this->assertNotContains('Variation ID', $keys);
+    }
+
+    public function test_admin_formatted_meta_hides_underscore_internal_keys() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        unset($GLOBALS['intersoccer_test_doing_ajax']);
+        $meta = [
+            (object) ['key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => '_intersoccer_canonical_age_group', 'value' => '3-5y'],
+            (object) ['key' => '_intersoccer_discount_season_key', 'value' => 'ps:88001|2026'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_pv_filter_admin_order_item_formatted_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertSame(['Activity Type'], $keys);
+    }
+
+    public function test_admin_formatted_meta_keeps_visible_operational_keys() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        unset($GLOBALS['intersoccer_test_doing_ajax']);
+        $meta = [
+            (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Child'],
+            (object) ['key' => 'Base Price', 'display_key' => 'Base Price', 'value' => '525'],
+            (object) ['key' => 'Camp Start Date', 'display_key' => 'Camp Start Date', 'value' => '2026-07-06'],
+            (object) ['key' => '_camp_start_date', 'value' => '2026-07-06'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_pv_filter_admin_order_item_formatted_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertContains('Assigned Attendee', $keys);
+        $this->assertContains('Base Price', $keys);
+        $this->assertContains('Camp Start Date', $keys);
+        $this->assertNotContains('_camp_start_date', $keys);
+    }
+
+    public function test_admin_ajax_does_not_strip_internal_keys_for_customer_style_pipeline() {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = true;
+        $meta = [
+            (object) ['key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => '_intersoccer_discount_season_key', 'value' => 'ps:1|2026'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_pv_filter_admin_order_item_formatted_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertContains('_intersoccer_discount_season_key', $keys);
+    }
+
+    public function test_dedupe_assigned_attendee_customer_meta() {
+        $meta = [
+            (object) ['key' => 'Assigned Attendee', 'display_key' => 'Assigned Attendee', 'value' => 'Child A'],
+            (object) ['key' => 'assigned_attendee', 'display_key' => 'assigned_attendee', 'value' => 'Child A'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+        $attendee_rows = array_filter($filtered, static function ($m) {
+            $canonical = intersoccer_pv_canonical_stored_order_meta_key((string) $m->key);
+            return $canonical === 'Assigned Attendee';
+        });
+        $this->assertCount(1, $attendee_rows);
+    }
+
+    public function test_build_order_line_meta_stores_english_keys_when_icl_t_would_use_fr_labels(): void {
+        $this->assertBuildStoresEnglishKeysNotTranslated([
+            'Activity Type' => "Type d'activité",
+            'Season' => 'Saison',
+            'Camp Start Date' => 'Date de début du camp',
+            'Camp End Date' => 'Date de fin du camp',
+            'Camp Week Index' => 'Index de semaine du camp',
+        ]);
+    }
+
+    public function test_build_order_line_meta_stores_english_keys_when_icl_t_would_use_de_labels(): void {
+        $this->assertBuildStoresEnglishKeysNotTranslated([
+            'Activity Type' => 'Aktivitätstyp',
+            'Season' => 'Saison',
+            'Camp Start Date' => 'Camp-Startdatum',
+            'Camp End Date' => 'Camp-Enddatum',
+            'Camp Week Index' => 'Camp-Wochenindex',
+        ]);
+    }
+
+    private function assertBuildStoresEnglishKeysNotTranslated(array $icl_map): void {
+        require_once dirname(__DIR__) . '/includes/woocommerce/camp-schedule.php';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::reset();
+        }
+        $GLOBALS['intersoccer_test_icl_t_map'] = $icl_map;
+        $vid = 88100;
+        intersoccer_update_camp_schedule($vid, '2026-07-27', '2026-07-31', 6, true);
+
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 88101,
+            'variation_id' => $vid,
+            'product_type' => 'camp',
+            'cart_values' => [],
+        ]);
+        $updates = $built['updates'];
+
+        $this->assertArrayHasKey('Activity Type', $updates);
+        $this->assertArrayHasKey('Camp Start Date', $updates);
+        $this->assertArrayHasKey('Camp End Date', $updates);
+        foreach ($icl_map as $translated) {
+            $this->assertArrayNotHasKey($translated, $updates);
+        }
+        unset($GLOBALS['intersoccer_test_icl_t_map']);
+    }
+
+    public function test_customer_display_translates_english_stored_activity_type_key(): void {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+            if ($text === 'Activity Type') {
+                return "Type d'activité";
+            }
+            return $translation;
+        };
+        $label = intersoccer_translate_stored_order_meta_display_key('Activity Type', 'Activity Type');
+        $this->assertSame("Type d'activité", $label);
+        MockFilters::reset();
+    }
+
+    public function test_admin_formatted_meta_keeps_english_stored_keys(): void {
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        unset($GLOBALS['intersoccer_test_doing_ajax']);
+        $meta = [
+            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Camp'],
+            (object) ['key' => 'Camp Start Date', 'display_key' => 'Camp Start Date', 'value' => '2026-07-27'],
+        ];
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_pv_filter_admin_order_item_formatted_meta($meta, $item);
+        $keys = array_map(static fn($m) => $m->key, $filtered);
+        $this->assertSame(['Activity Type', 'Camp Start Date'], $keys);
+    }
+
+    public function test_order_item_get_meta_by_canonical_key_reads_legacy_translated_keys(): void {
+        $item = new WC_Order_Item_Product([
+            "Type d'activité" => 'Camp',
+            'Date de début du camp' => '2026-07-27',
+            'Date de fin du camp' => '2026-07-31',
+        ]);
+        $this->assertSame('Camp', intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type'));
+        $this->assertSame('2026-07-27', intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Camp Start Date'));
+        $this->assertSame('2026-07-31', intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Camp End Date'));
+    }
+
+    public function test_customer_meta_hides_player_dob_when_attendee_dob_present_en_fr_de(): void {
+        $cases = [
+            ['Attendee DOB', 'Player DOB'],
+            ['Date de naissance du participant', 'Player DOB'],
+            ['Geburtsdatum des Teilnehmers', 'Player DOB'],
+        ];
+        foreach ($cases as [$attendee_key, $player_key]) {
+            $meta = [
+                (object) ['key' => $attendee_key, 'display_key' => $attendee_key, 'value' => '2015-06-01'],
+                (object) ['key' => $player_key, 'display_key' => $player_key, 'value' => '2015-06-01'],
+            ];
+            $item = new WC_Order_Item_Product([
+                $attendee_key => '2015-06-01',
+                $player_key => '2015-06-01',
+            ]);
+            $GLOBALS['intersoccer_test_is_admin'] = false;
+            $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
+            $keys = array_map(static fn($m) => $m->key, $filtered);
+            $this->assertContains($attendee_key, $keys);
+            $this->assertNotContains($player_key, $keys, "Player DOB must hide when $attendee_key is set");
+        }
     }
 
 }

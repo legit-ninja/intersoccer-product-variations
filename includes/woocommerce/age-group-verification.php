@@ -61,6 +61,114 @@ function intersoccer_get_variation_age_group_label($product_id, $variation_id) {
  * @param int $variation_id Variation ID.
  * @return string
  */
+/**
+ * Default-language variation ID for camp schedule / camp-terms resolution (WPML).
+ *
+ * @param int $variation_id
+ * @return int
+ */
+function intersoccer_pv_default_language_variation_id($variation_id) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0) {
+        return 0;
+    }
+    if (function_exists('intersoccer_discount_wpml_canonical_variation_id')) {
+        return intersoccer_discount_wpml_canonical_variation_id($variation_id);
+    }
+    return $variation_id;
+}
+
+/**
+ * Canonical pa_age-group term ID for a variation (slug + WPML default language).
+ *
+ * @param int $variation_id
+ * @return int
+ */
+function intersoccer_pv_resolve_pa_age_group_term_id($variation_id) {
+    $slug = intersoccer_get_variation_age_group_slug_for_gate((int) $variation_id);
+    if ($slug === '') {
+        return 0;
+    }
+    $taxonomy = 'pa_age-group';
+    $term = get_term_by('slug', $slug, $taxonomy);
+    if (!$term || is_wp_error($term) || empty($term->term_id)) {
+        return 0;
+    }
+    if (function_exists('intersoccer_discount_wpml_canonical_term_id')) {
+        return intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy);
+    }
+    return (int) $term->term_id;
+}
+
+/**
+ * Parse inclusive age bounds using slug and default-language term name (not localized labels).
+ *
+ * @param int $product_id   Parent product ID.
+ * @param int $variation_id Variation ID.
+ * @return array{min: int|null, max: int|null}|null
+ */
+function intersoccer_pv_age_group_bounds_for_line($product_id, $variation_id) {
+    $variation_id = (int) $variation_id;
+    $slug = $variation_id > 0 ? intersoccer_get_variation_age_group_slug_for_gate($variation_id) : '';
+    if ($slug !== '') {
+        $bounds = intersoccer_parse_age_group_bounds($slug);
+        if ($bounds !== null) {
+            return $bounds;
+        }
+    }
+    if ($variation_id > 0) {
+        $term_id = intersoccer_pv_resolve_pa_age_group_term_id($variation_id);
+        if ($term_id > 0 && function_exists('intersoccer_discount_canonical_term_name')) {
+            $canonical = intersoccer_discount_canonical_term_name($term_id, 'pa_age-group');
+            if ($canonical !== '') {
+                $bounds = intersoccer_parse_age_group_bounds($canonical);
+                if ($bounds !== null) {
+                    return $bounds;
+                }
+            }
+        }
+    }
+    $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
+    if (is_string($label) && $label !== '') {
+        return intersoccer_parse_age_group_bounds($label);
+    }
+    return null;
+}
+
+/**
+ * Customer-facing label for the allowed age range in error messages.
+ *
+ * @param int $product_id   Parent product ID.
+ * @param int $variation_id Variation ID.
+ * @return string
+ */
+function intersoccer_pv_localized_age_group_display_label($product_id, $variation_id) {
+    $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
+    if (is_string($label) && $label !== '') {
+        return $label;
+    }
+    $slug = $variation_id ? intersoccer_get_variation_age_group_slug((int) $variation_id) : '';
+    return $slug;
+}
+
+/**
+ * Out-of-range age gate error (translated; range label in customer language).
+ *
+ * @param int    $age_years    Age on program start date.
+ * @param int    $product_id   Parent product ID.
+ * @param int    $variation_id Variation ID.
+ * @return string
+ */
+function intersoccer_pv_age_out_of_range_error_message($age_years, $product_id, $variation_id) {
+    $range_label = intersoccer_pv_localized_age_group_display_label($product_id, $variation_id);
+    return sprintf(
+        /* translators: 1: child age on program start, 2: allowed age range description */
+        __('This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session.', 'intersoccer-product-variations'),
+        (int) $age_years,
+        $range_label
+    );
+}
+
 function intersoccer_get_variation_age_group_slug($variation_id) {
     if (!$variation_id) {
         return '';
@@ -80,6 +188,28 @@ function intersoccer_get_variation_age_group_slug($variation_id) {
 }
 
 /**
+ * Age-group slug for validation (WPML: empty translation meta → default-language variation).
+ *
+ * @param int $variation_id
+ * @return string
+ */
+function intersoccer_get_variation_age_group_slug_for_gate($variation_id) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0) {
+        return '';
+    }
+    $slug = intersoccer_get_variation_age_group_slug($variation_id);
+    if ($slug !== '') {
+        return $slug;
+    }
+    $default_id = intersoccer_pv_default_language_variation_id($variation_id);
+    if ($default_id > 0 && $default_id !== $variation_id) {
+        return intersoccer_get_variation_age_group_slug($default_id);
+    }
+    return '';
+}
+
+/**
  * Whether the line has pa_age-group (variation first, else unambiguous parent).
  *
  * @param int $product_id   Parent product ID.
@@ -92,7 +222,7 @@ function intersoccer_line_has_age_group_attribute($product_id, $variation_id) {
         return false;
     }
     $variation_id = (int) $variation_id;
-    if ($variation_id > 0 && intersoccer_get_variation_age_group_slug($variation_id) !== '') {
+    if ($variation_id > 0 && intersoccer_get_variation_age_group_slug_for_gate($variation_id) !== '') {
         return true;
     }
     $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
@@ -507,14 +637,20 @@ function intersoccer_get_program_reference_date($product_id, $variation_id, $pro
                 break;
 
             case 'camp':
-                if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
-                    $schedule = intersoccer_get_camp_schedule((int) $variation_id, true);
+                $schedule_variation_id = $variation_id
+                    ? intersoccer_pv_default_language_variation_id((int) $variation_id)
+                    : 0;
+                if ($schedule_variation_id && function_exists('intersoccer_get_camp_schedule')) {
+                    $schedule = intersoccer_get_camp_schedule((int) $schedule_variation_id, true);
                     if (!empty($schedule['start'])) {
                         $computed = $schedule['start'];
                         break;
                     }
                 }
-                $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
+                $camp_terms = intersoccer_get_camp_terms_slug(
+                    $product_id,
+                    $schedule_variation_id ?: (int) $variation_id
+                );
                 $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
                 $computed = intersoccer_parse_camp_start_date_from_terms($camp_terms, $season);
                 break;
@@ -534,14 +670,20 @@ function intersoccer_get_program_reference_date($product_id, $variation_id, $pro
         if ($variation_id && function_exists('intersoccer_get_course_meta')) {
             $course_start = (string) intersoccer_get_course_meta((int) $variation_id, '_course_start_date', '');
         }
-        if ($variation_id && function_exists('intersoccer_get_camp_schedule')) {
-            $sched = intersoccer_get_camp_schedule((int) $variation_id, true);
+        $schedule_variation_id = $variation_id
+            ? intersoccer_pv_default_language_variation_id((int) $variation_id)
+            : 0;
+        if ($schedule_variation_id && function_exists('intersoccer_get_camp_schedule')) {
+            $sched = intersoccer_get_camp_schedule((int) $schedule_variation_id, true);
             if (!empty($sched['start'])) {
                 $computed = $sched['start'];
             }
         }
         if ($computed === null) {
-            $camp_terms = intersoccer_get_camp_terms_slug($product_id, $variation_id);
+            $camp_terms = intersoccer_get_camp_terms_slug(
+                $product_id,
+                $schedule_variation_id ?: (int) $variation_id
+            );
             $season = intersoccer_get_variation_program_season_string($product_id, $variation_id);
             $event_raw = intersoccer_get_first_raw_event_date_attribute($product_id, $variation_id);
             $computed = intersoccer_program_reference_date_from_discovery_inputs($course_start, $camp_terms, $season, $event_raw);
@@ -777,15 +919,9 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
         ? intersoccer_get_product_type($product_id)
         : null;
 
-    $label = intersoccer_get_variation_age_group_label($product_id, $variation_id);
-    $slug = $variation_id ? intersoccer_get_variation_age_group_slug((int) $variation_id) : '';
-    $bounds = null;
-    if ($label) {
-        $bounds = intersoccer_parse_age_group_bounds($label);
-    }
-    if ($bounds === null && $slug !== '') {
-        $bounds = intersoccer_parse_age_group_bounds($slug);
-    }
+    $slug = $variation_id ? intersoccer_get_variation_age_group_slug_for_gate((int) $variation_id) : '';
+    $bounds = intersoccer_pv_age_group_bounds_for_line($product_id, (int) $variation_id);
+    $label = intersoccer_pv_localized_age_group_display_label($product_id, (int) $variation_id);
 
     if ($bounds === null) {
         intersoccer_warning('InterSoccer age check: unparseable pa_age-group for product ' . $product_id . ' variation ' . $variation_id . ' label=' . ($label ?: '') . ' slug=' . $slug);
@@ -842,7 +978,7 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
     $settings = intersoccer_get_age_restriction_settings();
     if (
         function_exists('intersoccer_is_half_day_age_group')
-        && intersoccer_is_half_day_age_group($label, $slug)
+        && intersoccer_is_half_day_age_group('', $slug)
         && ($bounds['max'] ?? null) !== null
     ) {
         $settings['above_max_months'] = (int) ($settings['half_day_above_max_months'] ?? 96);
@@ -890,12 +1026,7 @@ function intersoccer_validate_line_player_age($user_id, $player_index, $product_
     if (!$matches) {
         return new WP_Error(
             'intersoccer_age_out_of_range',
-            sprintf(
-                /* translators: 1: child age on program start, 2: allowed age range description */
-                __('This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session.', 'intersoccer-product-variations'),
-                $age,
-                $label ? $label : $slug
-            )
+            intersoccer_pv_age_out_of_range_error_message($age, $product_id, (int) $variation_id)
         );
     }
 

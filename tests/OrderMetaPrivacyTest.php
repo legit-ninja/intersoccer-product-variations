@@ -76,18 +76,6 @@ if (!function_exists('has_action')) {
     }
 }
 
-if (!function_exists('unload_textdomain')) {
-    function unload_textdomain($domain) {
-        unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
-    }
-}
-
-if (!function_exists('load_plugin_textdomain')) {
-    function load_plugin_textdomain($domain, $deprecated, $path) {
-        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = true;
-    }
-}
-
 if (!function_exists('plugin_basename')) {
     function plugin_basename($file) {
         return 'intersoccer-product-variations/intersoccer-product-variations.php';
@@ -144,7 +132,10 @@ class OrderMetaPrivacyTest extends TestCase {
             $GLOBALS['intersoccer_test_is_order_received_page'],
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
             $GLOBALS['intersoccer_sensitive_order_meta_email_depth'],
-            $GLOBALS['intersoccer_test_wpml_language']
+            $GLOBALS['intersoccer_test_wpml_language'],
+            $GLOBALS['intersoccer_test_textdomain_loaded'],
+            $GLOBALS['intersoccer_pv_test_textdomain_loaded'],
+            $GLOBALS['intersoccer_pv_test_textdomain_strings']
         );
     }
 
@@ -228,7 +219,8 @@ class OrderMetaPrivacyTest extends TestCase {
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
         $map = $this->meta_map($filtered);
         $this->assertSame('Peanut allergy', $map['Player Medical']);
-        $this->assertSame('2016-03-15', $map['Player DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map, 'PV Attendee DOB suppresses duplicate PM Player DOB on customer views');
+        $this->assertSame('2015-06-20', $map['Attendee DOB']);
     }
 
     public function test_thank_you_page_redacts_pv_and_pm_meta_keys(): void {
@@ -244,20 +236,23 @@ class OrderMetaPrivacyTest extends TestCase {
             $this->assertStringContainsString('Medical information: provided', $map[$k]);
             $this->assertStringNotContainsString('Peanut', $map[$k]);
         }
-        foreach (['Attendee DOB', 'Player DOB'] as $k) {
-            $this->assertStringNotContainsString('2015-06-20', $map[$k]);
-            $this->assertStringNotContainsString('2016-03-15', $map[$k]);
-        }
+        $this->assertArrayHasKey('Attendee DOB', $map);
+        $this->assertStringNotContainsString('2015-06-20', $map['Attendee DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_html_email_redacts_player_dob_and_player_medical(): void {
         intersoccer_sensitive_order_meta_begin_email_context(false, false, false, null);
-        $item = new WC_Order_Item_Product(['Camp Start Date' => '2026-10-19']);
+        $item = new WC_Order_Item_Product([
+            'Camp Start Date' => '2026-10-19',
+            'Attendee DOB' => '2015-06-20',
+            'Player DOB' => '2016-03-15',
+        ]);
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(false), $item);
         intersoccer_sensitive_order_meta_end_email_context(false, false, false, null);
         $map = $this->meta_map($filtered);
         $this->assertStringNotContainsString('Peanut', $map['Player Medical']);
-        $this->assertStringNotContainsString('2016-03-15', $map['Player DOB']);
+        $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
     public function test_plain_text_customer_email_redacts_both_naming_sets(): void {

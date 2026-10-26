@@ -553,6 +553,9 @@ msgstr ""
 msgid "20% Sibling Discount Applied"
 msgstr ""
 
+msgid "%d%% Sibling Discount Applied"
+msgstr ""
+
 # wpml-name: saved
 msgid "saved"
 msgstr ""
@@ -753,6 +756,86 @@ msgstr ""
 msgid "Assigned Attendee"
 msgstr ""
 
+msgid "Booking details"
+msgstr ""
+
+# wpml-name: Late Pickup Days
+msgid "Late Pickup Days"
+msgstr ""
+
+# wpml-name: Activity Type
+msgid "Activity Type"
+msgstr ""
+
+# wpml-name: Attendee DOB
+msgid "Attendee DOB"
+msgstr ""
+
+# wpml-name: Attendee Gender
+msgid "Attendee Gender"
+msgstr ""
+
+# wpml-name: Late Pickup Cost
+msgid "Late Pickup Cost"
+msgstr ""
+
+# wpml-name: Camp Start Date
+msgid "Camp Start Date"
+msgstr ""
+
+# wpml-name: Camp End Date
+msgid "Camp End Date"
+msgstr ""
+
+# wpml-name: Camp Times
+msgid "Camp Times"
+msgstr ""
+
+# wpml-name: Canton/Region
+msgid "Canton/Region"
+msgstr ""
+
+# wpml-name: Canton / Region
+msgid "Canton / Region"
+msgstr ""
+
+# wpml-name: City
+msgid "City"
+msgstr ""
+
+# wpml-name: Booking Type
+msgid "Booking Type"
+msgstr ""
+
+# wpml-name: Discount Amount
+msgid "Discount Amount"
+msgstr ""
+
+# wpml-name: Sites InterSoccer
+msgid "Sites InterSoccer"
+msgstr ""
+
+# wpml-name: Medical Conditions
+msgid "Medical Conditions"
+msgstr ""
+
+# wpml-name: Season
+msgid "Season"
+msgstr ""
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr ""
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr ""
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr ""
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr ""
+
 # wpml-name: 50% Same-Season Course Discount
 msgid "50% Same-Season Course Discount"
 msgstr ""
@@ -923,3 +1006,83 @@ msgstr ""
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr ""
 
+msgid "%d%% Camp Week %d+ Discount"
+msgstr ""
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr ""
+
+msgid "%d%% Same Season Course Discount"
+msgstr ""
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr ""
+
+msgid "%s%% Camp Sibling Discount"
+msgstr ""
+
+msgid "%s%% Course Sibling Discount"
+msgstr ""
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr ""
+
+msgid "Autumn"
+msgstr ""
+
+msgid "Birthday Party"
+msgstr ""
+
+msgid "Camp Terms"
+msgstr ""
+
+msgid "Discount"
+msgstr ""
+
+msgid "Female"
+msgstr ""
+
+msgid "Full Term"
+msgstr ""
+
+msgid "Girls Only"
+msgstr ""
+
+msgid "Late Pickup"
+msgstr ""
+
+msgid "Male"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Single Day(s)"
+msgstr ""
+
+msgid "Spring"
+msgstr ""
+
+msgid "Summer"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
+msgid "Tournament"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Winter"
+msgstr ""
+
+msgid "j F Y"
+msgstr ""

@@ -496,6 +496,9 @@ msgstr "Remise pour deuxième enfant pour camp"
 msgid "20% Sibling Discount Applied"
 msgstr "20% de réduction appliquée pour frère/soeur"
 
+msgid "%d%% Sibling Discount Applied"
+msgstr "%d%% de réduction appliquée pour frère/soeur"
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr "sauvegardé"
@@ -695,6 +698,70 @@ msgstr "Jours sélectionnés"
 msgid "Assigned Attendee"
 msgstr "Participant assigné"
 
+msgid "Booking details"
+msgstr "Détails de la réservation"
+
+msgid "Late Pickup Days"
+msgstr "Jours de garde tardive"
+
+msgid "Activity Type"
+msgstr "Type d'activité"
+
+msgid "Attendee DOB"
+msgstr "Date de naissance du participant"
+
+msgid "Attendee Gender"
+msgstr "Sexe du participant"
+
+msgid "Late Pickup Cost"
+msgstr "Coût de la garde tardive"
+
+msgid "Camp Start Date"
+msgstr "Date de début du camp"
+
+msgid "Camp End Date"
+msgstr "Date de fin du camp"
+
+msgid "Camp Times"
+msgstr "Horaires du camp"
+
+msgid "Canton/Region"
+msgstr "Canton / région"
+
+msgid "Canton / Region"
+msgstr "Canton / région"
+
+msgid "City"
+msgstr "Ville"
+
+msgid "Booking Type"
+msgstr "Type de réservation"
+
+msgid "Discount Amount"
+msgstr "Montant de la remise"
+
+msgid "Sites InterSoccer"
+msgstr "Sites InterSoccer"
+
+msgid "Medical Conditions"
+msgstr "Conditions médicales"
+
+msgid "Season"
+msgstr "Saison"
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr "Ce participant a %1$d ans à la date de début du programme, ce qui est hors de la tranche d’âge autorisée (%2$s) pour cette session."
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr "La tranche d’âge de ce programme n’a pas pu être lue. Veuillez nous contacter ou choisir une autre session."
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr "La date de début du programme n’a pas pu être déterminée ; l’âge ne peut pas être vérifié. Veuillez nous contacter ou essayer une autre option."
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr "La date de naissance du participant est invalide ou postérieure à la date de début du programme."
+
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
 msgstr "Remise de 50% pour cours même saison"
@@ -806,10 +873,6 @@ msgstr "ID de produit invalide."
 #~ "Veuillez sélectionner au moins un jour pour la récupération tardive "
 #~ "lorsque vous choisissez Jour(s) unique(s)."
 
-# wpml-name: 0e2bee26cc1140f922ba50c40e6b6473
-#~ msgid "Late Pickup"
-#~ msgstr "Récupération tardive"
-
 # wpml-name: 585f617ecc56b8abba20acfb2e53ce81
 #~ msgid "The number of selected days must match the quantity."
 #~ msgstr "Le nombre de jours sélectionnés doit correspondre à la quantité."
@@ -825,10 +888,6 @@ msgstr "ID de produit invalide."
 # wpml-name: 50c76258af04f26fec99b2c7dc8ffd9b
 #~ msgid "Late Pick Up Settings"
 #~ msgstr "Paramètres de récupération tardive"
-
-# wpml-name: 104d9898c04874d0fbac36e125fa1369
-#~ msgid "Discount"
-#~ msgstr "Remise"
 
 # wpml-name: Loading players...
 msgid "Loading players..."
@@ -959,3 +1018,83 @@ msgstr "Cette séance est réservée aux filles. Le participant sélectionné do
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr "Cette séance est réservée aux filles. Le participant sélectionné doit avoir le genre « femme » dans votre compte. Veuillez le mettre à jour dans <a href=\"%s\">Gérer les participants</a>."
 
+msgid "%d%% Camp Week %d+ Discount"
+msgstr "%d%% Réduction camp semaine %d+"
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr "%d%% Réduction camp semaine 2"
+
+msgid "%d%% Same Season Course Discount"
+msgstr "%d%% Réduction cours même saison"
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr "%d%% Réduction tournoi plusieurs jours"
+
+msgid "%s%% Camp Sibling Discount"
+msgstr "%s%% Réduction fratrie camp"
+
+msgid "%s%% Course Sibling Discount"
+msgstr "%s%% Réduction fratrie cours"
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr "%s%% Réduction fratrie tournoi"
+
+msgid "Autumn"
+msgstr "Automne"
+
+msgid "Birthday Party"
+msgstr "Anniversaire"
+
+msgid "Camp Terms"
+msgstr "Semaine de camp"
+
+msgid "Discount"
+msgstr "Remise"
+
+msgid "Female"
+msgstr "Fille"
+
+msgid "Full Term"
+msgstr "Trimestre complet"
+
+msgid "Girls Only"
+msgstr "Filles uniquement"
+
+msgid "Late Pickup"
+msgstr "Récupération tardive"
+
+msgid "Male"
+msgstr "Garçon"
+
+msgid "Note"
+msgstr "Remarque"
+
+msgid "Other"
+msgstr "Autre"
+
+msgid "Saturday"
+msgstr "Samedi"
+
+msgid "Single Day(s)"
+msgstr "Jour(s) unique(s)"
+
+msgid "Spring"
+msgstr "Printemps"
+
+msgid "Summer"
+msgstr "Été"
+
+msgid "Sunday"
+msgstr "Dimanche"
+
+msgid "Tournament"
+msgstr "Tournoi"
+
+msgid "Unknown"
+msgstr "Inconnu"
+
+msgid "Winter"
+msgstr "Hiver"
+
+msgid "j F Y"
+msgstr "j F Y"
