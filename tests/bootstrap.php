@@ -113,6 +113,9 @@ if (!function_exists('esc_attr')) {
 
 if (!function_exists('__')) {
     function __($text, $domain = 'default') {
+        if (function_exists('translate')) {
+            return translate($text, $domain);
+        }
         return $text;
     }
 }

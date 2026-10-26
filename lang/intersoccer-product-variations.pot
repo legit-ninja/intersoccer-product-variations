@@ -840,5 +840,11 @@ msgstr ""
 msgid "Request failed"
 msgstr ""
 
+#, php-format
+# wpml-name: The selected attendee needs a valid date of birth. Update it under Manage Players: %s
+#. translators: %s: URL to Manage Players
+msgid "The selected attendee needs a valid date of birth. Update it under Manage Players: %s"
+msgstr ""
+
 msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
 msgstr ""

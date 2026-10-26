@@ -2095,13 +2095,28 @@ function intersoccer_normalize_attendee_dob_order_meta_value($value) {
     if ($raw === '') {
         return null;
     }
+
+    $accept_dob_ymd = static function ($ymd) {
+        if (!is_string($ymd) || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $parts)) {
+            return null;
+        }
+        if (!checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            return null;
+        }
+        $today = function_exists('current_time') ? current_time('Y-m-d') : gmdate('Y-m-d');
+        if ($ymd > $today) {
+            return null;
+        }
+        return $ymd;
+    };
+
     if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
-        return $raw;
+        return $accept_dob_ymd($raw);
     }
     if (function_exists('intersoccer_parse_loose_date_to_ymd')) {
         $parsed = intersoccer_parse_loose_date_to_ymd($raw);
-        if (is_string($parsed) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed)) {
-            return $parsed;
+        if (is_string($parsed)) {
+            return $accept_dob_ymd($parsed);
         }
     }
     return null;
@@ -2117,10 +2132,23 @@ function intersoccer_normalize_attendee_dob_order_meta_value($value) {
 function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
     $dob_ymd = intersoccer_normalize_attendee_dob_order_meta_value($value);
     if ($dob_ymd === null) {
-        $year = is_scalar($value) ? preg_replace('/[^\d]/', '', (string) $value) : '';
-        $year = strlen($year) >= 4 ? substr($year, 0, 4) : '';
-        if ($year !== '' && preg_match('/^\d{4}$/', $year)) {
-            return intersoccer_pv_privacy_string('Birth year: %s', [$year]);
+        $raw = is_scalar($value) ? trim((string) $value) : '';
+        $year = null;
+        if ($raw !== '') {
+            $current_year = (int) (function_exists('current_time') ? current_time('Y') : gmdate('Y'));
+            if (preg_match('/^\d{4}$/', $raw)) {
+                $year = (int) $raw;
+            } elseif (preg_match('/^\d{1,2}[\/\.](\d{4})$/', $raw, $my_match)) {
+                $year = (int) $my_match[1];
+            } elseif (preg_match('/^(\d{4})-\d{1,2}$/', $raw, $ym_match)) {
+                $year = (int) $ym_match[1];
+            }
+            if ($year !== null && ($year < 1900 || $year > $current_year)) {
+                $year = null;
+            }
+        }
+        if ($year !== null) {
+            return intersoccer_pv_privacy_string('Birth year: %s', [(string) $year]);
         }
         return '';
     }
