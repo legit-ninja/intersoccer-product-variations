@@ -144,7 +144,9 @@ function intersoccer_get_multilingual_plugin() {
 function intersoccer_get_player_assignment_strings($args = []) {
     $defaults = [
         'dashboard_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('dashboard') : '',
-        'manage_players_url' => function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('manage-players') : '',
+        'manage_players_url' => function_exists('intersoccer_pv_manage_players_url')
+            ? intersoccer_pv_manage_players_url()
+            : (function_exists('wc_get_account_endpoint_url') ? wc_get_account_endpoint_url('manage-players') : ''),
     ];
 
     $args = wp_parse_args($args, $defaults);
@@ -182,6 +184,43 @@ function intersoccer_get_player_assignment_strings($args = []) {
         'selectAtLeastOneDay' => __('Please select at least one day.', 'intersoccer-product-variations'),
         'resolveError' => __('Please resolve the error to continue.', 'intersoccer-product-variations'),
         'genericRequestFailed' => __('Request failed', 'intersoccer-product-variations'),
+    ];
+}
+
+/**
+ * Late pickup Elementor / inline JS strings (customer-facing).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_get_late_pickup_elementor_strings() {
+    return [
+        'selectOptional' => __('Select late pick up option (optional)', 'intersoccer-product-variations'),
+        'noLatePickup' => __('No Late Pickup', 'intersoccer-product-variations'),
+        'fullWeek' => __('Full Week', 'intersoccer-product-variations'),
+        'singleDays' => __('Single Days', 'intersoccer-product-variations'),
+        'noSelection' => __('No late pick up selected', 'intersoccer-product-variations'),
+        'fullWeekFiveDays' => __('Full Week (5 days): ', 'intersoccer-product-variations'),
+        'selectAtLeastOneDay' => __('Select at least one day', 'intersoccer-product-variations'),
+        'dayCountSingular' => _n('%d day: ', '%d days: ', 1, 'intersoccer-product-variations'),
+        'dayCountPlural' => _n('%d day: ', '%d days: ', 2, 'intersoccer-product-variations'),
+        'invalidSelection' => __('Invalid selection', 'intersoccer-product-variations'),
+    ];
+}
+
+/**
+ * Course variation table / JS display labels (customer-facing).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_get_course_display_strings() {
+    return [
+        'start_date' => __('Start Date', 'intersoccer-product-variations'),
+        'end_date' => __('End Date', 'intersoccer-product-variations'),
+        'total_sessions' => __('Total Sessions', 'intersoccer-product-variations'),
+        'remaining_sessions' => __('Remaining Sessions', 'intersoccer-product-variations'),
+        'holidays' => __('Holidays', 'intersoccer-product-variations'),
+        'holidays_no_session' => __('Holidays (No Session)', 'intersoccer-product-variations'),
+        'label_value_separator' => _x(':', 'label/value separator', 'intersoccer-product-variations'),
     ];
 }
 

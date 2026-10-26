@@ -120,6 +120,56 @@ if (!function_exists('__')) {
     }
 }
 
+if (!function_exists('_n')) {
+    function _n($single, $plural, $number, $domain = 'default') {
+        $index = (int) $number === 1 ? 0 : 1;
+        if (function_exists('translate')) {
+            $key = $single . "\0" . $plural;
+            $translated = translate($key, $domain);
+            if ($translated !== $key && str_contains($translated, "\0")) {
+                $parts = explode("\0", $translated);
+                if (isset($parts[$index])) {
+                    return $parts[$index];
+                }
+            }
+        }
+        return $index === 0 ? $single : $plural;
+    }
+}
+
+if (!function_exists('_x')) {
+    function _x($text, $context, $domain = 'default') {
+        if (function_exists('translate')) {
+            $key = $context . "\4" . $text;
+            $translated = translate($key, $domain);
+            if ($translated !== $key) {
+                return $translated;
+            }
+        }
+        return __($text, $domain);
+    }
+}
+
+if (!function_exists('wp_kses')) {
+    function wp_kses($string, $allowed_html, $allowed_protocols = []) {
+        $string = (string) $string;
+        if ($allowed_html === [] || $allowed_html === null) {
+            return wp_strip_all_tags($string);
+        }
+        if (isset($allowed_html['a']['href']) && preg_match_all('/<a\\s+[^>]*href=(["\'])([^"\']*)\\1[^>]*>(.*?)<\\/a>/is', $string, $matches, PREG_SET_ORDER)) {
+            $out = $string;
+            foreach ($matches as $match) {
+                $href = esc_url($match[2]);
+                $inner = $match[3];
+                $replacement = '<a href="' . $href . '">' . $inner . '</a>';
+                $out = str_replace($match[0], $replacement, $out);
+            }
+            return preg_replace('/<(?!\/?a\b)[^>]+>/', '', $out);
+        }
+        return wp_strip_all_tags($string);
+    }
+}
+
 if (!function_exists('_e')) {
     function _e($text, $domain = 'default') {
         echo $text;
@@ -611,6 +661,10 @@ if (!function_exists('wc_add_notice')) {
 
 if (!function_exists('wc_get_account_endpoint_url')) {
     function wc_get_account_endpoint_url($endpoint) {
+        global $intersoccer_test_myaccount_permalink;
+        if (isset($intersoccer_test_myaccount_permalink) && $intersoccer_test_myaccount_permalink === '') {
+            return '';
+        }
         return 'http://example.com/my-account/' . $endpoint . '/';
     }
 }

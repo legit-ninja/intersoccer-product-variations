@@ -810,7 +810,7 @@ function intersoccer_pv_age_no_dob_error_message() {
     if ($template_string === $english_template) {
         $lang_code = intersoccer_pv_age_no_dob_notice_lang_code();
         if ($lang_code === 'fr') {
-            $template_string = 'Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants : %s';
+            $template_string = "Le participant sélectionné doit avoir une date de naissance valide. Mettez-la à jour dans Gérer les participants\u{00A0}: %s";
         } elseif ($lang_code === 'de') {
             $template_string = 'Für den ausgewählten Teilnehmer ist ein gültiges Geburtsdatum erforderlich. Bitte aktualisieren Sie es unter „Teilnehmer verwalten“: %s';
         }
@@ -818,5 +818,38 @@ function intersoccer_pv_age_no_dob_error_message() {
     $template = esc_html($template_string);
 
     return sprintf($template, $link);
+}
+
+/**
+ * Customer-facing notice when a girls-only session attendee has no gender set.
+ *
+ * @return string HTML (anchor only) or plain text when Manage Players URL is unavailable.
+ */
+function intersoccer_pv_girls_only_gender_required_message() {
+    $url = intersoccer_pv_manage_players_url();
+    if ($url === '') {
+        return __(
+            'This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking.',
+            'intersoccer-product-variations'
+        );
+    }
+
+    $allowed_link_tags = [
+        'a' => [
+            'href' => [],
+        ],
+    ];
+
+    return wp_kses(
+        sprintf(
+            /* translators: %s: URL to Manage Players */
+            __(
+                'This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href="%s">Manage Players</a>.',
+                'intersoccer-product-variations'
+            ),
+            esc_url($url)
+        ),
+        $allowed_link_tags
+    );
 }
 
