@@ -113,10 +113,53 @@ if (!function_exists('esc_attr')) {
 
 if (!function_exists('__')) {
     function __($text, $domain = 'default') {
+        $translation = $text;
+        if (class_exists('MockFilters') && isset(MockFilters::$filters['gettext_' . $domain])) {
+            return call_user_func(MockFilters::$filters['gettext_' . $domain], $translation, $text, $domain);
+        }
         if (function_exists('translate')) {
             return translate($text, $domain);
         }
-        return $text;
+        return $translation;
+    }
+}
+
+if (!function_exists('is_textdomain_loaded')) {
+    function is_textdomain_loaded($domain) {
+        global $intersoccer_pv_test_textdomain_loaded;
+        return !empty($intersoccer_pv_test_textdomain_loaded[$domain])
+            || !empty($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+    }
+}
+
+if (!function_exists('unload_textdomain')) {
+    function unload_textdomain($domain, $reloadable = false) {
+        $GLOBALS['intersoccer_test_textdomain_unload_reloadable'][$domain] = (bool) $reloadable;
+        unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+        global $intersoccer_pv_test_textdomain_loaded;
+        unset($intersoccer_pv_test_textdomain_loaded[$domain]);
+    }
+}
+
+if (!function_exists('load_plugin_textdomain')) {
+    function load_plugin_textdomain($domain, $deprecated, $path) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'path' => $path,
+            'locale' => function_exists('determine_locale') ? determine_locale() : 'en_US',
+            'via' => 'load_plugin_textdomain',
+        ];
+        return true;
+    }
+}
+
+if (!function_exists('load_textdomain')) {
+    function load_textdomain($domain, $mofile, $locale = null) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'mofile' => $mofile,
+            'locale' => $locale ?: (function_exists('determine_locale') ? determine_locale() : 'en_US'),
+            'via' => 'load_textdomain',
+        ];
+        return true;
     }
 }
 

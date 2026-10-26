@@ -184,7 +184,7 @@ msgstr ""
 
 # wpml-name: 1431360f9839dbc8fc08138211fe7e8f
 msgid "Full Week"
-msgstr ""
+msgstr "Ganze Woche"
 
 # wpml-name: 643562a9ae7099c8aabfdc93478db117
 msgid "Processing"
@@ -425,23 +425,23 @@ msgstr ""
 
 # wpml-name: 3a37dedbdc456a5a048974930a867b7d
 msgid "50%% Same Season Course Discount (%s)"
-msgstr ""
+msgstr "50%% Rabatt für Kurs gleiche Saison (%s)"
 
 # wpml-name: bc77e703b6554ab3671c124db7c48589
 msgid "%d%% Multi-Child Course Discount"
-msgstr ""
+msgstr "%d%% Mehrkind-Kurs-Rabatt"
 
 # wpml-name: f093ad31cc309a075892ae12365d0a4a
 msgid "%d%% Sibling Course Discount"
-msgstr ""
+msgstr "%d%% Kurs-Geschwister-Rabatt"
 
 # wpml-name: fd6cefad6ac3f0c59e9813b1851d12da
 msgid "%d%% Multi-Child Camp Discount"
-msgstr ""
+msgstr "%d%% Mehrkind-Camp-Rabatt"
 
 # wpml-name: 26bae96a3db17d6b0aacec91e7a6e5b1
 msgid "%d%% Sibling Camp Discount"
-msgstr ""
+msgstr "%d%% Camp-Geschwister-Rabatt"
 
 # wpml-name: tournament_multi_child_discount
 msgid "%d%% Multi-Child Tournament Discount"
@@ -491,29 +491,32 @@ msgstr "Zweites Kind Camp-Rabatt"
 msgid "20% Sibling Discount Applied"
 msgstr "20% Geschwister-Rabatt angewendet"
 
+msgid "%d%% Sibling Discount Applied"
+msgstr "%d%% Geschwister-Rabatt angewendet"
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr ""
 
 # wpml-name: 3b8dae5b06af017dfd637787d41deb39
 msgid "Discounts Applied"
-msgstr ""
+msgstr "Angewendete Rabatte"
 
 # wpml-name: 559239d226fc41ded4a63d71b9aa0993
 msgid "Discount Information"
-msgstr ""
+msgstr "Rabattinformationen"
 
 # wpml-name: c2e0383f6afcd9efdd1293ae9f01ac89
 msgid "50%% Same Season Course Discount (Child %d, %s)"
-msgstr ""
+msgstr "50%% Rabatt für Kurs gleiche Saison (Kind %d, %s)"
 
 # wpml-name: 44b442f734438b0573e8c349352231d3
 msgid "%d%% Course Multi-Child Discount (Child %d)"
-msgstr ""
+msgstr "%d%% Mehrkind-Kurs-Rabatt (Kind %d)"
 
 # wpml-name: edb9be8ad5dbcdf93f068fe7afd2e6bb
 msgid "%d%% Camp Combo Discount (Child %d)"
-msgstr ""
+msgstr "%d%% Camp-Kombinations-Rabatt (Kind %d)"
 
 # wpml-name: tournament_multi_child_discount_template
 msgid "%d%% Tournament Multi-Child Discount (Child %d)"
@@ -656,7 +659,7 @@ msgstr "%d Wochen verbleibend"
 
 # wpml-name: ea9aa7aabff7550810c1515c5a6e0240
 msgid "Discount Applied"
-msgstr ""
+msgstr "Rabatt angewendet"
 
 # wpml-name: 1d53c54b671a42c3c108eb0147ebefd5
 msgid "Holidays"
@@ -680,23 +683,23 @@ msgstr ""
 
 # wpml-name: 59ec68ce0386af0b3298dacf940d767f
 msgid "Days Selected"
-msgstr ""
+msgstr "Ausgewählte Tage"
 
 # wpml-name: 7bfddf530b40af0073fbfb957594d475
 msgid "Assigned Attendee"
-msgstr ""
+msgstr "Zugewiesener Teilnehmer"
 
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
-msgstr ""
+msgstr "50% Rabatt für Kurs gleiche Saison"
 
 # wpml-name: 01e0d7cc38afaa0ee32c5df46659f52f
 msgid "%d%% Combo Discount (%s Child)"
-msgstr ""
+msgstr "%d%% Kombinations-Rabatt (%s Kind)"
 
 # wpml-name: fa580353b0e0ef9d4136355c33dc4e48
 msgid "%d%% Family Discount (%s Child)"
-msgstr ""
+msgstr "%d%% Familien-Rabatt (%s Kind)"
 
 # wpml-name: 0ebb26492fc4da57d7bd30d0936bec74
 msgid "Missing parameters."
@@ -855,3 +858,83 @@ msgstr "Diese Veranstaltung ist nur für Mädchen. Für den ausgewählten Teilne
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr "Diese Veranstaltung ist nur für Mädchen. Für den ausgewählten Teilnehmer muss im Konto das Geschlecht „weiblich“ hinterlegt sein. Bitte aktualisieren Sie dies unter <a href=\"%s\">Teilnehmer verwalten</a>."
 
+msgid "%d%% Camp Week %d+ Discount"
+msgstr "%d%% Camp-Rabatt Woche %d+"
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr "%d%% Camp-Rabatt Woche 2"
+
+msgid "%d%% Same Season Course Discount"
+msgstr "%d%% Rabatt zweiter Kurs gleiche Saison"
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr "%d%% Turnier-Mehrtages-Rabatt"
+
+msgid "%s%% Camp Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Camp"
+
+msgid "%s%% Course Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Kurs"
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr "%s%% Geschwister-Rabatt Turnier"
+
+msgid "Autumn"
+msgstr "Herbst"
+
+msgid "Birthday Party"
+msgstr "Geburtstagsfeier"
+
+msgid "Camp Terms"
+msgstr "Camp-Woche"
+
+msgid "Discount"
+msgstr "Rabatt"
+
+msgid "Female"
+msgstr "Mädchen"
+
+msgid "Full Term"
+msgstr "Ganzes Semester"
+
+msgid "Girls Only"
+msgstr "Nur Mädchen"
+
+msgid "Late Pickup"
+msgstr "Spätabholung"
+
+msgid "Male"
+msgstr "Junge"
+
+msgid "Note"
+msgstr "Hinweis"
+
+msgid "Other"
+msgstr "Andere"
+
+msgid "Saturday"
+msgstr "Samstag"
+
+msgid "Single Day(s)"
+msgstr "Einzelne Tag(e)"
+
+msgid "Spring"
+msgstr "Frühling"
+
+msgid "Summer"
+msgstr "Sommer"
+
+msgid "Sunday"
+msgstr "Sonntag"
+
+msgid "Tournament"
+msgstr "Turnier"
+
+msgid "Unknown"
+msgstr "Unbekannt"
+
+msgid "Winter"
+msgstr "Winter"
+
+msgid "j F Y"
+msgstr "j. F Y"

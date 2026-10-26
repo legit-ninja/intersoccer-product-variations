@@ -19,20 +19,13 @@ if (!defined('ABSPATH')) {
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Load plugin text domain for translations
-add_action('plugins_loaded', function () {
-    load_plugin_textdomain(
-        'intersoccer-product-variations',
-        false,
-        dirname(plugin_basename(__FILE__)) . '/lang'
-    );
-});
+require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/pv-textdomain.php';
 
 // Register strings for WPML translation on init to ensure WPML is loaded
 add_action('init', function () {
     if (function_exists('icl_register_string')) {
         // Day names
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         foreach ($days as $day) {
             icl_register_string('intersoccer-product-variations', $day, $day);
         }
@@ -317,6 +310,37 @@ add_action('init', function () {
             '50% Same Season Course Discount',
             '%s Camp Sibling Discount',
             '%s Course Sibling Discount',
+            'Camp Terms',
+            'Note',
+            'j F Y',
+            'Birthday Party',
+            'Tournament',
+            'Unknown',
+            'Single Day(s)',
+            'Full Term',
+            'Girls Only',
+            'Summer',
+            'Autumn',
+            'Spring',
+            'Winter',
+            'Male',
+            'Female',
+            'Other',
+            'Attendee Gender',
+            '%d%% Camp Sibling Discount',
+            '%d%% Course Sibling Discount',
+            '%d%% Tournament Sibling Discount',
+            '%d%% Camp Week 2 Discount',
+            '%d%% Camp Week %d+ Discount',
+            '%d%% Same Season Course Discount',
+            '%d%% Tournament Multiple Days Discount',
+            '%d%% Sibling Camp Discount',
+            '%d%% Multi-Child Camp Discount',
+            '%d%% Sibling Course Discount',
+            '%d%% Multi-Child Course Discount',
+            '%d%% Sibling Tournament Discount',
+            '%d%% Multi-Child Tournament Discount',
+            '%d%% Sibling Discount Applied',
             'Coach',
             'Organizer',
             'Manage Players',
