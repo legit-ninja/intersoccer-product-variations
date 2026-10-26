@@ -759,6 +759,83 @@ msgstr ""
 msgid "Booking details"
 msgstr ""
 
+# wpml-name: Late Pickup Days
+msgid "Late Pickup Days"
+msgstr ""
+
+# wpml-name: Activity Type
+msgid "Activity Type"
+msgstr ""
+
+# wpml-name: Attendee DOB
+msgid "Attendee DOB"
+msgstr ""
+
+# wpml-name: Attendee Gender
+msgid "Attendee Gender"
+msgstr ""
+
+# wpml-name: Late Pickup Cost
+msgid "Late Pickup Cost"
+msgstr ""
+
+# wpml-name: Camp Start Date
+msgid "Camp Start Date"
+msgstr ""
+
+# wpml-name: Camp End Date
+msgid "Camp End Date"
+msgstr ""
+
+# wpml-name: Camp Times
+msgid "Camp Times"
+msgstr ""
+
+# wpml-name: Canton/Region
+msgid "Canton/Region"
+msgstr ""
+
+# wpml-name: Canton / Region
+msgid "Canton / Region"
+msgstr ""
+
+# wpml-name: City
+msgid "City"
+msgstr ""
+
+# wpml-name: Booking Type
+msgid "Booking Type"
+msgstr ""
+
+# wpml-name: Discount Amount
+msgid "Discount Amount"
+msgstr ""
+
+# wpml-name: Sites InterSoccer
+msgid "Sites InterSoccer"
+msgstr ""
+
+# wpml-name: Medical Conditions
+msgid "Medical Conditions"
+msgstr ""
+
+# wpml-name: Season
+msgid "Season"
+msgstr ""
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr ""
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr ""
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr ""
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr ""
+
 # wpml-name: 50% Same-Season Course Discount
 msgid "50% Same-Season Course Discount"
 msgstr ""

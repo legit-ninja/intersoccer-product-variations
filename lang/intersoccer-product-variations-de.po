@@ -692,6 +692,67 @@ msgstr "Zugewiesener Teilnehmer"
 msgid "Booking details"
 msgstr "Buchungsdetails"
 
+msgid "Late Pickup Days"
+msgstr "Tage für Spätabholung"
+
+msgid "Activity Type"
+msgstr "Aktivitätstyp"
+
+msgid "Attendee DOB"
+msgstr "Geburtsdatum des Teilnehmers"
+
+msgid "Attendee Gender"
+msgstr "Geschlecht des Teilnehmers"
+
+msgid "Late Pickup Cost"
+msgstr "Kosten für Spätabholung"
+
+msgid "Camp Start Date"
+msgstr "Camp-Startdatum"
+
+msgid "Camp End Date"
+msgstr "Camp-Enddatum"
+
+msgid "Camp Times"
+msgstr "Camp-Zeiten"
+
+msgid "Canton/Region"
+msgstr "Kanton / Region"
+
+msgid "Canton / Region"
+msgstr "Kanton / Region"
+
+msgid "City"
+msgstr "Stadt"
+
+msgid "Booking Type"
+msgstr "Buchungstyp"
+
+msgid "Discount Amount"
+msgstr "Rabattbetrag"
+
+msgid "Sites InterSoccer"
+msgstr "InterSoccer Standorte"
+
+msgid "Medical Conditions"
+msgstr "Medizinische Angaben"
+
+msgid "Season"
+msgstr "Saison"
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr "Dieser Teilnehmer ist am Programmstart %1$d Jahre alt und liegt außerhalb des erlaubten Altersbereichs (%2$s) für diese Session."
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr "Die Altersgruppe für dieses Programm konnte nicht gelesen werden. Bitte kontaktieren Sie uns oder wählen Sie eine andere Session."
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr "Das Programmstartdatum konnte nicht ermittelt werden; das Alter kann nicht überprüft werden. Bitte kontaktieren Sie uns oder wählen Sie eine andere Option."
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr "Das Geburtsdatum des Teilnehmers ist ungültig oder liegt nach dem Programmstartdatum."
+
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
 msgstr "50% Rabatt für Kurs gleiche Saison"

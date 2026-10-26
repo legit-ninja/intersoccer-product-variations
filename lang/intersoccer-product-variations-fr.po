@@ -701,6 +701,67 @@ msgstr "Participant assigné"
 msgid "Booking details"
 msgstr "Détails de la réservation"
 
+msgid "Late Pickup Days"
+msgstr "Jours de garde tardive"
+
+msgid "Activity Type"
+msgstr "Type d'activité"
+
+msgid "Attendee DOB"
+msgstr "Date de naissance du participant"
+
+msgid "Attendee Gender"
+msgstr "Sexe du participant"
+
+msgid "Late Pickup Cost"
+msgstr "Coût de la garde tardive"
+
+msgid "Camp Start Date"
+msgstr "Date de début du camp"
+
+msgid "Camp End Date"
+msgstr "Date de fin du camp"
+
+msgid "Camp Times"
+msgstr "Horaires du camp"
+
+msgid "Canton/Region"
+msgstr "Canton / région"
+
+msgid "Canton / Region"
+msgstr "Canton / région"
+
+msgid "City"
+msgstr "Ville"
+
+msgid "Booking Type"
+msgstr "Type de réservation"
+
+msgid "Discount Amount"
+msgstr "Montant de la remise"
+
+msgid "Sites InterSoccer"
+msgstr "Sites InterSoccer"
+
+msgid "Medical Conditions"
+msgstr "Conditions médicales"
+
+msgid "Season"
+msgstr "Saison"
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr "Ce participant a %1$d ans à la date de début du programme, ce qui est hors de la tranche d’âge autorisée (%2$s) pour cette session."
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr "La tranche d’âge de ce programme n’a pas pu être lue. Veuillez nous contacter ou choisir une autre session."
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr "La date de début du programme n’a pas pu être déterminée ; l’âge ne peut pas être vérifié. Veuillez nous contacter ou essayer une autre option."
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr "La date de naissance du participant est invalide ou postérieure à la date de début du programme."
+
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"
 msgstr "Remise de 50% pour cours même saison"

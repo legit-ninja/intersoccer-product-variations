@@ -1071,7 +1071,9 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 $existing_meta = $item->get_meta_data();
                 $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
                 
-                $existing_activity_type = in_array('Activity Type', $existing_keys) ? $item->get_meta('Activity Type', true) : '';
+                $existing_activity_type = function_exists('intersoccer_pv_order_item_get_meta_by_canonical_key')
+                    ? (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type')
+                    : (in_array('Activity Type', $existing_keys) ? $item->get_meta('Activity Type', true) : '');
 
                 $built = intersoccer_build_order_line_meta([
                     'order' => $order,
@@ -2076,9 +2078,9 @@ function intersoccer_analyze_item_metadata($order, $item, $product_type) {
     $missing = [];
     $proposed = [];
 
-    $existing_activity_type = in_array('Activity Type', $existing_keys, true)
-        ? $item->get_meta('Activity Type', true)
-        : '';
+    $existing_activity_type = function_exists('intersoccer_pv_order_item_get_meta_by_canonical_key')
+        ? (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type')
+        : (in_array('Activity Type', $existing_keys, true) ? $item->get_meta('Activity Type', true) : '');
 
     $built = intersoccer_build_order_line_meta([
         'order' => $order,

@@ -21,6 +21,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/tests/support/SeasonSqlTestBootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
@@ -63,6 +64,11 @@ class SiblingDiscountCrossLanguageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        intersoccer_pv_test_bootstrap_season_sql_wpdb(WpdbSeasonSqlMock::autumn_2026_wpml_fixture(
+            self::SEASON_TERM_EN,
+            self::SEASON_TERM_FR,
+            self::SEASON_TERM_DE
+        ));
         $GLOBALS['intersoccer_test_product_type'] = 'camp';
         // Deterministic globals regardless of suite order (other tests set these).
         $GLOBALS['intersoccer_test_options'] = [];
@@ -144,7 +150,10 @@ class SiblingDiscountCrossLanguageTest extends TestCase
             $GLOBALS['intersoccer_test_is_admin'],
             $GLOBALS['intersoccer_test_wc_get_orders'],
             $GLOBALS['intersoccer_test_orders'],
-            $GLOBALS['intersoccer_test_user_id']
+            $GLOBALS['intersoccer_test_user_id'],
+            $GLOBALS['wpdb'],
+            $GLOBALS['intersoccer_test_transients'],
+            $GLOBALS['intersoccer_test_object_cache']
         );
         MockMetaData::$data = [];
         MockFilters::reset();
@@ -334,13 +343,12 @@ class SiblingDiscountCrossLanguageTest extends TestCase
 
     public function testNormalizeSeasonKeyMapsTranslatedStoredMetaToCanonical(): void
     {
-        $this->assertSame(
-            'autumn camps 2026|2026',
-            intersoccer_discount_normalize_season_key('herbst camps 2026|2026')
-        );
-        $this->assertSame(
-            'autumn camps 2026|2026',
-            intersoccer_discount_normalize_season_key("camps d'automne 2026|2026")
-        );
+        $en = intersoccer_discount_normalize_season_key('autumn camps 2026|2026');
+        $de = intersoccer_discount_normalize_season_key('herbst camps 2026|2026');
+        $fr = intersoccer_discount_normalize_season_key("camps d'automne 2026|2026");
+        $this->assertSame($en, $de);
+        $this->assertSame($en, $fr);
+        $this->assertStringStartsWith('ps:', $en);
+        $this->assertStringContainsString('|2026', $en);
     }
 }
