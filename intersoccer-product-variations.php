@@ -59,6 +59,7 @@ add_action('init', function () {
             '%d%% Combo Discount (%s Child)',
             '50% Same-Season Course Discount',
             'Assigned Attendee',
+            'Booking details',
             'Days Selected',
             '%d of %d',
             'Sessions Remaining',

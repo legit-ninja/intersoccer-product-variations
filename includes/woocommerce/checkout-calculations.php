@@ -346,6 +346,10 @@ function intersoccer_display_checkout_cart_item_metadata($cart_item_name, $cart_
             $meta_output .= '<div class="intersoccer-checkout-meta"><strong>' . esc_html__('Assigned Attendee', 'intersoccer-product-variations') . ':</strong> ' . esc_html($cart_item['assigned_attendee']) . '</div>';
         }
 
+        if (!empty($cart_item['intersoccer_info_note'])) {
+            $meta_output .= '<div class="intersoccer-checkout-meta intersoccer-info"><strong>' . esc_html__('Booking details', 'intersoccer-product-variations') . ':</strong> ' . esc_html($cart_item['intersoccer_info_note']) . '</div>';
+        }
+
         // Discount Note
         if (isset($cart_item['discount_note']) && !empty($cart_item['discount_note'])) {
             $discount_display = function_exists('intersoccer_translate_stored_discount_label_for_display')

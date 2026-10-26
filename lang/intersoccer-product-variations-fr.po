@@ -496,6 +496,9 @@ msgstr "Remise pour deuxième enfant pour camp"
 msgid "20% Sibling Discount Applied"
 msgstr "20% de réduction appliquée pour frère/soeur"
 
+msgid "%d%% Sibling Discount Applied"
+msgstr "%d%% de réduction appliquée pour frère/soeur"
+
 # wpml-name: 536a056b710e94b16169efd17a4a657b
 msgid "saved"
 msgstr "sauvegardé"
@@ -694,6 +697,9 @@ msgstr "Jours sélectionnés"
 # wpml-name: 7bfddf530b40af0073fbfb957594d475
 msgid "Assigned Attendee"
 msgstr "Participant assigné"
+
+msgid "Booking details"
+msgstr "Détails de la réservation"
 
 # wpml-name: 8fbf65583970ee15e73651684dd0f5ac
 msgid "50% Same-Season Course Discount"

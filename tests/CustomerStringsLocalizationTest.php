@@ -101,6 +101,7 @@ class CustomerStringsLocalizationTest extends TestCase {
         'End Date',
         'Remaining Sessions',
         'Holidays',
+        '%d%% Sibling Discount Applied',
     ];
 
     private const FR_EXPECTED = [
@@ -291,6 +292,20 @@ class CustomerStringsLocalizationTest extends TestCase {
         foreach (['de', 'de_DE'] as $fileLocale) {
             $mo = $this->readMo($fileLocale);
             $this->assertSame(self::DE_BOOKING_STASH_MSGSTR, $mo[$msgid], $fileLocale);
+        }
+    }
+
+    public function test_sibling_discount_applied_percentage_note_localized_fr_de(): void {
+        $msgid = '%d%% Sibling Discount Applied';
+        foreach (['fr', 'fr_FR'] as $fileLocale) {
+            $mo = $this->readMo($fileLocale);
+            $this->assertSame('%d%% de réduction appliquée pour frère/soeur', $mo[$msgid], $fileLocale);
+            $this->assertSame('20% de réduction appliquée pour frère/soeur', sprintf($mo[$msgid], 20), $fileLocale . ' sprintf');
+        }
+        foreach (['de', 'de_DE'] as $fileLocale) {
+            $mo = $this->readMo($fileLocale);
+            $this->assertSame('%d%% Geschwister-Rabatt angewendet', $mo[$msgid], $fileLocale);
+            $this->assertSame('20% Geschwister-Rabatt angewendet', sprintf($mo[$msgid], 20), $fileLocale . ' sprintf');
         }
     }
 
