@@ -107,7 +107,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 <?php else : ?>
                     <p class="intersoccer-loading-players"><?php echo esc_html($player_assignment_i18n['loadingPlayers']); ?></p>
                 <?php endif; ?>
-                <span class="woocommerce-info intersoccer-attendee-notification" style="display: none;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></span>
+                <div class="woocommerce-info intersoccer-attendee-notification" style="display: none;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></div>
             </div>
         </td>
     </tr>
@@ -123,7 +123,7 @@ $intersoccer_elementor_product_page_cb = function () {
         <td>
             <div class="intersoccer-day-checkboxes"></div> <!-- Added this div for JS to append checkboxes -->
             <div class="intersoccer-day-notification"></div>
-            <span class="error-message woocommerce-error" style="display: none;"></span>
+            <div class="error-message woocommerce-error" style="display: none;"></div>
         </td>
     </tr>
 <?php
@@ -367,6 +367,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 debugError('InterSoccer: Product form not found');
                 return;
             }
+            $form.addClass('intersoccer-product-form');
             
             debug('InterSoccer: Found product form:', $form[0], 'Classes:', $form.attr('class'));
 
@@ -908,6 +909,37 @@ $intersoccer_elementor_product_page_cb = function () {
             }
             
             var intersoccerPlayerI18n = <?php echo wp_json_encode($player_assignment_i18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS); ?>;
+
+            function intersoccerPvHideNotice($notice) {
+                if ($notice && $notice.length) {
+                    $notice.removeClass('woocommerce-error').hide();
+                }
+            }
+            function intersoccerPvShowDayError($notice) {
+                if (!$notice || !$notice.length) {
+                    return;
+                }
+                $notice.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.')
+                    .removeClass('woocommerce-info')
+                    .addClass('woocommerce-error')
+                    .show();
+            }
+            function intersoccerPvShowAttendeeNotice($notice) {
+                if (!$notice || !$notice.length) {
+                    return;
+                }
+                var text = $.trim($notice.text());
+                var errorTexts = [
+                    intersoccerPlayerI18n.pleaseAddPlayer,
+                    intersoccerPlayerI18n.resolveError
+                ];
+                if (errorTexts.indexOf(text) !== -1) {
+                    $notice.removeClass('woocommerce-info').addClass('woocommerce-error');
+                } else {
+                    $notice.removeClass('woocommerce-error').addClass('woocommerce-info');
+                }
+                $notice.show();
+            }
             
             // CRITICAL FIX: Intercept WooCommerce AJAX add-to-cart for camp and course products
             // We need to prevent AJAX but keep the variation form working
@@ -1528,13 +1560,13 @@ $intersoccer_elementor_product_page_cb = function () {
                                     $playerContent.empty();
                                     $playerContent.append($container);
                                     $playerContent.append(
-                                        $('<span>', {
+                                        $('<div>', {
                                             'class': 'error-message woocommerce-error',
                                             style: 'display: none;'
                                         })
                                     );
                                     $playerContent.append(
-                                        $('<span>', {
+                                        $('<div>', {
                                             'class': 'woocommerce-info intersoccer-attendee-notification',
                                             style: 'display: none;'
                                         }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
@@ -1579,7 +1611,7 @@ $intersoccer_elementor_product_page_cb = function () {
                                             $('<p></p>').html(intersoccerPlayerI18n.noPlayersRegisteredHtml)
                                         )
                                         .append(
-                                            $('<span>', {
+                                            $('<div>', {
                                                 'class': 'woocommerce-error intersoccer-attendee-notification',
                                                 style: 'display: block;'
                                             }).text(intersoccerPlayerI18n.pleaseAddPlayer)
@@ -1608,7 +1640,7 @@ $intersoccer_elementor_product_page_cb = function () {
                                     $('<p></p>').text(formattedError)
                                 )
                                 .append(
-                                    $('<span>', {
+                                    $('<div>', {
                                         'class': 'woocommerce-error intersoccer-attendee-notification',
                                         style: 'display: block;'
                                     }).text(intersoccerPlayerI18n.resolveError)
@@ -1617,7 +1649,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         }
                     });
                 } else {
-                    $form.find('.intersoccer-attendee-notification').show();
+                    intersoccerPvShowAttendeeNotice($form.find('.intersoccer-attendee-notification'));
                     intersoccerPvDispatchUpdateButtonState();
                 }
 
@@ -1735,11 +1767,12 @@ $intersoccer_elementor_product_page_cb = function () {
                     var actuallyCheckedCount = $dayCheckboxes.find('input.intersoccer-day-checkbox:checked').length;
                     // Don't show notification if form is being submitted or has been submitted
                     if (isSubmitting) {
-                        $dayNotification.hide().css('display', 'none');
+                        intersoccerPvHideNotice($dayNotification);
+                        $dayNotification.css('display', 'none');
                     } else if (actuallyCheckedCount === 0) {
-                        $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
+                        intersoccerPvShowDayError($dayNotification);
                     } else {
-                        $dayNotification.hide();
+                        intersoccerPvHideNotice($dayNotification);
                     }
 
                     var lastCampDayChangeTime = 0;
@@ -1761,9 +1794,9 @@ $intersoccer_elementor_product_page_cb = function () {
                         var $dayNotification = $daySelection.find('.intersoccer-day-notification');
                         if (!isSubmitting) {
                             if (selectedDays.length === 0) {
-                                $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
+                                intersoccerPvShowDayError($dayNotification);
                             } else {
-                                $dayNotification.hide();
+                                intersoccerPvHideNotice($dayNotification);
                             }
                         } else {
                             debug('  Checkbox change - form is submitting, keeping notification hidden');
@@ -1782,7 +1815,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     $form.find('input[name="camp_days[]"]').remove();
                     selectedDays = [];
                     // Hide the notification when day selection is hidden
-                    $daySelection.find('.intersoccer-day-notification').hide();
+                    intersoccerPvHideNotice($daySelection.find('.intersoccer-day-notification'));
                 }
             }
             
@@ -2019,6 +2052,7 @@ $intersoccer_elementor_product_page_cb = function () {
             function updateLatePickupCost(settings) {
                 var $latePickupRow = getLatePickupRow();
                 var $costContainer = $latePickupRow.find('.intersoccer-late-pickup-cost');
+                $costContainer.removeClass('woocommerce-error');
                 
                 // Handle radio button selection
                 if (selectedLatePickupOption === 'none') {
@@ -2238,29 +2272,29 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 if (shouldEnable) {
                     $button.prop('disabled', false).removeClass('disabled');
-                    $attendeeNotification.hide();
+                    intersoccerPvHideNotice($attendeeNotification);
                     if (!isSubmitting) {
-                        $dayNotification.hide();
+                        intersoccerPvHideNotice($dayNotification);
                     }
                 } else {
                     $button.prop('disabled', true).addClass('disabled');
                     
                     // Don't show notifications if form is being submitted
                     if (isSubmitting) {
-                        $attendeeNotification.hide();
-                        $dayNotification.hide();
+                        intersoccerPvHideNotice($attendeeNotification);
+                        intersoccerPvHideNotice($dayNotification);
                     } else {
                         // Show appropriate notification based on what's missing
                         if (!hasPlayer) {
-                            $attendeeNotification.show();
-                            $dayNotification.hide();
+                            intersoccerPvShowAttendeeNotice($attendeeNotification);
+                            intersoccerPvHideNotice($dayNotification);
                         } else if (isSingleDayBooking && !daysSelected) {
-                            $attendeeNotification.hide();
-                            $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
+                            intersoccerPvHideNotice($attendeeNotification);
+                            intersoccerPvShowDayError($dayNotification);
                         } else {
                             // Variation not selected or other issue
-                            $attendeeNotification.hide();
-                            $dayNotification.hide();
+                            intersoccerPvHideNotice($attendeeNotification);
+                            intersoccerPvHideNotice($dayNotification);
                         }
                     }
                 }
@@ -2518,8 +2552,10 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Hide all notifications during submission
                 $currentForm.addClass('intersoccer-form-submitting');
-                $currentForm.find('.intersoccer-attendee-notification').hide().css('display', 'none');
-                $currentForm.find('.intersoccer-day-notification').hide().css('display', 'none');
+                intersoccerPvHideNotice($currentForm.find('.intersoccer-attendee-notification'));
+                $currentForm.find('.intersoccer-attendee-notification').css('display', 'none');
+                intersoccerPvHideNotice($currentForm.find('.intersoccer-day-notification'));
+                $currentForm.find('.intersoccer-day-notification').css('display', 'none');
                 
                 debug('InterSoccer: Form submitting, isSubmitting =', isSubmitting);
                 
@@ -2591,8 +2627,10 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Hide all notifications and add a class to track submission
                 $productForm.addClass('intersoccer-form-submitting');
-                $productForm.find('.intersoccer-attendee-notification').hide().css('display', 'none');
-                $productForm.find('.intersoccer-day-notification').hide().css('display', 'none');
+                intersoccerPvHideNotice($productForm.find('.intersoccer-attendee-notification'));
+                $productForm.find('.intersoccer-attendee-notification').css('display', 'none');
+                intersoccerPvHideNotice($productForm.find('.intersoccer-day-notification'));
+                $productForm.find('.intersoccer-day-notification').css('display', 'none');
                 
                 debug('InterSoccer: ✅ Proceeding with form submission, isSubmitting =', isSubmitting);
             });
@@ -2607,7 +2645,7 @@ $intersoccer_elementor_product_page_cb = function () {
             // Handle add to cart errors
             $(document.body).on('wc_fragments_refreshed wc_cart_fragments_refreshed', function() {
                 // Check if there are error notices
-                if ($('.woocommerce-error, .woocommerce-message--error').length > 0) {
+                if ($('.woocommerce-error, .woocommerce-message--error').not('.error-message, .intersoccer-attendee-notification, .intersoccer-day-notification, .intersoccer-pv-stash-wait-notice').length > 0) {
                     debug('InterSoccer: Add to cart failed, resetting isSubmitting');
                     isSubmitting = false;
                     $form.removeClass('intersoccer-form-submitting');
@@ -3302,6 +3340,21 @@ $intersoccer_elementor_product_page_cb = function () {
         define('INTERSOCCER_PV_EXTRAS_EMITTED', true);
     }
 };
+
+add_action('woocommerce_before_add_to_cart_button', static function () {
+    if (!function_exists('intersoccer_get_product_type')) {
+        return;
+    }
+    global $product;
+    if (!is_a($product, 'WC_Product')) {
+        return;
+    }
+    $product_type = intersoccer_get_product_type($product->get_id());
+    if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+        return;
+    }
+    echo '<script>var intersoccerProductForm=document.currentScript&&document.currentScript.closest("form");if(intersoccerProductForm){intersoccerProductForm.classList.add("intersoccer-product-form");}</script>';
+}, 0);
 
 add_action('woocommerce_before_single_product', $intersoccer_elementor_product_page_cb, 5);
 add_action('woocommerce_single_product_summary', $intersoccer_elementor_product_page_cb, 0);

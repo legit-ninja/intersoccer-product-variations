@@ -4,7 +4,10 @@
  */
 
 /* Column stack only on InterSoccer product forms. No !important, so Elementor
-   keeps display, wrap, colours, and the theme button width. */
+   keeps display, wrap, colours, and the theme button width.
+   The class is added in PHP while the form renders. :has() covers a clone
+   that missed the class. Safari before 15.4 has no :has(). */
+form.intersoccer-product-form .woocommerce-variation-add-to-cart,
 form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-cart {
     flex-direction: column;
 }
@@ -47,7 +50,7 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
 }
 
 .intersoccer-text-light {
-    color: #8f8e8e;
+    color: var(--theme-color-text_light, #8f8e8e);
 }
 
 .intersoccer-late-pickup-cost {

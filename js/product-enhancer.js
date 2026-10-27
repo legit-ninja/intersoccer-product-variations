@@ -537,8 +537,8 @@
             }
 
             if ($notification.length) {
-                $notification.text(message).show();
-                setTimeout(() => $notification.hide(), 5000);
+                $notification.removeClass('woocommerce-info').addClass('woocommerce-error').text(message).show();
+                setTimeout(() => $notification.removeClass('woocommerce-error').hide(), 5000);
             }
         },
 
@@ -628,18 +628,18 @@
             const $notification = $form.find('.intersoccer-attendee-notification');
 
             if (!isLoggedIn) {
-                $notification.text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
+                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
             } else if (!playerSelected) {
-                $notification.text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
+                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
             } else {
-                $notification.hide();
+                $notification.removeClass('woocommerce-error').hide();
             }
 
             const $dayNotification = $form.find('.intersoccer-day-notification');
             if (playerSelected && !daysSelected) {
-                $dayNotification.text(getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.')).show();
+                $dayNotification.removeClass('woocommerce-info').addClass('woocommerce-error').text(getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.')).show();
             } else {
-                $dayNotification.hide();
+                $dayNotification.removeClass('woocommerce-error').hide();
             }
         },
 

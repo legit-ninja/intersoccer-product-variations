@@ -496,12 +496,42 @@ add_action('wp_enqueue_scripts', function () {
     $on_checkout = function_exists('is_checkout') && is_checkout();
     $on_cart = function_exists('is_cart') && is_cart();
     $on_product = function_exists('is_product') && is_product();
-    if ($on_product || $on_cart || $on_checkout) {
+    // Header mini-cart prints the same cart-meta markup on other pages once the cart has items.
+    $on_cart_widget = function_exists('WC') && WC()->cart && method_exists(WC()->cart, 'is_empty') && !WC()->cart->is_empty();
+    // A non-product page can still render the product form via a Woo shortcode or an Elementor add-to-cart widget.
+    $on_embedded_product = false;
+    if (!$on_product && function_exists('is_singular') && is_singular() && class_exists('WP_Post')) {
+        $embedded_post = get_post();
+        if ($embedded_post instanceof WP_Post) {
+            $embedded_content = (string) $embedded_post->post_content;
+            if ($embedded_content !== '' && function_exists('has_shortcode') && (
+                has_shortcode($embedded_content, 'product_page')
+                || has_shortcode($embedded_content, 'add_to_cart')
+            )) {
+                $on_embedded_product = true;
+            }
+            if (!$on_embedded_product) {
+                $elementor_data = get_post_meta($embedded_post->ID, '_elementor_data', true);
+                if (is_string($elementor_data) && strpos($elementor_data, 'woocommerce-product-add-to-cart') !== false) {
+                    $on_embedded_product = true;
+                }
+            }
+        }
+    }
+    if ($on_product || $on_cart || $on_checkout || $on_cart_widget || $on_embedded_product) {
+        $styles_path = INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'css/styles.css';
+        $styles_ver = '1.4.63';
+        if (file_exists($styles_path)) {
+            $styles_mtime = filemtime($styles_path);
+            if ($styles_mtime) {
+                $styles_ver = (string) $styles_mtime;
+            }
+        }
         wp_enqueue_style(
             'intersoccer-styles',
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
             [],
-            '1.4.63' // Bumped to match JS version
+            $styles_ver
         );
     }
     if ($on_checkout || $on_cart) {
