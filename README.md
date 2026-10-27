@@ -7,7 +7,7 @@ Taxonomy standard (attributes, term shapes, order-meta keys, distressed bands): 
 
 ## Version
 - **Version: 2.10.25**
-- Release Date: October 3, 2026
+- Release Date: October 26, 2026
 
 ## Camp schedule meta (2.7.18+)
 
