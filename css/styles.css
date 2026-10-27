@@ -1,16 +1,17 @@
-.woocommerce-variation-add-to-cart {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important; /* Align left, not stretch */
-    gap: 10px;
+/*
+ * Customer-facing layout only. Colours, buttons, inputs, and checkboxes
+ * come from the Cloe Brooks theme and WooCommerce.
+ */
+
+/* Column stack only on InterSoccer product forms. No !important, so Elementor
+   keeps display, wrap, colours, and the theme button width. */
+form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-cart {
+    flex-direction: column;
 }
+
 .intersoccer-attributes {
-    width: 100% !important;
     font-size: 14px;
-    color: #bbb;
-    margin: 0 !important;
     padding: 10px;
-    display: block !important;
     order: -1; /* Above button */
 }
 .intersoccer-attributes p {
@@ -19,64 +20,74 @@
 .intersoccer-attributes strong {
     font-weight: bold;
 }
-.single_add_to_cart_button {
-    width: auto !important; /* Preserve default/theme width */
-    align-self: flex-start; /* Prevent stretch */
-}
-.quantity {
-    align-self: flex-start; /* Prevent quantity stretch */
-}
-.intersoccer-player-selection, .intersoccer-day-selection {
-    margin: 10px 0;
+
+/* Player select fills its table cell. Variation attribute selects stay with Elementor. */
+.intersoccer-player-selection select,
+.intersoccer-day-selection select,
+.intersoccer-late-pickup-row select {
     width: 100%;
+    max-width: 100%;
 }
-.intersoccer-player-selection select, .intersoccer-day-selection input[type="checkbox"] {
-    width: 100%;
+
+.intersoccer-day-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.85rem;
 }
+.intersoccer-day-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.intersoccer-day-notification {
+    margin-top: 10px;
+}
+
+.intersoccer-text-light {
+    color: #8f8e8e;
+}
+
+.intersoccer-late-pickup-cost {
+    margin-top: 10px;
+    font-weight: bold;
+}
+.intersoccer-late-pickup-note {
+    margin-bottom: 10px;
+    font-style: italic;
+}
+.intersoccer-late-pickup-option {
+    display: block;
+    margin-bottom: 8px;
+}
+.intersoccer-late-pickup-day-checkboxes {
+    margin-left: 25px;
+    margin-top: 10px;
+    display: none;
+}
+.intersoccer-late-pickup-day-option {
+    display: block;
+    margin-bottom: 5px;
+}
+
 .intersoccer-camp-day-selection {
     margin: 15px 0;
     width: 100%;
 }
 .intersoccer-camp-day-selection label {
     display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
     margin-bottom: 8px;
 }
 .intersoccer-camp-day-selection .select2-container {
-    width: 100% !important;
+    width: 100%;
 }
-.intersoccer-camp-day-selection .select2-selection--multiple {
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    background-color: #fff;
-    padding: 5px;
-    min-height: 40px;
-    font-size: 14px;
-}
-.intersoccer-camp-day-selection .select2-selection--multiple:focus {
-    border-color: #708840;
-    outline: none;
-}
+
 @media (max-width: 767px) {
-    .woocommerce-variation-add-to-cart {
-        gap: 5px;
-    }
     .intersoccer-attributes {
         padding: 8px;
     }
-    .single_add_to_cart_button, .quantity {
-        width: auto !important;
-        align-self: flex-start;
-    }
-}
-
-/* Checkout metadata list styling */
-.intersoccer-meta-list {
-    list-style: none;
-    margin: 0.5em 0;
-    padding: 0;
 }
 
 /* Checkout metadata list styling */
@@ -98,84 +109,6 @@
     margin-right: 0.5em;
 }
 
-/* Mobile adjustments */
-@media (max-width: 767px) {
-    .intersoccer-meta-list {
-        margin: 0.75em 0;
-    }
-    .intersoccer-meta-item {
-        font-size: 13px;
-        margin-bottom: 0.75em;
-    }
-}/* Checkout metadata list styling */
-.intersoccer-meta-list {
-    list-style: none;
-    margin: 0.5em 0;
-    padding: 0;
-}
-
-.intersoccer-meta-item {
-    display: block;
-    margin-bottom: 0.5em;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.intersoccer-meta-item strong {
-    font-weight: 600;
-    margin-right: 0.5em;
-}
-
-/* Mobile adjustments */
-@media (max-width: 767px) {
-    .intersoccer-meta-list {
-        margin: 0.75em 0;
-    }
-    .intersoccer-meta-item {
-        font-size: 13px;
-        margin-bottom: 0.75em;
-    }
-}/* Checkout metadata list styling */
-.intersoccer-meta-list {
-    list-style: none;
-    margin: 0.5em 0;
-    padding: 0;
-}
-
-.intersoccer-meta-item {
-    display: block;
-    margin-bottom: 0.5em;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.intersoccer-meta-item strong {
-    font-weight: 600;
-    margin-right: 0.5em;
-}
-
-/* Mobile adjustments */
-@media (max-width: 767px) {
-    .intersoccer-meta-list {
-        margin: 0.75em 0;
-    }
-    .intersoccer-meta-item {
-        font-size: 13px;
-        margin-bottom: 0.75em;
-    }
-}-meta-item {
-    display: block;
-    margin-bottom: 0.5em;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.intersoccer-meta-item strong {
-    font-weight: 600;
-    margin-right: 0.5em;
-}
-
-/* Mobile adjustments */
 @media (max-width: 767px) {
     .intersoccer-meta-list {
         margin: 0.75em 0;
@@ -188,7 +121,6 @@
 
 .intersoccer-discount-note {
     display: block;
-    color: #e2401c; /* Red for visibility */
     font-size: 0.85em;
     margin-top: 5px;
 }
@@ -200,17 +132,13 @@
 .intersoccer-cart-meta, .intersoccer-checkout-meta {
     display: block;
     font-size: 1em;
-    /* margin-top: 5px; */
-    color: #555;
 }
 
 .intersoccer-cart-meta.intersoccer-discount, .intersoccer-checkout-meta.intersoccer-discount {
-    color: #0073aa;
     font-style: italic;
 }
 
 .intersoccer-checkout-meta-wrapper {
-    /* margin-top: 8px; */
     padding-left: 10px;
 }
 
@@ -218,7 +146,6 @@
 .intersoccer-late-pickup-price,
 .intersoccer-total-price {
     font-weight: bold;
-    color: #333; /* Match WooCommerce theme or adjust per Jonas's UI/UX */
     display: inline-block;
 }
 

@@ -107,7 +107,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 <?php else : ?>
                     <p class="intersoccer-loading-players"><?php echo esc_html($player_assignment_i18n['loadingPlayers']); ?></p>
                 <?php endif; ?>
-                <span class="intersoccer-attendee-notification" style="color: red; display: none; margin-top: 10px;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></span>
+                <span class="woocommerce-info intersoccer-attendee-notification" style="display: none;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></span>
             </div>
         </td>
     </tr>
@@ -122,8 +122,8 @@ $intersoccer_elementor_product_page_cb = function () {
         <th><label><?php esc_html_e('Select Days', 'intersoccer-product-variations'); ?></label></th>
         <td>
             <div class="intersoccer-day-checkboxes"></div> <!-- Added this div for JS to append checkboxes -->
-            <div class="intersoccer-day-notification" style="margin-top: 10px;"></div>
-            <span class="error-message" style="color: red; display: none;"></span>
+            <div class="intersoccer-day-notification"></div>
+            <span class="error-message woocommerce-error" style="display: none;"></span>
         </td>
     </tr>
 <?php
@@ -268,7 +268,7 @@ $intersoccer_elementor_product_page_cb = function () {
         <td class="value">
             <div class="intersoccer-late-pickup-content">
                 <div class="intersoccer-late-pickup-days"></div>
-                <div class="intersoccer-late-pickup-cost" style="margin-top: 10px; font-weight: bold;"></div>
+                <div class="intersoccer-late-pickup-cost"></div>
             </div>
         </td>
     </tr>
@@ -1529,14 +1529,14 @@ $intersoccer_elementor_product_page_cb = function () {
                                     $playerContent.append($container);
                                     $playerContent.append(
                                         $('<span>', {
-                                            'class': 'error-message',
-                                            style: 'color: red; display: none;'
+                                            'class': 'error-message woocommerce-error',
+                                            style: 'display: none;'
                                         })
                                     );
                                     $playerContent.append(
                                         $('<span>', {
-                                            'class': 'intersoccer-attendee-notification',
-                                            style: 'color: red; display: none; margin-top: 10px;'
+                                            'class': 'woocommerce-info intersoccer-attendee-notification',
+                                            style: 'display: none;'
                                         }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
                                     );
 
@@ -1580,8 +1580,8 @@ $intersoccer_elementor_product_page_cb = function () {
                                         )
                                         .append(
                                             $('<span>', {
-                                                'class': 'intersoccer-attendee-notification',
-                                                style: 'color: red; display: block; margin-top: 10px;'
+                                                'class': 'woocommerce-error intersoccer-attendee-notification',
+                                                style: 'display: block;'
                                             }).text(intersoccerPlayerI18n.pleaseAddPlayer)
                                         );
                                     intersoccerPvDispatchUpdateButtonState();
@@ -1609,8 +1609,8 @@ $intersoccer_elementor_product_page_cb = function () {
                                 )
                                 .append(
                                     $('<span>', {
-                                        'class': 'intersoccer-attendee-notification',
-                                        style: 'color: red; display: block; margin-top: 10px;'
+                                        'class': 'woocommerce-error intersoccer-attendee-notification',
+                                        style: 'display: block;'
                                     }).text(intersoccerPlayerI18n.resolveError)
                                 );
                             intersoccerPvDispatchUpdateButtonState();
@@ -1723,7 +1723,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         var translatedDay = dayTranslations[day] || day; // Fallback to English if translation not found
                         var isChecked = currentChecked.includes(day) || selectedDays.includes(day) || hiddenDays.includes(day) ? 'checked' : '';
                         $dayCheckboxes.append(`
-                            <label style="margin-right: 10px; display: inline-block;">
+                            <label class="intersoccer-day-label">
                                 <input type="checkbox" name="camp_days_temp[]" value="${day}" class="intersoccer-day-checkbox" ${isChecked}> ${translatedDay}
                             </label>
                         `);
@@ -1737,7 +1737,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     if (isSubmitting) {
                         $dayNotification.hide().css('display', 'none');
                     } else if (actuallyCheckedCount === 0) {
-                        $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
+                        $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
                     } else {
                         $dayNotification.hide();
                     }
@@ -1761,7 +1761,7 @@ $intersoccer_elementor_product_page_cb = function () {
                         var $dayNotification = $daySelection.find('.intersoccer-day-notification');
                         if (!isSubmitting) {
                             if (selectedDays.length === 0) {
-                                $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
+                                $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
                             } else {
                                 $dayNotification.hide();
                             }
@@ -1907,7 +1907,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Add optional note
                 $daysContainer.append(`
-                    <div style="margin-bottom: 10px; font-style: italic; color: #666;">
+                    <div class="intersoccer-late-pickup-note intersoccer-text-light">
                         ${latePickupI18n.selectOptional || 'Select late pick up option (optional)'}
                     </div>
                 `);
@@ -1918,7 +1918,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Add "No Late Pickup" option (default)
                 var noneChecked = selectedLatePickupOption === 'none' ? 'checked' : '';
                 $optionsContainer.append(`
-                    <label style="display: block; margin-bottom: 8px;">
+                    <label class="intersoccer-late-pickup-option">
                         <input type="radio" name="late_pickup_option" value="none" class="intersoccer-late-pickup-radio" ${noneChecked}> 
                         <strong>${latePickupI18n.noLatePickup || 'No Late Pickup'}</strong>
                     </label>
@@ -1927,7 +1927,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Add "Full Week" option
                 var fullWeekChecked = selectedLatePickupOption === 'full-week' ? 'checked' : '';
                 $optionsContainer.append(`
-                    <label style="display: block; margin-bottom: 8px;">
+                    <label class="intersoccer-late-pickup-option">
                         <input type="radio" name="late_pickup_option" value="full-week" class="intersoccer-late-pickup-radio" ${fullWeekChecked}> 
                         <strong>${latePickupI18n.fullWeek || 'Full Week'}</strong>
                     </label>
@@ -1936,7 +1936,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 // Add "Single Days" option
                 var singleDaysChecked = selectedLatePickupOption === 'single-days' ? 'checked' : '';
                 $optionsContainer.append(`
-                    <label style="display: block; margin-bottom: 8px;">
+                    <label class="intersoccer-late-pickup-option">
                         <input type="radio" name="late_pickup_option" value="single-days" class="intersoccer-late-pickup-radio" ${singleDaysChecked}> 
                         <strong>${latePickupI18n.singleDays || 'Single Days'}</strong>
                     </label>
@@ -1945,13 +1945,13 @@ $intersoccer_elementor_product_page_cb = function () {
                 $daysContainer.append($optionsContainer);
                 
                 // Add day checkboxes container (hidden by default)
-                var $dayCheckboxesContainer = $('<div class="intersoccer-late-pickup-day-checkboxes" style="margin-left: 25px; margin-top: 10px; display: none;"></div>');
+                var $dayCheckboxesContainer = $('<div class="intersoccer-late-pickup-day-checkboxes"></div>');
                 
                 days.forEach(function(day) {
                     var translatedDay = dayTranslations[day] || day;
                     var isChecked = selectedLatePickupDays.includes(day) ? 'checked' : '';
                     $dayCheckboxesContainer.append(`
-                        <label style="display: block; margin-bottom: 5px;">
+                        <label class="intersoccer-late-pickup-day-option">
                             <input type="checkbox" name="late_pickup_single_days[]" value="${day}" class="intersoccer-late-pickup-day-checkbox" ${isChecked}> ${translatedDay}
                         </label>
                     `);
@@ -2022,7 +2022,7 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Handle radio button selection
                 if (selectedLatePickupOption === 'none') {
-                    $costContainer.html('<span style="color: #666;">' + (latePickupI18n.noSelection || 'No late pick up selected') + '</span>');
+                    $costContainer.html('<span class="intersoccer-text-light">' + (latePickupI18n.noSelection || 'No late pick up selected') + '</span>');
                     debug('InterSoccer Late Pickup: No option selected');
                     
                     // Update main price display to remove late pickup cost
@@ -2041,7 +2041,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     var dayCount = selectedLatePickupDays.length;
                     
                     if (dayCount === 0) {
-                        $costContainer.html('<span style="color: #666;">' + (latePickupI18n.selectAtLeastOneDay || 'Select at least one day') + '</span>');
+                        $costContainer.html('<span class="intersoccer-text-light">' + (latePickupI18n.selectAtLeastOneDay || 'Select at least one day') + '</span>');
                         debug('InterSoccer Late Pickup: Single days selected but no days checked');
                         
                         // Update main price display to remove late pickup cost
@@ -2061,7 +2061,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     }
                 } else {
                     // Fallback (shouldn't happen)
-                    $costContainer.html('<span style="color: #666;">' + (latePickupI18n.invalidSelection || 'Invalid selection') + '</span>');
+                    $costContainer.html('<span class="intersoccer-text-light">' + (latePickupI18n.invalidSelection || 'Invalid selection') + '</span>');
                     updateMainPriceWithLatePickup(0);
                     return;
                 }
@@ -2256,7 +2256,7 @@ $intersoccer_elementor_product_page_cb = function () {
                             $dayNotification.hide();
                         } else if (isSingleDayBooking && !daysSelected) {
                             $attendeeNotification.hide();
-                            $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').css('color', 'red').show();
+                            $dayNotification.text(intersoccerPlayerI18n.selectAtLeastOneDay || 'Please select at least one day.').addClass('woocommerce-error').show();
                         } else {
                             // Variation not selected or other issue
                             $attendeeNotification.hide();

@@ -493,15 +493,17 @@ add_action('wp_enqueue_scripts', function () {
         );
     }
 
-    wp_enqueue_style(
-        'intersoccer-styles',
-        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
-        [],
-        '1.4.63' // Bumped to match JS version
-    );
-
     $on_checkout = function_exists('is_checkout') && is_checkout();
     $on_cart = function_exists('is_cart') && is_cart();
+    $on_product = function_exists('is_product') && is_product();
+    if ($on_product || $on_cart || $on_checkout) {
+        wp_enqueue_style(
+            'intersoccer-styles',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
+            [],
+            '1.4.63' // Bumped to match JS version
+        );
+    }
     if ($on_checkout || $on_cart) {
         wp_enqueue_script(
             'intersoccer-campaign-checkout',

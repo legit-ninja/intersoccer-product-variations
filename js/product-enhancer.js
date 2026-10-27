@@ -416,7 +416,7 @@
             this.config.preloadedDays.forEach(day => {
                 const isChecked = this.state.selectedDays.includes(day);
                 const $label = $(`
-                    <label style="margin-right: 10px; display: inline-block;">
+                    <label class="intersoccer-day-label">
                         <input type="checkbox" name="camp_days_temp[]" value="${day}" 
                                class="intersoccer-day-checkbox" ${isChecked ? 'checked' : ''}> ${day}
                     </label>
