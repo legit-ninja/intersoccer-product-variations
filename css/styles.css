@@ -12,6 +12,15 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     flex-direction: column;
 }
 
+/* Logged-in cart-tracking consent is injected after the button, inside this
+   wrapper. Woo leaves the wrapper as a block, so a flex gap does not apply.
+   The notice span is inline; make it a block so the margin has an effect. */
+form.intersoccer-product-form .woocommerce-variation-add-to-cart > #wcal_gdpr_message_block,
+form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-cart > #wcal_gdpr_message_block {
+    display: block;
+    margin-top: 0.65rem;
+}
+
 .intersoccer-attributes {
     font-size: 14px;
     padding: 10px;
@@ -38,6 +47,15 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     align-items: center;
     gap: 0.5rem 0.85rem;
 }
+/* Five day names do not fit on one line at 375px. Three columns keeps
+   Vendredi/Freitag with another day instead of alone on the next row. */
+@media (max-width: 400px) {
+    .intersoccer-day-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem 0.4rem;
+    }
+}
 .intersoccer-day-label {
     display: inline-flex;
     align-items: center;
@@ -46,7 +64,7 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
 }
 
 .intersoccer-day-notification {
-    margin-top: 10px;
+    margin-top: 0.65rem;
 }
 
 .intersoccer-text-light {
