@@ -47,13 +47,15 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     align-items: center;
     gap: 0.5rem 0.85rem;
 }
-/* Five day names do not fit on one line at 375px. Three columns keeps
-   Vendredi/Freitag with another day instead of alone on the next row. */
+/* Equal thirds are narrower than Donnerstag and Wednesday, so those
+   labels paint into the next checkbox or past the grid. Two content-sized
+   columns keep each name on one line and inside the grid. */
 @media (max-width: 400px) {
     .intersoccer-day-checkboxes {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.35rem 0.4rem;
+        grid-template-columns: repeat(2, auto);
+        justify-content: start;
+        gap: 0.5rem 0.85rem;
     }
 }
 .intersoccer-day-label {
