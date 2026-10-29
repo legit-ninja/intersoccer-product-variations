@@ -3,6 +3,7 @@
  * Display-only dedupe of pa_* / attribute_pa_* order line twins (stored meta unchanged).
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 if (!defined('ABSPATH')) {
@@ -294,9 +295,7 @@ class OrderItemAttributeTwinDisplayTest extends TestCase {
         $this->assertSame($once, intersoccer_pv_dedupe_taxonomy_attribute_formatted_meta($meta));
     }
 
-    /**
-     * @dataProvider display_context_provider
-     */
+    #[DataProvider('display_context_provider')]
     public function test_fresh_checkout_shows_each_attribute_once(string $context): void {
         $item = new WC_Order_Item_Product([]);
         $meta = $this->fresh_checkout_formatted_meta_triplets();
@@ -310,7 +309,7 @@ class OrderItemAttributeTwinDisplayTest extends TestCase {
     /**
      * @return array<string,array{0:string}>
      */
-    public function display_context_provider(): array {
+    public static function display_context_provider(): array {
         return [
             'admin' => ['admin'],
             'customer' => ['customer'],
