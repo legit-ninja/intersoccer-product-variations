@@ -1800,6 +1800,8 @@ function intersoccer_privacy_redaction_locale_for_order($order) {
         'en' => 'en_US',
         'fr' => 'fr_FR',
         'de' => 'de_DE',
+        'de_CH' => 'de_DE',
+        'fr_CH' => 'fr_FR',
     ];
     if (isset($map[$wpml])) {
         return $map[$wpml];
@@ -2614,6 +2616,45 @@ function intersoccer_pv_translate_activity_type_order_meta_value($text) {
 }
 
 /**
+ * Translate a PV textdomain msgid on customer-facing order surfaces (reload .mo, WPML strings).
+ *
+ * @param string $msgid English msgid.
+ * @return string
+ */
+function intersoccer_pv_translate_textdomain_msgid_for_customer($msgid) {
+    $msgid = (string) $msgid;
+    if ($msgid === '') {
+        return '';
+    }
+
+    if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')
+        && defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+        intersoccer_pv_load_textdomain_for_current_locale();
+    }
+
+    $text = __($msgid, 'intersoccer-product-variations');
+    if ($text !== $msgid) {
+        return $text;
+    }
+
+    $lang = apply_filters('wpml_current_language', null);
+    if (is_string($lang) && $lang !== '' && $lang !== 'en') {
+        $wpml = apply_filters('wpml_translate_single_string', $msgid, 'intersoccer-product-variations', $msgid, $lang);
+        if (is_string($wpml) && $wpml !== '' && $wpml !== $msgid) {
+            return $wpml;
+        }
+        if (function_exists('icl_t')) {
+            $icl = icl_t('intersoccer-product-variations', $msgid, $msgid);
+            if (is_string($icl) && $icl !== '' && $icl !== $msgid) {
+                return $icl;
+            }
+        }
+    }
+
+    return $text;
+}
+
+/**
  * @param string $display_key Label shown to the customer.
  * @param string $meta_key    Raw meta key.
  * @return string
@@ -2626,7 +2667,7 @@ function intersoccer_translate_stored_order_meta_display_key($display_key, $meta
     $lookup = $meta_key !== '' ? $meta_key : $display_key;
     $map = intersoccer_stored_order_meta_display_key_map();
     if (isset($map[$lookup])) {
-        return __($map[$lookup], 'intersoccer-product-variations');
+        return intersoccer_pv_translate_textdomain_msgid_for_customer((string) $map[$lookup]);
     }
 
     return $display_key;
@@ -3199,6 +3240,173 @@ function intersoccer_pv_filter_dedupe_taxonomy_attribute_formatted_meta($formatt
 }
 
 /**
+ * Resolve pa_* taxonomy from a slug-side order-item meta key.
+ *
+ * @param string $meta_key
+ * @return string Taxonomy name (pa_*) or empty.
+ */
+function intersoccer_pv_taxonomy_from_slug_meta_key($meta_key) {
+    $meta_key = (string) $meta_key;
+    if ($meta_key === '') {
+        return '';
+    }
+
+    if ($meta_key === 'girls_only' && function_exists('intersoccer_attr_taxonomy')) {
+        return (string) intersoccer_attr_taxonomy('girls-only');
+    }
+
+    if (preg_match('/^attribute_(pa_.+)$/i', $meta_key, $matches)) {
+        return (string) $matches[1];
+    }
+
+    if (preg_match('/^pa_/i', $meta_key)) {
+        return $meta_key;
+    }
+
+    if (function_exists('intersoccer_attr_registry') && function_exists('intersoccer_attr_taxonomy')) {
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+                if ((string) $alias === $meta_key) {
+                    return (string) intersoccer_attr_taxonomy($slug);
+                }
+            }
+            foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+                if ((string) $legacy_key !== $meta_key) {
+                    continue;
+                }
+                if (preg_match('/^attribute_(pa_.+)$/i', (string) $legacy_key, $matches)) {
+                    return (string) $matches[1];
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * WPML/current language code for term label resolution.
+ *
+ * @return string
+ */
+function intersoccer_pv_wpml_current_language_code() {
+    if (defined('ICL_LANGUAGE_CODE') && ICL_LANGUAGE_CODE) {
+        return (string) ICL_LANGUAGE_CODE;
+    }
+
+    $lang = apply_filters('wpml_current_language', null);
+
+    return is_string($lang) ? trim($lang) : '';
+}
+
+/**
+ * Readable term name for a taxonomy slug in the current language (falls back to stored slug).
+ *
+ * @param string $taxonomy pa_* taxonomy.
+ * @param string $term_slug Term slug stored on the line item.
+ * @return string
+ */
+function intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $term_slug) {
+    $taxonomy = (string) $taxonomy;
+    $term_slug = trim((string) $term_slug);
+    if ($taxonomy === '' || $term_slug === '') {
+        return $term_slug;
+    }
+
+    if (!function_exists('get_term_by')) {
+        return $term_slug;
+    }
+
+    $term = get_term_by('slug', $term_slug, $taxonomy);
+    if (!$term || is_wp_error($term)) {
+        return $term_slug;
+    }
+
+    $name = isset($term->name) ? (string) $term->name : $term_slug;
+    $lang = intersoccer_pv_wpml_current_language_code();
+    if ($lang !== '' && function_exists('icl_object_id')) {
+        $translated_id = icl_object_id((int) $term->term_id, $taxonomy, false, $lang);
+        if ($translated_id && (int) $translated_id !== (int) $term->term_id && function_exists('get_term')) {
+            $translated = get_term((int) $translated_id, $taxonomy);
+            if ($translated && !is_wp_error($translated) && !empty($translated->name)) {
+                $name = (string) $translated->name;
+            }
+        }
+    }
+
+    return $name !== '' ? $name : $term_slug;
+}
+
+/**
+ * @param array<string,true> $keys_present
+ * @param string             $slug_meta_key
+ * @return bool
+ */
+function intersoccer_pv_customer_should_synthesize_readable_slug_attribute_row(array $keys_present, $slug_meta_key) {
+    if (!intersoccer_pv_is_hidden_slug_attribute_meta_key($slug_meta_key)) {
+        return false;
+    }
+
+    $taxonomy = intersoccer_pv_taxonomy_from_slug_meta_key($slug_meta_key);
+    if ($taxonomy === '' || !function_exists('intersoccer_attr_slug_from_taxonomy')) {
+        return false;
+    }
+
+    $slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
+    if ($slug === null || $slug === '') {
+        return false;
+    }
+
+    return !intersoccer_pv_formatted_meta_has_human_facet_key($keys_present, $slug);
+}
+
+/**
+ * Build a customer-facing formatted-meta row for a slug-only attribute line.
+ *
+ * @param object              $meta Slug-side formatted meta object.
+ * @param WC_Order_Item_Product $item Order line item.
+ * @return object|null
+ */
+function intersoccer_pv_build_customer_readable_slug_attribute_formatted_meta($meta, $item) {
+    unset($item);
+    if (!is_object($meta)) {
+        return null;
+    }
+
+    $meta_key = (string) ($meta->key ?? '');
+    $taxonomy = intersoccer_pv_taxonomy_from_slug_meta_key($meta_key);
+    if ($taxonomy === '') {
+        return null;
+    }
+
+    $registry_label = function_exists('intersoccer_attr_order_meta_label_for_taxonomy')
+        ? (string) intersoccer_attr_order_meta_label_for_taxonomy($taxonomy)
+        : '';
+    if ($registry_label === '' && function_exists('wc_attribute_label')) {
+        $registry_label = (string) wc_attribute_label($taxonomy);
+    }
+    if ($registry_label === '') {
+        return null;
+    }
+
+    $stored_slug = isset($meta->value) ? (string) $meta->value : '';
+    $readable_value = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $stored_slug);
+    $display_key = intersoccer_translate_stored_order_meta_display_key($registry_label, $registry_label);
+
+    $out = clone $meta;
+    $out->display_key = $display_key;
+    $out->value = $readable_value;
+    if (isset($out->display_value)) {
+        $out->display_value = $readable_value;
+    }
+
+    return $out;
+}
+
+/**
  * Dedupe customer-facing formatted meta (e.g. legacy assigned_attendee + Assigned Attendee).
  *
  * @param array<int,object> $formatted_meta
@@ -3288,10 +3496,28 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         return $formatted_meta;
     }
 
+    $keys_present = [];
+    foreach ($formatted_meta as $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $present_key = (string) ($meta->key ?? '');
+        if ($present_key !== '') {
+            $keys_present[$present_key] = true;
+        }
+    }
+
     $filtered = [];
     foreach ($formatted_meta as $meta) {
         $key = isset($meta->key) ? (string) $meta->key : '';
         if ($key === '' || intersoccer_is_hidden_customer_order_meta_key($key)) {
+            if ($key !== ''
+                && intersoccer_pv_customer_should_synthesize_readable_slug_attribute_row($keys_present, $key)) {
+                $readable = intersoccer_pv_build_customer_readable_slug_attribute_formatted_meta($meta, $item);
+                if ($readable !== null) {
+                    $filtered[] = $readable;
+                }
+            }
             continue;
         }
         if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
