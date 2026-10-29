@@ -2911,6 +2911,294 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
 }
 
 /**
+ * Meta keys that are raw taxonomy slugs (display twins of human order-meta labels).
+ *
+ * @return array<int,string>
+ */
+function intersoccer_pv_hidden_slug_attribute_meta_keys() {
+    static $keys = null;
+    if ($keys !== null) {
+        return $keys;
+    }
+
+    $keys = ['girls_only'];
+    if (!function_exists('intersoccer_attr_registry')) {
+        return $keys;
+    }
+
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        if (!is_array($def)) {
+            continue;
+        }
+        if (function_exists('intersoccer_attr_taxonomy')) {
+            $keys[] = (string) intersoccer_attr_taxonomy($slug);
+        }
+        if (function_exists('intersoccer_attr_resolve_meta_key')) {
+            $keys[] = (string) intersoccer_attr_resolve_meta_key($slug);
+        }
+        foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+            $keys[] = (string) $alias;
+        }
+        foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+            $keys[] = (string) $legacy_key;
+        }
+    }
+
+    $keys = array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+
+    return $keys;
+}
+
+/**
+ * @param string $meta_key Stored order-item meta key.
+ * @return bool
+ */
+function intersoccer_pv_is_hidden_slug_attribute_meta_key($meta_key) {
+    $meta_key = (string) $meta_key;
+    if ($meta_key === '') {
+        return false;
+    }
+
+    return in_array($meta_key, intersoccer_pv_hidden_slug_attribute_meta_keys(), true);
+}
+
+/**
+ * Prefer raw pa_* over attribute_pa_* when only slug keys share a display label.
+ *
+ * @param string $meta_key
+ * @return int
+ */
+function intersoccer_pv_formatted_meta_slug_display_priority($meta_key) {
+    $meta_key = (string) $meta_key;
+    if (preg_match('/^attribute_pa_/i', $meta_key)) {
+        return 40;
+    }
+    if (preg_match('/^pa_/i', $meta_key)) {
+        return 30;
+    }
+
+    return 35;
+}
+
+/**
+ * Stored meta_key strings that represent the human facet for a registry attribute slug.
+ *
+ * @param string $slug Registry slug (bare, not pa_*).
+ * @return array<int,string>
+ */
+function intersoccer_pv_stored_human_meta_keys_for_attr_slug($slug) {
+    $slug = (string) $slug;
+    if ($slug === '' || !function_exists('intersoccer_attr_registry')) {
+        return [];
+    }
+
+    $registry = intersoccer_attr_registry();
+    if (!isset($registry[$slug]) || !is_array($registry[$slug])) {
+        return [];
+    }
+
+    $def = $registry[$slug];
+    $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+    $keys = [];
+    if ($label !== '') {
+        $keys[] = $label;
+        if (function_exists('intersoccer_pv_order_item_meta_canonical_key_variants')) {
+            $keys = array_merge($keys, intersoccer_pv_order_item_meta_canonical_key_variants($label));
+        }
+    }
+    foreach ($def['legacy_order_meta_labels'] ?? [] as $legacy) {
+        $legacy = (string) $legacy;
+        if ($legacy !== '') {
+            $keys[] = $legacy;
+        }
+    }
+
+    return array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+}
+
+/**
+ * Slug-side meta keys for one registry attribute (including legacy aliases).
+ *
+ * @param string $slug
+ * @return array<int,string>
+ */
+function intersoccer_pv_slug_side_meta_keys_for_attr_slug($slug) {
+    $slug = (string) $slug;
+    if ($slug === '' || !function_exists('intersoccer_attr_registry')) {
+        return [];
+    }
+
+    $registry = intersoccer_attr_registry();
+    if (!isset($registry[$slug]) || !is_array($registry[$slug])) {
+        return [];
+    }
+
+    $def = $registry[$slug];
+    $keys = [];
+    if (function_exists('intersoccer_attr_taxonomy')) {
+        $keys[] = (string) intersoccer_attr_taxonomy($slug);
+    }
+    if (function_exists('intersoccer_attr_resolve_meta_key')) {
+        $keys[] = (string) intersoccer_attr_resolve_meta_key($slug);
+    }
+    foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+        $keys[] = (string) $alias;
+    }
+    foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+        $keys[] = (string) $legacy_key;
+    }
+    if ($slug === 'girls-only') {
+        $keys[] = 'girls_only';
+    }
+
+    return array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+}
+
+/**
+ * @param array<string,true> $keys_present
+ * @param string             $slug
+ * @return bool
+ */
+function intersoccer_pv_formatted_meta_has_human_facet_key(array $keys_present, $slug) {
+    foreach (intersoccer_pv_stored_human_meta_keys_for_attr_slug($slug) as $human_key) {
+        if (isset($keys_present[$human_key])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Hide pa_* / attribute_pa_* display rows when a readable stored label row remains (display only).
+ *
+ * @param array<int|mixed,object> $formatted_meta
+ * @return array<int|mixed,object>
+ */
+function intersoccer_pv_dedupe_taxonomy_attribute_formatted_meta(array $formatted_meta) {
+    if ($formatted_meta === []) {
+        return $formatted_meta;
+    }
+
+    $keys_present = [];
+    foreach ($formatted_meta as $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $keys_present[(string) ($meta->key ?? '')] = true;
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            if (!intersoccer_pv_formatted_meta_has_human_facet_key($keys_present, (string) $slug)) {
+                continue;
+            }
+            $hide_keys = array_flip(intersoccer_pv_slug_side_meta_keys_for_attr_slug((string) $slug));
+            foreach ($formatted_meta as $meta_id => $meta) {
+                if (!is_object($meta)) {
+                    continue;
+                }
+                $key = (string) ($meta->key ?? '');
+                if ($key !== '' && isset($hide_keys[$key])) {
+                    unset($formatted_meta[$meta_id]);
+                }
+            }
+        }
+    }
+
+    $by_label = [];
+    foreach ($formatted_meta as $meta_id => $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $display_key = isset($meta->display_key) ? (string) $meta->display_key : '';
+        $label = strtolower(trim($display_key));
+        if ($label === '') {
+            continue;
+        }
+        $by_label[$label][] = $meta_id;
+    }
+
+    foreach ($by_label as $meta_ids) {
+        if (count($meta_ids) <= 1) {
+            continue;
+        }
+
+        $non_slug_ids = [];
+        $slug_ids = [];
+        foreach ($meta_ids as $meta_id) {
+            $meta = $formatted_meta[$meta_id] ?? null;
+            if (!is_object($meta)) {
+                continue;
+            }
+            $key = isset($meta->key) ? (string) $meta->key : '';
+            if (intersoccer_pv_is_hidden_slug_attribute_meta_key($key)) {
+                $slug_ids[] = $meta_id;
+            } else {
+                $non_slug_ids[] = $meta_id;
+            }
+        }
+
+        if ($non_slug_ids !== []) {
+            foreach ($slug_ids as $slug_id) {
+                unset($formatted_meta[$slug_id]);
+            }
+            continue;
+        }
+
+        if (count($slug_ids) <= 1) {
+            continue;
+        }
+
+        $keep_id = null;
+        $keep_priority = PHP_INT_MAX;
+        foreach ($slug_ids as $slug_id) {
+            $key = (string) ($formatted_meta[$slug_id]->key ?? '');
+            $priority = intersoccer_pv_formatted_meta_slug_display_priority($key);
+            if ($priority < $keep_priority) {
+                $keep_priority = $priority;
+                $keep_id = $slug_id;
+            }
+        }
+
+        if ($keep_id === null) {
+            continue;
+        }
+
+        foreach ($slug_ids as $slug_id) {
+            if ($slug_id !== $keep_id) {
+                unset($formatted_meta[$slug_id]);
+            }
+        }
+    }
+
+    return $formatted_meta;
+}
+
+/**
+ * @param array<int|mixed,object> $formatted_meta
+ * @param mixed                   $item
+ * @return array<int|mixed,object>
+ */
+function intersoccer_pv_filter_dedupe_taxonomy_attribute_formatted_meta($formatted_meta, $item) {
+    unset($item);
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+
+    return intersoccer_pv_dedupe_taxonomy_attribute_formatted_meta($formatted_meta);
+}
+
+/**
  * Dedupe customer-facing formatted meta (e.g. legacy assigned_attendee + Assigned Attendee).
  *
  * @param array<int,object> $formatted_meta
@@ -3028,6 +3316,7 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
 
 add_filter('woocommerce_hidden_order_itemmeta', 'intersoccer_pv_admin_hidden_order_itemmeta', 20);
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_pv_filter_admin_order_item_formatted_meta', 5, 2);
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_pv_filter_dedupe_taxonomy_attribute_formatted_meta', 10, 2);
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
 add_action('woocommerce_email_before_order_table', 'intersoccer_sensitive_order_meta_begin_email_context', 0, 4);
 add_action('woocommerce_email_after_order_table', 'intersoccer_sensitive_order_meta_end_email_context', 9999, 4);
