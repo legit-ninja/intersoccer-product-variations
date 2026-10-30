@@ -413,6 +413,7 @@ $includes = [
     'includes/woocommerce/order-meta-contract.php',
     'includes/woocommerce/attribute-enforcement.php',
     'includes/woocommerce/admin-ui.php',
+    'includes/woocommerce/wcml-order-screen-guard.php',
     'includes/woocommerce/pm-wpml-sync.php',
     'includes/woocommerce/program-manager.php',
     'includes/woocommerce/product-types.php',
