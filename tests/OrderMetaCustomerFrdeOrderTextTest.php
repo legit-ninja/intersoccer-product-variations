@@ -659,14 +659,59 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         $this->assertSame('Keine', $display);
     }
 
-    public function test_fr_medical_none_uses_feminine_auune(): void {
+    public function test_fr_medical_none_uses_feminine_aucune(): void {
         $this->bindLocale('fr_FR');
         $this->setWpmlLanguage('fr');
         $display = intersoccer_translate_stored_order_meta_display_value('none', 'Medical Conditions');
         $this->assertSame('Aucune', $display);
     }
 
-    public function test_wcml_activity_type_slug_resolves_to_term_name_fr(): void {
+    public function test_de_medical_none_uses_keine(): void {
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $display = intersoccer_translate_stored_order_meta_display_value('None', 'Medical Conditions');
+        $this->assertSame('Keine', $display);
+    }
+
+    public function test_fr_note_none_uses_feminine_aucune(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $display = intersoccer_translate_stored_order_meta_display_value('none', 'Note');
+        $this->assertSame('Aucune', $display);
+    }
+
+    public function test_de_note_none_uses_keine(): void {
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $display = intersoccer_translate_stored_order_meta_display_value('none', 'Note');
+        $this->assertSame('Keine', $display);
+    }
+
+    public function test_fr_masculine_none_default_aucun_for_season(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $display = intersoccer_translate_stored_order_meta_display_value('none', 'Season');
+        $this->assertSame('Aucun', $display);
+    }
+
+    public function test_de_masculine_none_default_keine_for_season(): void {
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $display = intersoccer_translate_stored_order_meta_display_value('none', 'Season');
+        $this->assertSame('Keine', $display);
+    }
+
+    public function test_fr_discount_condition_none_label_feminine_aucune(): void {
+        $this->bindLocale('fr_FR');
+        $this->assertSame('Aucune', intersoccer_pv_translate_none_feminine_label());
+    }
+
+    public function test_de_discount_condition_none_label_keine(): void {
+        $this->bindLocale('de_DE');
+        $this->assertSame('Keine', intersoccer_pv_translate_none_feminine_label());
+    }
+
+    public function test_fr_wcml_activity_type_slug_resolves_to_term_name(): void {
         $GLOBALS['intersoccer_test_terms'] = [
             701 => [
                 'taxonomy' => 'pa_activity-type',
@@ -675,11 +720,40 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             ],
         ];
         $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
         $display = intersoccer_translate_stored_order_meta_display_value('course', 'Activity Type');
         $this->assertSame('Cours', $display);
     }
 
-    public function test_wcml_booking_type_slug_resolves_to_term_name_de(): void {
+    public function test_de_wcml_activity_type_slug_resolves_to_term_name(): void {
+        $GLOBALS['intersoccer_test_terms'] = [
+            711 => [
+                'taxonomy' => 'pa_activity-type',
+                'slug' => 'camp',
+                'name' => 'Camp',
+            ],
+        ];
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $display = intersoccer_translate_stored_order_meta_display_value('camp', 'Activity Type');
+        $this->assertSame('Camp', $display);
+    }
+
+    public function test_fr_wcml_booking_type_slug_resolves_to_term_name(): void {
+        $GLOBALS['intersoccer_test_terms'] = [
+            712 => [
+                'taxonomy' => 'pa_booking-type',
+                'slug' => 'full-term',
+                'name' => 'Semestre complet',
+            ],
+        ];
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $display = intersoccer_translate_stored_order_meta_display_value('full-term', 'Booking Type');
+        $this->assertSame('Semestre complet', $display);
+    }
+
+    public function test_de_wcml_booking_type_slug_resolves_to_term_name(): void {
         $GLOBALS['intersoccer_test_terms'] = [
             702 => [
                 'taxonomy' => 'pa_booking-type',
@@ -688,11 +762,12 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             ],
         ];
         $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
         $display = intersoccer_translate_stored_order_meta_display_value('full-term', 'Booking Type');
         $this->assertSame('Ganzes Semester', $display);
     }
 
-    public function test_wcml_note_slug_resolves_to_term_name_fr(): void {
+    public function test_fr_wcml_note_slug_resolves_to_term_name(): void {
         $GLOBALS['intersoccer_test_terms'] = [
             703 => [
                 'taxonomy' => 'pa_note',
@@ -701,21 +776,86 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             ],
         ];
         $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
         $display = intersoccer_translate_stored_order_meta_display_value('join-anytime', 'Note');
         $this->assertSame('Inscription à tout moment', $display);
     }
 
-    public function test_course_customer_meta_sorts_times_before_day(): void {
-        $GLOBALS['intersoccer_test_product_type'] = 'course';
-        $meta = [
-            (object) ['key' => 'Course Day', 'display_key' => 'Course Day', 'value' => 'Monday', 'display_value' => 'Monday'],
-            (object) ['key' => 'Course Times', 'display_key' => 'Course Times', 'value' => '1000-1700', 'display_value' => '1000-1700'],
-            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Course', 'display_value' => 'Course'],
+    public function test_de_wcml_note_slug_resolves_to_term_name(): void {
+        $GLOBALS['intersoccer_test_terms'] = [
+            713 => [
+                'taxonomy' => 'pa_note',
+                'slug' => 'join-anytime',
+                'name' => 'Jederzeit einsteigen',
+            ],
         ];
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $display = intersoccer_translate_stored_order_meta_display_value('join-anytime', 'Note');
+        $this->assertSame('Jederzeit einsteigen', $display);
+    }
+
+    /**
+     * @return array<int,object>
+     */
+    private function courseLineFormattedMetaWrongDayFirst(): array {
+        return [
+            (object) ['key' => 'Course Day', 'display_key' => 'Course Day', 'value' => 'Monday', 'display_value' => 'Monday'],
+            (object) ['key' => 'Activity Type', 'display_key' => 'Activity Type', 'value' => 'Course', 'display_value' => 'Course'],
+            (object) ['key' => 'Start Date', 'display_key' => 'Start Date', 'value' => 'September 1, 2026', 'display_value' => 'September 1, 2026'],
+            (object) ['key' => 'Course Times', 'display_key' => 'Course Times', 'value' => '1000-1700', 'display_value' => '1000-1700'],
+        ];
+    }
+
+    /**
+     * EN checkout meta_id order: Activity Type and dates before Course Day, then Course Times (~949–950, ~548–555).
+     *
+     * @return list<string>
+     */
+    private function expectedEnCourseCustomerMetaKeyOrder(): array {
+        return ['Activity Type', 'Start Date', 'Course Day', 'Course Times'];
+    }
+
+    public function test_en_course_customer_meta_preserves_checkout_meta_id_order(): void {
+        global $intersoccer_pv_test_determine_locale;
+        $intersoccer_pv_test_determine_locale = 'en_US';
+        MockFilters::$filters['wpml_current_language'] = static function () {
+            return 'en';
+        };
+        $GLOBALS['intersoccer_test_product_type'] = 'course';
+        $meta = $this->courseLineFormattedMetaWrongDayFirst();
+        usort($meta, static function ($a, $b) {
+            $order = ['Activity Type' => 0, 'Start Date' => 1, 'Course Day' => 2, 'Course Times' => 3];
+
+            return ($order[$a->key] ?? 99) <=> ($order[$b->key] ?? 99);
+        });
         $item = new WC_Order_Item_Product([]);
         $filtered = intersoccer_filter_customer_order_item_meta($meta, $item);
         $keys = array_map(static fn($m) => (string) $m->key, $filtered);
-        $this->assertSame(['Activity Type', 'Course Times', 'Course Day'], $keys);
+        $this->assertSame($this->expectedEnCourseCustomerMetaKeyOrder(), $keys);
+        unset($GLOBALS['intersoccer_test_product_type']);
+        MockFilters::reset();
+    }
+
+    public function test_fr_course_customer_meta_matches_en_row_order(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $GLOBALS['intersoccer_test_product_type'] = 'course';
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_customer_order_item_meta($this->courseLineFormattedMetaWrongDayFirst(), $item);
+        $keys = array_map(static fn($m) => (string) $m->key, $filtered);
+        $this->assertSame($this->expectedEnCourseCustomerMetaKeyOrder(), $keys);
+        unset($GLOBALS['intersoccer_test_product_type']);
+    }
+
+    public function test_de_course_customer_meta_matches_en_row_order(): void {
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $GLOBALS['intersoccer_test_product_type'] = 'course';
+        $item = new WC_Order_Item_Product([]);
+        $filtered = intersoccer_filter_customer_order_item_meta($this->courseLineFormattedMetaWrongDayFirst(), $item);
+        $keys = array_map(static fn($m) => (string) $m->key, $filtered);
+        $this->assertSame($this->expectedEnCourseCustomerMetaKeyOrder(), $keys);
         unset($GLOBALS['intersoccer_test_product_type']);
     }
 }

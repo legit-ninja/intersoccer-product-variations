@@ -2778,6 +2778,9 @@ function intersoccer_translate_persisted_discount_label_for_display($label) {
 /**
  * gettext context for customer-facing "None" placeholder by stored meta key.
  *
+ * Order lines that may persist the literal placeholder: Medical Conditions ({@see intersoccer_apply_assigned_player_order_meta()} ~357–359),
+ * and Note when stored as the pa_note slug {@code none}. Other keys use the masculine default if ever set.
+ *
  * @param string $meta_key Stored meta key.
  * @return string feminine noun|masculine noun
  */
@@ -2802,6 +2805,125 @@ function intersoccer_pv_translate_order_meta_none_for_display($meta_key) {
     $ctxt = intersoccer_pv_order_meta_none_display_msgctxt($meta_key);
 
     return _x('None', $ctxt, 'intersoccer-product-variations');
+}
+
+/**
+ * Feminine "None" for admin labels (e.g. discount condition = la condition).
+ *
+ * @return string
+ */
+function intersoccer_pv_translate_none_feminine_label() {
+    return _x('None', 'feminine noun', 'intersoccer-product-variations');
+}
+
+/**
+ * Masculine "None" for admin labels (e.g. no attribute terms selected).
+ *
+ * @return string
+ */
+function intersoccer_pv_translate_none_masculine_label() {
+    return _x('None', 'masculine noun', 'intersoccer-product-variations');
+}
+
+/**
+ * Whether the current request is FR/DE customer order text (not EN).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_fr_de_customer_text_locale() {
+    if (function_exists('intersoccer_pv_wpml_current_language_code')) {
+        $lang = intersoccer_pv_wpml_current_language_code();
+        if ($lang === 'fr' || $lang === 'de') {
+            return true;
+        }
+    }
+
+    $locale = function_exists('determine_locale') ? (string) determine_locale() : '';
+    if ($locale !== '') {
+        return str_starts_with($locale, 'fr') || str_starts_with($locale, 'de');
+    }
+
+    return false;
+}
+
+/**
+ * FR/DE course lines: relocate synthesized Course Day before Course Times (EN checkout meta_id order).
+ *
+ * EN leaves WooCommerce meta_id order from {@see intersoccer_write_order_line_meta()} — parent
+ * attributes (Course Day) in {@see intersoccer_build_order_line_meta()} ~548–555, then variation
+ * facets in {@see intersoccer_collect_variation_taxonomy_meta()} merged at ~949–950, so Course Day
+ * precedes Course Times without a display sort. WCML slug-only pa_course-day can appear early in
+ * formatted meta; synthesis (~3966) then surfaces Course Day before Activity Type on FR/DE only.
+ *
+ * @param array<int,object>     $formatted_meta
+ * @param WC_Order_Item_Product $item
+ * @return array<int,object>
+ */
+function intersoccer_pv_normalize_frde_course_day_meta_position(array $formatted_meta, $item) {
+    if (!intersoccer_pv_is_fr_de_customer_text_locale()) {
+        return $formatted_meta;
+    }
+
+    $product_type = '';
+    if ($item instanceof WC_Order_Item_Product && function_exists('intersoccer_get_product_type')) {
+        $product_type = strtolower((string) intersoccer_get_product_type((int) $item->get_product_id()));
+    }
+    if ($product_type === '' && !empty($GLOBALS['intersoccer_test_product_type'])) {
+        $product_type = strtolower((string) $GLOBALS['intersoccer_test_product_type']);
+    }
+    if ($product_type !== 'course' || $formatted_meta === []) {
+        return $formatted_meta;
+    }
+
+    $day_idx = null;
+    $times_idx = null;
+    foreach ($formatted_meta as $idx => $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $key = (string) ($meta->key ?? '');
+        if (function_exists('intersoccer_pv_order_meta_key_is')) {
+            if (intersoccer_pv_order_meta_key_is($key, 'Course Day')) {
+                $day_idx = $idx;
+            } elseif (intersoccer_pv_order_meta_key_is($key, 'Course Times')) {
+                $times_idx = $idx;
+            }
+        }
+    }
+
+    if ($day_idx === null) {
+        return $formatted_meta;
+    }
+
+    if ($times_idx === null) {
+        return $formatted_meta;
+    }
+
+    if ($day_idx === $times_idx - 1) {
+        return $formatted_meta;
+    }
+
+    $day_meta = $formatted_meta[$day_idx];
+    unset($formatted_meta[$day_idx]);
+    $formatted_meta = array_values($formatted_meta);
+
+    $times_idx = null;
+    foreach ($formatted_meta as $idx => $meta) {
+        if (is_object($meta) && function_exists('intersoccer_pv_order_meta_key_is')
+            && intersoccer_pv_order_meta_key_is((string) ($meta->key ?? ''), 'Course Times')) {
+            $times_idx = $idx;
+            break;
+        }
+    }
+    if ($times_idx === null) {
+        $formatted_meta[] = $day_meta;
+
+        return $formatted_meta;
+    }
+
+    array_splice($formatted_meta, $times_idx, 0, [$day_meta]);
+
+    return $formatted_meta;
 }
 
 /**
@@ -3787,102 +3909,6 @@ function intersoccer_pv_dedupe_customer_order_formatted_meta(array $formatted_me
 }
 
 /**
- * Display rank map for customer order lines (matches EN contract; course times before course day).
- *
- * @param string $product_type camp|course|birthday|tournament
- * @return array<string,int>
- */
-function intersoccer_pv_customer_order_meta_display_rank_map($product_type) {
-    static $cache = [];
-    $type = strtolower((string) $product_type);
-    if ($type === '') {
-        $type = 'camp';
-    }
-    if (isset($cache[$type])) {
-        return $cache[$type];
-    }
-
-    $sequence = [];
-    if (function_exists('intersoccer_order_meta_allowed_keys')) {
-        foreach (intersoccer_order_meta_allowed_keys($type) as $key) {
-            $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
-                ? intersoccer_pv_canonical_stored_order_meta_key((string) $key)
-                : (string) $key;
-            if ($canonical === '' || $canonical[0] === '_' || strncmp($canonical, 'pa_', 3) === 0) {
-                continue;
-            }
-            if (!in_array($canonical, $sequence, true)) {
-                $sequence[] = $canonical;
-            }
-        }
-    }
-
-    if ($type === 'course') {
-        $times_idx = array_search('Course Times', $sequence, true);
-        $day_idx = array_search('Course Day', $sequence, true);
-        if ($times_idx !== false && $day_idx !== false && $day_idx < $times_idx) {
-            unset($sequence[$times_idx], $sequence[$day_idx]);
-            $sequence = array_values($sequence);
-            $insert_at = min($times_idx, $day_idx);
-            array_splice($sequence, $insert_at, 0, ['Course Times', 'Course Day']);
-        }
-    }
-
-    $map = [];
-    foreach ($sequence as $idx => $canonical) {
-        $map[$canonical] = $idx;
-    }
-
-    $cache[$type] = $map;
-
-    return $map;
-}
-
-/**
- * @param array<int,object>     $formatted_meta
- * @param WC_Order_Item_Product $item
- * @return array<int,object>
- */
-function intersoccer_pv_sort_customer_order_formatted_meta(array $formatted_meta, $item) {
-    if ($formatted_meta === [] || !($item instanceof WC_Order_Item_Product)) {
-        return $formatted_meta;
-    }
-    if (!function_exists('intersoccer_get_product_type')) {
-        return $formatted_meta;
-    }
-
-    $product_type = strtolower((string) intersoccer_get_product_type((int) $item->get_product_id()));
-    if ($product_type !== 'course') {
-        return $formatted_meta;
-    }
-
-    $ranks = intersoccer_pv_customer_order_meta_display_rank_map($product_type);
-    if ($ranks === []) {
-        return $formatted_meta;
-    }
-
-    $indexed = [];
-    foreach ($formatted_meta as $idx => $meta) {
-        $key = isset($meta->key) ? (string) $meta->key : '';
-        $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
-            ? intersoccer_pv_canonical_stored_order_meta_key($key)
-            : $key;
-        $rank = $ranks[$canonical] ?? (1000 + $idx);
-        $indexed[] = ['rank' => $rank, 'idx' => $idx, 'meta' => $meta];
-    }
-
-    usort($indexed, static function ($a, $b) {
-        if ($a['rank'] === $b['rank']) {
-            return $a['idx'] <=> $b['idx'];
-        }
-
-        return $a['rank'] <=> $b['rank'];
-    });
-
-    return array_map(static fn($row) => $row['meta'], $indexed);
-}
-
-/**
  * Hide underscore-prefixed internal keys in admin order item meta (display only).
  *
  * @param array<int,object> $formatted_meta
@@ -3980,7 +4006,9 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     }
 
     $filtered = intersoccer_pv_dedupe_customer_order_formatted_meta($filtered);
-    $filtered = intersoccer_pv_sort_customer_order_formatted_meta($filtered, $item);
+    if ($item instanceof WC_Order_Item_Product) {
+        $filtered = intersoccer_pv_normalize_frde_course_day_meta_position($filtered, $item);
+    }
 
     if (intersoccer_should_mask_sensitive_order_item_meta()) {
         $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);
