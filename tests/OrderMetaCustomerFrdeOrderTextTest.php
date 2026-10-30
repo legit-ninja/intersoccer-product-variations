@@ -22,6 +22,31 @@ if (!function_exists('wp_doing_ajax')) {
     }
 }
 
+if (!function_exists('is_cart')) {
+    function is_cart() {
+        return !empty($GLOBALS['intersoccer_test_is_cart']);
+    }
+}
+
+if (!function_exists('is_checkout')) {
+    function is_checkout() {
+        return !empty($GLOBALS['intersoccer_test_is_checkout']);
+    }
+}
+
+if (!function_exists('is_order_received_page')) {
+    function is_order_received_page() {
+        return !empty($GLOBALS['intersoccer_test_is_order_received_page']);
+    }
+}
+
+if (!function_exists('is_wc_endpoint_url')) {
+    function is_wc_endpoint_url($endpoint) {
+        return !empty($GLOBALS['intersoccer_test_wc_endpoint'])
+            && (string) $GLOBALS['intersoccer_test_wc_endpoint'] === (string) $endpoint;
+    }
+}
+
 if (!function_exists('translate')) {
     function translate($text, $domain = 'default') {
         global $intersoccer_pv_test_textdomain_strings;
@@ -33,6 +58,7 @@ if (!function_exists('translate')) {
     }
 }
 
+require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__) . '/includes/language-helpers.php';
@@ -73,15 +99,46 @@ if (!class_exists('WC_Order_Item_Product')) {
 class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
 
     protected function tearDown(): void {
+        MockFilters::reset();
         unset(
             $GLOBALS['intersoccer_test_is_admin'],
             $GLOBALS['intersoccer_test_doing_ajax'],
+            $GLOBALS['intersoccer_test_is_cart'],
+            $GLOBALS['intersoccer_test_is_checkout'],
+            $GLOBALS['intersoccer_test_is_order_received_page'],
+            $GLOBALS['intersoccer_test_wc_endpoint'],
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
             $GLOBALS['intersoccer_pv_test_textdomain_strings'],
             $GLOBALS['intersoccer_pv_test_textdomain_loaded'],
             $GLOBALS['intersoccer_test_terms']
         );
         parent::tearDown();
+    }
+
+    private function setWpmlLanguage(string $lang): void {
+        MockFilters::$filters['wpml_current_language'] = static function () use ($lang) {
+            return $lang;
+        };
+    }
+
+    private function setFrCartSurface(): void {
+        $GLOBALS['intersoccer_test_is_cart'] = true;
+        unset(
+            $GLOBALS['intersoccer_test_is_checkout'],
+            $GLOBALS['intersoccer_test_is_order_received_page'],
+            $GLOBALS['intersoccer_test_wc_endpoint'],
+            $GLOBALS['intersoccer_sensitive_order_meta_email']
+        );
+    }
+
+    private function clearCustomerSurface(): void {
+        unset(
+            $GLOBALS['intersoccer_test_is_cart'],
+            $GLOBALS['intersoccer_test_is_checkout'],
+            $GLOBALS['intersoccer_test_is_order_received_page'],
+            $GLOBALS['intersoccer_test_wc_endpoint'],
+            $GLOBALS['intersoccer_sensitive_order_meta_email']
+        );
     }
 
     /**
@@ -236,18 +293,24 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
 
     public function test_cart_attribute_label_interSoccer_venues_fr(): void {
         $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->setFrCartSurface();
         $label = intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues');
         $this->assertSame('Sites InterSoccer', $label);
     }
 
     public function test_cart_attribute_label_age_group_de(): void {
         $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $this->setFrCartSurface();
         $label = intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group');
         $this->assertSame('Altersgruppe', $label);
     }
 
     public function test_cart_item_data_keys_translated(): void {
         $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $this->setFrCartSurface();
         $rows = intersoccer_pv_translate_cart_item_data_keys(
             [
                 ['key' => 'Camp Terms', 'value' => 'Week 1'],
@@ -257,5 +320,72 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         );
         $this->assertSame('Camp-Woche', $rows[0]['key']);
         $this->assertSame('Buchungstyp', $rows[1]['key']);
+    }
+
+    public function test_en_product_page_wc_attribute_labels_unchanged(): void {
+        $this->setWpmlLanguage('en');
+        $this->clearCustomerSurface();
+        $this->assertSame(
+            'InterSoccer Venues',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues')
+        );
+        $this->assertSame(
+            'Program Year',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Program Year', 'pa_program-year')
+        );
+        $this->assertSame(
+            'Program Season',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Program Season', 'pa_program-season')
+        );
+    }
+
+    public function test_fr_product_page_keeps_wpml_and_english_incoming_labels(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->clearCustomerSurface();
+        $this->assertSame(
+            'Duree du camp',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Duree du camp', 'pa_camp-terms')
+        );
+        $this->assertSame(
+            'Camp Terms',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+    }
+
+    public function test_fr_cart_translates_english_registry_labels(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->setFrCartSurface();
+        $this->assertSame(
+            'Groupe d\'âge',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
+        );
+        $this->assertSame(
+            'Semaine de camp',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+    }
+
+    public function test_fr_cart_item_data_keeps_non_english_key(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->setFrCartSurface();
+        $rows = intersoccer_pv_translate_cart_item_data_keys(
+            [['key' => 'Duree du camp', 'value' => 'Semaine 1']],
+            []
+        );
+        $this->assertSame('Duree du camp', $rows[0]['key']);
+    }
+
+    public function test_fr_cart_item_data_translates_english_key(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->setFrCartSurface();
+        $rows = intersoccer_pv_translate_cart_item_data_keys(
+            [['key' => 'Camp Terms', 'value' => 'Week 1']],
+            []
+        );
+        $this->assertSame('Semaine de camp', $rows[0]['key']);
     }
 }

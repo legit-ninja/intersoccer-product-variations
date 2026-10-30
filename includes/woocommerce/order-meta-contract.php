@@ -2882,6 +2882,148 @@ add_filter('woocommerce_order_item_display_meta_key', 'intersoccer_filter_order_
 add_filter('woocommerce_order_item_display_meta_value', 'intersoccer_filter_order_item_display_meta_value', 10, 3);
 
 /**
+ * FR or DE language code for cart/checkout attribute-label overrides (empty when EN/other).
+ *
+ * @return string fr|de|''
+ */
+function intersoccer_pv_resolve_fr_de_language_code() {
+    $lang = intersoccer_pv_wpml_current_language_code();
+    if ($lang === '') {
+        return '';
+    }
+
+    $short = strtolower(substr(trim($lang), 0, 2));
+
+    return ($short === 'fr' || $short === 'de') ? $short : '';
+}
+
+/**
+ * Cart, checkout, order customer surfaces where registry attribute labels may be translated.
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_cart_checkout_order_customer_surface() {
+    if (function_exists('intersoccer_is_sensitive_order_meta_email_context')
+        && intersoccer_is_sensitive_order_meta_email_context()) {
+        return true;
+    }
+
+    if (function_exists('wp_doing_ajax') && wp_doing_ajax()) {
+        $action = '';
+        if (isset($_REQUEST['wc-ajax'])) {
+            $raw = $_REQUEST['wc-ajax'];
+            $action = function_exists('wp_unslash') ? wp_unslash($raw) : $raw;
+            $action = function_exists('sanitize_text_field') ? sanitize_text_field($action) : (string) $action;
+        }
+        if ($action === 'update_order_review') {
+            return true;
+        }
+    }
+
+    if (function_exists('is_cart') && is_cart()) {
+        return true;
+    }
+    if (function_exists('is_checkout') && is_checkout()) {
+        return true;
+    }
+    if (function_exists('is_order_received_page') && is_order_received_page()) {
+        return true;
+    }
+    if (function_exists('is_wc_endpoint_url') && is_wc_endpoint_url('view-order')) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Whether FR/DE cart/checkout/order/email surfaces should rewrite English attribute labels.
+ *
+ * @return bool
+ */
+function intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override() {
+    if (intersoccer_pv_resolve_fr_de_language_code() === '') {
+        return false;
+    }
+
+    return intersoccer_pv_is_cart_checkout_order_customer_surface();
+}
+
+/**
+ * English registry / Woo attribute labels for a taxonomy name (pa_*).
+ *
+ * @param string $taxonomy_or_name Attribute taxonomy.
+ * @return array<int,string>
+ */
+function intersoccer_pv_english_attribute_labels_for_taxonomy($taxonomy_or_name) {
+    $name = (string) $taxonomy_or_name;
+    if ($name === '') {
+        return [];
+    }
+
+    $labels = [];
+    if (function_exists('intersoccer_attr_order_meta_label_map')) {
+        $map = intersoccer_attr_order_meta_label_map();
+        if (isset($map[$name]) && $map[$name] !== '') {
+            $labels[] = (string) $map[$name];
+        }
+    }
+
+    if (function_exists('intersoccer_attr_slug_from_taxonomy')) {
+        $slug = intersoccer_attr_slug_from_taxonomy($name);
+        if ($slug !== null && $slug !== '' && function_exists('intersoccer_attr_registry')) {
+            $registry = intersoccer_attr_registry();
+            if (isset($registry[$slug]) && is_array($registry[$slug])) {
+                $def = $registry[$slug];
+                if (!empty($def['wc_label'])) {
+                    $labels[] = (string) $def['wc_label'];
+                }
+                if (!empty($def['order_meta_label'])) {
+                    $labels[] = (string) $def['order_meta_label'];
+                }
+            }
+        }
+    }
+
+    return array_values(array_unique(array_filter($labels, static function ($label) {
+        return is_string($label) && $label !== '';
+    })));
+}
+
+/**
+ * True when the incoming label is still the English registry/WC string (not WPML-translated).
+ *
+ * @param string $label            Label from WooCommerce.
+ * @param string $taxonomy_or_name Taxonomy name when known.
+ * @return bool
+ */
+function intersoccer_pv_incoming_attribute_label_is_english($label, $taxonomy_or_name = '') {
+    $label = (string) $label;
+    if ($label === '') {
+        return false;
+    }
+
+    if ((string) $taxonomy_or_name !== '') {
+        return in_array($label, intersoccer_pv_english_attribute_labels_for_taxonomy($taxonomy_or_name), true);
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            foreach (['wc_label', 'order_meta_label'] as $field) {
+                if (!empty($def[$field]) && (string) $def[$field] === $label) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
  * Translate registry attribute labels on cart, checkout review, and related customer views.
  *
  * @param string      $label   Default WooCommerce attribute label.
@@ -2891,11 +3033,15 @@ add_filter('woocommerce_order_item_display_meta_value', 'intersoccer_filter_orde
  */
 function intersoccer_pv_filter_wc_attribute_label_for_customer($label, $name, $product = null) {
     unset($product);
-    if (!intersoccer_is_customer_order_meta_display_context()) {
+    if (!intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override()) {
         return $label;
     }
 
     $name = (string) $name;
+    if (!intersoccer_pv_incoming_attribute_label_is_english($label, $name)) {
+        return $label;
+    }
+
     if ($name !== '' && function_exists('intersoccer_attr_order_meta_label_map')) {
         $map = intersoccer_attr_order_meta_label_map();
         if (isset($map[$name])) {
@@ -2917,7 +3063,7 @@ add_filter('woocommerce_attribute_label', 'intersoccer_pv_filter_wc_attribute_la
  */
 function intersoccer_pv_translate_cart_item_data_keys($item_data, $cart_item) {
     unset($cart_item);
-    if (!is_array($item_data) || !intersoccer_is_customer_order_meta_display_context()) {
+    if (!is_array($item_data) || !intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override()) {
         return $item_data;
     }
 
@@ -2926,6 +3072,9 @@ function intersoccer_pv_translate_cart_item_data_keys($item_data, $cart_item) {
             continue;
         }
         $key = (string) $row['key'];
+        if (!intersoccer_pv_incoming_attribute_label_is_english($key, '')) {
+            continue;
+        }
         $translated = intersoccer_translate_stored_order_meta_display_key($key, $key);
         if ($translated !== $key) {
             $item_data[$index]['key'] = $translated;
