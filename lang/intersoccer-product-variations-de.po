@@ -728,6 +728,20 @@ msgstr "Stadt"
 msgid "Year"
 msgstr "Jahr"
 
+msgid "Course Day"
+msgstr "Kurstag"
+
+msgid "Course Times"
+msgstr "Kurszeiten"
+
+msgctxt "feminine noun"
+msgid "None"
+msgstr "Keine"
+
+msgctxt "masculine noun"
+msgid "None"
+msgstr "Keine"
+
 msgid "Age Group"
 msgstr "Altersgruppe"
 

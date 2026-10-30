@@ -2775,6 +2775,62 @@ function intersoccer_translate_persisted_discount_label_for_display($label) {
     return $label;
 }
 
+/**
+ * gettext context for customer-facing "None" placeholder by stored meta key.
+ *
+ * @param string $meta_key Stored meta key.
+ * @return string feminine noun|masculine noun
+ */
+function intersoccer_pv_order_meta_none_display_msgctxt($meta_key) {
+    $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+        ? intersoccer_pv_canonical_stored_order_meta_key((string) $meta_key)
+        : (string) $meta_key;
+
+    $feminine = [
+        'Medical Conditions',
+        'Note',
+    ];
+
+    return in_array($canonical, $feminine, true) ? 'feminine noun' : 'masculine noun';
+}
+
+/**
+ * @param string $meta_key Stored meta key.
+ * @return string
+ */
+function intersoccer_pv_translate_order_meta_none_for_display($meta_key) {
+    $ctxt = intersoccer_pv_order_meta_none_display_msgctxt($meta_key);
+
+    return _x('None', $ctxt, 'intersoccer-product-variations');
+}
+
+/**
+ * When token translation leaves a WCML slug unchanged, resolve the localized term name.
+ *
+ * @param mixed  $value         Raw stored value.
+ * @param string $meta_key      Meta key.
+ * @param mixed  $display_value Value after token/dash repair.
+ * @return mixed
+ */
+function intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $display_value) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $display_value;
+    }
+
+    $before = is_scalar($display_value) ? trim((string) $display_value) : '';
+    $raw = is_scalar($value) ? trim((string) $value) : '';
+    if ($before === '' || ($raw !== '' && $before !== $raw)) {
+        return $display_value;
+    }
+
+    $readable = intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key);
+    if (is_scalar($readable) && trim((string) $readable) !== '' && (string) $readable !== $before) {
+        return $readable;
+    }
+
+    return $display_value;
+}
+
 function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
     $text = is_scalar($value) ? (string) $value : '';
     if ($text === '') {
@@ -2799,21 +2855,27 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
         }
     }
 
-    if (intersoccer_pv_order_meta_key_is($meta_key, 'Medical Conditions') && $text === 'None') {
-        return __('None', 'intersoccer-product-variations');
+    if (strcasecmp($text, 'none') === 0) {
+        return intersoccer_pv_translate_order_meta_none_for_display($meta_key);
     }
 
     if (intersoccer_pv_order_meta_key_is($meta_key, 'Note')) {
-        return intersoccer_pv_repair_utf8_dash_mojibake_in_note($text);
+        $note = intersoccer_pv_repair_utf8_dash_mojibake_in_note($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $note);
     }
 
     if (intersoccer_pv_order_meta_key_is($meta_key, 'Activity Type')) {
-        return intersoccer_pv_translate_activity_type_order_meta_value($text);
+        $activity = intersoccer_pv_translate_activity_type_order_meta_value($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $activity);
     }
 
     if (intersoccer_pv_order_meta_key_is($meta_key, 'Booking Type')
         || intersoccer_pv_order_meta_key_is($meta_key, 'Late Pickup Type')) {
-        return intersoccer_pv_translate_order_meta_token_for_display($text);
+        $booking = intersoccer_pv_translate_order_meta_token_for_display($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $booking);
     }
 
     if (intersoccer_pv_order_meta_key_is($meta_key, 'Girls Only')) {
@@ -3725,6 +3787,102 @@ function intersoccer_pv_dedupe_customer_order_formatted_meta(array $formatted_me
 }
 
 /**
+ * Display rank map for customer order lines (matches EN contract; course times before course day).
+ *
+ * @param string $product_type camp|course|birthday|tournament
+ * @return array<string,int>
+ */
+function intersoccer_pv_customer_order_meta_display_rank_map($product_type) {
+    static $cache = [];
+    $type = strtolower((string) $product_type);
+    if ($type === '') {
+        $type = 'camp';
+    }
+    if (isset($cache[$type])) {
+        return $cache[$type];
+    }
+
+    $sequence = [];
+    if (function_exists('intersoccer_order_meta_allowed_keys')) {
+        foreach (intersoccer_order_meta_allowed_keys($type) as $key) {
+            $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+                ? intersoccer_pv_canonical_stored_order_meta_key((string) $key)
+                : (string) $key;
+            if ($canonical === '' || $canonical[0] === '_' || strncmp($canonical, 'pa_', 3) === 0) {
+                continue;
+            }
+            if (!in_array($canonical, $sequence, true)) {
+                $sequence[] = $canonical;
+            }
+        }
+    }
+
+    if ($type === 'course') {
+        $times_idx = array_search('Course Times', $sequence, true);
+        $day_idx = array_search('Course Day', $sequence, true);
+        if ($times_idx !== false && $day_idx !== false && $day_idx < $times_idx) {
+            unset($sequence[$times_idx], $sequence[$day_idx]);
+            $sequence = array_values($sequence);
+            $insert_at = min($times_idx, $day_idx);
+            array_splice($sequence, $insert_at, 0, ['Course Times', 'Course Day']);
+        }
+    }
+
+    $map = [];
+    foreach ($sequence as $idx => $canonical) {
+        $map[$canonical] = $idx;
+    }
+
+    $cache[$type] = $map;
+
+    return $map;
+}
+
+/**
+ * @param array<int,object>     $formatted_meta
+ * @param WC_Order_Item_Product $item
+ * @return array<int,object>
+ */
+function intersoccer_pv_sort_customer_order_formatted_meta(array $formatted_meta, $item) {
+    if ($formatted_meta === [] || !($item instanceof WC_Order_Item_Product)) {
+        return $formatted_meta;
+    }
+    if (!function_exists('intersoccer_get_product_type')) {
+        return $formatted_meta;
+    }
+
+    $product_type = strtolower((string) intersoccer_get_product_type((int) $item->get_product_id()));
+    if ($product_type !== 'course') {
+        return $formatted_meta;
+    }
+
+    $ranks = intersoccer_pv_customer_order_meta_display_rank_map($product_type);
+    if ($ranks === []) {
+        return $formatted_meta;
+    }
+
+    $indexed = [];
+    foreach ($formatted_meta as $idx => $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+            ? intersoccer_pv_canonical_stored_order_meta_key($key)
+            : $key;
+        $rank = $ranks[$canonical] ?? (1000 + $idx);
+        $indexed[] = ['rank' => $rank, 'idx' => $idx, 'meta' => $meta];
+    }
+
+    usort($indexed, static function ($a, $b) {
+        if ($a['rank'] === $b['rank']) {
+            return $a['idx'] <=> $b['idx'];
+        }
+
+        return $a['rank'] <=> $b['rank'];
+    });
+
+    return array_map(static fn($row) => $row['meta'], $indexed);
+}
+
+/**
  * Hide underscore-prefixed internal keys in admin order item meta (display only).
  *
  * @param array<int,object> $formatted_meta
@@ -3822,6 +3980,7 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     }
 
     $filtered = intersoccer_pv_dedupe_customer_order_formatted_meta($filtered);
+    $filtered = intersoccer_pv_sort_customer_order_formatted_meta($filtered, $item);
 
     if (intersoccer_should_mask_sensitive_order_item_meta()) {
         $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);

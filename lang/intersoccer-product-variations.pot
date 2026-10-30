@@ -806,6 +806,20 @@ msgstr ""
 msgid "Year"
 msgstr ""
 
+msgid "Course Day"
+msgstr ""
+
+msgid "Course Times"
+msgstr ""
+
+msgctxt "feminine noun"
+msgid "None"
+msgstr ""
+
+msgctxt "masculine noun"
+msgid "None"
+msgstr ""
+
 msgid "Age Group"
 msgstr ""
 
