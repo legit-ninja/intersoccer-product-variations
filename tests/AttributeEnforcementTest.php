@@ -302,18 +302,71 @@ class AttributeEnforcementTest extends TestCase {
         $this->assertStringContainsString('Saved and kept live', $stored['message']);
     }
 
-    public function test_live_private_product_with_shape_violation_is_not_demoted_to_draft() {
+    public function test_live_private_product_save_stays_private_without_notice() {
         $this->reset_product_save_test_state();
         $product_id = 51818;
         intersoccer_attr_set_product_pre_save_status($product_id, 'private');
         $GLOBALS['intersoccer_test_post_status'][$product_id] = 'private';
         $this->seed_year_qualified_season_on_product($product_id);
-        $product = $this->make_camp_product_for_save($product_id, 'publish');
+        $product = $this->make_camp_product_for_save($product_id, 'private');
 
         intersoccer_attr_validate_product_on_save($product);
 
         $this->assertNotContains('draft', $product->set_status_calls);
         $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    public function test_private_to_publish_with_violation_stores_kept_live_warning() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        $product_id = 51818;
+        intersoccer_attr_set_product_pre_save_status($product_id, 'private');
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'private';
+        $this->seed_classic_product_edit_post($product_id, ['pa_program-season' => [9100]]);
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertNotContains('draft', $product->set_status_calls);
+        $stored = get_transient(intersoccer_attr_product_save_notice_transient_key($product_id));
+        $this->assertIsArray($stored);
+        $this->assertSame('warning', $stored['type']);
+        $this->assertStringContainsString('Saved and kept live', $stored['message']);
+    }
+
+    public function test_pre_write_block_notice_survives_process_object_and_shows_once() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $product_id = 41078;
+        intersoccer_attr_set_product_pre_save_status($product_id, 'draft');
+        $this->seed_classic_product_edit_post($product_id, ['pa_program-season' => [9100]]);
+
+        intersoccer_attr_wp_insert_post_data_enforce_publish_rules(
+            ['post_type' => 'product', 'post_status' => 'publish'],
+            ['ID' => $product_id]
+        );
+
+        $product = $this->make_camp_product_for_save($product_id, 'draft');
+        intersoccer_attr_validate_product_on_save($product);
+
+        $stored = get_transient(intersoccer_attr_product_save_notice_transient_key($product_id));
+        $this->assertIsArray($stored);
+        $this->assertStringContainsString('Publish blocked', $stored['message']);
+
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_current_screen'] = (object) ['id' => 'product'];
+        $_GET['post'] = (string) $product_id;
+
+        ob_start();
+        intersoccer_attr_admin_product_save_notice();
+        $first = ob_get_clean();
+        $this->assertStringContainsString('Publish blocked', $first);
+
+        ob_start();
+        intersoccer_attr_admin_product_save_notice();
+        $second = ob_get_clean();
+        $this->assertSame('', $second);
     }
 
     public function test_draft_product_with_shape_violation_blocked_from_publish() {

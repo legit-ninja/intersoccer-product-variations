@@ -730,12 +730,15 @@ function intersoccer_attr_validate_product_on_save($product) {
     $has_publish_block = $wants_publish && (!empty($missing_parent) || !empty($shape_errors));
 
     if (!$has_publish_block) {
-        intersoccer_attr_clear_product_save_notice($product_id);
+        if (empty($GLOBALS['intersoccer_attr_publish_blocked_pre_write'][$product_id])) {
+            intersoccer_attr_clear_product_save_notice($product_id);
+        }
     } else {
         $detail = intersoccer_attr_publish_block_detail_message($missing_parent, $shape_errors);
 
         if (intersoccer_attr_product_stored_status_is_live($product_id)) {
-            if (intersoccer_attr_product_pre_save_status($product_id) !== 'private') {
+            $pre_status = intersoccer_attr_product_pre_save_status($product_id);
+            if ($pre_status !== 'private' || $wants_publish) {
                 $persist_message = __('Saved and kept live, but fix before next publish:', 'intersoccer-product-variations') . ' ' . $detail;
                 intersoccer_attr_store_product_save_notice($product_id, $persist_message, 'warning');
             }
