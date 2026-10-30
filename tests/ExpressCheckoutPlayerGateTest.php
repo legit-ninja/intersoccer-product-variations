@@ -197,6 +197,17 @@ class ExpressCheckoutPlayerGateTest extends TestCase
         $this->assertStringNotContainsString('display', $css, 'display:none can stop Stripe mounting its iframe');
     }
 
+    public function testCssUsesNoImportant()
+    {
+        $css = intersoccer_express_gate_css();
+        $this->assertStringNotContainsString('!important', $css);
+        // Stripe's inline margin-top can't be beaten without !important, so the hidden box leaves the flow instead.
+        $this->assertStringContainsString('position: absolute', $css);
+        $this->assertStringContainsString('left: 0', $css);
+        $this->assertStringContainsString('right: 0', $css);
+        $this->assertStringContainsString('body.intersoccer-express-cart-has-programs #wc-stripe-express-checkout-button-separator', $css);
+    }
+
     public function testFrontEndTogglesGateFromPlayerChoice()
     {
         $root = dirname(__DIR__);
