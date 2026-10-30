@@ -9,9 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Camp Times catalog terms: validate strict HHMM-HHMM ranges (start before end) instead of locking to the two registry default slugs only. WPML suffixed slugs on assigned terms remain accepted when the term name is a valid range.
-- Product save: block invalid publish in `wp_insert_post_data` before status is written (WPML twin safety); validate posted attributes/terms with WPML terms resolved to default-language originals; never demote already-live products; persistent admin notices after redirect.
-- Product save (follow-up): classic edit-post POST shape (taxonomy term ID arrays), scope pre-write block to editpost + WC nonce, skip enforcement on WPML translation products, fall back to stored attributes when pa_* not posted.
-- Product save: retain pre-write Publish blocked notice through process_product_object; warn when private product is published with validation failures.
+- Product save (#134): block invalid publish in `wp_insert_post_data` before the post status is written, using submitted attribute/taxonomy values from the classic product edit form (`editpost`, matching post ID, WooCommerce meta nonce); fall back to stored product attributes when no `pa_*` payload is posted. Scope excludes Quick Edit, bulk edit, REST, and programmatic saves. Enforcement runs on the default-language product only—WPML translation products are skipped (twin safety: the original never transitions to publish, so WPML cannot sync publish to translations). Already-live products (`publish`, `future`, `private`) are never demoted; validation failures while requesting publish show a one-time admin notice after redirect (including private → publish; private → private stays silent). Pre-write **Publish blocked.** notices are retained through `woocommerce_admin_process_product_object`.
 
 ## [2.9.28] - 2026-09-28
 
