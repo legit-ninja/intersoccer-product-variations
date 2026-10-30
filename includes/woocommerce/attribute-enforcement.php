@@ -293,37 +293,48 @@ function intersoccer_attr_locked_term_attribute_slugs() {
 }
 
 /**
- * Normalize a camp time label or slug to HHMM-HHMM when possible.
+ * Strip WPML/WCML suffix from a camp time slug and return HHMM-HHMM, or empty.
  *
- * Accepts bare ranges, WPML/WCML slug suffixes (-fr, -de, -en, -digits), and
- * alternate display forms (10:00-17:00, 10h00-17h00) when they map to a range.
- *
- * @param string $value Term name or slug fragment.
- * @return string Normalized HHMM-HHMM or empty string.
+ * @param string $slug Term slug (may include -fr, -de, -en, or -digits).
+ * @return string
  */
-function intersoccer_attr_normalize_camp_time_range($value) {
-    $value = trim((string) $value);
-    if ($value === '') {
+function intersoccer_attr_camp_time_range_from_slug($slug) {
+    $slug = strtolower(trim((string) $slug));
+    if ($slug === '') {
         return '';
     }
-
-    if (preg_match('/^(\d{4}-\d{4})(?:-(?:fr|de|en|\d+))?$/i', $value, $m)) {
-        return strtolower($m[1]);
-    }
-
-    if (preg_match('/^(\d{4})-(\d{4})$/', $value, $m)) {
-        return $m[1] . '-' . $m[2];
-    }
-
-    if (preg_match('/^(\d{1,2})[hH](\d{2})-(\d{1,2})[hH](\d{2})$/', $value, $m)) {
-        return sprintf('%02d%02d-%02d%02d', (int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4]);
-    }
-
-    if (preg_match('/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/', $value, $m)) {
-        return sprintf('%02d%02d-%02d%02d', (int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4]);
+    if (preg_match('/^(\d{4}-\d{4})(?:-(?:fr|de|en|\d+))?$/', $slug, $m)) {
+        return $m[1];
     }
 
     return '';
+}
+
+/**
+ * @param string $name Term name (must be literal HHMM-HHMM).
+ * @return bool
+ */
+function intersoccer_attr_strict_camp_time_name_is_valid($name) {
+    $name = trim((string) $name);
+    if (!preg_match('/^\d{4}-\d{4}$/', $name)) {
+        return false;
+    }
+
+    return intersoccer_attr_is_valid_camp_time_range(strtolower($name));
+}
+
+/**
+ * @param string $slug Term slug (HHMM-HHMM or HHMM-HHMM with WPML suffix).
+ * @return bool
+ */
+function intersoccer_attr_camp_time_slug_with_suffix_is_valid($slug) {
+    $slug = strtolower(trim((string) $slug));
+    if ($slug === '' || !preg_match('/^\d{4}-\d{4}(?:-(?:fr|de|en|\d+))?$/', $slug)) {
+        return false;
+    }
+    $range = intersoccer_attr_camp_time_range_from_slug($slug);
+
+    return $range !== '' && intersoccer_attr_is_valid_camp_time_range($range);
 }
 
 /**
@@ -499,6 +510,7 @@ function intersoccer_attr_validate_new_term($taxonomy, $name, $slug = '') {
     $taxonomy = (string) $taxonomy;
     $name = trim((string) $name);
     $slug = trim((string) $slug);
+    $slug_explicit = ($slug !== '');
 
     if ($name === '') {
         return new WP_Error(
@@ -556,16 +568,19 @@ function intersoccer_attr_validate_new_term($taxonomy, $name, $slug = '') {
     }
 
     if ($attr_slug === 'camp-times') {
-        $name_range = intersoccer_attr_normalize_camp_time_range($name);
-        $slug_range = intersoccer_attr_normalize_camp_time_range($slug);
-        if (intersoccer_attr_is_valid_camp_time_range($name_range)
-            || intersoccer_attr_is_valid_camp_time_range($slug_range)) {
-            return true;
+        if (!intersoccer_attr_strict_camp_time_name_is_valid($name)) {
+            return new WP_Error(
+                'invalid_camp_time',
+                __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
+            );
         }
-        return new WP_Error(
-            'invalid_camp_time',
-            __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
-        );
+        if ($slug_explicit && !intersoccer_attr_camp_time_slug_with_suffix_is_valid($slug)) {
+            return new WP_Error(
+                'invalid_camp_time',
+                __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
+            );
+        }
+        return true;
     }
 
     if (in_array($attr_slug, intersoccer_attr_locked_term_attribute_slugs(), true)) {

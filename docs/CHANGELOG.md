@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.10.30] - 2026-10-30
 
 ### Fixed
-- Camp Times catalog terms: validate HHMM-HHMM ranges (start before end) instead of locking to the two registry default slugs only. WPML suffixed slugs and alternate display forms that normalize to a valid range remain accepted.
+- Camp Times catalog terms: validate strict HHMM-HHMM ranges (start before end) instead of locking to the two registry default slugs only. WPML suffixed slugs on assigned terms remain accepted when the term name is a valid range.
 
 ## [2.9.28] - 2026-09-28
 

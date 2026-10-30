@@ -159,6 +159,8 @@ class AttributeEnforcementTest extends TestCase {
             '1530-0830',
             '2500-2600',
             'abc',
+            '10:00-17:00',
+            '10h00-17h00',
         ];
         foreach ($bad as $name) {
             $result = intersoccer_attr_validate_new_term('pa_camp-times', $name);
