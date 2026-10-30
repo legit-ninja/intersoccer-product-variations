@@ -99,6 +99,12 @@ class OrderMetaCustomerLabelCatalogTest extends TestCase
             'Discount Amount',
             'Booking details',
             'Assigned Attendee',
+            'Year',
+            'Age Group',
+            'Days of Week',
+            'Sites InterSoccer',
+            'Camp Terms',
+            'Season',
         ];
         $cases = [];
         foreach ($labels as $msgid) {

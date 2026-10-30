@@ -2237,7 +2237,7 @@ function intersoccer_stored_order_meta_display_key_map() {
     $map['Sessions Remaining'] = 'Sessions Remaining';
     $map['InterSoccer Venues'] = 'Sites InterSoccer';
     $map['Player DOB'] = 'Player DOB';
-    $map['Player Medical'] = 'Player Medical';
+    $map['Player Medical'] = 'Medical Conditions';
 
     foreach ([
         "Type d'activité" => 'Activity Type',
@@ -2470,11 +2470,16 @@ function intersoccer_pv_repair_utf8_dash_mojibake_in_note($text) {
  *
  * @param string            $key  Meta key.
  * @param WC_Order_Item     $item Order line item.
+ * @param array<string,true> $keys_present Keys on the formatted meta pass (optional).
  * @return bool
  */
-function intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item) {
-    if (!intersoccer_pv_order_meta_key_is($key, 'Player Medical')) {
+function intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item, array $keys_present = []) {
+    if ((string) $key !== 'Player Medical') {
         return false;
+    }
+
+    if (isset($keys_present['Medical Conditions'])) {
+        return true;
     }
 
     if (!($item instanceof WC_Order_Item_Product) && !is_object($item)) {
@@ -2848,7 +2853,7 @@ function intersoccer_translate_stored_order_meta_display_value($value, $meta_key
         }
     }
 
-    return $value;
+    return intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key);
 }
 
 /**
@@ -2875,6 +2880,62 @@ function intersoccer_filter_order_item_display_meta_value($display_value, $meta,
 
 add_filter('woocommerce_order_item_display_meta_key', 'intersoccer_filter_order_item_display_meta_key', 10, 3);
 add_filter('woocommerce_order_item_display_meta_value', 'intersoccer_filter_order_item_display_meta_value', 10, 3);
+
+/**
+ * Translate registry attribute labels on cart, checkout review, and related customer views.
+ *
+ * @param string      $label   Default WooCommerce attribute label.
+ * @param string      $name    Taxonomy or attribute name.
+ * @param WC_Product|null $product Product context.
+ * @return string
+ */
+function intersoccer_pv_filter_wc_attribute_label_for_customer($label, $name, $product = null) {
+    unset($product);
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $label;
+    }
+
+    $name = (string) $name;
+    if ($name !== '' && function_exists('intersoccer_attr_order_meta_label_map')) {
+        $map = intersoccer_attr_order_meta_label_map();
+        if (isset($map[$name])) {
+            return intersoccer_translate_stored_order_meta_display_key($map[$name], $map[$name]);
+        }
+    }
+
+    return intersoccer_translate_stored_order_meta_display_key((string) $label, (string) $label);
+}
+
+add_filter('woocommerce_attribute_label', 'intersoccer_pv_filter_wc_attribute_label_for_customer', 20, 3);
+
+/**
+ * Translate cart line item data keys produced with English registry labels.
+ *
+ * @param array<int,array<string,mixed>> $item_data Cart row fragments.
+ * @param array<string,mixed>            $cart_item Cart line.
+ * @return array<int,array<string,mixed>>
+ */
+function intersoccer_pv_translate_cart_item_data_keys($item_data, $cart_item) {
+    unset($cart_item);
+    if (!is_array($item_data) || !intersoccer_is_customer_order_meta_display_context()) {
+        return $item_data;
+    }
+
+    foreach ($item_data as $index => $row) {
+        if (!is_array($row) || !isset($row['key'])) {
+            continue;
+        }
+        $key = (string) $row['key'];
+        $translated = intersoccer_translate_stored_order_meta_display_key($key, $key);
+        if ($translated !== $key) {
+            $item_data[$index]['key'] = $translated;
+        }
+    }
+
+    return $item_data;
+}
+
+add_filter('woocommerce_get_item_data', 'intersoccer_pv_translate_cart_item_data_keys', 25, 2);
 
 /**
  * Apply display-time label translation on formatted meta objects.
@@ -3341,6 +3402,70 @@ function intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $term_sl
 }
 
 /**
+ * Registry taxonomy for a stored human order-meta key (canonical English label).
+ *
+ * @param string $meta_key Stored meta key or display label.
+ * @return string pa_* taxonomy or empty.
+ */
+function intersoccer_pv_taxonomy_for_stored_order_meta_key($meta_key) {
+    $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+        ? intersoccer_pv_canonical_stored_order_meta_key((string) $meta_key)
+        : (string) $meta_key;
+    if ($canonical === '' || !function_exists('intersoccer_attr_registry')) {
+        return '';
+    }
+
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        if (!is_array($def)) {
+            continue;
+        }
+        $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+        if ($label === $canonical) {
+            return function_exists('intersoccer_attr_taxonomy') ? (string) intersoccer_attr_taxonomy($slug) : '';
+        }
+        foreach ($def['legacy_order_meta_labels'] ?? [] as $legacy) {
+            if ((string) $legacy === $canonical) {
+                return function_exists('intersoccer_attr_taxonomy') ? (string) intersoccer_attr_taxonomy($slug) : '';
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * When WCML rewrote a human facet value to a term slug, show the localized term name.
+ *
+ * @param mixed  $value    Stored meta value.
+ * @param string $meta_key Meta key.
+ * @return mixed
+ */
+function intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $value;
+    }
+
+    $text = is_scalar($value) ? trim((string) $value) : '';
+    if ($text === '' || !function_exists('get_term_by')) {
+        return $value;
+    }
+
+    $taxonomy = intersoccer_pv_taxonomy_for_stored_order_meta_key($meta_key);
+    if ($taxonomy === '') {
+        return $value;
+    }
+
+    $term = get_term_by('slug', $text, $taxonomy);
+    if (!$term || is_wp_error($term) || (string) $term->slug !== $text) {
+        return $value;
+    }
+
+    $readable = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $text);
+
+    return $readable !== '' ? $readable : $value;
+}
+
+/**
  * @param array<string,true> $keys_present
  * @param string             $slug_meta_key
  * @return bool
@@ -3521,6 +3646,9 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
             continue;
         }
         if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
+            continue;
+        }
+        if (intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item, $keys_present)) {
             continue;
         }
         $filtered[] = $meta;

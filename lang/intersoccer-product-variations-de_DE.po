@@ -725,6 +725,15 @@ msgstr "Kanton / Region"
 msgid "City"
 msgstr "Stadt"
 
+msgid "Year"
+msgstr "Jahr"
+
+msgid "Age Group"
+msgstr "Altersgruppe"
+
+msgid "Days of Week"
+msgstr "Wochentage"
+
 msgid "Booking Type"
 msgstr "Buchungstyp"
 
@@ -732,7 +741,7 @@ msgid "Discount Amount"
 msgstr "Rabattbetrag"
 
 msgid "Sites InterSoccer"
-msgstr "InterSoccer Standorte"
+msgstr "InterSoccer-Standorte"
 
 msgid "Medical Conditions"
 msgstr "Medizinische Angaben"

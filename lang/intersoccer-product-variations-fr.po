@@ -734,6 +734,15 @@ msgstr "Canton / région"
 msgid "City"
 msgstr "Ville"
 
+msgid "Year"
+msgstr "Année"
+
+msgid "Age Group"
+msgstr "Groupe d'âge"
+
+msgid "Days of Week"
+msgstr "Jours de la semaine"
+
 msgid "Booking Type"
 msgstr "Type de réservation"
 

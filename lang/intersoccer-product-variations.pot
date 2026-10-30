@@ -803,6 +803,15 @@ msgstr ""
 msgid "City"
 msgstr ""
 
+msgid "Year"
+msgstr ""
+
+msgid "Age Group"
+msgstr ""
+
+msgid "Days of Week"
+msgstr ""
+
 # wpml-name: Booking Type
 msgid "Booking Type"
 msgstr ""

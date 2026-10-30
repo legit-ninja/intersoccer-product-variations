@@ -218,7 +218,8 @@ class OrderMetaPrivacyTest extends TestCase {
         ]);
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
         $map = $this->meta_map($filtered);
-        $this->assertSame('Peanut allergy', $map['Player Medical']);
+        $this->assertSame('Peanut allergy', $map['Medical Conditions']);
+        $this->assertArrayNotHasKey('Player Medical', $map, 'PV Medical Conditions suppresses duplicate PM row on customer views');
         $this->assertArrayNotHasKey('Player DOB', $map, 'PV Attendee DOB suppresses duplicate PM Player DOB on customer views');
         $this->assertSame('2015-06-20', $map['Attendee DOB']);
     }
@@ -232,10 +233,10 @@ class OrderMetaPrivacyTest extends TestCase {
         ]);
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(), $item);
         $map = $this->meta_map($filtered);
-        foreach (['Medical Conditions', 'Player Medical'] as $k) {
-            $this->assertStringContainsString('Medical information: provided', $map[$k]);
-            $this->assertStringNotContainsString('Peanut', $map[$k]);
-        }
+        $this->assertArrayHasKey('Medical Conditions', $map);
+        $this->assertStringContainsString('Medical information: provided', $map['Medical Conditions']);
+        $this->assertStringNotContainsString('Peanut', $map['Medical Conditions']);
+        $this->assertArrayNotHasKey('Player Medical', $map);
         $this->assertArrayHasKey('Attendee DOB', $map);
         $this->assertStringNotContainsString('2015-06-20', $map['Attendee DOB']);
         $this->assertArrayNotHasKey('Player DOB', $map);
@@ -251,7 +252,8 @@ class OrderMetaPrivacyTest extends TestCase {
         $filtered = intersoccer_filter_customer_order_item_meta($this->dual_naming_meta(false), $item);
         intersoccer_sensitive_order_meta_end_email_context(false, false, false, null);
         $map = $this->meta_map($filtered);
-        $this->assertStringNotContainsString('Peanut', $map['Player Medical']);
+        $this->assertStringNotContainsString('Peanut', $map['Medical Conditions'] ?? '');
+        $this->assertArrayNotHasKey('Player Medical', $map);
         $this->assertArrayNotHasKey('Player DOB', $map);
     }
 
