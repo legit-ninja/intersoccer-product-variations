@@ -109,6 +109,93 @@ function intersoccer_attr_block_unregistered_attribute_creation($attribute_id, $
  * Validate product attributes on save for InterSoccer program products.
  */
 add_action('woocommerce_admin_process_product_object', 'intersoccer_attr_validate_product_on_save', 20, 1);
+
+/**
+ * @param int $product_id
+ * @return bool True when the product was already live in the DB before this save.
+ */
+function intersoccer_attr_product_stored_status_is_live($product_id) {
+    $stored = get_post_status((int) $product_id);
+
+    return in_array($stored, ['publish', 'future', 'private'], true);
+}
+
+/**
+ * @param int $product_id
+ * @return string
+ */
+function intersoccer_attr_product_save_notice_transient_key($product_id) {
+    return 'intersoccer_attr_notice_' . (int) get_current_user_id() . '_' . (int) $product_id;
+}
+
+/**
+ * @param int    $product_id
+ * @param string $message
+ * @param string $type `error` or `warning`.
+ * @return void
+ */
+function intersoccer_attr_store_product_save_notice($product_id, $message, $type = 'error') {
+    $ttl = defined('DAY_IN_SECONDS') ? (int) DAY_IN_SECONDS : 86400;
+    set_transient(
+        intersoccer_attr_product_save_notice_transient_key($product_id),
+        [
+            'message' => (string) $message,
+            'type' => (string) $type,
+        ],
+        $ttl
+    );
+}
+
+/**
+ * @param int $product_id
+ * @return void
+ */
+function intersoccer_attr_clear_product_save_notice($product_id) {
+    delete_transient(intersoccer_attr_product_save_notice_transient_key($product_id));
+}
+
+/**
+ * @param int $product_id
+ * @return array{message:string,type:string}|null
+ */
+function intersoccer_attr_read_and_clear_product_save_notice($product_id) {
+    $key = intersoccer_attr_product_save_notice_transient_key($product_id);
+    $payload = get_transient($key);
+    delete_transient($key);
+    if (!is_array($payload) || empty($payload['message'])) {
+        return null;
+    }
+
+    return [
+        'message' => (string) $payload['message'],
+        'type' => (string) ($payload['type'] ?? 'error'),
+    ];
+}
+
+/**
+ * Show a persistent attribute enforcement notice on the product edit screen.
+ */
+add_action('admin_notices', 'intersoccer_attr_admin_product_save_notice');
+function intersoccer_attr_admin_product_save_notice() {
+    if (!is_admin() || !function_exists('get_current_screen')) {
+        return;
+    }
+    $screen = get_current_screen();
+    if (!$screen || ($screen->id ?? '') !== 'product') {
+        return;
+    }
+    $post_id = isset($_GET['post']) ? (int) $_GET['post'] : 0;
+    if ($post_id <= 0) {
+        return;
+    }
+    $payload = intersoccer_attr_read_and_clear_product_save_notice($post_id);
+    if ($payload === null) {
+        return;
+    }
+    $class = ($payload['type'] === 'warning') ? 'notice notice-warning' : 'notice notice-error';
+    echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($payload['message']) . '</p></div>';
+}
+
 function intersoccer_attr_validate_product_on_save($product) {
     if (!($product instanceof WC_Product) || !current_user_can('edit_product', $product->get_id())) {
         return;
@@ -168,8 +255,11 @@ function intersoccer_attr_validate_product_on_save($product) {
 
     $missing_parent = intersoccer_attr_missing_required_parent_facets_from_product($product, $product_type);
     $wants_publish = ($product->get_status() === 'publish');
-    if ($wants_publish && (!empty($missing_parent) || !empty($shape_errors))) {
-        $product->set_status('draft');
+    $has_publish_block = $wants_publish && (!empty($missing_parent) || !empty($shape_errors));
+
+    if (!$has_publish_block) {
+        intersoccer_attr_clear_product_save_notice($product_id);
+    } else {
         $parts = [];
         if (!empty($missing_parent)) {
             $parts[] = sprintf(
@@ -179,14 +269,28 @@ function intersoccer_attr_validate_product_on_save($product) {
             );
         }
         if (!empty($shape_errors)) {
-            $parts[] = __('Assigned terms violate the taxonomy standard.', 'intersoccer-product-variations');
+            $parts[] = sprintf(
+                /* translators: %s: semicolon-separated term-shape errors */
+                __('Term-shape violations (taxonomy standard): %s', 'intersoccer-product-variations'),
+                implode('; ', $shape_errors)
+            );
         }
-        add_settings_error(
-            'intersoccer_attr_enforcement',
-            'intersoccer_attr_publish_blocked_' . $product_id,
-            __('Publish blocked.', 'intersoccer-product-variations') . ' ' . implode(' ', $parts),
-            'error'
-        );
+        $detail = implode(' ', $parts);
+
+        if (intersoccer_attr_product_stored_status_is_live($product_id)) {
+            $persist_message = __('Saved and kept live, but fix before next publish:', 'intersoccer-product-variations') . ' ' . $detail;
+            intersoccer_attr_store_product_save_notice($product_id, $persist_message, 'warning');
+        } else {
+            $product->set_status('draft');
+            $blocked_message = __('Publish blocked.', 'intersoccer-product-variations') . ' ' . $detail;
+            add_settings_error(
+                'intersoccer_attr_enforcement',
+                'intersoccer_attr_publish_blocked_' . $product_id,
+                $blocked_message,
+                'error'
+            );
+            intersoccer_attr_store_product_save_notice($product_id, $blocked_message, 'error');
+        }
     }
 
     if (in_array($product_type, ['camp', 'course'], true)) {

@@ -41,6 +41,88 @@ if (!function_exists('sanitize_title')) {
 
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 
+if (!function_exists('get_post_status')) {
+    function get_post_status($post_id) {
+        $post_id = (int) $post_id;
+        if (isset($GLOBALS['intersoccer_test_post_status'][$post_id])) {
+            return $GLOBALS['intersoccer_test_post_status'][$post_id];
+        }
+
+        return 'draft';
+    }
+}
+
+if (!function_exists('get_current_screen')) {
+    function get_current_screen() {
+        return $GLOBALS['intersoccer_test_current_screen'] ?? null;
+    }
+}
+
+if (!class_exists('WC_Product')) {
+    class WC_Product {
+        public function get_id() {
+            return 0;
+        }
+
+        public function is_type($type) {
+            return false;
+        }
+
+        public function get_parent_id() {
+            return 0;
+        }
+
+        public function get_children() {
+            return [];
+        }
+
+        public function get_price() {
+            return 0;
+        }
+    }
+}
+
+class AttributeEnforcementMockAttributeWithTerms {
+    public function get_options() {
+        return [1];
+    }
+}
+
+class AttributeEnforcementSaveMockProduct extends WC_Product {
+    /** @var array<int,string> */
+    public $set_status_calls = [];
+
+    /** @var array<string,mixed> */
+    private $attributes;
+
+    public function __construct(int $id, string $status, array $attributes) {
+        $this->id = $id;
+        $this->status = $status;
+        $this->attributes = $attributes;
+    }
+
+    private $id;
+
+    private $status;
+
+    public function get_id() {
+        return $this->id;
+    }
+
+    public function get_status() {
+        return $this->status;
+    }
+
+    public function set_status($status) {
+        $this->set_status_calls[] = (string) $status;
+        $this->status = (string) $status;
+    }
+
+    public function get_attributes() {
+        return $this->attributes;
+    }
+}
+
 class AttributeEnforcementTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
@@ -194,5 +276,112 @@ class AttributeEnforcementTest extends TestCase {
     public function test_birthday_publish_requires_activity_type_only() {
         $this->assertSame([], intersoccer_attr_parent_facets_block_publish(['pa_activity-type'], 'birthday'));
         $this->assertSame(['pa_activity-type'], intersoccer_attr_parent_facets_block_publish([], 'birthday'));
+    }
+
+    public function test_live_publish_product_with_shape_violation_stays_publish_and_stores_notice() {
+        $this->reset_product_save_test_state();
+        $product_id = 51723;
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'publish';
+        $this->seed_year_qualified_season_on_product($product_id);
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertSame('publish', $product->get_status());
+        $this->assertNotContains('draft', $product->set_status_calls);
+        $stored = get_transient(intersoccer_attr_product_save_notice_transient_key($product_id));
+        $this->assertIsArray($stored);
+        $this->assertSame('warning', $stored['type']);
+        $this->assertStringContainsString('Saved and kept live', $stored['message']);
+    }
+
+    public function test_live_private_product_with_shape_violation_is_not_demoted_to_draft() {
+        $this->reset_product_save_test_state();
+        $product_id = 51818;
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'private';
+        $this->seed_year_qualified_season_on_product($product_id);
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertNotContains('draft', $product->set_status_calls);
+        $this->assertNotFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    public function test_draft_product_with_shape_violation_blocked_from_publish() {
+        $this->reset_product_save_test_state();
+        $product_id = 41078;
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'draft';
+        $this->seed_year_qualified_season_on_product($product_id);
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertSame('draft', $product->get_status());
+        $this->assertContains('draft', $product->set_status_calls);
+        $stored = get_transient(intersoccer_attr_product_save_notice_transient_key($product_id));
+        $this->assertIsArray($stored);
+        $this->assertSame('error', $stored['type']);
+        $this->assertStringContainsString('Publish blocked', $stored['message']);
+    }
+
+    public function test_product_save_notice_shown_once_on_edit_screen() {
+        $this->reset_product_save_test_state();
+        $product_id = 51723;
+        intersoccer_attr_store_product_save_notice($product_id, 'Test persistent notice', 'warning');
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_current_screen'] = (object) ['id' => 'product'];
+        $_GET['post'] = (string) $product_id;
+
+        ob_start();
+        intersoccer_attr_admin_product_save_notice();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('Test persistent notice', $html);
+        $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    public function test_product_save_notice_cleared_when_save_has_no_violations() {
+        $this->reset_product_save_test_state();
+        $product_id = 51723;
+        intersoccer_attr_store_product_save_notice($product_id, 'Stale notice', 'error');
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'publish';
+        $GLOBALS['intersoccer_test_product_terms'][$product_id]['pa_program-season'] = [
+            (object) ['name' => 'Autumn', 'slug' => 'autumn'],
+        ];
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    private function reset_product_save_test_state(): void {
+        $GLOBALS['intersoccer_test_transients'] = [];
+        $GLOBALS['intersoccer_test_product_terms'] = [];
+        $GLOBALS['intersoccer_test_post_status'] = [];
+        $GLOBALS['intersoccer_test_product_type'] = 'camp';
+        $GLOBALS['intersoccer_test_user_id'] = 42;
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        unset($GLOBALS['intersoccer_test_current_screen']);
+        unset($_GET['post']);
+    }
+
+    private function seed_year_qualified_season_on_product(int $product_id): void {
+        $GLOBALS['intersoccer_test_product_terms'][$product_id]['pa_program-season'] = [
+            (object) [
+                'name' => 'Autumn Camps 2026',
+                'slug' => 'autumn-camps-2026',
+            ],
+        ];
+    }
+
+    private function make_camp_product_for_save(int $product_id, string $status): AttributeEnforcementSaveMockProduct {
+        $attributes = [];
+        foreach (intersoccer_attr_required_parent_taxonomies('camp') as $taxonomy) {
+            $attributes[$taxonomy] = new AttributeEnforcementMockAttributeWithTerms();
+        }
+
+        return new AttributeEnforcementSaveMockProduct($product_id, $status, $attributes);
     }
 }
