@@ -111,13 +111,64 @@ function intersoccer_attr_block_unregistered_attribute_creation($attribute_id, $
 add_action('woocommerce_admin_process_product_object', 'intersoccer_attr_validate_product_on_save', 20, 1);
 
 /**
+ * Remember product post_status before wp_insert_post updates the row (same request).
+ *
+ * @param string  $new_status
+ * @param string  $old_status
+ * @param WP_Post $post
+ * @return void
+ */
+add_action('transition_post_status', 'intersoccer_attr_capture_product_pre_save_status', 10, 3);
+function intersoccer_attr_capture_product_pre_save_status($new_status, $old_status, $post) {
+    if (!is_object($post) || ($post->post_type ?? '') !== 'product') {
+        return;
+    }
+    $product_id = (int) ($post->ID ?? 0);
+    if ($product_id <= 0) {
+        return;
+    }
+    intersoccer_attr_set_product_pre_save_status($product_id, (string) $old_status);
+}
+
+/**
+ * @param int    $product_id
+ * @param string $status
+ * @return void
+ */
+function intersoccer_attr_set_product_pre_save_status($product_id, $status) {
+    if (!isset($GLOBALS['intersoccer_attr_product_pre_save_status'])) {
+        $GLOBALS['intersoccer_attr_product_pre_save_status'] = [];
+    }
+    $GLOBALS['intersoccer_attr_product_pre_save_status'][(int) $product_id] = (string) $status;
+}
+
+/**
+ * Product status immediately before the current admin save (not the post-save DB row).
+ *
  * @param int $product_id
- * @return bool True when the product was already live in the DB before this save.
+ * @return string
+ */
+function intersoccer_attr_product_pre_save_status($product_id) {
+    $product_id = (int) $product_id;
+    if (!empty($GLOBALS['intersoccer_attr_product_pre_save_status'][$product_id])) {
+        return (string) $GLOBALS['intersoccer_attr_product_pre_save_status'][$product_id];
+    }
+    if (!empty($_POST['original_post_status']) && !empty($_POST['post_ID'])
+        && (int) $_POST['post_ID'] === $product_id) {
+        return sanitize_key((string) wp_unslash($_POST['original_post_status']));
+    }
+
+    return (string) get_post_status($product_id);
+}
+
+/**
+ * @param int $product_id
+ * @return bool True when the product was already live before this save request.
  */
 function intersoccer_attr_product_stored_status_is_live($product_id) {
-    $stored = get_post_status((int) $product_id);
+    $previous = intersoccer_attr_product_pre_save_status($product_id);
 
-    return in_array($stored, ['publish', 'future', 'private'], true);
+    return in_array($previous, ['publish', 'future', 'private'], true);
 }
 
 /**
