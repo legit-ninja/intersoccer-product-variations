@@ -83,6 +83,13 @@ function intersoccer_express_gate_body_class($classes) {
  * can leave the buttons blank or unmounted. The rule sits on body, so it also
  * covers a container Stripe renders or re-mounts later.
  *
+ * Plain specificity only: body class + ID already outranks Stripe's own ID
+ * rules. Stripe prints an inline margin-top on its containers, which no
+ * selector can override without an important flag, so the hidden container
+ * is taken out of the flow (position: absolute, pinned to its containing
+ * block's width) instead of zeroing that margin. It then takes no space and
+ * adds no sideways scroll.
+ *
  * @return string
  */
 function intersoccer_express_gate_css() {
@@ -95,14 +102,17 @@ function intersoccer_express_gate_css() {
         }
     }
     return implode(",\n", $selectors) . " {\n"
-        . "    visibility: hidden !important;\n"
-        . "    opacity: 0 !important;\n"
-        . "    pointer-events: none !important;\n"
-        . "    height: 0 !important;\n"
-        . "    min-height: 0 !important;\n"
-        . "    margin: 0 !important;\n"
-        . "    padding: 0 !important;\n"
-        . "    overflow: hidden !important;\n"
+        . "    position: absolute;\n"
+        . "    left: 0;\n"
+        . "    right: 0;\n"
+        . "    visibility: hidden;\n"
+        . "    opacity: 0;\n"
+        . "    pointer-events: none;\n"
+        . "    height: 0;\n"
+        . "    min-height: 0;\n"
+        . "    margin: 0;\n"
+        . "    padding: 0;\n"
+        . "    overflow: hidden;\n"
         . "}\n";
 }
 
