@@ -138,6 +138,47 @@ class AttributeEnforcementTest extends TestCase {
         $this->assertTrue(intersoccer_attr_validate_new_term('pa_city', 'Lausanne'));
     }
 
+    public function test_camp_times_accepts_new_office_ranges() {
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '0830-1530'));
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '1200-1530'));
+    }
+
+    public function test_camp_times_accepts_registry_defaults() {
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '1000-1700'));
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '1000-1230'));
+    }
+
+    public function test_camp_times_accepts_wpml_suffixed_slugs() {
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '1000-1700', '1000-1700-fr'));
+        $this->assertTrue(intersoccer_attr_validate_new_term('pa_camp-times', '1000-1700', '1000-1700-de'));
+    }
+
+    public function test_camp_times_rejects_malformed_ranges() {
+        $bad = [
+            '8:30-15:30x',
+            '1530-0830',
+            '2500-2600',
+            'abc',
+        ];
+        foreach ($bad as $name) {
+            $result = intersoccer_attr_validate_new_term('pa_camp-times', $name);
+            $this->assertInstanceOf(WP_Error::class, $result, 'Expected rejection for: ' . $name);
+            $this->assertSame('invalid_camp_time', array_key_first($result->errors));
+        }
+    }
+
+    public function test_pre_insert_term_camp_times_filter() {
+        $bad = intersoccer_attr_pre_insert_term('1530-0830', 'pa_camp-times');
+        $this->assertInstanceOf(WP_Error::class, $bad);
+
+        $good = intersoccer_attr_pre_insert_term('0830-1530', 'pa_camp-times');
+        $this->assertSame('0830-1530', $good);
+    }
+
+    public function test_camp_times_not_on_locked_slug_list() {
+        $this->assertNotContains('camp-times', intersoccer_attr_locked_term_attribute_slugs());
+    }
+
     public function test_required_parent_facets_block_publish_for_camp() {
         $missing = intersoccer_attr_parent_facets_block_publish(['pa_activity-type'], 'camp');
         $this->assertContains('pa_program-year', $missing);

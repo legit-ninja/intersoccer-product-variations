@@ -276,6 +276,7 @@ function intersoccer_attr_enforcement_drift_notice() {
  * Attribute slugs whose catalog terms must match the taxonomy standard locked lists.
  *
  * Year is shape-checked (bare 20xx) rather than limited to the seeded default years.
+ * Camp-times is HHMM-HHMM format-checked (not limited to registry defaults).
  * Venues, canton, city, camp-terms, course-times, age-group stay free-form.
  *
  * @return array<int,string>
@@ -288,8 +289,63 @@ function intersoccer_attr_locked_term_attribute_slugs() {
         'days-of-week',
         'course-day',
         'booking-type',
-        'camp-times',
     ];
+}
+
+/**
+ * Normalize a camp time label or slug to HHMM-HHMM when possible.
+ *
+ * Accepts bare ranges, WPML/WCML slug suffixes (-fr, -de, -en, -digits), and
+ * alternate display forms (10:00-17:00, 10h00-17h00) when they map to a range.
+ *
+ * @param string $value Term name or slug fragment.
+ * @return string Normalized HHMM-HHMM or empty string.
+ */
+function intersoccer_attr_normalize_camp_time_range($value) {
+    $value = trim((string) $value);
+    if ($value === '') {
+        return '';
+    }
+
+    if (preg_match('/^(\d{4}-\d{4})(?:-(?:fr|de|en|\d+))?$/i', $value, $m)) {
+        return strtolower($m[1]);
+    }
+
+    if (preg_match('/^(\d{4})-(\d{4})$/', $value, $m)) {
+        return $m[1] . '-' . $m[2];
+    }
+
+    if (preg_match('/^(\d{1,2})[hH](\d{2})-(\d{1,2})[hH](\d{2})$/', $value, $m)) {
+        return sprintf('%02d%02d-%02d%02d', (int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4]);
+    }
+
+    if (preg_match('/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/', $value, $m)) {
+        return sprintf('%02d%02d-%02d%02d', (int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4]);
+    }
+
+    return '';
+}
+
+/**
+ * @param string $range Normalized HHMM-HHMM.
+ * @return bool
+ */
+function intersoccer_attr_is_valid_camp_time_range($range) {
+    $range = (string) $range;
+    if (!preg_match('/^(\d{2})(\d{2})-(\d{2})(\d{2})$/', $range, $m)) {
+        return false;
+    }
+    $start_h = (int) $m[1];
+    $start_m = (int) $m[2];
+    $end_h = (int) $m[3];
+    $end_m = (int) $m[4];
+    if ($start_h > 23 || $end_h > 23 || $start_m > 59 || $end_m > 59) {
+        return false;
+    }
+    $start_minutes = ($start_h * 60) + $start_m;
+    $end_minutes = ($end_h * 60) + $end_m;
+
+    return $start_minutes < $end_minutes;
 }
 
 /**
@@ -497,6 +553,19 @@ function intersoccer_attr_validate_new_term($taxonomy, $name, $slug = '') {
             );
         }
         return true;
+    }
+
+    if ($attr_slug === 'camp-times') {
+        $name_range = intersoccer_attr_normalize_camp_time_range($name);
+        $slug_range = intersoccer_attr_normalize_camp_time_range($slug);
+        if (intersoccer_attr_is_valid_camp_time_range($name_range)
+            || intersoccer_attr_is_valid_camp_time_range($slug_range)) {
+            return true;
+        }
+        return new WP_Error(
+            'invalid_camp_time',
+            __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
+        );
     }
 
     if (in_array($attr_slug, intersoccer_attr_locked_term_attribute_slugs(), true)) {
