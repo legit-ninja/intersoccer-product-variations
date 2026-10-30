@@ -420,6 +420,7 @@ $includes = [
     'includes/woocommerce/product-camp.php',
     'includes/woocommerce/camp-schedule.php',
     'includes/woocommerce/camp-schedule-migrate.php',
+    'includes/woocommerce/time-format.php',
     'includes/woocommerce/campaign-offers.php',
     'includes/woocommerce/campaign-offers-admin.php',
     'includes/woocommerce/campaign-checkout-field.php',
