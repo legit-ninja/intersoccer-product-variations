@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Camp Times catalog terms: validate strict HHMM-HHMM ranges (start before end) instead of locking to the two registry default slugs only. WPML suffixed slugs on assigned terms remain accepted when the term name is a valid range.
+- Product save: block invalid publish in `wp_insert_post_data` before status is written (WPML twin safety); validate posted attributes/terms with WPML terms resolved to default-language originals; never demote already-live products; persistent admin notices after redirect.
 
 ## [2.9.28] - 2026-09-28
 

@@ -247,6 +247,352 @@ function intersoccer_attr_admin_product_save_notice() {
     echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($payload['message']) . '</p></div>';
 }
 
+/**
+ * Admin-facing label for a pa_* taxonomy (not the slug).
+ *
+ * @param string $taxonomy
+ * @return string
+ */
+function intersoccer_attr_admin_label_for_taxonomy($taxonomy) {
+    $slug = function_exists('intersoccer_attr_slug_from_taxonomy')
+        ? intersoccer_attr_slug_from_taxonomy((string) $taxonomy)
+        : null;
+    $def = ($slug && function_exists('intersoccer_attr_definition'))
+        ? intersoccer_attr_definition($slug)
+        : null;
+    if ($def && !empty($def['wc_label'])) {
+        return (string) $def['wc_label'];
+    }
+
+    return (string) $taxonomy;
+}
+
+/**
+ * Default-language term ID for taxonomy standard checks (WPML-aware).
+ *
+ * @param int    $term_id
+ * @param string $taxonomy
+ * @return int
+ */
+function intersoccer_attr_wpml_canonical_term_id($term_id, $taxonomy) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0) {
+        return 0;
+    }
+    if (!function_exists('apply_filters')) {
+        return $term_id;
+    }
+    $default_lang = apply_filters('wpml_default_language', null);
+    if (!$default_lang) {
+        return $term_id;
+    }
+    $canonical = (int) apply_filters('wpml_object_id', $term_id, (string) $taxonomy, true, $default_lang);
+
+    return $canonical > 0 ? $canonical : $term_id;
+}
+
+/**
+ * Term IDs assigned to a taxonomy on the current classic product save request.
+ *
+ * @param int    $product_id Unused; reserved for future context.
+ * @param string $taxonomy   pa_* taxonomy.
+ * @return array<int,int>
+ */
+function intersoccer_attr_posted_taxonomy_term_ids($product_id, $taxonomy) {
+    $product_id = (int) $product_id;
+    unset($product_id);
+    $taxonomy = (string) $taxonomy;
+    if (strpos($taxonomy, 'pa_') !== 0) {
+        $taxonomy = 'pa_' . $taxonomy;
+    }
+    $ids = [];
+    if (!empty($_POST['tax_input'][$taxonomy]) && is_array($_POST['tax_input'][$taxonomy])) {
+        foreach ($_POST['tax_input'][$taxonomy] as $raw) {
+            if ($raw === '' || $raw === null) {
+                continue;
+            }
+            if (is_numeric($raw)) {
+                $ids[] = (int) $raw;
+                continue;
+            }
+            $term = get_term_by('name', wp_unslash((string) $raw), $taxonomy);
+            if ($term && !is_wp_error($term)) {
+                $ids[] = (int) $term->term_id;
+            }
+        }
+    }
+    if (!empty($_POST['attribute_names']) && is_array($_POST['attribute_names'])) {
+        $values = isset($_POST['attribute_values']) && is_array($_POST['attribute_values'])
+            ? $_POST['attribute_values']
+            : [];
+        foreach ($_POST['attribute_names'] as $i => $name) {
+            $name = function_exists('wc_sanitize_taxonomy_name')
+                ? wc_sanitize_taxonomy_name((string) wp_unslash($name))
+                : sanitize_title((string) wp_unslash($name));
+            $tax = (strpos($name, 'pa_') === 0) ? $name : ('pa_' . $name);
+            if ($tax !== $taxonomy) {
+                continue;
+            }
+            $val = isset($values[$i]) ? (string) wp_unslash($values[$i]) : '';
+            if ($val === '') {
+                continue;
+            }
+            foreach (array_filter(array_map('trim', explode('|', $val))) as $piece) {
+                $term = get_term_by('slug', sanitize_title($piece), $taxonomy);
+                if (!$term) {
+                    $term = get_term_by('name', $piece, $taxonomy);
+                }
+                if ($term && !is_wp_error($term)) {
+                    $ids[] = (int) $term->term_id;
+                }
+            }
+        }
+    }
+
+    return array_values(array_unique(array_filter($ids)));
+}
+
+/**
+ * @return bool
+ */
+function intersoccer_attr_admin_product_save_has_posted_attributes() {
+    if (!empty($_POST['tax_input']) && is_array($_POST['tax_input'])) {
+        foreach ($_POST['tax_input'] as $terms) {
+            if (!empty(array_filter((array) $terms, static function ($v) {
+                return $v !== '' && $v !== null;
+            }))) {
+                return true;
+            }
+        }
+    }
+    if (!empty($_POST['attribute_names']) && is_array($_POST['attribute_names'])) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * @param int         $product_id
+ * @param string      $product_type
+ * @param WC_Product|null $product Fallback when POST has no attribute payload.
+ * @return array<int,string> pa_* taxonomies still missing.
+ */
+function intersoccer_attr_missing_required_parent_facets_from_request($product_id, $product_type, $product = null) {
+    if (intersoccer_attr_admin_product_save_has_posted_attributes()) {
+        $assigned = [];
+        if (!empty($_POST['tax_input']) && is_array($_POST['tax_input'])) {
+            foreach ($_POST['tax_input'] as $taxonomy => $terms) {
+                $taxonomy = (string) $taxonomy;
+                if (strpos($taxonomy, 'pa_') !== 0) {
+                    continue;
+                }
+                if (empty(array_filter((array) $terms, static function ($v) {
+                    return $v !== '' && $v !== null;
+                }))) {
+                    continue;
+                }
+                $assigned[] = $taxonomy;
+            }
+        }
+        if (!empty($_POST['attribute_names']) && is_array($_POST['attribute_names'])) {
+            $values = isset($_POST['attribute_values']) && is_array($_POST['attribute_values'])
+                ? $_POST['attribute_values']
+                : [];
+            foreach ($_POST['attribute_names'] as $i => $name) {
+                $name = function_exists('wc_sanitize_taxonomy_name')
+                    ? wc_sanitize_taxonomy_name((string) wp_unslash($name))
+                    : sanitize_title((string) wp_unslash($name));
+                $tax = (strpos($name, 'pa_') === 0) ? $name : ('pa_' . $name);
+                $val = isset($values[$i]) ? (string) wp_unslash($values[$i]) : '';
+                if ($val !== '' || intersoccer_attr_posted_taxonomy_term_ids(0, $tax) !== []) {
+                    $assigned[] = $tax;
+                }
+            }
+        }
+        $assigned = array_values(array_unique($assigned));
+
+        return intersoccer_attr_parent_facets_block_publish($assigned, $product_type);
+    }
+    if ($product instanceof WC_Product) {
+        return intersoccer_attr_missing_required_parent_facets_from_product($product, $product_type);
+    }
+
+    return intersoccer_attr_required_parent_taxonomies($product_type);
+}
+
+/**
+ * Term-shape violations from the save request (canonical EN terms under WPML).
+ *
+ * @param int         $product_id
+ * @param WC_Product|null $product
+ * @return array<int,string>
+ */
+function intersoccer_attr_product_term_shape_violations_from_request($product_id, $product = null) {
+    $violations = [];
+    $seen = [];
+    $slugs = array_merge(
+        intersoccer_attr_locked_term_attribute_slugs(),
+        ['program-year']
+    );
+    $use_post = intersoccer_attr_admin_product_save_has_posted_attributes();
+    foreach ($slugs as $slug) {
+        $taxonomy = function_exists('intersoccer_attr_taxonomy')
+            ? intersoccer_attr_taxonomy($slug)
+            : ('pa_' . $slug);
+        if (function_exists('taxonomy_exists') && !taxonomy_exists($taxonomy)) {
+            continue;
+        }
+        $term_rows = [];
+        if ($use_post) {
+            foreach (intersoccer_attr_posted_taxonomy_term_ids($product_id, $taxonomy) as $term_id) {
+                $canonical_id = intersoccer_attr_wpml_canonical_term_id($term_id, $taxonomy);
+                $term = get_term($canonical_id, $taxonomy);
+                if ($term && !is_wp_error($term)) {
+                    $term_rows[] = $term;
+                }
+            }
+        } elseif ($product instanceof WC_Product && function_exists('wc_get_product_terms')) {
+            $stored = wc_get_product_terms((int) $product->get_id(), $taxonomy, ['fields' => 'all']);
+            if (!empty($stored) && !is_wp_error($stored)) {
+                foreach ($stored as $term) {
+                    $term_id = is_object($term) ? (int) ($term->term_id ?? 0) : 0;
+                    if ($term_id > 0) {
+                        $canonical_id = intersoccer_attr_wpml_canonical_term_id($term_id, $taxonomy);
+                        $canonical = get_term($canonical_id, $taxonomy);
+                        if ($canonical && !is_wp_error($canonical)) {
+                            $term_rows[] = $canonical;
+                        }
+                    } else {
+                        $term_rows[] = $term;
+                    }
+                }
+            }
+        }
+        foreach ($term_rows as $term) {
+            $term_name = is_object($term) ? (string) ($term->name ?? '') : '';
+            $term_slug = is_object($term) ? (string) ($term->slug ?? '') : '';
+            $result = intersoccer_attr_validate_new_term($taxonomy, $term_name, $term_slug);
+            if (is_wp_error($result)) {
+                $msg = intersoccer_attr_admin_label_for_taxonomy($taxonomy) . ': ' . $result->get_error_message();
+                if (isset($seen[$msg])) {
+                    continue;
+                }
+                $seen[$msg] = true;
+                $violations[] = $msg;
+            }
+        }
+    }
+
+    return $violations;
+}
+
+/**
+ * @param int    $product_id
+ * @param string $product_type
+ * @param WC_Product|null $product
+ * @return array{shape_errors:array<int,string>,missing_parent:array<int,string>,block_publish:bool}
+ */
+function intersoccer_attr_evaluate_program_product_publish_block($product_id, $product_type, $product = null) {
+    $shape_errors = intersoccer_attr_product_term_shape_violations_from_request($product_id, $product);
+    $missing_parent = intersoccer_attr_missing_required_parent_facets_from_request($product_id, $product_type, $product);
+
+    return [
+        'shape_errors' => $shape_errors,
+        'missing_parent' => $missing_parent,
+        'block_publish' => !empty($shape_errors) || !empty($missing_parent),
+    ];
+}
+
+/**
+ * @param array<int,string> $missing_parent pa_* taxonomies.
+ * @param array<int,string> $shape_errors
+ * @return string
+ */
+function intersoccer_attr_publish_block_detail_message(array $missing_parent, array $shape_errors) {
+    $parts = [];
+    if (!empty($missing_parent)) {
+        $labels = array_map('intersoccer_attr_admin_label_for_taxonomy', $missing_parent);
+        $parts[] = sprintf(
+            /* translators: %s: comma-separated attribute labels */
+            __('Missing required parent attributes: %s.', 'intersoccer-product-variations'),
+            implode(', ', $labels)
+        );
+    }
+    if (!empty($shape_errors)) {
+        $parts[] = sprintf(
+            /* translators: %s: semicolon-separated term-shape errors */
+            __('Term-shape violations (taxonomy standard): %s', 'intersoccer-product-variations'),
+            implode('; ', $shape_errors)
+        );
+    }
+
+    return implode(' ', $parts);
+}
+
+/**
+ * Block invalid publish before wp_insert_post writes a publish status (WPML twin safety).
+ *
+ * @param array<string,mixed> $data
+ * @param array<string,mixed> $postarr
+ * @return array<string,mixed>
+ */
+add_filter('wp_insert_post_data', 'intersoccer_attr_wp_insert_post_data_enforce_publish_rules', 99, 2);
+function intersoccer_attr_wp_insert_post_data_enforce_publish_rules($data, $postarr) {
+    if (($data['post_type'] ?? '') !== 'product') {
+        return $data;
+    }
+    if (!is_admin() || (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)) {
+        return $data;
+    }
+    if (function_exists('intersoccer_attr_sync_in_progress') && intersoccer_attr_sync_in_progress()) {
+        return $data;
+    }
+    $requested = sanitize_key((string) ($data['post_status'] ?? ''));
+    if (!in_array($requested, ['publish', 'future'], true)) {
+        return $data;
+    }
+    $product_id = (int) ($postarr['ID'] ?? 0);
+    if ($product_id <= 0 && !empty($_POST['post_ID'])) {
+        $product_id = (int) $_POST['post_ID'];
+    }
+    if ($product_id <= 0 || !current_user_can('edit_product', $product_id)) {
+        return $data;
+    }
+    $product_type = function_exists('intersoccer_get_product_type')
+        ? strtolower((string) intersoccer_get_product_type($product_id))
+        : '';
+    if (!in_array($product_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+        return $data;
+    }
+    if (intersoccer_attr_product_stored_status_is_live($product_id)) {
+        return $data;
+    }
+    $evaluation = intersoccer_attr_evaluate_program_product_publish_block($product_id, $product_type);
+    if (empty($evaluation['block_publish'])) {
+        return $data;
+    }
+    $data['post_status'] = 'draft';
+    if (!isset($GLOBALS['intersoccer_attr_publish_blocked_pre_write'])) {
+        $GLOBALS['intersoccer_attr_publish_blocked_pre_write'] = [];
+    }
+    $GLOBALS['intersoccer_attr_publish_blocked_pre_write'][$product_id] = true;
+    $detail = intersoccer_attr_publish_block_detail_message(
+        $evaluation['missing_parent'],
+        $evaluation['shape_errors']
+    );
+    $blocked_message = __('Publish blocked.', 'intersoccer-product-variations') . ' ' . $detail;
+    add_settings_error(
+        'intersoccer_attr_enforcement',
+        'intersoccer_attr_publish_blocked_' . $product_id,
+        $blocked_message,
+        'error'
+    );
+    intersoccer_attr_store_product_save_notice($product_id, $blocked_message, 'error');
+
+    return $data;
+}
+
 function intersoccer_attr_validate_product_on_save($product) {
     if (!($product instanceof WC_Product) || !current_user_can('edit_product', $product->get_id())) {
         return;
@@ -290,7 +636,7 @@ function intersoccer_attr_validate_product_on_save($product) {
         );
     }
 
-    $shape_errors = intersoccer_attr_product_term_shape_violations($product);
+    $shape_errors = intersoccer_attr_product_term_shape_violations_from_request($product_id, $product);
     if (!empty($shape_errors)) {
         add_settings_error(
             'intersoccer_attr_enforcement',
@@ -304,34 +650,21 @@ function intersoccer_attr_validate_product_on_save($product) {
         );
     }
 
-    $missing_parent = intersoccer_attr_missing_required_parent_facets_from_product($product, $product_type);
+    $missing_parent = intersoccer_attr_missing_required_parent_facets_from_request($product_id, $product_type, $product);
     $wants_publish = ($product->get_status() === 'publish');
     $has_publish_block = $wants_publish && (!empty($missing_parent) || !empty($shape_errors));
 
     if (!$has_publish_block) {
         intersoccer_attr_clear_product_save_notice($product_id);
     } else {
-        $parts = [];
-        if (!empty($missing_parent)) {
-            $parts[] = sprintf(
-                /* translators: %s: comma-separated attribute taxonomies */
-                __('Missing required parent attributes: %s.', 'intersoccer-product-variations'),
-                implode(', ', $missing_parent)
-            );
-        }
-        if (!empty($shape_errors)) {
-            $parts[] = sprintf(
-                /* translators: %s: semicolon-separated term-shape errors */
-                __('Term-shape violations (taxonomy standard): %s', 'intersoccer-product-variations'),
-                implode('; ', $shape_errors)
-            );
-        }
-        $detail = implode(' ', $parts);
+        $detail = intersoccer_attr_publish_block_detail_message($missing_parent, $shape_errors);
 
         if (intersoccer_attr_product_stored_status_is_live($product_id)) {
-            $persist_message = __('Saved and kept live, but fix before next publish:', 'intersoccer-product-variations') . ' ' . $detail;
-            intersoccer_attr_store_product_save_notice($product_id, $persist_message, 'warning');
-        } else {
+            if (intersoccer_attr_product_pre_save_status($product_id) !== 'private') {
+                $persist_message = __('Saved and kept live, but fix before next publish:', 'intersoccer-product-variations') . ' ' . $detail;
+                intersoccer_attr_store_product_save_notice($product_id, $persist_message, 'warning');
+            }
+        } elseif (empty($GLOBALS['intersoccer_attr_publish_blocked_pre_write'][$product_id])) {
             $product->set_status('draft');
             $blocked_message = __('Publish blocked.', 'intersoccer-product-variations') . ' ' . $detail;
             add_settings_error(

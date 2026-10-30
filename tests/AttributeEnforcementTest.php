@@ -58,6 +58,12 @@ if (!function_exists('get_current_screen')) {
     }
 }
 
+if (!function_exists('wc_sanitize_taxonomy_name')) {
+    function wc_sanitize_taxonomy_name($taxonomy) {
+        return sanitize_title((string) $taxonomy);
+    }
+}
+
 if (!class_exists('WC_Product')) {
     class WC_Product {
         public function get_id() {
@@ -307,7 +313,7 @@ class AttributeEnforcementTest extends TestCase {
         intersoccer_attr_validate_product_on_save($product);
 
         $this->assertNotContains('draft', $product->set_status_calls);
-        $this->assertNotFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+        $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
     }
 
     public function test_draft_product_with_shape_violation_blocked_from_publish() {
@@ -364,12 +370,94 @@ class AttributeEnforcementTest extends TestCase {
     public function test_product_save_notice_cleared_when_save_has_no_violations() {
         $this->reset_product_save_test_state();
         $product_id = 51723;
+        $this->register_enforcement_save_fixture_terms();
         intersoccer_attr_store_product_save_notice($product_id, 'Stale notice', 'error');
         intersoccer_attr_set_product_pre_save_status($product_id, 'publish');
         $GLOBALS['intersoccer_test_post_status'][$product_id] = 'publish';
-        $GLOBALS['intersoccer_test_product_terms'][$product_id]['pa_program-season'] = [
-            (object) ['name' => 'Autumn', 'slug' => 'autumn'],
-        ];
+        $this->seed_camp_product_save_post($product_id, ['pa_program-season' => 9101]);
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+
+        intersoccer_attr_validate_product_on_save($product);
+
+        $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    public function test_wp_insert_post_data_blocks_en_publish_before_write_twin_safe() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        $en_id = 39966;
+        $fr_id = 40124;
+        $de_id = 41593;
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $GLOBALS['intersoccer_test_post_status'][$fr_id] = 'draft';
+        $GLOBALS['intersoccer_test_post_status'][$de_id] = 'draft';
+        intersoccer_attr_set_product_pre_save_status($en_id, 'draft');
+        $this->seed_camp_product_save_post($en_id, ['pa_program-season' => 9100]);
+        $_POST['post_ID'] = (string) $en_id;
+
+        $data = intersoccer_attr_wp_insert_post_data_enforce_publish_rules(
+            ['post_type' => 'product', 'post_status' => 'publish'],
+            ['ID' => $en_id]
+        );
+
+        $this->assertSame('draft', $data['post_status']);
+        $this->assertSame('draft', $GLOBALS['intersoccer_test_post_status'][$fr_id]);
+        $this->assertSame('draft', $GLOBALS['intersoccer_test_post_status'][$de_id]);
+    }
+
+    public function test_fr_product_save_passes_when_wpml_terms_map_to_en_originals() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        MockFilters::$filters['wpml_default_language'] = static function () {
+            return 'en';
+        };
+        MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) {
+            if ((int) $id === 9103) {
+                return 9102;
+            }
+            if ((int) $id === 9105) {
+                return 9104;
+            }
+            return (int) $id;
+        };
+        $fr_id = 40124;
+        $this->seed_camp_product_save_post($fr_id, [
+            'pa_program-season' => 9101,
+            'pa_days-of-week' => [9103, 9103, 9103, 9103, 9103],
+            'pa_booking-type' => 9105,
+        ]);
+        $evaluation = intersoccer_attr_evaluate_program_product_publish_block($fr_id, 'camp');
+        $this->assertSame([], $evaluation['missing_parent']);
+        $this->assertSame([], $evaluation['shape_errors']);
+    }
+
+    public function test_fix_and_publish_in_one_click_allows_publish() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $product_id = 41078;
+        intersoccer_attr_set_product_pre_save_status($product_id, 'draft');
+        $this->seed_camp_product_save_post($product_id, ['pa_program-season' => 9101]);
+        $_POST['post_ID'] = (string) $product_id;
+
+        $data = intersoccer_attr_wp_insert_post_data_enforce_publish_rules(
+            ['post_type' => 'product', 'post_status' => 'publish'],
+            ['ID' => $product_id]
+        );
+        $this->assertSame('publish', $data['post_status']);
+
+        $product = $this->make_camp_product_for_save($product_id, 'publish');
+        intersoccer_attr_validate_product_on_save($product);
+        $this->assertFalse(get_transient(intersoccer_attr_product_save_notice_transient_key($product_id)));
+    }
+
+    public function test_fixing_save_does_not_store_warning_when_posted_season_is_valid() {
+        $this->reset_product_save_test_state();
+        $this->register_enforcement_save_fixture_terms();
+        $product_id = 51723;
+        intersoccer_attr_set_product_pre_save_status($product_id, 'publish');
+        $GLOBALS['intersoccer_test_post_status'][$product_id] = 'publish';
+        $this->seed_camp_product_save_post($product_id, ['pa_program-season' => 9101]);
         $product = $this->make_camp_product_for_save($product_id, 'publish');
 
         intersoccer_attr_validate_product_on_save($product);
@@ -382,20 +470,68 @@ class AttributeEnforcementTest extends TestCase {
         $GLOBALS['intersoccer_test_product_terms'] = [];
         $GLOBALS['intersoccer_test_post_status'] = [];
         $GLOBALS['intersoccer_attr_product_pre_save_status'] = [];
+        $GLOBALS['intersoccer_attr_publish_blocked_pre_write'] = [];
         $GLOBALS['intersoccer_test_product_type'] = 'camp';
         $GLOBALS['intersoccer_test_user_id'] = 42;
         $GLOBALS['intersoccer_test_is_admin'] = false;
         unset($GLOBALS['intersoccer_test_current_screen']);
-        unset($_GET['post']);
+        unset($_GET['post'], $_POST['tax_input'], $_POST['post_ID'], $_POST['attribute_names'], $_POST['attribute_values']);
+        MockFilters::$filters = array_diff_key(
+            MockFilters::$filters,
+            array_flip(['wpml_default_language', 'wpml_object_id'])
+        );
+    }
+
+    private function register_enforcement_save_fixture_terms(): void {
+        $rows = [
+            9100 => ['name' => 'Autumn Camps 2026', 'slug' => 'autumn-camps-2026', 'taxonomy' => 'pa_program-season'],
+            9101 => ['name' => 'Autumn', 'slug' => 'autumn', 'taxonomy' => 'pa_program-season'],
+            9102 => ['name' => 'Monday', 'slug' => 'monday', 'taxonomy' => 'pa_days-of-week', 'wpml_lang' => 'en'],
+            9103 => ['name' => 'Monday', 'slug' => 'lundi', 'taxonomy' => 'pa_days-of-week', 'wpml_lang' => 'fr'],
+            9104 => ['name' => 'Full Week', 'slug' => 'full-week', 'taxonomy' => 'pa_booking-type', 'wpml_lang' => 'en'],
+            9105 => ['name' => 'Full Week', 'slug' => 'semaine-complete', 'taxonomy' => 'pa_booking-type', 'wpml_lang' => 'fr'],
+            9201 => ['name' => 'Camp', 'slug' => 'camp', 'taxonomy' => 'pa_activity-type'],
+            9202 => ['name' => 'Geneva Site', 'slug' => 'geneva-site', 'taxonomy' => 'pa_intersoccer-venues'],
+            9204 => ['name' => '2026', 'slug' => '2026', 'taxonomy' => 'pa_program-year'],
+            9205 => ['name' => '5-13y (Full Day)', 'slug' => '5-13y-full-day', 'taxonomy' => 'pa_age-group'],
+            9206 => ['name' => 'Geneva', 'slug' => 'geneva', 'taxonomy' => 'pa_canton-region'],
+            9207 => ['name' => 'Geneva', 'slug' => 'geneva-city', 'taxonomy' => 'pa_city'],
+            9208 => ['name' => 'Yes', 'slug' => 'yes', 'taxonomy' => 'pa_girls-only'],
+            9209 => ['name' => 'autumn-week-1', 'slug' => 'autumn-week-1', 'taxonomy' => 'pa_camp-terms'],
+            9210 => ['name' => '1000-1700', 'slug' => '1000-1700', 'taxonomy' => 'pa_camp-times'],
+        ];
+        foreach ($rows as $id => $row) {
+            $GLOBALS['intersoccer_test_terms'][$id] = $row;
+        }
+    }
+
+    private function seed_camp_product_save_post(int $product_id, array $overrides = []): void {
+        unset($product_id);
+        $_POST['tax_input'] = [];
+        $defaults = [
+            'pa_activity-type' => [9201],
+            'pa_intersoccer-venues' => [9202],
+            'pa_program-season' => [9100],
+            'pa_program-year' => [9204],
+            'pa_age-group' => [9205],
+            'pa_canton-region' => [9206],
+            'pa_city' => [9207],
+            'pa_girls-only' => [9208],
+            'pa_days-of-week' => [9102],
+            'pa_camp-terms' => [9209],
+            'pa_camp-times' => [9210],
+        ];
+        foreach ($defaults as $tax => $ids) {
+            $_POST['tax_input'][$tax] = $overrides[$tax] ?? $ids;
+        }
+        foreach ($overrides as $tax => $ids) {
+            $_POST['tax_input'][$tax] = is_array($ids) ? $ids : [(int) $ids];
+        }
     }
 
     private function seed_year_qualified_season_on_product(int $product_id): void {
-        $GLOBALS['intersoccer_test_product_terms'][$product_id]['pa_program-season'] = [
-            (object) [
-                'name' => 'Autumn Camps 2026',
-                'slug' => 'autumn-camps-2026',
-            ],
-        ];
+        $this->register_enforcement_save_fixture_terms();
+        $this->seed_camp_product_save_post($product_id, ['pa_program-season' => 9100]);
     }
 
     private function make_camp_product_for_save(int $product_id, string $status): AttributeEnforcementSaveMockProduct {
