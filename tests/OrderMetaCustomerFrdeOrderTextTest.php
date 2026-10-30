@@ -47,6 +47,17 @@ if (!function_exists('is_wc_endpoint_url')) {
     }
 }
 
+if (!function_exists('doing_action')) {
+    function doing_action($hook = '') {
+        $stack = $GLOBALS['intersoccer_test_doing_action_stack'] ?? [];
+        if ($hook === '' || $hook === null) {
+            return $stack !== [];
+        }
+
+        return in_array((string) $hook, $stack, true);
+    }
+}
+
 if (!function_exists('translate')) {
     function translate($text, $domain = 'default') {
         global $intersoccer_pv_test_textdomain_strings;
@@ -107,6 +118,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             $GLOBALS['intersoccer_test_is_checkout'],
             $GLOBALS['intersoccer_test_is_order_received_page'],
             $GLOBALS['intersoccer_test_wc_endpoint'],
+            $GLOBALS['intersoccer_test_doing_action_stack'],
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
             $GLOBALS['intersoccer_pv_test_textdomain_strings'],
             $GLOBALS['intersoccer_pv_test_textdomain_loaded'],
@@ -387,5 +399,55 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             []
         );
         $this->assertSame('Semaine de camp', $rows[0]['key']);
+    }
+
+    /**
+     * @return array<string,array{0:string}>
+     */
+    public static function frDeLanguageProvider(): array {
+        return [
+            'fr' => ['fr'],
+            'de' => ['de'],
+        ];
+    }
+
+    #[DataProvider('frDeLanguageProvider')]
+    public function test_wc_attribute_label_stays_english_during_order_line_item_creation(string $lang): void {
+        $GLOBALS['intersoccer_test_doing_action_stack'] = ['woocommerce_checkout_create_order_line_item'];
+        $this->setWpmlLanguage($lang);
+        $this->setFrCartSurface();
+        $this->assertSame(
+            'Age Group',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
+        );
+        $this->assertSame(
+            'Camp Terms',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+    }
+
+    public function test_update_order_review_still_translates_attribute_labels(): void {
+        unset($GLOBALS['intersoccer_test_doing_action_stack']);
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $GLOBALS['intersoccer_test_doing_ajax'] = true;
+        $_REQUEST['wc-ajax'] = 'update_order_review';
+        $this->assertSame(
+            'Groupe d\'âge',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
+        );
+        unset($_REQUEST['wc-ajax'], $GLOBALS['intersoccer_test_doing_ajax']);
+    }
+
+    public function test_de_medical_none_in_catalog_and_customer_display(): void {
+        $mo = $this->loadMoCatalog('de');
+        $this->assertArrayHasKey('None', $mo);
+        $this->assertSame('Keine', $mo['None']);
+
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $display = intersoccer_translate_stored_order_meta_display_value('None', 'Medical Conditions');
+        $this->assertSame('Keine', $display);
     }
 }

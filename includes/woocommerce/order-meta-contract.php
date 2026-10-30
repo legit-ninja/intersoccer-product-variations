@@ -2937,11 +2937,29 @@ function intersoccer_pv_is_cart_checkout_order_customer_surface() {
 }
 
 /**
+ * True while WooCommerce is persisting checkout order line meta (not display).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_writing_checkout_order_line_meta() {
+    if (!function_exists('doing_action')) {
+        return false;
+    }
+
+    return doing_action('woocommerce_checkout_create_order_line_item')
+        || doing_action('woocommerce_checkout_create_order');
+}
+
+/**
  * Whether FR/DE cart/checkout/order/email surfaces should rewrite English attribute labels.
  *
  * @return bool
  */
 function intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override() {
+    if (intersoccer_pv_is_writing_checkout_order_line_meta()) {
+        return false;
+    }
+
     if (intersoccer_pv_resolve_fr_de_language_code() === '') {
         return false;
     }
