@@ -69,6 +69,48 @@ if (!function_exists('translate')) {
     }
 }
 
+if (!function_exists('wc_attribute_label')) {
+    function wc_attribute_label($name, $product = null) {
+        $label = (string) $name;
+        if (function_exists('intersoccer_attr_order_meta_label_map')) {
+            $map = intersoccer_attr_order_meta_label_map();
+            if (isset($map[$name])) {
+                $label = (string) $map[$name];
+            }
+        }
+
+        return apply_filters('woocommerce_attribute_label', $label, $name, $product);
+    }
+}
+
+if (!function_exists('intersoccer_get_parent_product_attributes')) {
+    function intersoccer_get_parent_product_attributes($product_id, $variation_id = null) {
+        unset($product_id, $variation_id);
+        $taxonomies = $GLOBALS['intersoccer_pv_test_parent_attribute_taxonomies'] ?? null;
+        if (is_array($taxonomies) && $taxonomies !== []) {
+            $label_map = intersoccer_attr_order_meta_label_map();
+            $attributes = [];
+            foreach ($taxonomies as $taxonomy) {
+                $label = wc_attribute_label((string) $taxonomy);
+                $english_label = $label_map[$taxonomy] ?? $label;
+                if ($english_label !== '') {
+                    $attributes[$english_label] = 'fixture-value';
+                }
+            }
+
+            return $attributes;
+        }
+        if (class_exists('OrderMetaContractTest')) {
+            $mock = OrderMetaContractTest::$mock_parent_attributes ?? null;
+            if (is_array($mock)) {
+                return $mock;
+            }
+        }
+
+        return [];
+    }
+}
+
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
@@ -77,28 +119,76 @@ require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
 
 if (!class_exists('WC_Order_Item_Product')) {
     class WC_Order_Item_Product {
-        /** @var array<string,string> */
+        /** @var array<int,array{key:string,value:mixed}> */
         private $meta = [];
+        private $product_id = 0;
+        private $variation_id = 0;
 
         public function __construct(array $meta = []) {
-            $this->meta = $meta;
+            foreach ($meta as $key => $value) {
+                $this->meta[] = ['key' => (string) $key, 'value' => $value];
+            }
         }
 
         public function get_meta($key, $single = true) {
             unset($single);
-            return $this->meta[$key] ?? '';
-        }
+            $values = [];
+            foreach ($this->meta as $row) {
+                if ($row['key'] === $key) {
+                    $values[] = $row['value'];
+                }
+            }
 
-        public function get_product_id() {
-            return 0;
-        }
-
-        public function get_variation_id() {
-            return 0;
+            return $values[0] ?? '';
         }
 
         public function get_meta_data() {
-            return [];
+            $out = [];
+            foreach ($this->meta as $row) {
+                $out[] = (object) ['key' => $row['key'], 'value' => $row['value']];
+            }
+
+            return $out;
+        }
+
+        public function add_meta_data($key, $value, $unique = false) {
+            if ($unique) {
+                foreach ($this->meta as $index => $row) {
+                    if ($row['key'] === $key) {
+                        $this->meta[$index]['value'] = $value;
+                        return;
+                    }
+                }
+            }
+            $this->meta[] = ['key' => (string) $key, 'value' => $value];
+        }
+
+        public function update_meta_data($key, $value) {
+            $this->delete_meta_data($key);
+            $this->meta[] = ['key' => (string) $key, 'value' => $value];
+        }
+
+        public function delete_meta_data($key) {
+            $this->meta = array_values(array_filter(
+                $this->meta,
+                static fn($row) => $row['key'] !== $key
+            ));
+        }
+
+        public function set_product_id($id) {
+            $this->product_id = (int) $id;
+        }
+
+        public function set_variation_id($id) {
+            $this->variation_id = (int) $id;
+        }
+
+        public function get_product_id() {
+            return $this->product_id;
+        }
+
+        public function get_variation_id() {
+            return $this->variation_id;
         }
 
         public function get_order() {
@@ -122,8 +212,12 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
             $GLOBALS['intersoccer_pv_test_textdomain_strings'],
             $GLOBALS['intersoccer_pv_test_textdomain_loaded'],
-            $GLOBALS['intersoccer_test_terms']
+            $GLOBALS['intersoccer_test_terms'],
+            $GLOBALS['intersoccer_test_products'],
+            $GLOBALS['intersoccer_test_product_type'],
+            $GLOBALS['intersoccer_pv_test_parent_attribute_taxonomies']
         );
+        unset($_REQUEST['wc-ajax']);
         parent::tearDown();
     }
 
@@ -149,7 +243,62 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             $GLOBALS['intersoccer_test_is_checkout'],
             $GLOBALS['intersoccer_test_is_order_received_page'],
             $GLOBALS['intersoccer_test_wc_endpoint'],
+            $GLOBALS['intersoccer_sensitive_order_meta_email'],
+            $GLOBALS['intersoccer_test_doing_ajax']
+        );
+        unset($_REQUEST['wc-ajax']);
+    }
+
+    private function setCheckoutOrderCreationContext(): void {
+        $GLOBALS['intersoccer_test_doing_action_stack'] = ['woocommerce_checkout_create_order_line_item'];
+        $GLOBALS['intersoccer_test_is_checkout'] = true;
+        $GLOBALS['intersoccer_test_doing_ajax'] = true;
+        $_REQUEST['wc-ajax'] = 'checkout';
+        unset(
+            $GLOBALS['intersoccer_test_is_cart'],
+            $GLOBALS['intersoccer_test_is_order_received_page'],
+            $GLOBALS['intersoccer_test_wc_endpoint'],
             $GLOBALS['intersoccer_sensitive_order_meta_email']
+        );
+    }
+
+    private function applyCustomerDisplaySurface(string $surface): void {
+        $this->clearCustomerSurface();
+        unset($GLOBALS['intersoccer_test_doing_action_stack']);
+        switch ($surface) {
+            case 'checkout':
+                $GLOBALS['intersoccer_test_is_checkout'] = true;
+                break;
+            case 'update_order_review':
+                $GLOBALS['intersoccer_test_doing_ajax'] = true;
+                $_REQUEST['wc-ajax'] = 'update_order_review';
+                break;
+            case 'order_received':
+                $GLOBALS['intersoccer_test_is_order_received_page'] = true;
+                break;
+            case 'view_order':
+                $GLOBALS['intersoccer_test_wc_endpoint'] = 'view-order';
+                break;
+            case 'email':
+                $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+                break;
+            default:
+                $this->fail('Unknown surface: ' . $surface);
+        }
+    }
+
+    private function seedRegistryAttributeProductFixtures(): void {
+        $GLOBALS['intersoccer_pv_test_parent_attribute_taxonomies'] = ['pa_age-group', 'pa_camp-terms'];
+        $GLOBALS['intersoccer_test_product_type'] = 'camp';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function metaKeysFromItem(WC_Order_Item_Product $item): array {
+        return array_map(
+            static fn($meta) => (string) $meta->key,
+            $item->get_meta_data()
         );
     }
 
@@ -413,9 +562,9 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
 
     #[DataProvider('frDeLanguageProvider')]
     public function test_wc_attribute_label_stays_english_during_order_line_item_creation(string $lang): void {
-        $GLOBALS['intersoccer_test_doing_action_stack'] = ['woocommerce_checkout_create_order_line_item'];
+        $this->setCheckoutOrderCreationContext();
         $this->setWpmlLanguage($lang);
-        $this->setFrCartSurface();
+        $this->bindLocale($lang === 'fr' ? 'fr_FR' : 'de_DE');
         $this->assertSame(
             'Age Group',
             intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
@@ -423,6 +572,64 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         $this->assertSame(
             'Camp Terms',
             intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+    }
+
+    #[DataProvider('frDeLanguageProvider')]
+    public function test_checkout_creation_stores_english_registry_meta_keys(string $lang): void {
+        // intersoccer_add_order_item_metadata lives in checkout-calculations.php, which cannot be
+        // required in this harness (duplicate helpers vs bootstrap). This exercises the same
+        // write_order_line_meta checkout path it calls, with a stub get_parent_product_attributes
+        // that mirrors wc_attribute_label() → English registry keys (checkout-calculations.php ~274-287).
+        $this->seedRegistryAttributeProductFixtures();
+        $this->setCheckoutOrderCreationContext();
+        $this->setWpmlLanguage($lang);
+        $this->bindLocale($lang === 'fr' ? 'fr_FR' : 'de_DE');
+
+        $item = new WC_Order_Item_Product();
+
+        intersoccer_write_order_line_meta($item, [
+            'mode' => 'checkout',
+            'product_type' => 'camp',
+            'product_id' => 88001,
+            'variation_id' => 88002,
+            'cart_values' => [],
+        ]);
+
+        $keys = $this->metaKeysFromItem($item);
+        $this->assertContains('Age Group', $keys);
+        $this->assertContains('Camp Terms', $keys);
+        $this->assertNotContains('Groupe d\'âge', $keys);
+        $this->assertNotContains('Altersgruppe', $keys);
+        $this->assertNotContains('Semaine de camp', $keys);
+    }
+
+    /**
+     * @return array<string,array{0:string,1:string,2:string}>
+     */
+    public static function frDeCustomerDisplaySurfacesProvider(): array {
+        $cases = [];
+        foreach (['fr' => 'Groupe d\'âge', 'de' => 'Altersgruppe'] as $lang => $expected) {
+            foreach (['checkout', 'update_order_review', 'order_received', 'view_order', 'email'] as $surface) {
+                $cases[$lang . ' ' . $surface] = [$lang, $expected, $surface];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('frDeCustomerDisplaySurfacesProvider')]
+    public function test_age_group_label_translated_on_fr_de_customer_surfaces(
+        string $lang,
+        string $expected,
+        string $surface
+    ): void {
+        $this->bindLocale($lang === 'fr' ? 'fr_FR' : 'de_DE');
+        $this->setWpmlLanguage($lang);
+        $this->applyCustomerDisplaySurface($surface);
+        $this->assertSame(
+            $expected,
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
         );
     }
 
