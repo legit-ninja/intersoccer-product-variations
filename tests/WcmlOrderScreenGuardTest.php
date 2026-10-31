@@ -9,6 +9,12 @@ class WcmlOrderScreenGuardTest extends TestCase {
     /** @var object|null */
     private $saved_woocommerce_wpml;
 
+    /** @var array|null */
+    private $saved_intersoccer_test_actions;
+
+    /** @var array|null */
+    private $saved_intersoccer_test_removed_actions;
+
     protected function setUp(): void {
         parent::setUp();
         if (class_exists('MockFilters')) {
@@ -16,6 +22,8 @@ class WcmlOrderScreenGuardTest extends TestCase {
         }
         $this->saved_woocommerce_wpml = $GLOBALS['woocommerce_wpml'] ?? null;
         unset($GLOBALS['woocommerce_wpml']);
+        $this->saved_intersoccer_test_actions = $GLOBALS['intersoccer_test_actions'] ?? null;
+        $this->saved_intersoccer_test_removed_actions = $GLOBALS['intersoccer_test_removed_actions'] ?? null;
         $admin_init_callbacks = $GLOBALS['intersoccer_test_actions']['admin_init'] ?? null;
         $GLOBALS['intersoccer_test_removed_actions'] = [];
         $GLOBALS['intersoccer_test_actions'] = [];
@@ -25,6 +33,8 @@ class WcmlOrderScreenGuardTest extends TestCase {
 
         if (!function_exists('intersoccer_pv_block_wcml_order_itemmeta_rewrite')) {
             require_once dirname(__DIR__) . '/includes/woocommerce/wcml-order-screen-guard.php';
+        } else {
+            add_action('admin_init', 'intersoccer_pv_block_wcml_order_itemmeta_rewrite', 1);
         }
     }
 
@@ -34,7 +44,16 @@ class WcmlOrderScreenGuardTest extends TestCase {
         } else {
             $GLOBALS['woocommerce_wpml'] = $this->saved_woocommerce_wpml;
         }
-        unset($GLOBALS['intersoccer_test_removed_actions']);
+        if ($this->saved_intersoccer_test_actions === null) {
+            unset($GLOBALS['intersoccer_test_actions']);
+        } else {
+            $GLOBALS['intersoccer_test_actions'] = $this->saved_intersoccer_test_actions;
+        }
+        if ($this->saved_intersoccer_test_removed_actions === null) {
+            unset($GLOBALS['intersoccer_test_removed_actions']);
+        } else {
+            $GLOBALS['intersoccer_test_removed_actions'] = $this->saved_intersoccer_test_removed_actions;
+        }
         if (class_exists('MockFilters')) {
             MockFilters::reset();
         }
