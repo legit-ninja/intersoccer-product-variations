@@ -1,10 +1,10 @@
 <?php
 /**
- * Camp/course time range display formatting (shared with checkout order-line labels).
+ * Time range display formatting (storefront #141 + checkout order-line labels).
  *
- * Storefront variation selects are formatted on the time-formats branch (#141); this file
- * ships the pure helpers early so checkout can format order-line human labels without
- * depending on #141 merge. Each symbol is guarded for a later merge without redeclare fatals.
+ * Storefront variation selects use {@see intersoccer_time_range_taxonomies()} on #141; checkout
+ * reformats {@see intersoccer_checkout_order_line_time_taxonomies()} for FR course times only.
+ * Each symbol is guarded for a later merge without redeclare fatals.
  *
  * @package InterSoccer_Product_Variations
  */
@@ -21,6 +21,17 @@ if (!function_exists('intersoccer_time_range_taxonomies')) {
      */
     function intersoccer_time_range_taxonomies() {
         return ['pa_camp-times', 'pa_course-times'];
+    }
+}
+
+if (!function_exists('intersoccer_checkout_order_line_time_taxonomies')) {
+    /**
+     * Taxonomies whose order-line human labels may be reformatted at checkout (FR course only).
+     *
+     * @return string[]
+     */
+    function intersoccer_checkout_order_line_time_taxonomies() {
+        return ['pa_course-times'];
     }
 }
 
@@ -144,11 +155,12 @@ if (!function_exists('intersoccer_format_time_range')) {
      * Reformat a time range like "1000-1230" or "10h00-11h30" for display.
      * Anything that is not exactly a valid time range comes back unchanged.
      *
-     * @param string      $value    Term name.
-     * @param string|null $language Optional two-letter language; defaults to current WPML language.
+     * @param string      $value     Term name.
+     * @param string|null $language  Optional two-letter language; defaults to current WPML language.
+     * @param string|null $separator Range separator; null uses {@see intersoccer_time_range_separator} (en dash).
      * @return string
      */
-    function intersoccer_format_time_range($value, $language = null) {
+    function intersoccer_format_time_range($value, $language = null, $separator = null) {
         $value = (string) $value;
         $pattern = '/^\s*(\d{1,2})\s*[h:.]?\s*(\d{2})\s*[-\x{2013}\x{2014}]\s*(\d{1,2})\s*[h:.]?\s*(\d{2})\s*$/u';
         if (!preg_match($pattern, $value, $m)) {
@@ -181,7 +193,11 @@ if (!function_exists('intersoccer_format_time_range')) {
             }
         }
 
-        $separator = (string) apply_filters('intersoccer_time_range_separator', "\u{2013}");
+        if ($separator === null) {
+            $separator = (string) apply_filters('intersoccer_time_range_separator', "\u{2013}");
+        } else {
+            $separator = (string) $separator;
+        }
 
         return intersoccer_format_time_of_day($start_h, $start_m, $language)
             . $separator
@@ -193,16 +209,52 @@ if (!function_exists('intersoccer_format_order_line_time_attribute_label')) {
     /**
      * Format a taxonomy term name for order-line display when the attribute is a time range.
      *
+     * Checkout: FR {@see pa_course-times} only — compact HHMM-HHMM (optional WPML suffix) → FR
+     * labels with an ASCII hyphen; already-localised FR names and camp times stay unchanged.
+     *
      * @param string      $term_name       Translated term name.
-     * @param string      $attribute_name  Taxonomy name (e.g. pa_camp-times).
+     * @param string      $attribute_name  Taxonomy name (e.g. pa_course-times).
      * @param string|null $language        Order or request language code.
      * @return string
      */
     function intersoccer_format_order_line_time_attribute_label($term_name, $attribute_name, $language = null) {
-        if (!in_array($attribute_name, intersoccer_time_range_taxonomies(), true)) {
+        if (!in_array($attribute_name, intersoccer_checkout_order_line_time_taxonomies(), true)) {
             return $term_name;
         }
 
-        return intersoccer_format_time_range($term_name, $language);
+        if ($language === null) {
+            $language = intersoccer_order_line_time_range_language();
+        } else {
+            $language = strtolower(substr(trim((string) $language), 0, 2));
+            if ($language === '') {
+                $language = intersoccer_order_line_time_range_language();
+            }
+        }
+
+        if ($language !== 'fr') {
+            return $term_name;
+        }
+
+        $term_name = (string) $term_name;
+        $compact = function_exists('intersoccer_attr_camp_time_range_from_slug')
+            ? intersoccer_attr_camp_time_range_from_slug($term_name)
+            : '';
+        if ($compact === '' && preg_match('/^(\d{4}-\d{4})(?:-(?:fr|de|en|\d+))?$/', strtolower(trim($term_name)), $m)) {
+            $compact = $m[1];
+        }
+        if ($compact === '') {
+            return $term_name;
+        }
+
+        if (function_exists('intersoccer_attr_is_valid_camp_time_range')) {
+            $valid = intersoccer_attr_is_valid_camp_time_range($compact);
+        } else {
+            $valid = intersoccer_time_range_valid_fallback($compact);
+        }
+        if (!$valid) {
+            return $term_name;
+        }
+
+        return intersoccer_format_time_range($compact, 'fr', '-');
     }
 }

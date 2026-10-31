@@ -151,3 +151,19 @@ function seed_checkout_time_range_camp_product($slug, $term_name): void
         8001 => ['name' => $term_name, 'slug' => $slug, 'taxonomy' => 'pa_camp-times'],
     ];
 }
+
+/**
+ * @param string $slug
+ * @param string $term_name
+ */
+function seed_checkout_time_range_course_product($slug, $term_name): void
+{
+    $parent = new CheckoutTimeRangeMockParentProduct(5001, ['pa_course-times']);
+    $variation = new CheckoutTimeRangeMockVariationProduct(5002, [
+        'attribute_pa_course-times' => $slug,
+    ]);
+    $GLOBALS['intersoccer_test_products'] = [5001 => $parent, 5002 => $variation];
+    $GLOBALS['intersoccer_test_terms'] = [
+        8001 => ['name' => $term_name, 'slug' => $slug, 'taxonomy' => 'pa_course-times'],
+    ];
+}
