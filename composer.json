@@ -1,5 +1,8 @@
 {
     "require-dev": {
         "phpunit/phpunit": "^13.3"
+    },
+    "scripts": {
+        "install-hooks": "bash bin/install-hooks.sh"
     }
 }

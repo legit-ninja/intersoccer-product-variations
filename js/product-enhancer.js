@@ -5,12 +5,122 @@
 (function($) {
     'use strict';
 
-    const playerMessages = (window.intersoccerCheckout && window.intersoccerCheckout.i18n && window.intersoccerCheckout.i18n.player_assignment) || {};
+    window.intersoccerPvPendingStashAjax = window.intersoccerPvPendingStashAjax || [];
+    window.intersoccerPvPendingStashDeferreds = window.intersoccerPvPendingStashDeferreds || [];
+
+    function intersoccerPvRegisterPendingProductPageStashDeferred(deferred) {
+        if (!deferred || typeof deferred.always !== 'function') {
+            return deferred;
+        }
+        window.intersoccerPvPendingStashDeferreds.push(deferred);
+        deferred.always(function () {
+            const list = window.intersoccerPvPendingStashDeferreds;
+            const idx = list.indexOf(deferred);
+            if (idx >= 0) {
+                list.splice(idx, 1);
+            }
+        });
+        return deferred;
+    }
+
+    function intersoccerPvTrackProductPageStashAjax(jqXHR) {
+        if (!jqXHR || typeof jqXHR.always !== 'function') {
+            return jqXHR;
+        }
+        window.intersoccerPvPendingStashAjax.push(jqXHR);
+        jqXHR.always(function () {
+            const list = window.intersoccerPvPendingStashAjax;
+            const idx = list.indexOf(jqXHR);
+            if (idx >= 0) {
+                list.splice(idx, 1);
+            }
+        });
+        return jqXHR;
+    }
+
+    function intersoccerPvHasPendingProductPageStashAjax() {
+        const deferredsPending = (window.intersoccerPvPendingStashDeferreds || []).some(function (dfd) {
+            return dfd && dfd.state && dfd.state() === 'pending';
+        });
+        if (deferredsPending) {
+            return true;
+        }
+        return (window.intersoccerPvPendingStashAjax || []).some(function (xhr) {
+            return xhr && xhr.state && xhr.state() === 'pending';
+        });
+    }
+
+    function intersoccerPvGetStashWaitTimeoutMessage() {
+        const checkout = window.intersoccerCheckout || {};
+        const i18n = checkout.i18n || {};
+        if (i18n.stash_wait_timeout) {
+            return i18n.stash_wait_timeout;
+        }
+        return 'Booking data is still saving. Please wait a moment, then try Add to cart again.';
+    }
+
+    function intersoccerPvShowStashWaitTimeoutNotice($form) {
+        const message = intersoccerPvGetStashWaitTimeoutMessage();
+        const $notice = $('<div class="woocommerce-error intersoccer-pv-stash-wait-notice" role="alert"></div>').text(message);
+        const $target = $form && $form.length ? $form : $('form.cart').first();
+        if ($target.length) {
+            $target.prepend($notice);
+        } else {
+            $('body').prepend($notice);
+        }
+        $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+    }
+
+    function intersoccerPvWaitForProductPageStashAjax(options) {
+        const safetyMs = (options && typeof options.safetyMs === 'number')
+            ? options.safetyMs
+            : (typeof options === 'number' ? options : 60000);
+        return new Promise(function (resolve) {
+            const deadline = Date.now() + safetyMs;
+            (function tick() {
+                if (!intersoccerPvHasPendingProductPageStashAjax()) {
+                    resolve({ timedOut: false });
+                    return;
+                }
+                if (Date.now() >= deadline) {
+                    resolve({ timedOut: true });
+                    return;
+                }
+                setTimeout(tick, 40);
+            })();
+        });
+    }
+
+    window.intersoccerPvTrackProductPageStashAjax = intersoccerPvTrackProductPageStashAjax;
+    window.intersoccerPvRegisterPendingProductPageStashDeferred = intersoccerPvRegisterPendingProductPageStashDeferred;
+    window.intersoccerPvHasPendingProductPageStashAjax = intersoccerPvHasPendingProductPageStashAjax;
+    window.intersoccerPvWaitForProductPageStashAjax = intersoccerPvWaitForProductPageStashAjax;
+
+    const checkoutI18n = (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {};
+    const playerMessages = checkoutI18n.player_assignment || {};
     const getPlayerMessage = (key, fallback) => {
         if (playerMessages && Object.prototype.hasOwnProperty.call(playerMessages, key)) {
             return playerMessages[key];
         }
         return fallback;
+    };
+    const getCourseLabel = (key, fallback) => {
+        if (checkoutI18n && Object.prototype.hasOwnProperty.call(checkoutI18n, key) && checkoutI18n[key]) {
+            return checkoutI18n[key];
+        }
+        return fallback;
+    };
+    const getLabelValueSeparator = () => {
+        if (checkoutI18n && Object.prototype.hasOwnProperty.call(checkoutI18n, 'label_value_separator') && checkoutI18n.label_value_separator !== '') {
+            return checkoutI18n.label_value_separator;
+        }
+        return ':';
+    };
+    const formatRemainingSessionsOfTotal = (remaining, total) => {
+        const template = checkoutI18n.remaining_sessions_of_total || '%1$s of %2$s';
+        return String(template)
+            .replace(/%1\$s/g, String(remaining))
+            .replace(/%2\$s/g, String(total));
     };
 
     function intersoccerIsSingleDayBookingType(bt) {
@@ -77,6 +187,21 @@
             // Form submission validation is now handled by elementor-widgets.php
             // Only keeping quantity enforcement here
             $form.on('submit', function(e) {
+                if (!window.intersoccerPvResubmitAfterStashWait && intersoccerPvHasPendingProductPageStashAjax()) {
+                    e.preventDefault();
+                    const $defer = $form;
+                    $defer.find('.intersoccer-pv-stash-wait-notice').remove();
+                    intersoccerPvWaitForProductPageStashAjax({ safetyMs: 60000 }).then(function (result) {
+                        if (result && result.timedOut) {
+                            intersoccerPvShowStashWaitTimeoutNotice($defer);
+                            return;
+                        }
+                        window.intersoccerPvResubmitAfterStashWait = true;
+                        $defer.trigger('submit');
+                        window.intersoccerPvResubmitAfterStashWait = false;
+                    });
+                    return false;
+                }
                 // Force quantity to 1 for InterSoccer products
                 if (['camp', 'course'].includes(self.config.productType)) {
                     $form.find('input[name="quantity"], .quantity input[type="number"]').val(1);
@@ -349,22 +474,21 @@
             let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
                 const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
-                html += `<p><strong>Start Date:</strong> ${startDate}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${startDate}</p>`;
             }
             if (courseData.end_date) {
                 const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
-                html += `<p><strong>End Date:</strong> ${endDate}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${endDate}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
                 const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
-                html += `<p><strong>Holidays (No Session):</strong> ${holidays}</p>`;
+                html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}${getLabelValueSeparator()}</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
-                html += `<p><strong>Remaining Sessions:</strong> ${courseData.remaining_sessions}`;
-                if (courseData.total_sessions) {
-                    html += ` of ${courseData.total_sessions}`;
-                }
-                html += `</p>`;
+                const sessionsValue = courseData.total_sessions
+                    ? formatRemainingSessionsOfTotal(courseData.remaining_sessions, courseData.total_sessions)
+                    : String(courseData.remaining_sessions);
+                html += `<p><strong>${getCourseLabel('remaining_sessions', 'Remaining Sessions')}${getLabelValueSeparator()}</strong> ${sessionsValue}</p>`;
             }
             html += '</div>';
 
@@ -442,13 +566,13 @@
             } else if ($idField.length) {
                 $idField.remove();
             }
-            jQuery.post(intersoccerCheckout.ajax_url, {
+            intersoccerPvTrackProductPageStashAjax(jQuery.post(intersoccerCheckout.ajax_url, {
                 action: 'intersoccer_store_selected_player',
                 nonce: intersoccerCheckout.nonce,
                 product_id: this.config.productId,
                 player_index: (playerValue === null || playerValue === undefined) ? '' : playerValue,
                 player_id: resolvedId || ''
-            });
+            }));
         },
 
         // Update add to cart button state

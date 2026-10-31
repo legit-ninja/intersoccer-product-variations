@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/tests/support/SeasonSqlTestBootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
@@ -83,7 +84,8 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
             $GLOBALS['intersoccer_test_wpml_suppress_term_filters'],
             $GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'],
             $GLOBALS['intersoccer_test_disable_discount_order_suppress_filters'],
-            $GLOBALS['intersoccer_test_disable_discount_term_default_lang_read']
+            $GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'],
+            $GLOBALS['wpdb']
         );
         MockMetaData::$data = [];
         MockFilters::reset();
@@ -92,6 +94,12 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
 
     private function bootstrapWpmlFixtures(): void
     {
+        intersoccer_pv_test_bootstrap_season_sql_wpdb(WpdbSeasonSqlMock::autumn_2026_wpml_fixture(
+            self::SEASON_TERM_EN,
+            self::SEASON_TERM_FR,
+            self::SEASON_TERM_DE
+        ));
+
         $terms = [];
         $term_ids = [];
         $parents = [];
@@ -288,10 +296,14 @@ class SiblingDiscountCrossOrderWpmlTest extends TestCase
     }
 
     #[DataProvider('crossOrderWpmlBreakPairs')]
-    public function testCrossOrderFailsWithoutDefaultLanguageTermRead(string $prior_lang, string $cart_lang): void
+    public function testCrossOrderFailsWithoutSeasonSqlFixture(string $prior_lang, string $cart_lang): void
     {
-        $GLOBALS['intersoccer_test_disable_discount_term_default_lang_read'] = true;
-        $customer_id = 891000 + crc32('noterm' . $prior_lang . $cart_lang) % 1000;
+        intersoccer_pv_test_clear_season_resolution_persistent_caches();
+        $empty = new WpdbSeasonSqlMock();
+        $empty->load_fixture(['terms' => [], 'term_taxonomy' => [], 'icl' => []]);
+        $GLOBALS['wpdb'] = $empty;
+        intersoccer_pv_discount_season_term_id_clear_request_cache();
+        $customer_id = 891000 + crc32('nosql' . $prior_lang . $cart_lang) % 1000;
         $this->runCrossOrderScenario($prior_lang, $cart_lang, $customer_id, false);
     }
 

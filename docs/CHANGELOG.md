@@ -5,6 +5,20 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.31] - 2026-10-31
+
+Note: v2.10.30.1 failed to publish because the publish workflow rejects four-part versions, so nothing shipped under it. This release ships the same changes.
+
+### Fixed
+- Order display: show each line-item attribute once (#127).
+- FR/DE customer order text: Year label, one medical row, readable values, cart labels (#132).
+
+## [2.10.30] - 2026-10-30
+
+### Fixed
+- Camp Times catalog terms: validate strict HHMM-HHMM ranges (start before end) instead of locking to the two registry default slugs only. WPML suffixed slugs on assigned terms remain accepted when the term name is a valid range.
+- Product save (#134): block invalid publish in `wp_insert_post_data` before the post status is written, using submitted attribute/taxonomy values from the classic product edit form (`editpost`, matching post ID, WooCommerce meta nonce); fall back to stored product attributes when no `pa_*` payload is posted. Scope excludes Quick Edit, bulk edit, REST, and programmatic saves. Enforcement runs on the default-language product only—WPML translation products are skipped (twin safety: the original never transitions to publish, so WPML cannot sync publish to translations). Already-live products (`publish`, `future`, `private`) are never demoted; validation failures while requesting publish show a one-time admin notice after redirect (including private → publish; private → private stays silent). Pre-write **Publish blocked.** notices are retained through `woocommerce_admin_process_product_object`.
+
 ## [2.9.28] - 2026-09-28
 
 ### Changed

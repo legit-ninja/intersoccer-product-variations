@@ -7,6 +7,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/tests/support/SeasonSqlTestBootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
@@ -86,6 +87,12 @@ class CampProgressiveWeekWpmlTest extends TestCase
 
     private function bootstrapWpmlProductFixtures(): void
     {
+        intersoccer_pv_test_bootstrap_season_sql_wpdb(WpdbSeasonSqlMock::autumn_2026_wpml_fixture(
+            self::SEASON_TERM_EN,
+            self::SEASON_TERM_FR,
+            self::SEASON_TERM_DE
+        ));
+
         $terms = [];
         $term_ids = [];
         $parents = [];

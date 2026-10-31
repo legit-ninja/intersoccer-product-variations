@@ -90,6 +90,8 @@ class HalfDayLatePickupTest extends TestCase {
 
     public function test_is_half_day_age_group_detects_slug_and_label() {
         $this->assertTrue(intersoccer_is_half_day_age_group('3-5y (Half-Day)', '3-5y-half-day'));
+        $this->assertTrue(intersoccer_is_half_day_age_group('3-5 ans (Demi-journée)', '3-5-ans-demi-journee'));
+        $this->assertTrue(intersoccer_is_half_day_age_group('3-5 Jahre (halber Tag)', '3-5-jahre-halber-tag'));
         $this->assertFalse(intersoccer_is_half_day_age_group('5-13y (Full Day)', '5-13y-full-day'));
     }
 

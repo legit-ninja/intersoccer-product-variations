@@ -27,6 +27,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/tests/support/SeasonSqlTestBootstrap.php';
 require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
@@ -106,7 +107,8 @@ class Pv99CookieAndSameWeekReproTest extends TestCase
             'intersoccer_test_wc_get_orders', 'intersoccer_test_user_id', 'intersoccer_test_wpml_simulate_term_filters',
             'intersoccer_test_wpml_suppress_term_filters', 'intersoccer_test_wpml_current_language',
             'intersoccer_test_wpml_term_id_for_current_lang', 'intersoccer_test_wpml_switch_language_count',
-            'intersoccer_test_is_admin',
+            'intersoccer_test_is_admin', 'wpdb',
+            'intersoccer_test_transients', 'intersoccer_test_object_cache',
         ] as $g) {
             unset($GLOBALS[$g]);
         }
@@ -117,6 +119,11 @@ class Pv99CookieAndSameWeekReproTest extends TestCase
 
     private function fixtures(): void
     {
+        intersoccer_pv_test_bootstrap_season_sql_wpdb(WpdbSeasonSqlMock::autumn_2026_wpml_fixture(
+            self::TERM_EN,
+            self::TERM_FR,
+            self::TERM_DE
+        ));
         $by_lang = ['en' => self::TERM_EN, 'fr' => self::TERM_FR, 'de' => self::TERM_DE];
         $GLOBALS['intersoccer_test_terms'] = [];
         $terms = $term_ids = $parents = [];

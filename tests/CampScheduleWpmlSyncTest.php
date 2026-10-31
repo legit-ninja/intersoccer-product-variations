@@ -133,11 +133,7 @@ class CampScheduleWpmlSyncTest extends TestCase {
 				return 'product_variation';
 			}
 		}
-		if (!function_exists('wp_get_post_parent_id')) {
-			function wp_get_post_parent_id($post_id) {
-				return 9999;
-			}
-		}
+		$GLOBALS['intersoccer_test_wp_get_post_parent_id_default'] = 9999;
 
 		intersoccer_sync_camp_schedule_on_translation_complete($this->fr_id);
 

@@ -52,6 +52,7 @@ function intersoccer_order_meta_checkout_extras() {
         'Holidays',
         'Discount',
         'Discount Amount',
+        'Booking details',
         'Campaign Code',
         'Campaign Discount %',
         'Girls Only',
@@ -404,14 +405,11 @@ function intersoccer_build_order_line_meta($args) {
     }
 
     if ($existing_activity_type === '' && $item instanceof WC_Order_Item_Product) {
-        $existing_activity_type = (string) $item->get_meta('Activity Type', true);
+        $existing_activity_type = (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type');
     }
 
     $activity_type = intersoccer_resolve_order_activity_type($product_id, $variation_id, $product_type, $existing_activity_type);
-    $activity_type_key = function_exists('icl_t')
-        ? icl_t('intersoccer-product-variations', 'Activity Type', 'Activity Type')
-        : 'Activity Type';
-    $updates[$activity_type_key] = $activity_type;
+    $updates['Activity Type'] = $activity_type;
 
     $forced_girls_only = apply_filters('intersoccer_order_activity_type_is_girls_only', null, $product_id, $variation_id, $product_type);
     if ($forced_girls_only !== null) {
@@ -467,12 +465,11 @@ function intersoccer_build_order_line_meta($args) {
                 $updates['Late Pickup Cost'] = wc_price($cart_values['late_pickup_cost']);
             }
         }
-        // Stamp structured camp schedule as localized human keys (variation SoT stays _camp_*).
+        // Stamp structured camp schedule as canonical English keys (variation SoT stays _camp_*).
         $vid = $variation_id ?: $product_id;
         if (function_exists('intersoccer_get_camp_schedule_meta')) {
             $schedule = intersoccer_get_camp_schedule_meta($vid);
-            $lang = intersoccer_order_activity_type_detect_language($existing_activity_type);
-            $labels = intersoccer_camp_schedule_order_meta_labels_for_language($lang);
+            $labels = intersoccer_camp_schedule_order_meta_labels_en();
             if ($schedule['start'] !== '') {
                 $updates[$labels['start']] = $schedule['start'];
             }
@@ -507,6 +504,10 @@ function intersoccer_build_order_line_meta($args) {
         $updates['Discount'] = sanitize_text_field($cart_values['discount_note']);
     }
 
+    if (!empty($cart_values['intersoccer_info_note'])) {
+        $updates['Booking details'] = sanitize_text_field((string) $cart_values['intersoccer_info_note']);
+    }
+
     if (isset($cart_values['discount_amount']) && floatval($cart_values['discount_amount']) > 0) {
         // Store the raw number only — never wc_price()/HTML. Reports parse "Discount Amount"
         // with a digit regex; entity-encoded CHF (&#67;…) was read as 67 instead of 105.
@@ -535,8 +536,7 @@ function intersoccer_build_order_line_meta($args) {
         $season = intersoccer_get_product_season($product_id);
     }
     if ($season) {
-        $season_label = function_exists('icl_t') ? icl_t('intersoccer-product-variations', 'Season', 'Season') : 'Season';
-        $updates[$season_label] = $season;
+        $updates['Season'] = $season;
     }
     if (function_exists('intersoccer_discount_season_key')) {
         $discount_season = intersoccer_discount_season_key($season_product_id);
@@ -942,7 +942,7 @@ function intersoccer_write_order_line_meta($item, array $context) {
         'variation_id' => $variation_id,
         'product_type' => $product_type,
         'cart_values' => $cart_values,
-        'existing_activity_type' => (string) $item->get_meta('Activity Type', true),
+        'existing_activity_type' => (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type'),
         'fix_activity_type_only' => $fix_activity_type_only,
     ]);
 
@@ -1280,16 +1280,7 @@ function intersoccer_prune_camp_schedule_order_meta_twins($item, $language = '')
     }
 
     if ($language === '') {
-        $activity = (string) $item->get_meta('Activity Type', true);
-        if ($activity === '') {
-            // FR/DE Activity Type keys may be localized on the item.
-            foreach (['Type d\'activité', 'Type d’activité', 'Aktivitätstyp'] as $alt) {
-                $activity = (string) $item->get_meta($alt, true);
-                if ($activity !== '') {
-                    break;
-                }
-            }
-        }
+        $activity = (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type');
         $language = intersoccer_order_activity_type_detect_language($activity);
     }
 
@@ -1567,9 +1558,12 @@ function intersoccer_order_meta_hidden_customer_keys() {
     $keys = [
         'assigned_player',
         'assigned_player_id',
+        'assigned_attendee',
         'Player Index',
         'intersoccer_player_index',
         'Camp Week Index',
+        'Base Price',
+        'Variation ID',
     ];
 
     return apply_filters('intersoccer_order_meta_hidden_customer_keys', $keys);
@@ -1597,9 +1591,12 @@ function intersoccer_order_meta_hidden_customer_patterns() {
  */
 function intersoccer_is_hidden_customer_order_meta_key($key) {
     $key = (string) $key;
+    $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+        ? intersoccer_pv_canonical_stored_order_meta_key($key)
+        : $key;
 
     $hidden_keys = intersoccer_order_meta_hidden_customer_keys();
-    if (in_array($key, $hidden_keys, true)) {
+    if (in_array($key, $hidden_keys, true) || in_array($canonical, $hidden_keys, true)) {
         return true;
     }
 
@@ -1652,6 +1649,41 @@ function intersoccer_privacy_redaction_string_i18n_map() {
 }
 
 /**
+ * Fingerprint of privacy redaction msgids and FR/DE seed map (gates WPML seeding).
+ *
+ * @return string
+ */
+function intersoccer_pv_privacy_redaction_strings_seed_fingerprint() {
+    $payload = [
+        'msgids' => intersoccer_privacy_redaction_string_msgids(),
+        'map' => intersoccer_privacy_redaction_string_i18n_map(),
+    ];
+    $json = function_exists('wp_json_encode') ? wp_json_encode($payload) : json_encode($payload);
+
+    return hash('sha256', (string) $json);
+}
+
+/**
+ * Whether a WPML string translation row should be seeded from the static map.
+ *
+ * @param array<string,mixed> $lang_row        Existing translation row for one language.
+ * @param int                 $complete_status ICL_TM_COMPLETE (or 10).
+ * @return bool
+ */
+function intersoccer_pv_privacy_redaction_translation_needs_seed(array $lang_row, $complete_status) {
+    if ($lang_row === []) {
+        return true;
+    }
+    $value = isset($lang_row['value']) ? (string) $lang_row['value'] : '';
+    if ($value === '' || $value === '10') {
+        return true;
+    }
+    $status = isset($lang_row['status']) ? (int) $lang_row['status'] : 0;
+
+    return $status !== (int) $complete_status;
+}
+
+/**
  * Register privacy redaction strings with WPML and seed FR/DE translations from the .po map.
  *
  * @return void
@@ -1661,20 +1693,54 @@ function intersoccer_register_privacy_redaction_wpml_strings() {
         return;
     }
 
+    $fingerprint = intersoccer_pv_privacy_redaction_strings_seed_fingerprint();
+    $stored = get_option('intersoccer_pv_privacy_strings_seed', '');
+    if (is_string($stored) && $stored === $fingerprint) {
+        return;
+    }
+
     $map = intersoccer_privacy_redaction_string_i18n_map();
+    $status = defined('ICL_TM_COMPLETE') ? (int) ICL_TM_COMPLETE : 10;
+    $can_read_existing = function_exists('icl_get_string_translations_by_id');
+    $can_seed_translations = function_exists('icl_get_string_id') && function_exists('icl_add_string_translation');
+    $complete = $can_seed_translations;
+
     foreach (intersoccer_privacy_redaction_string_msgids() as $msgid) {
         icl_register_string('intersoccer-product-variations', $msgid, $msgid);
-        if (!function_exists('icl_get_string_id') || !function_exists('icl_add_string_translation')) {
+        if (!$can_seed_translations) {
             continue;
         }
         $string_id = icl_get_string_id($msgid, 'intersoccer-product-variations');
         if (!$string_id) {
+            $complete = false;
             continue;
         }
-        $status = defined('ICL_TM_COMPLETE') ? ICL_TM_COMPLETE : 10;
-        foreach ($map[$msgid] ?? [] as $lang => $translation) {
-            icl_add_string_translation($string_id, $lang, $status, $translation);
+        $existing_by_lang = [];
+        if ($can_read_existing) {
+            $raw = icl_get_string_translations_by_id($string_id);
+            if (is_array($raw)) {
+                foreach ($map[$msgid] ?? [] as $lang => $_translation) {
+                    if (isset($raw[$lang]) && is_array($raw[$lang])) {
+                        $existing_by_lang[$lang] = $raw[$lang];
+                    } elseif (isset($raw['translations'][$lang]) && is_array($raw['translations'][$lang])) {
+                        $existing_by_lang[$lang] = $raw['translations'][$lang];
+                    }
+                }
+            }
         }
+        foreach ($map[$msgid] ?? [] as $lang => $translation) {
+            if ($can_read_existing) {
+                $row = $existing_by_lang[$lang] ?? [];
+                if (!intersoccer_pv_privacy_redaction_translation_needs_seed($row, $status)) {
+                    continue;
+                }
+            }
+            icl_add_string_translation($string_id, $lang, $translation, $status);
+        }
+    }
+
+    if ($complete) {
+        update_option('intersoccer_pv_privacy_strings_seed', $fingerprint, false);
     }
 }
 
@@ -1734,6 +1800,8 @@ function intersoccer_privacy_redaction_locale_for_order($order) {
         'en' => 'en_US',
         'fr' => 'fr_FR',
         'de' => 'de_DE',
+        'de_CH' => 'de_DE',
+        'fr_CH' => 'fr_FR',
     ];
     if (isset($map[$wpml])) {
         return $map[$wpml];
@@ -1766,13 +1834,8 @@ function intersoccer_sensitive_order_meta_begin_email_context($order = false, $s
             ? determine_locale()
             : get_locale();
         switch_to_locale($locale);
-        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
-            unload_textdomain('intersoccer-product-variations');
-            load_plugin_textdomain(
-                'intersoccer-product-variations',
-                false,
-                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
-            );
+        if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')) {
+            intersoccer_pv_load_textdomain_for_current_locale($locale);
         }
     }
 
@@ -1812,15 +1875,11 @@ function intersoccer_sensitive_order_meta_end_email_context($order = false, $sen
     }
 
     if (isset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']) && function_exists('restore_previous_locale')) {
+        $prev_locale = (string) $GLOBALS['intersoccer_sensitive_order_meta_prev_locale'];
         restore_previous_locale();
         unset($GLOBALS['intersoccer_sensitive_order_meta_prev_locale']);
-        if (defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
-            unload_textdomain('intersoccer-product-variations');
-            load_plugin_textdomain(
-                'intersoccer-product-variations',
-                false,
-                dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'
-            );
+        if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')) {
+            intersoccer_pv_load_textdomain_for_current_locale($prev_locale);
         }
     }
 }
@@ -2026,13 +2085,28 @@ function intersoccer_normalize_attendee_dob_order_meta_value($value) {
     if ($raw === '') {
         return null;
     }
+
+    $accept_dob_ymd = static function ($ymd) {
+        if (!is_string($ymd) || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $parts)) {
+            return null;
+        }
+        if (!checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            return null;
+        }
+        $today = function_exists('current_time') ? current_time('Y-m-d') : gmdate('Y-m-d');
+        if ($ymd > $today) {
+            return null;
+        }
+        return $ymd;
+    };
+
     if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
-        return $raw;
+        return $accept_dob_ymd($raw);
     }
     if (function_exists('intersoccer_parse_loose_date_to_ymd')) {
         $parsed = intersoccer_parse_loose_date_to_ymd($raw);
-        if (is_string($parsed) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed)) {
-            return $parsed;
+        if (is_string($parsed)) {
+            return $accept_dob_ymd($parsed);
         }
     }
     return null;
@@ -2048,10 +2122,23 @@ function intersoccer_normalize_attendee_dob_order_meta_value($value) {
 function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
     $dob_ymd = intersoccer_normalize_attendee_dob_order_meta_value($value);
     if ($dob_ymd === null) {
-        $year = is_scalar($value) ? preg_replace('/[^\d]/', '', (string) $value) : '';
-        $year = strlen($year) >= 4 ? substr($year, 0, 4) : '';
-        if ($year !== '' && preg_match('/^\d{4}$/', $year)) {
-            return intersoccer_pv_privacy_string('Birth year: %s', [$year]);
+        $raw = is_scalar($value) ? trim((string) $value) : '';
+        $year = null;
+        if ($raw !== '') {
+            $current_year = (int) (function_exists('current_time') ? current_time('Y') : gmdate('Y'));
+            if (preg_match('/^\d{4}$/', $raw)) {
+                $year = (int) $raw;
+            } elseif (preg_match('/^\d{1,2}[\/\.](\d{4})$/', $raw, $my_match)) {
+                $year = (int) $my_match[1];
+            } elseif (preg_match('/^(\d{4})-\d{1,2}$/', $raw, $ym_match)) {
+                $year = (int) $ym_match[1];
+            }
+            if ($year !== null && ($year < 1900 || $year > $current_year)) {
+                $year = null;
+            }
+        }
+        if ($year !== null) {
+            return intersoccer_pv_privacy_string('Birth year: %s', [(string) $year]);
         }
         return '';
     }
@@ -2074,6 +2161,1162 @@ function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
  */
 function intersoccer_format_medical_conditions_for_redacted_surface() {
     return intersoccer_pv_privacy_string('Medical information: provided (view or update in My Account).');
+}
+
+/**
+ * Customer-facing order views (thank-you, My Account, customer emails).
+ */
+function intersoccer_is_customer_order_meta_display_context() {
+    if (function_exists('intersoccer_is_sensitive_order_meta_email_context') && intersoccer_is_sensitive_order_meta_email_context()) {
+        return true;
+    }
+
+    if (function_exists('is_admin') && is_admin() && (!function_exists('wp_doing_ajax') || !wp_doing_ajax())) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * English keys/values persisted on order lines — translate at display only.
+ *
+ * @return array<string,string> English key => English msgid for gettext.
+ */
+function intersoccer_stored_order_meta_display_key_map() {
+    static $cached = null;
+    if ($cached !== null) {
+        return apply_filters('intersoccer_stored_order_meta_display_key_map', $cached);
+    }
+
+    $map = [];
+    $skip_keys = ['assigned_player', 'assigned_player_id'];
+    foreach (intersoccer_order_meta_checkout_extras() as $key) {
+        if (in_array($key, $skip_keys, true) || strpos($key, '_') === 0) {
+            continue;
+        }
+        $map[$key] = $key;
+    }
+
+    if (function_exists('intersoccer_camp_schedule_order_meta_labels_en')
+        && function_exists('intersoccer_camp_schedule_order_meta_label_variants')) {
+        $en_camp = intersoccer_camp_schedule_order_meta_labels_en();
+        foreach (intersoccer_camp_schedule_order_meta_label_variants() as $field => $variants) {
+            $msgid = $en_camp[$field] ?? '';
+            if ($msgid === '') {
+                continue;
+            }
+            $map[$msgid] = $msgid;
+            foreach ($variants as $variant) {
+                if ($variant !== '') {
+                    $map[$variant] = $msgid;
+                }
+            }
+        }
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $def) {
+            $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+            if ($label === '') {
+                continue;
+            }
+            $map[$label] = $label;
+            if (!empty($def['legacy_order_meta_labels']) && is_array($def['legacy_order_meta_labels'])) {
+                foreach ($def['legacy_order_meta_labels'] as $legacy) {
+                    $legacy = (string) $legacy;
+                    if ($legacy !== '') {
+                        $map[$legacy] = $label;
+                    }
+                }
+            }
+        }
+    }
+
+    $map['Remaining Sessions'] = 'Remaining Sessions';
+    $map['Sessions Remaining'] = 'Sessions Remaining';
+    $map['InterSoccer Venues'] = 'Sites InterSoccer';
+    $map['Player DOB'] = 'Player DOB';
+    $map['Player Medical'] = 'Medical Conditions';
+
+    foreach ([
+        "Type d'activité" => 'Activity Type',
+        'Type d’activité' => 'Activity Type',
+        'Aktivitätstyp' => 'Activity Type',
+        'Date de naissance du participant' => 'Attendee DOB',
+        'Geburtsdatum des Teilnehmers' => 'Attendee DOB',
+    ] as $legacy_key => $canonical_key) {
+        $map[$legacy_key] = $canonical_key;
+    }
+
+    $cached = $map;
+
+    return apply_filters('intersoccer_stored_order_meta_display_key_map', $cached);
+}
+
+/**
+ * Resolve a stored order-meta key (EN/FR/DE legacy) to its canonical English msgid.
+ *
+ * @param string $meta_key Stored meta key.
+ * @return string
+ */
+function intersoccer_pv_canonical_stored_order_meta_key($meta_key) {
+    $meta_key = (string) $meta_key;
+    if ($meta_key === '') {
+        return '';
+    }
+
+    $map = intersoccer_stored_order_meta_display_key_map();
+    if (isset($map[$meta_key])) {
+        return $map[$meta_key];
+    }
+
+    if (function_exists('intersoccer_attr_legacy_order_meta_label_reverse_map')) {
+        $reverse = intersoccer_attr_legacy_order_meta_label_reverse_map();
+        if (isset($reverse[$meta_key])) {
+            return (string) $reverse[$meta_key];
+        }
+    }
+
+    return $meta_key;
+}
+
+/**
+ * @param string $meta_key        Stored meta key.
+ * @param string $canonical_english Canonical English key (e.g. Activity Type).
+ * @return bool
+ */
+function intersoccer_pv_order_meta_key_is($meta_key, $canonical_english) {
+    return intersoccer_pv_canonical_stored_order_meta_key($meta_key) === $canonical_english;
+}
+
+/**
+ * Stored meta key aliases for a canonical English order-meta key (includes legacy FR/DE keys).
+ *
+ * @param string $canonical_english
+ * @return array<int,string>
+ */
+function intersoccer_pv_order_item_meta_canonical_key_variants($canonical_english) {
+    $canonical_english = (string) $canonical_english;
+    if ($canonical_english === '') {
+        return [];
+    }
+
+    $variants = [$canonical_english];
+    $map = intersoccer_stored_order_meta_display_key_map();
+    foreach ($map as $stored => $canonical) {
+        if ($canonical === $canonical_english && $stored !== $canonical_english) {
+            $variants[] = $stored;
+        }
+    }
+
+    return array_values(array_unique($variants));
+}
+
+/**
+ * Read order-item meta by canonical English key (tolerates legacy translated storage keys).
+ *
+ * @param WC_Order_Item_Product|object $item
+ * @param string                       $canonical_english
+ * @param bool                         $single
+ * @return mixed
+ */
+function intersoccer_pv_order_item_get_meta_by_canonical_key($item, $canonical_english, $single = true) {
+    if (!is_object($item) || !method_exists($item, 'get_meta')) {
+        return $single ? '' : [];
+    }
+
+    foreach (intersoccer_pv_order_item_meta_canonical_key_variants($canonical_english) as $key) {
+        $value = $item->get_meta($key, $single);
+        if ($single) {
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+            if ($value !== '' && $value !== null && !is_string($value)) {
+                return $value;
+            }
+        } elseif (!empty($value)) {
+            return $value;
+        }
+    }
+
+    return $single ? '' : [];
+}
+
+/**
+ * Format a stored English order date label for customer display (values stay English in DB).
+ *
+ * @param string $text Stored date string.
+ * @return string
+ */
+function intersoccer_pv_customer_display_date_format_msgid() {
+    return __('j F Y', 'intersoccer-product-variations');
+}
+
+function intersoccer_pv_format_stored_order_date_for_display($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+
+    $ts = strtotime($text);
+    if ($ts === false) {
+        return $text;
+    }
+
+    return date_i18n(intersoccer_pv_customer_display_date_format_msgid(), $ts);
+}
+
+/**
+ * Localize a stored comma-separated list of English date labels (e.g. Holidays).
+ *
+ * @param string $text Stored value.
+ * @return string
+ */
+function intersoccer_pv_stored_english_order_date_token_pattern() {
+    return '/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}/';
+}
+
+/**
+ * Extract whole stored English date tokens from a comma-containing Holidays value.
+ *
+ * @param string $text Stored Holidays meta value.
+ * @return array<int,string>
+ */
+function intersoccer_pv_extract_stored_order_date_list_segments($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return [];
+    }
+
+    if (!preg_match_all(intersoccer_pv_stored_english_order_date_token_pattern(), $text, $matches)) {
+        return [];
+    }
+
+    return $matches[0];
+}
+
+function intersoccer_pv_format_stored_order_date_list_for_display($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+
+    $segments = intersoccer_pv_extract_stored_order_date_list_segments($text);
+    if ($segments === []) {
+        if (strpos($text, ',') !== false) {
+            return $text;
+        }
+
+        return intersoccer_pv_format_stored_order_date_for_display($text);
+    }
+
+    if (count($segments) === 1 && trim($segments[0]) === $text) {
+        return intersoccer_pv_format_stored_order_date_for_display($segments[0]);
+    }
+
+    $scratch = $text;
+    foreach ($segments as $segment) {
+        $scratch = str_replace($segment, '', $scratch);
+    }
+    $scratch = preg_replace('/[\s,]+/', '', $scratch);
+    if ($scratch !== '') {
+        return $text;
+    }
+
+    $formatted = array_map('intersoccer_pv_format_stored_order_date_for_display', $segments);
+
+    return implode(', ', $formatted);
+}
+
+/**
+ * Repair common UTF-8 en-dash corruption stored as "?" between words (e.g. DE course Note).
+ *
+ * @param string $text Note body.
+ * @return string
+ */
+function intersoccer_pv_is_german_display_locale() {
+    $locale = '';
+    if (function_exists('determine_locale')) {
+        $locale = (string) determine_locale();
+    } elseif (function_exists('get_locale')) {
+        $locale = (string) get_locale();
+    }
+
+    return $locale !== '' && strpos(strtolower($locale), 'de') === 0;
+}
+
+/**
+ * Repair DE course Note text where a stored en-dash was saved as "?" between words (DB content).
+ *
+ * @param string $text Note body.
+ * @return string
+ */
+function intersoccer_pv_repair_utf8_dash_mojibake_in_note($text) {
+    $text = (string) $text;
+    if ($text === '' || strpos($text, '?') === false || !intersoccer_pv_is_german_display_locale()) {
+        return $text;
+    }
+
+    if (preg_match('/\p{L}\s+\?\s+\p{L}/u', $text)) {
+        return preg_replace('/\s+\?\s+/u', ' – ', $text);
+    }
+
+    return $text;
+}
+
+/**
+ * Hide PM Player Medical when PV Medical Conditions is also on the line (duplicate).
+ *
+ * @param string            $key  Meta key.
+ * @param WC_Order_Item     $item Order line item.
+ * @param array<string,true> $keys_present Keys on the formatted meta pass (optional).
+ * @return bool
+ */
+function intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item, array $keys_present = []) {
+    if ((string) $key !== 'Player Medical') {
+        return false;
+    }
+
+    if (isset($keys_present['Medical Conditions'])) {
+        return true;
+    }
+
+    if (!($item instanceof WC_Order_Item_Product) && !is_object($item)) {
+        return false;
+    }
+
+    if (!method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $pv_medical = trim((string) $item->get_meta('Medical Conditions', true));
+
+    return $pv_medical !== '';
+}
+
+/**
+ * Hide PM Player DOB when PV Attendee DOB is also on the line (duplicate).
+ *
+ * @param string            $key  Meta key.
+ * @param WC_Order_Item     $item Order line item.
+ * @return bool
+ */
+function intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item) {
+    if (!intersoccer_pv_order_meta_key_is($key, 'Player DOB')) {
+        return false;
+    }
+
+    if (!($item instanceof WC_Order_Item_Product) && !is_object($item)) {
+        return false;
+    }
+
+    if (!method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $attendee = trim((string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Attendee DOB'));
+
+    return $attendee !== '';
+}
+
+/**
+ * Weekday names persisted in English on order lines.
+ *
+ * @return array<int,string>
+ */
+function intersoccer_pv_order_meta_weekday_msgids() {
+    return [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+    ];
+}
+
+/**
+ * @param string $label Single token (e.g. weekday).
+ * @return string
+ */
+function intersoccer_pv_translate_order_meta_token_for_display($label) {
+    $label = trim((string) $label);
+    if ($label === '') {
+        return '';
+    }
+
+    if (in_array($label, intersoccer_pv_order_meta_weekday_msgids(), true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    $activity_types = ['Camp', 'Course', 'Birthday Party', 'Tournament', 'Unknown'];
+    if (in_array($label, $activity_types, true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    $seasons = ['Summer', 'Autumn', 'Spring', 'Winter'];
+    if (in_array($label, $seasons, true)) {
+        return __($label, 'intersoccer-product-variations');
+    }
+
+    if ($label === 'Full Week') {
+        return __('Full Week', 'intersoccer-product-variations');
+    }
+    if ($label === 'Single Day(s)') {
+        return __('Single Day(s)', 'intersoccer-product-variations');
+    }
+    if ($label === 'Full Term') {
+        return __('Full Term', 'intersoccer-product-variations');
+    }
+    if ($label === 'Yes') {
+        return __('Yes', 'intersoccer-product-variations');
+    }
+    if ($label === 'No') {
+        return __('No', 'intersoccer-product-variations');
+    }
+    if ($label === 'Girls Only') {
+        return __('Girls Only', 'intersoccer-product-variations');
+    }
+
+    return $label;
+}
+
+/**
+ * Translate comma-separated stored order meta values (days, holidays).
+ *
+ * @param string $text Raw stored value.
+ * @return string
+ */
+function intersoccer_pv_translate_comma_separated_order_meta_value($text) {
+    $text = (string) $text;
+    if ($text === '' || strpos($text, ',') === false) {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    $parts = array_map('trim', explode(',', $text));
+    $translated = array_map('intersoccer_pv_translate_order_meta_token_for_display', $parts);
+
+    return implode(', ', $translated);
+}
+
+/**
+ * @param string $text Stored Activity Type value.
+ * @return string
+ */
+function intersoccer_pv_translate_activity_type_order_meta_value($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+
+    $suffix = ' - Girls Only';
+    if (substr($text, -strlen($suffix)) === $suffix) {
+        $base = substr($text, 0, -strlen($suffix));
+        return intersoccer_pv_translate_order_meta_token_for_display($base) . ' - ' . __('Girls Only', 'intersoccer-product-variations');
+    }
+
+    return intersoccer_pv_translate_order_meta_token_for_display($text);
+}
+
+/**
+ * Translate a PV textdomain msgid on customer-facing order surfaces (reload .mo, WPML strings).
+ *
+ * @param string $msgid English msgid.
+ * @return string
+ */
+function intersoccer_pv_translate_textdomain_msgid_for_customer($msgid) {
+    $msgid = (string) $msgid;
+    if ($msgid === '') {
+        return '';
+    }
+
+    if (function_exists('intersoccer_pv_load_textdomain_for_current_locale')
+        && defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+        intersoccer_pv_load_textdomain_for_current_locale();
+    }
+
+    $text = __($msgid, 'intersoccer-product-variations');
+    if ($text !== $msgid) {
+        return $text;
+    }
+
+    $lang = apply_filters('wpml_current_language', null);
+    if (is_string($lang) && $lang !== '' && $lang !== 'en') {
+        $wpml = apply_filters('wpml_translate_single_string', $msgid, 'intersoccer-product-variations', $msgid, $lang);
+        if (is_string($wpml) && $wpml !== '' && $wpml !== $msgid) {
+            return $wpml;
+        }
+        if (function_exists('icl_t')) {
+            $icl = icl_t('intersoccer-product-variations', $msgid, $msgid);
+            if (is_string($icl) && $icl !== '' && $icl !== $msgid) {
+                return $icl;
+            }
+        }
+    }
+
+    return $text;
+}
+
+/**
+ * @param string $display_key Label shown to the customer.
+ * @param string $meta_key    Raw meta key.
+ * @return string
+ */
+function intersoccer_translate_stored_order_meta_display_key($display_key, $meta_key = '') {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $display_key;
+    }
+
+    $lookup = $meta_key !== '' ? $meta_key : $display_key;
+    $map = intersoccer_stored_order_meta_display_key_map();
+    if (isset($map[$lookup])) {
+        return intersoccer_pv_translate_textdomain_msgid_for_customer((string) $map[$lookup]);
+    }
+
+    return $display_key;
+}
+
+/**
+ * Translate known English values stored on order lines (not keys).
+ *
+ * @param string $value     Stored meta value.
+ * @param string $meta_key  Meta key.
+ * @return string
+ */
+/**
+ * Translate a stored discount label (cart/checkout/order display only).
+ *
+ * @param string $label English label from cart/order storage.
+ * @return string
+ */
+function intersoccer_translate_stored_discount_label_for_display($label) {
+    return intersoccer_translate_persisted_discount_label_for_display($label);
+}
+
+/**
+ * Translate English discount labels stored on cart lines / order meta (display only).
+ *
+ * @param string $label Stored English label.
+ * @return string
+ */
+function intersoccer_translate_persisted_discount_label_for_display($label) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $label;
+    }
+
+    $text = is_scalar($label) ? (string) $label : '';
+    if ($text === '') {
+        return $label;
+    }
+
+    $percent = '(\d+(?:\.\d+)?)';
+    $rules = [
+        '/^' . $percent . '\s*%?\s*Camp Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Camp Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Course Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Course Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Tournament Sibling Discount$/' => static function ($m) {
+            return sprintf(__('%s%% Tournament Sibling Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Camp Week 2 Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Camp Week 2 Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Camp Week (\d+)\+ Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Camp Week %d+ Discount', 'intersoccer-product-variations'), $m[1], $m[2]);
+        },
+        '/^' . $percent . '\s*%?\s*Same Season Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Same Season Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Tournament Multiple Days Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Tournament Multiple Days Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Camp Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Camp Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Camp Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Camp Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Course Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Course Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Tournament Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Tournament Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Multi-Child Tournament Discount$/' => static function ($m) {
+            return sprintf(__('%d%% Multi-Child Tournament Discount', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^' . $percent . '\s*%?\s*Sibling Discount Applied$/' => static function ($m) {
+            return sprintf(__('%d%% Sibling Discount Applied', 'intersoccer-product-variations'), $m[1]);
+        },
+        '/^20\s*%?\s*Course Sibling Discount$/' => static function () {
+            return __('20% Course Sibling Discount', 'intersoccer-product-variations');
+        },
+        '/^30\s*%?\s*Multi-Child Course Discount$/' => static function () {
+            return __('30% Multi-Child Course Discount', 'intersoccer-product-variations');
+        },
+        '/^50\s*%?\s*Same-Season Course Discount$/' => static function () {
+            return __('50% Same-Season Course Discount', 'intersoccer-product-variations');
+        },
+    ];
+
+    foreach ($rules as $pattern => $callback) {
+        if (preg_match($pattern, $text, $matches)) {
+            return $callback($matches);
+        }
+    }
+
+    return $label;
+}
+
+/**
+ * gettext context for customer-facing "None" placeholder by stored meta key.
+ *
+ * Order lines that may persist the literal placeholder: Medical Conditions ({@see intersoccer_apply_assigned_player_order_meta()} ~357–359),
+ * and Note when stored as the pa_note slug {@code none}. Other keys use the masculine default if ever set.
+ *
+ * @param string $meta_key Stored meta key.
+ * @return string feminine noun|masculine noun
+ */
+function intersoccer_pv_order_meta_none_display_msgctxt($meta_key) {
+    $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+        ? intersoccer_pv_canonical_stored_order_meta_key((string) $meta_key)
+        : (string) $meta_key;
+
+    $feminine = [
+        'Medical Conditions',
+        'Note',
+    ];
+
+    return in_array($canonical, $feminine, true) ? 'feminine noun' : 'masculine noun';
+}
+
+/**
+ * @param string $meta_key Stored meta key.
+ * @return string
+ */
+function intersoccer_pv_translate_order_meta_none_for_display($meta_key) {
+    $ctxt = intersoccer_pv_order_meta_none_display_msgctxt($meta_key);
+
+    return _x('None', $ctxt, 'intersoccer-product-variations');
+}
+
+/**
+ * Feminine "None" for admin labels (e.g. discount condition = la condition).
+ *
+ * @return string
+ */
+function intersoccer_pv_translate_none_feminine_label() {
+    return _x('None', 'feminine noun', 'intersoccer-product-variations');
+}
+
+/**
+ * Masculine "None" for admin labels (e.g. no attribute terms selected).
+ *
+ * @return string
+ */
+function intersoccer_pv_translate_none_masculine_label() {
+    return _x('None', 'masculine noun', 'intersoccer-product-variations');
+}
+
+/**
+ * Whether the current request is FR/DE customer order text (not EN).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_fr_de_customer_text_locale() {
+    if (function_exists('intersoccer_pv_wpml_current_language_code')) {
+        $lang = intersoccer_pv_wpml_current_language_code();
+        if ($lang === 'fr' || $lang === 'de') {
+            return true;
+        }
+    }
+
+    $locale = function_exists('determine_locale') ? (string) determine_locale() : '';
+    if ($locale !== '') {
+        return str_starts_with($locale, 'fr') || str_starts_with($locale, 'de');
+    }
+
+    return false;
+}
+
+/**
+ * FR/DE course lines: relocate synthesized Course Day before Course Times (EN checkout meta_id order).
+ *
+ * EN leaves WooCommerce meta_id order from {@see intersoccer_write_order_line_meta()} — parent
+ * attributes (Course Day) in {@see intersoccer_build_order_line_meta()} ~548–555, then variation
+ * facets in {@see intersoccer_collect_variation_taxonomy_meta()} merged at ~949–950, so Course Day
+ * precedes Course Times without a display sort. WCML slug-only pa_course-day can appear early in
+ * formatted meta; synthesis (~3966) then surfaces Course Day before Activity Type on FR/DE only.
+ *
+ * @param array<int,object>     $formatted_meta
+ * @param WC_Order_Item_Product $item
+ * @return array<int,object>
+ */
+function intersoccer_pv_normalize_frde_course_day_meta_position(array $formatted_meta, $item) {
+    if (!intersoccer_pv_is_fr_de_customer_text_locale()) {
+        return $formatted_meta;
+    }
+
+    $product_type = '';
+    if ($item instanceof WC_Order_Item_Product && function_exists('intersoccer_get_product_type')) {
+        $product_type = strtolower((string) intersoccer_get_product_type((int) $item->get_product_id()));
+    }
+    if ($product_type === '' && !empty($GLOBALS['intersoccer_test_product_type'])) {
+        $product_type = strtolower((string) $GLOBALS['intersoccer_test_product_type']);
+    }
+    if ($product_type !== 'course' || $formatted_meta === []) {
+        return $formatted_meta;
+    }
+
+    $day_idx = null;
+    $times_idx = null;
+    foreach ($formatted_meta as $idx => $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $key = (string) ($meta->key ?? '');
+        if (function_exists('intersoccer_pv_order_meta_key_is')) {
+            if (intersoccer_pv_order_meta_key_is($key, 'Course Day')) {
+                $day_idx = $idx;
+            } elseif (intersoccer_pv_order_meta_key_is($key, 'Course Times')) {
+                $times_idx = $idx;
+            }
+        }
+    }
+
+    if ($day_idx === null) {
+        return $formatted_meta;
+    }
+
+    if ($times_idx === null) {
+        return $formatted_meta;
+    }
+
+    if ($day_idx === $times_idx - 1) {
+        return $formatted_meta;
+    }
+
+    $day_meta = $formatted_meta[$day_idx];
+    unset($formatted_meta[$day_idx]);
+    $formatted_meta = array_values($formatted_meta);
+
+    $times_idx = null;
+    foreach ($formatted_meta as $idx => $meta) {
+        if (is_object($meta) && function_exists('intersoccer_pv_order_meta_key_is')
+            && intersoccer_pv_order_meta_key_is((string) ($meta->key ?? ''), 'Course Times')) {
+            $times_idx = $idx;
+            break;
+        }
+    }
+    if ($times_idx === null) {
+        $formatted_meta[] = $day_meta;
+
+        return $formatted_meta;
+    }
+
+    array_splice($formatted_meta, $times_idx, 0, [$day_meta]);
+
+    return $formatted_meta;
+}
+
+/**
+ * When token translation leaves a WCML slug unchanged, resolve the localized term name.
+ *
+ * @param mixed  $value         Raw stored value.
+ * @param string $meta_key      Meta key.
+ * @param mixed  $display_value Value after token/dash repair.
+ * @return mixed
+ */
+function intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $display_value) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $display_value;
+    }
+
+    $before = is_scalar($display_value) ? trim((string) $display_value) : '';
+    $raw = is_scalar($value) ? trim((string) $value) : '';
+    if ($before === '' || ($raw !== '' && $before !== $raw)) {
+        return $display_value;
+    }
+
+    $readable = intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key);
+    if (is_scalar($readable) && trim((string) $readable) !== '' && (string) $readable !== $before) {
+        if (intersoccer_pv_order_meta_key_is($meta_key, 'Note')) {
+            return intersoccer_pv_repair_utf8_dash_mojibake_in_note((string) $readable);
+        }
+
+        return $readable;
+    }
+
+    return $display_value;
+}
+
+function intersoccer_translate_stored_order_meta_display_value($value, $meta_key = '') {
+    $text = is_scalar($value) ? (string) $value : '';
+    if ($text === '') {
+        return $value;
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Attendee Gender')) {
+        if (intersoccer_is_customer_order_meta_display_context()
+            && function_exists('intersoccer_pv_format_stored_gender_for_display')) {
+            return intersoccer_pv_format_stored_gender_for_display($text);
+        }
+    }
+
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $value;
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Discount') || $meta_key === '') {
+        $translated = intersoccer_translate_persisted_discount_label_for_display($text);
+        if ($translated !== $text) {
+            return $translated;
+        }
+    }
+
+    if (strcasecmp($text, 'none') === 0) {
+        return intersoccer_pv_translate_order_meta_none_for_display($meta_key);
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Note')) {
+        $note = intersoccer_pv_repair_utf8_dash_mojibake_in_note($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $note);
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Activity Type')) {
+        $activity = intersoccer_pv_translate_activity_type_order_meta_value($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $activity);
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Booking Type')
+        || intersoccer_pv_order_meta_key_is($meta_key, 'Late Pickup Type')) {
+        $booking = intersoccer_pv_translate_order_meta_token_for_display($text);
+
+        return intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fallback($value, $meta_key, $booking);
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Girls Only')) {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    if (intersoccer_pv_order_meta_key_is($meta_key, 'Season')) {
+        return intersoccer_pv_translate_order_meta_token_for_display($text);
+    }
+
+    $date_keys = [
+        'Start Date',
+        'End Date',
+        'Camp Start Date',
+        'Camp End Date',
+        'Holidays',
+    ];
+    foreach ($date_keys as $date_key) {
+        if (intersoccer_pv_order_meta_key_is($meta_key, $date_key)) {
+            if ($date_key === 'Holidays') {
+                return intersoccer_pv_format_stored_order_date_list_for_display($text);
+            }
+            return intersoccer_pv_format_stored_order_date_for_display($text);
+        }
+    }
+
+    $comma_keys = [
+        'Days Selected',
+        'Late Pickup Days',
+        'Course Day',
+        'Days of Week',
+        'Tournament Day',
+    ];
+    foreach ($comma_keys as $comma_key) {
+        if (intersoccer_pv_order_meta_key_is($meta_key, $comma_key)) {
+            return intersoccer_pv_translate_comma_separated_order_meta_value($text);
+        }
+    }
+
+    return intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key);
+}
+
+/**
+ * @param string          $display_key Display label.
+ * @param object          $meta        Meta object.
+ * @param WC_Order_Item   $item        Order item.
+ * @return string
+ */
+function intersoccer_filter_order_item_display_meta_key($display_key, $meta, $item) {
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    return intersoccer_translate_stored_order_meta_display_key((string) $display_key, $meta_key);
+}
+
+/**
+ * @param string          $display_value Display value.
+ * @param object          $meta          Meta object.
+ * @param WC_Order_Item   $item          Order item.
+ * @return string
+ */
+function intersoccer_filter_order_item_display_meta_value($display_value, $meta, $item) {
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    return intersoccer_translate_stored_order_meta_display_value((string) $display_value, $meta_key);
+}
+
+add_filter('woocommerce_order_item_display_meta_key', 'intersoccer_filter_order_item_display_meta_key', 10, 3);
+add_filter('woocommerce_order_item_display_meta_value', 'intersoccer_filter_order_item_display_meta_value', 10, 3);
+
+/**
+ * FR or DE language code for cart/checkout attribute-label overrides (empty when EN/other).
+ *
+ * @return string fr|de|''
+ */
+function intersoccer_pv_resolve_fr_de_language_code() {
+    $lang = intersoccer_pv_wpml_current_language_code();
+    if ($lang === '') {
+        return '';
+    }
+
+    $short = strtolower(substr(trim($lang), 0, 2));
+
+    return ($short === 'fr' || $short === 'de') ? $short : '';
+}
+
+/**
+ * Cart, checkout, order customer surfaces where registry attribute labels may be translated.
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_cart_checkout_order_customer_surface() {
+    if (function_exists('intersoccer_is_sensitive_order_meta_email_context')
+        && intersoccer_is_sensitive_order_meta_email_context()) {
+        return true;
+    }
+
+    if (function_exists('wp_doing_ajax') && wp_doing_ajax()) {
+        $action = '';
+        if (isset($_REQUEST['wc-ajax'])) {
+            $raw = $_REQUEST['wc-ajax'];
+            $action = function_exists('wp_unslash') ? wp_unslash($raw) : $raw;
+            $action = function_exists('sanitize_text_field') ? sanitize_text_field($action) : (string) $action;
+        }
+        if ($action === 'update_order_review') {
+            return true;
+        }
+    }
+
+    if (function_exists('is_cart') && is_cart()) {
+        return true;
+    }
+    if (function_exists('is_checkout') && is_checkout()) {
+        return true;
+    }
+    if (function_exists('is_order_received_page') && is_order_received_page()) {
+        return true;
+    }
+    if (function_exists('is_wc_endpoint_url') && is_wc_endpoint_url('view-order')) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * True while WooCommerce is persisting checkout order line meta (not display).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_writing_checkout_order_line_meta() {
+    if (!function_exists('doing_action')) {
+        return false;
+    }
+
+    return doing_action('woocommerce_checkout_create_order_line_item')
+        || doing_action('woocommerce_checkout_create_order');
+}
+
+/**
+ * Whether FR/DE cart/checkout/order/email surfaces should rewrite English attribute labels.
+ *
+ * @return bool
+ */
+function intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override() {
+    if (intersoccer_pv_is_writing_checkout_order_line_meta()) {
+        return false;
+    }
+
+    if (intersoccer_pv_resolve_fr_de_language_code() === '') {
+        return false;
+    }
+
+    return intersoccer_pv_is_cart_checkout_order_customer_surface();
+}
+
+/**
+ * English registry / Woo attribute labels for a taxonomy name (pa_*).
+ *
+ * @param string $taxonomy_or_name Attribute taxonomy.
+ * @return array<int,string>
+ */
+function intersoccer_pv_english_attribute_labels_for_taxonomy($taxonomy_or_name) {
+    $name = (string) $taxonomy_or_name;
+    if ($name === '') {
+        return [];
+    }
+
+    $labels = [];
+    if (function_exists('intersoccer_attr_order_meta_label_map')) {
+        $map = intersoccer_attr_order_meta_label_map();
+        if (isset($map[$name]) && $map[$name] !== '') {
+            $labels[] = (string) $map[$name];
+        }
+    }
+
+    if (function_exists('intersoccer_attr_slug_from_taxonomy')) {
+        $slug = intersoccer_attr_slug_from_taxonomy($name);
+        if ($slug !== null && $slug !== '' && function_exists('intersoccer_attr_registry')) {
+            $registry = intersoccer_attr_registry();
+            if (isset($registry[$slug]) && is_array($registry[$slug])) {
+                $def = $registry[$slug];
+                if (!empty($def['wc_label'])) {
+                    $labels[] = (string) $def['wc_label'];
+                }
+                if (!empty($def['order_meta_label'])) {
+                    $labels[] = (string) $def['order_meta_label'];
+                }
+            }
+        }
+    }
+
+    return array_values(array_unique(array_filter($labels, static function ($label) {
+        return is_string($label) && $label !== '';
+    })));
+}
+
+/**
+ * True when the incoming label is still the English registry/WC string (not WPML-translated).
+ *
+ * @param string $label            Label from WooCommerce.
+ * @param string $taxonomy_or_name Taxonomy name when known.
+ * @return bool
+ */
+function intersoccer_pv_incoming_attribute_label_is_english($label, $taxonomy_or_name = '') {
+    $label = (string) $label;
+    if ($label === '') {
+        return false;
+    }
+
+    if ((string) $taxonomy_or_name !== '') {
+        return in_array($label, intersoccer_pv_english_attribute_labels_for_taxonomy($taxonomy_or_name), true);
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            foreach (['wc_label', 'order_meta_label'] as $field) {
+                if (!empty($def[$field]) && (string) $def[$field] === $label) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Translate registry attribute labels on cart, checkout review, and related customer views.
+ *
+ * @param string      $label   Default WooCommerce attribute label.
+ * @param string      $name    Taxonomy or attribute name.
+ * @param WC_Product|null $product Product context.
+ * @return string
+ */
+function intersoccer_pv_filter_wc_attribute_label_for_customer($label, $name, $product = null) {
+    unset($product);
+    if (!intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override()) {
+        return $label;
+    }
+
+    $name = (string) $name;
+    if (!intersoccer_pv_incoming_attribute_label_is_english($label, $name)) {
+        return $label;
+    }
+
+    if ($name !== '' && function_exists('intersoccer_attr_order_meta_label_map')) {
+        $map = intersoccer_attr_order_meta_label_map();
+        if (isset($map[$name])) {
+            return intersoccer_translate_stored_order_meta_display_key($map[$name], $map[$name]);
+        }
+    }
+
+    return intersoccer_translate_stored_order_meta_display_key((string) $label, (string) $label);
+}
+
+add_filter('woocommerce_attribute_label', 'intersoccer_pv_filter_wc_attribute_label_for_customer', 20, 3);
+
+/**
+ * Translate cart line item data keys produced with English registry labels.
+ *
+ * @param array<int,array<string,mixed>> $item_data Cart row fragments.
+ * @param array<string,mixed>            $cart_item Cart line.
+ * @return array<int,array<string,mixed>>
+ */
+function intersoccer_pv_translate_cart_item_data_keys($item_data, $cart_item) {
+    unset($cart_item);
+    if (!is_array($item_data) || !intersoccer_pv_should_apply_fr_de_cart_checkout_attribute_label_override()) {
+        return $item_data;
+    }
+
+    foreach ($item_data as $index => $row) {
+        if (!is_array($row) || !isset($row['key'])) {
+            continue;
+        }
+        $key = (string) $row['key'];
+        if (!intersoccer_pv_incoming_attribute_label_is_english($key, '')) {
+            continue;
+        }
+        $translated = intersoccer_translate_stored_order_meta_display_key($key, $key);
+        if ($translated !== $key) {
+            $item_data[$index]['key'] = $translated;
+        }
+    }
+
+    return $item_data;
+}
+
+add_filter('woocommerce_get_item_data', 'intersoccer_pv_translate_cart_item_data_keys', 25, 2);
+
+/**
+ * Apply display-time label translation on formatted meta objects.
+ *
+ * @param object $meta Formatted meta object.
+ * @return object
+ */
+function intersoccer_translate_order_item_formatted_meta_object($meta) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $meta;
+    }
+
+    $meta_key = isset($meta->key) ? (string) $meta->key : '';
+    if (isset($meta->display_key)) {
+        $meta->display_key = intersoccer_translate_stored_order_meta_display_key((string) $meta->display_key, $meta_key);
+    }
+    $raw_value = isset($meta->value) ? $meta->value : '';
+    $translated_value = intersoccer_translate_stored_order_meta_display_value($raw_value, $meta_key);
+    if ($translated_value !== $raw_value) {
+        $meta->value = $translated_value;
+        if (isset($meta->display_value)) {
+            $meta->display_value = $translated_value;
+        }
+    }
+
+    return $meta;
 }
 
 /**
@@ -2125,19 +3368,605 @@ function intersoccer_redact_sensitive_order_item_formatted_meta(array $formatted
 }
 
 /**
- * Filter order item formatted meta for customer-facing surfaces.
+ * Meta keys that are raw taxonomy slugs (display twins of human order-meta labels).
  *
- * Hides internal keys (assigned_player*, attribute_pa_*, underscore-prefixed)
- * from thank-you page, order emails, and My Account order views.
+ * @return array<int,string>
+ */
+function intersoccer_pv_hidden_slug_attribute_meta_keys() {
+    static $keys = null;
+    if ($keys !== null) {
+        return $keys;
+    }
+
+    $keys = ['girls_only'];
+    if (!function_exists('intersoccer_attr_registry')) {
+        return $keys;
+    }
+
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        if (!is_array($def)) {
+            continue;
+        }
+        if (function_exists('intersoccer_attr_taxonomy')) {
+            $keys[] = (string) intersoccer_attr_taxonomy($slug);
+        }
+        if (function_exists('intersoccer_attr_resolve_meta_key')) {
+            $keys[] = (string) intersoccer_attr_resolve_meta_key($slug);
+        }
+        foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+            $keys[] = (string) $alias;
+        }
+        foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+            $keys[] = (string) $legacy_key;
+        }
+    }
+
+    $keys = array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+
+    return $keys;
+}
+
+/**
+ * @param string $meta_key Stored order-item meta key.
+ * @return bool
+ */
+function intersoccer_pv_is_hidden_slug_attribute_meta_key($meta_key) {
+    $meta_key = (string) $meta_key;
+    if ($meta_key === '') {
+        return false;
+    }
+
+    return in_array($meta_key, intersoccer_pv_hidden_slug_attribute_meta_keys(), true);
+}
+
+/**
+ * Prefer raw pa_* over attribute_pa_* when only slug keys share a display label.
  *
- * Redacts attendee DOB and medical conditions on thank-you page and order emails only.
+ * @param string $meta_key
+ * @return int
+ */
+function intersoccer_pv_formatted_meta_slug_display_priority($meta_key) {
+    $meta_key = (string) $meta_key;
+    if (preg_match('/^attribute_pa_/i', $meta_key)) {
+        return 40;
+    }
+    if (preg_match('/^pa_/i', $meta_key)) {
+        return 30;
+    }
+
+    return 35;
+}
+
+/**
+ * Stored meta_key strings that represent the human facet for a registry attribute slug.
  *
- * Does NOT affect admin order screens, My Account, or reports-rosters raw meta reads.
+ * @param string $slug Registry slug (bare, not pa_*).
+ * @return array<int,string>
+ */
+function intersoccer_pv_stored_human_meta_keys_for_attr_slug($slug) {
+    $slug = (string) $slug;
+    if ($slug === '' || !function_exists('intersoccer_attr_registry')) {
+        return [];
+    }
+
+    $registry = intersoccer_attr_registry();
+    if (!isset($registry[$slug]) || !is_array($registry[$slug])) {
+        return [];
+    }
+
+    $def = $registry[$slug];
+    $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+    $keys = [];
+    if ($label !== '') {
+        $keys[] = $label;
+        if (function_exists('intersoccer_pv_order_item_meta_canonical_key_variants')) {
+            $keys = array_merge($keys, intersoccer_pv_order_item_meta_canonical_key_variants($label));
+        }
+    }
+    foreach ($def['legacy_order_meta_labels'] ?? [] as $legacy) {
+        $legacy = (string) $legacy;
+        if ($legacy !== '') {
+            $keys[] = $legacy;
+        }
+    }
+
+    return array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+}
+
+/**
+ * Slug-side meta keys for one registry attribute (including legacy aliases).
  *
- * @param array<int,object> $formatted_meta Array of formatted meta objects.
- * @param WC_Order_Item     $item           Order item.
+ * @param string $slug
+ * @return array<int,string>
+ */
+function intersoccer_pv_slug_side_meta_keys_for_attr_slug($slug) {
+    $slug = (string) $slug;
+    if ($slug === '' || !function_exists('intersoccer_attr_registry')) {
+        return [];
+    }
+
+    $registry = intersoccer_attr_registry();
+    if (!isset($registry[$slug]) || !is_array($registry[$slug])) {
+        return [];
+    }
+
+    $def = $registry[$slug];
+    $keys = [];
+    if (function_exists('intersoccer_attr_taxonomy')) {
+        $keys[] = (string) intersoccer_attr_taxonomy($slug);
+    }
+    if (function_exists('intersoccer_attr_resolve_meta_key')) {
+        $keys[] = (string) intersoccer_attr_resolve_meta_key($slug);
+    }
+    foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+        $keys[] = (string) $alias;
+    }
+    foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+        $keys[] = (string) $legacy_key;
+    }
+    if ($slug === 'girls-only') {
+        $keys[] = 'girls_only';
+    }
+
+    return array_values(array_unique(array_filter($keys, static function ($key) {
+        return is_string($key) && $key !== '';
+    })));
+}
+
+/**
+ * @param array<string,true> $keys_present
+ * @param string             $slug
+ * @return bool
+ */
+function intersoccer_pv_formatted_meta_has_human_facet_key(array $keys_present, $slug) {
+    foreach (intersoccer_pv_stored_human_meta_keys_for_attr_slug($slug) as $human_key) {
+        if (isset($keys_present[$human_key])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Hide pa_* / attribute_pa_* display rows when a readable stored label row remains (display only).
+ *
+ * @param array<int|mixed,object> $formatted_meta
+ * @return array<int|mixed,object>
+ */
+function intersoccer_pv_dedupe_taxonomy_attribute_formatted_meta(array $formatted_meta) {
+    if ($formatted_meta === []) {
+        return $formatted_meta;
+    }
+
+    $keys_present = [];
+    foreach ($formatted_meta as $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $keys_present[(string) ($meta->key ?? '')] = true;
+    }
+
+    if (function_exists('intersoccer_attr_registry')) {
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            if (!intersoccer_pv_formatted_meta_has_human_facet_key($keys_present, (string) $slug)) {
+                continue;
+            }
+            $hide_keys = array_flip(intersoccer_pv_slug_side_meta_keys_for_attr_slug((string) $slug));
+            foreach ($formatted_meta as $meta_id => $meta) {
+                if (!is_object($meta)) {
+                    continue;
+                }
+                $key = (string) ($meta->key ?? '');
+                if ($key !== '' && isset($hide_keys[$key])) {
+                    unset($formatted_meta[$meta_id]);
+                }
+            }
+        }
+    }
+
+    $by_label = [];
+    foreach ($formatted_meta as $meta_id => $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $display_key = isset($meta->display_key) ? (string) $meta->display_key : '';
+        $label = strtolower(trim($display_key));
+        if ($label === '') {
+            continue;
+        }
+        $by_label[$label][] = $meta_id;
+    }
+
+    foreach ($by_label as $meta_ids) {
+        if (count($meta_ids) <= 1) {
+            continue;
+        }
+
+        $non_slug_ids = [];
+        $slug_ids = [];
+        foreach ($meta_ids as $meta_id) {
+            $meta = $formatted_meta[$meta_id] ?? null;
+            if (!is_object($meta)) {
+                continue;
+            }
+            $key = isset($meta->key) ? (string) $meta->key : '';
+            if (intersoccer_pv_is_hidden_slug_attribute_meta_key($key)) {
+                $slug_ids[] = $meta_id;
+            } else {
+                $non_slug_ids[] = $meta_id;
+            }
+        }
+
+        if ($non_slug_ids !== []) {
+            foreach ($slug_ids as $slug_id) {
+                unset($formatted_meta[$slug_id]);
+            }
+            continue;
+        }
+
+        if (count($slug_ids) <= 1) {
+            continue;
+        }
+
+        $keep_id = null;
+        $keep_priority = PHP_INT_MAX;
+        foreach ($slug_ids as $slug_id) {
+            $key = (string) ($formatted_meta[$slug_id]->key ?? '');
+            $priority = intersoccer_pv_formatted_meta_slug_display_priority($key);
+            if ($priority < $keep_priority) {
+                $keep_priority = $priority;
+                $keep_id = $slug_id;
+            }
+        }
+
+        if ($keep_id === null) {
+            continue;
+        }
+
+        foreach ($slug_ids as $slug_id) {
+            if ($slug_id !== $keep_id) {
+                unset($formatted_meta[$slug_id]);
+            }
+        }
+    }
+
+    return $formatted_meta;
+}
+
+/**
+ * @param array<int|mixed,object> $formatted_meta
+ * @param mixed                   $item
+ * @return array<int|mixed,object>
+ */
+function intersoccer_pv_filter_dedupe_taxonomy_attribute_formatted_meta($formatted_meta, $item) {
+    unset($item);
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+
+    return intersoccer_pv_dedupe_taxonomy_attribute_formatted_meta($formatted_meta);
+}
+
+/**
+ * Resolve pa_* taxonomy from a slug-side order-item meta key.
+ *
+ * @param string $meta_key
+ * @return string Taxonomy name (pa_*) or empty.
+ */
+function intersoccer_pv_taxonomy_from_slug_meta_key($meta_key) {
+    $meta_key = (string) $meta_key;
+    if ($meta_key === '') {
+        return '';
+    }
+
+    if ($meta_key === 'girls_only' && function_exists('intersoccer_attr_taxonomy')) {
+        return (string) intersoccer_attr_taxonomy('girls-only');
+    }
+
+    if (preg_match('/^attribute_(pa_.+)$/i', $meta_key, $matches)) {
+        return (string) $matches[1];
+    }
+
+    if (preg_match('/^pa_/i', $meta_key)) {
+        return $meta_key;
+    }
+
+    if (function_exists('intersoccer_attr_registry') && function_exists('intersoccer_attr_taxonomy')) {
+        foreach (intersoccer_attr_registry() as $slug => $def) {
+            if (!is_array($def)) {
+                continue;
+            }
+            foreach ($def['legacy_taxonomy_aliases'] ?? [] as $alias) {
+                if ((string) $alias === $meta_key) {
+                    return (string) intersoccer_attr_taxonomy($slug);
+                }
+            }
+            foreach ($def['legacy_meta_keys'] ?? [] as $legacy_key) {
+                if ((string) $legacy_key !== $meta_key) {
+                    continue;
+                }
+                if (preg_match('/^attribute_(pa_.+)$/i', (string) $legacy_key, $matches)) {
+                    return (string) $matches[1];
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * WPML/current language code for term label resolution.
+ *
+ * @return string
+ */
+function intersoccer_pv_wpml_current_language_code() {
+    if (defined('ICL_LANGUAGE_CODE') && ICL_LANGUAGE_CODE) {
+        return (string) ICL_LANGUAGE_CODE;
+    }
+
+    $lang = apply_filters('wpml_current_language', null);
+
+    return is_string($lang) ? trim($lang) : '';
+}
+
+/**
+ * Readable term name for a taxonomy slug in the current language (falls back to stored slug).
+ *
+ * @param string $taxonomy pa_* taxonomy.
+ * @param string $term_slug Term slug stored on the line item.
+ * @return string
+ */
+function intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $term_slug) {
+    $taxonomy = (string) $taxonomy;
+    $term_slug = trim((string) $term_slug);
+    if ($taxonomy === '' || $term_slug === '') {
+        return $term_slug;
+    }
+
+    if (!function_exists('get_term_by')) {
+        return $term_slug;
+    }
+
+    $term = get_term_by('slug', $term_slug, $taxonomy);
+    if (!$term || is_wp_error($term)) {
+        return $term_slug;
+    }
+
+    $name = isset($term->name) ? (string) $term->name : $term_slug;
+    $lang = intersoccer_pv_wpml_current_language_code();
+    if ($lang !== '' && function_exists('icl_object_id')) {
+        $translated_id = icl_object_id((int) $term->term_id, $taxonomy, false, $lang);
+        if ($translated_id && (int) $translated_id !== (int) $term->term_id && function_exists('get_term')) {
+            $translated = get_term((int) $translated_id, $taxonomy);
+            if ($translated && !is_wp_error($translated) && !empty($translated->name)) {
+                $name = (string) $translated->name;
+            }
+        }
+    }
+
+    return $name !== '' ? $name : $term_slug;
+}
+
+/**
+ * Registry taxonomy for a stored human order-meta key (canonical English label).
+ *
+ * @param string $meta_key Stored meta key or display label.
+ * @return string pa_* taxonomy or empty.
+ */
+function intersoccer_pv_taxonomy_for_stored_order_meta_key($meta_key) {
+    $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+        ? intersoccer_pv_canonical_stored_order_meta_key((string) $meta_key)
+        : (string) $meta_key;
+    if ($canonical === '' || !function_exists('intersoccer_attr_registry')) {
+        return '';
+    }
+
+    foreach (intersoccer_attr_registry() as $slug => $def) {
+        if (!is_array($def)) {
+            continue;
+        }
+        $label = isset($def['order_meta_label']) ? (string) $def['order_meta_label'] : '';
+        if ($label === $canonical) {
+            return function_exists('intersoccer_attr_taxonomy') ? (string) intersoccer_attr_taxonomy($slug) : '';
+        }
+        foreach ($def['legacy_order_meta_labels'] ?? [] as $legacy) {
+            if ((string) $legacy === $canonical) {
+                return function_exists('intersoccer_attr_taxonomy') ? (string) intersoccer_attr_taxonomy($slug) : '';
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * When WCML rewrote a human facet value to a term slug, show the localized term name.
+ *
+ * @param mixed  $value    Stored meta value.
+ * @param string $meta_key Meta key.
+ * @return mixed
+ */
+function intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key) {
+    if (!intersoccer_is_customer_order_meta_display_context()) {
+        return $value;
+    }
+
+    $text = is_scalar($value) ? trim((string) $value) : '';
+    if ($text === '' || !function_exists('get_term_by')) {
+        return $value;
+    }
+
+    $taxonomy = intersoccer_pv_taxonomy_for_stored_order_meta_key($meta_key);
+    if ($taxonomy === '') {
+        return $value;
+    }
+
+    $term = get_term_by('slug', $text, $taxonomy);
+    if (!$term || is_wp_error($term) || (string) $term->slug !== $text) {
+        return $value;
+    }
+
+    $readable = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $text);
+
+    return $readable !== '' ? $readable : $value;
+}
+
+/**
+ * @param array<string,true> $keys_present
+ * @param string             $slug_meta_key
+ * @return bool
+ */
+function intersoccer_pv_customer_should_synthesize_readable_slug_attribute_row(array $keys_present, $slug_meta_key) {
+    if (!intersoccer_pv_is_hidden_slug_attribute_meta_key($slug_meta_key)) {
+        return false;
+    }
+
+    $taxonomy = intersoccer_pv_taxonomy_from_slug_meta_key($slug_meta_key);
+    if ($taxonomy === '' || !function_exists('intersoccer_attr_slug_from_taxonomy')) {
+        return false;
+    }
+
+    $slug = intersoccer_attr_slug_from_taxonomy($taxonomy);
+    if ($slug === null || $slug === '') {
+        return false;
+    }
+
+    return !intersoccer_pv_formatted_meta_has_human_facet_key($keys_present, $slug);
+}
+
+/**
+ * Build a customer-facing formatted-meta row for a slug-only attribute line.
+ *
+ * @param object              $meta Slug-side formatted meta object.
+ * @param WC_Order_Item_Product $item Order line item.
+ * @return object|null
+ */
+function intersoccer_pv_build_customer_readable_slug_attribute_formatted_meta($meta, $item) {
+    unset($item);
+    if (!is_object($meta)) {
+        return null;
+    }
+
+    $meta_key = (string) ($meta->key ?? '');
+    $taxonomy = intersoccer_pv_taxonomy_from_slug_meta_key($meta_key);
+    if ($taxonomy === '') {
+        return null;
+    }
+
+    $registry_label = function_exists('intersoccer_attr_order_meta_label_for_taxonomy')
+        ? (string) intersoccer_attr_order_meta_label_for_taxonomy($taxonomy)
+        : '';
+    if ($registry_label === '' && function_exists('wc_attribute_label')) {
+        $registry_label = (string) wc_attribute_label($taxonomy);
+    }
+    if ($registry_label === '') {
+        return null;
+    }
+
+    $stored_slug = isset($meta->value) ? (string) $meta->value : '';
+    $readable_value = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $stored_slug);
+    $display_key = intersoccer_translate_stored_order_meta_display_key($registry_label, $registry_label);
+
+    $out = clone $meta;
+    $out->display_key = $display_key;
+    $out->value = $readable_value;
+    if (isset($out->display_value)) {
+        $out->display_value = $readable_value;
+    }
+
+    return $out;
+}
+
+/**
+ * Dedupe customer-facing formatted meta (e.g. legacy assigned_attendee + Assigned Attendee).
+ *
+ * @param array<int,object> $formatted_meta
  * @return array<int,object>
  */
+function intersoccer_pv_dedupe_customer_order_formatted_meta(array $formatted_meta) {
+    $seen_canonical = [];
+    $out = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        $canonical = function_exists('intersoccer_pv_canonical_stored_order_meta_key')
+            ? intersoccer_pv_canonical_stored_order_meta_key($key)
+            : $key;
+        if ($canonical === 'Assigned Attendee') {
+            if (isset($seen_canonical[$canonical])) {
+                continue;
+            }
+            $seen_canonical[$canonical] = true;
+        }
+        $out[] = $meta;
+    }
+
+    return $out;
+}
+
+/**
+ * Hide underscore-prefixed internal keys in admin order item meta (display only).
+ *
+ * @param array<int,object> $formatted_meta
+ * @param WC_Order_Item     $item
+ * @return array<int,object>
+ */
+function intersoccer_pv_filter_admin_order_item_formatted_meta($formatted_meta, $item) {
+    if (!is_array($formatted_meta)) {
+        return $formatted_meta;
+    }
+    if (!is_admin()
+        || intersoccer_is_sensitive_order_meta_email_context()
+        || (function_exists('intersoccer_is_customer_order_meta_display_context')
+            && intersoccer_is_customer_order_meta_display_context())
+        || (function_exists('wp_doing_ajax') && wp_doing_ajax())) {
+        return $formatted_meta;
+    }
+
+    $filtered = [];
+    foreach ($formatted_meta as $meta) {
+        $key = isset($meta->key) ? (string) $meta->key : '';
+        if ($key !== '' && $key[0] === '_') {
+            continue;
+        }
+        $filtered[] = $meta;
+    }
+
+    return $filtered;
+}
+
+/**
+ * Register internal order-line keys with WooCommerce admin hidden meta list.
+ *
+ * @param array<int,string> $hidden
+ * @return array<int,string>
+ */
+function intersoccer_pv_admin_hidden_order_itemmeta($hidden) {
+    $extra = function_exists('intersoccer_canonical_order_meta_keys')
+        ? intersoccer_canonical_order_meta_keys()
+        : [];
+    $extra = array_merge($extra, [
+        '_intersoccer_discount_season_key',
+        '_intersoccer_total_item_discount',
+        '_intersoccer_item_discounts',
+        '_camp_start_date',
+        '_camp_end_date',
+        '_camp_week_index',
+        '_assigned_player',
+        '_assigned_player_id',
+    ]);
+
+    return array_values(array_unique(array_merge($hidden, $extra)));
+}
+
 function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
     if (!is_array($formatted_meta)) {
         return $formatted_meta;
@@ -2147,22 +3976,59 @@ function intersoccer_filter_customer_order_item_meta($formatted_meta, $item) {
         return $formatted_meta;
     }
 
+    $keys_present = [];
+    foreach ($formatted_meta as $meta) {
+        if (!is_object($meta)) {
+            continue;
+        }
+        $present_key = (string) ($meta->key ?? '');
+        if ($present_key !== '') {
+            $keys_present[$present_key] = true;
+        }
+    }
+
     $filtered = [];
     foreach ($formatted_meta as $meta) {
         $key = isset($meta->key) ? (string) $meta->key : '';
         if ($key === '' || intersoccer_is_hidden_customer_order_meta_key($key)) {
+            if ($key !== ''
+                && intersoccer_pv_customer_should_synthesize_readable_slug_attribute_row($keys_present, $key)) {
+                $readable = intersoccer_pv_build_customer_readable_slug_attribute_formatted_meta($meta, $item);
+                if ($readable !== null) {
+                    $filtered[] = $readable;
+                }
+            }
+            continue;
+        }
+        if (intersoccer_pv_should_hide_duplicate_player_dob_meta_key($key, $item)) {
+            continue;
+        }
+        if (intersoccer_pv_should_hide_duplicate_player_medical_meta_key($key, $item, $keys_present)) {
             continue;
         }
         $filtered[] = $meta;
+    }
+
+    $filtered = intersoccer_pv_dedupe_customer_order_formatted_meta($filtered);
+    if ($item instanceof WC_Order_Item_Product) {
+        $filtered = intersoccer_pv_normalize_frde_course_day_meta_position($filtered, $item);
     }
 
     if (intersoccer_should_mask_sensitive_order_item_meta()) {
         $filtered = intersoccer_redact_sensitive_order_item_formatted_meta($filtered, $item);
     }
 
-    return $filtered;
+    $translated = [];
+    foreach ($filtered as $meta) {
+        $translated[] = intersoccer_translate_order_item_formatted_meta_object($meta);
+    }
+
+    return $translated;
 }
 
+add_filter('woocommerce_hidden_order_itemmeta', 'intersoccer_pv_admin_hidden_order_itemmeta', 20);
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_pv_filter_admin_order_item_formatted_meta', 5, 2);
+add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_pv_filter_dedupe_taxonomy_attribute_formatted_meta', 10, 2);
 add_filter('woocommerce_order_item_get_formatted_meta_data', 'intersoccer_filter_customer_order_item_meta', 10, 2);
 add_action('woocommerce_email_before_order_table', 'intersoccer_sensitive_order_meta_begin_email_context', 0, 4);
 add_action('woocommerce_email_after_order_table', 'intersoccer_sensitive_order_meta_end_email_context', 9999, 4);

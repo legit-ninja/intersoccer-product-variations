@@ -27,42 +27,44 @@ if ! command -v msgfmt &> /dev/null; then
     exit 1
 fi
 
-# Check if languages directory exists
-if [ ! -d "languages" ]; then
-    echo -e "${YELLOW}⚠️  No languages directory found${NC}"
+LANG_DIR="lang"
+if [ ! -d "$LANG_DIR" ]; then
+    echo -e "${YELLOW}⚠️  No lang directory found${NC}"
     echo "Nothing to compile."
     exit 0
 fi
 
-cd languages
+cd "$LANG_DIR"
 
-# Count .po files
-PO_COUNT=$(ls -1 *.po 2>/dev/null | wc -l)
-if [ $PO_COUNT -eq 0 ]; then
-    echo -e "${YELLOW}⚠️  No .po files found${NC}"
-    echo "Nothing to compile."
-    exit 0
-fi
+PO_FILES=(
+    intersoccer-product-variations-fr.po
+    intersoccer-product-variations-fr_FR.po
+    intersoccer-product-variations-de.po
+    intersoccer-product-variations-de_DE.po
+)
 
-echo "Found $PO_COUNT translation file(s)"
+echo "Compiling ${#PO_FILES[@]} translation file(s)"
 echo ""
 
 COMPILED=0
 ERRORS=0
 
-# Compile each .po file
-for po_file in *.po; do
+for po_file in "${PO_FILES[@]}"; do
+    if [ ! -f "$po_file" ]; then
+        echo -e "${YELLOW}⚠️  Skipping missing $po_file${NC}"
+        continue
+    fi
     mo_file="${po_file%.po}.mo"
-    
+
     echo -n "Compiling $po_file → $mo_file ... "
-    
+
     if msgfmt -o "$mo_file" "$po_file" 2>/dev/null; then
         echo -e "${GREEN}✓${NC}"
         COMPILED=$((COMPILED + 1))
     else
         echo -e "${RED}✗ FAILED${NC}"
         echo "  Error compiling $po_file"
-        msgfmt -o "$mo_file" "$po_file"  # Show error
+        msgfmt -o "$mo_file" "$po_file"
         ERRORS=$((ERRORS + 1))
     fi
 done
@@ -75,7 +77,7 @@ if [ $ERRORS -eq 0 ]; then
     echo -e "${GREEN}✅ Successfully compiled $COMPILED translation file(s)${NC}"
     echo ""
     echo "Generated files:"
-    ls -lh *.mo 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+    ls -lh intersoccer-product-variations-*.mo 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
     echo ""
     echo "These files will be included in the next deployment."
     echo ""
@@ -86,4 +88,3 @@ else
     echo "Fix the .po file syntax errors and try again."
     exit 1
 fi
-
