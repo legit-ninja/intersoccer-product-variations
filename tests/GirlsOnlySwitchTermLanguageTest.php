@@ -115,6 +115,7 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
             'EN label Full Week' => ['Full Week'],
             'FR slug semaine-complete' => ['semaine-complete'],
             'FR label Semaine complète' => ['Semaine complète'],
+            'FR label semaine complète (lowercase)' => ['semaine complète'],
             'DE slug ganze-woche' => ['ganze-woche'],
             'DE label Ganze Woche' => ['Ganze Woche'],
         ];
@@ -151,12 +152,26 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
             'EN slug single-days' => ['single-days'],
             'DE slug einzelner-tage' => ['einzelner-tage'],
             'FR slug a-la-journee' => ['a-la-journee'],
+            'FR label À la journée' => ['À la journée'],
+            'FR label Journée' => ['Journée'],
         ];
     }
 
     #[DataProvider('singleDaysValues')]
     public function test_canonical_booking_type_single_days($raw) {
         $this->assertSame('single-days', intersoccer_normalize_canonical_booking_type($raw),
+            "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
+    }
+
+    public static function fullTermValues(): array {
+        return [
+            'FR label Trimestre complet' => ['Trimestre complet'],
+        ];
+    }
+
+    #[DataProvider('fullTermValues')]
+    public function test_canonical_booking_type_full_term($raw) {
+        $this->assertSame('full-term', intersoccer_normalize_canonical_booking_type($raw),
             "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
     }
 }
