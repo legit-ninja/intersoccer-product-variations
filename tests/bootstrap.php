@@ -423,6 +423,10 @@ if (!function_exists('date_i18n')) {
         if ($timestamp === false) {
             $timestamp = time();
         }
+        if (!empty($GLOBALS['intersoccer_test_date_i18n_override'])
+            && is_callable($GLOBALS['intersoccer_test_date_i18n_override'])) {
+            return $GLOBALS['intersoccer_test_date_i18n_override']($format, $timestamp, $gmt);
+        }
         return date($format, (int) $timestamp);
     }
 }

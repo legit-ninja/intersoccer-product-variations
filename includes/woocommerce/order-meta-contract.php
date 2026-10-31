@@ -2379,7 +2379,7 @@ function intersoccer_pv_format_order_line_date_for_storage($date) {
         return $date;
     }
 
-    return date_i18n(intersoccer_pv_order_line_date_format_for_storage(), $ts);
+    return date(intersoccer_pv_order_line_date_format_for_storage(), $ts);
 }
 
 /**
