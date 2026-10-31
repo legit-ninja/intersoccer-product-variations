@@ -29,7 +29,8 @@ function intersoccer_express_gate_body_class_name() {
 
 /**
  * Stripe containers to hide while a player is missing.
- * Covers the current Express Checkout Element and the older Payment Request button.
+ * WooCommerce Stripe Gateway (woocommerce-gateway-stripe): Express Checkout Element
+ * and legacy Payment Request button markup only.
  *
  * @return string[]
  */
@@ -39,7 +40,6 @@ function intersoccer_express_gate_selectors() {
         '#wc-stripe-express-checkout-button-separator',
         '#wc-stripe-payment-request-wrapper',
         '#wc-stripe-payment-request-button-separator',
-        '.wc-stripe-product-checkout-container',
     ];
 }
 
@@ -83,6 +83,12 @@ function intersoccer_express_gate_body_class($classes) {
  * can leave the buttons blank or unmounted. The rule sits on body, so it also
  * covers a container Stripe renders or re-mounts later.
  *
+ * Plain specificity only: body class + ID outranks Stripe's own ID rules.
+ * Stripe's inline margin-top cannot be overridden without an important flag. While
+ * hidden, the container is out of the document flow (position: absolute),
+ * positioned against the nearest positioned ancestor, with left and right 0
+ * so it does not cause sideways scroll; that margin then pushes nothing.
+ *
  * @return string
  */
 function intersoccer_express_gate_css() {
@@ -95,14 +101,16 @@ function intersoccer_express_gate_css() {
         }
     }
     return implode(",\n", $selectors) . " {\n"
-        . "    visibility: hidden !important;\n"
-        . "    opacity: 0 !important;\n"
-        . "    pointer-events: none !important;\n"
-        . "    height: 0 !important;\n"
-        . "    min-height: 0 !important;\n"
-        . "    margin: 0 !important;\n"
-        . "    padding: 0 !important;\n"
-        . "    overflow: hidden !important;\n"
+        . "    position: absolute;\n"
+        . "    left: 0;\n"
+        . "    right: 0;\n"
+        . "    visibility: hidden;\n"
+        . "    opacity: 0;\n"
+        . "    pointer-events: none;\n"
+        . "    height: 0;\n"
+        . "    min-height: 0;\n"
+        . "    padding: 0;\n"
+        . "    overflow: hidden;\n"
         . "}\n";
 }
 
