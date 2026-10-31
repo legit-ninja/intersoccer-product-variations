@@ -27,12 +27,12 @@ class TextdomainLoadPathTest extends TestCase
 
     public function test_load_plugin_textdomain_relative_path_matches_lang(): void
     {
-        $plugin_file = dirname(__DIR__) . '/intersoccer-product-variations.php';
-        $contents = file_get_contents($plugin_file);
+        $textdomain_file = dirname(__DIR__) . '/includes/pv-textdomain.php';
+        $contents = file_get_contents($textdomain_file);
         $this->assertIsString($contents);
 
         $this->assertStringContainsString(
-            "dirname(plugin_basename(__FILE__)) . '/lang'",
+            "dirname(plugin_basename(INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'intersoccer-product-variations.php')) . '/lang'",
             $contents,
             'load_plugin_textdomain should load from the lang subdirectory'
         );

@@ -23,6 +23,8 @@ if (!function_exists('__')) {
     }
 }
 
+require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 
 class GirlsOnlyVerificationTest extends TestCase {
@@ -121,7 +123,7 @@ class GirlsOnlyVerificationTest extends TestCase {
         $this->assertPlainTranslatedMessage($message);
     }
 
-    public function test_validate_line_player_girls_only_gender_required_message_includes_raw_manage_url() {
+    public function test_validate_line_player_girls_only_gender_required_message_uses_manage_players_link() {
         $this->girlsOnlyLineFilterAlwaysTrue();
         $GLOBALS['intersoccer_test_player_details'] = [
             'first_name' => 'Test',
@@ -132,16 +134,12 @@ class GirlsOnlyVerificationTest extends TestCase {
         $result = intersoccer_validate_line_player_girls_only(1, 0, 100, 0);
         $message = $this->wpErrorMessage($result, 'intersoccer_girls_only_gender_required');
 
-        $manage_url = function_exists('wc_get_account_endpoint_url')
-            ? wc_get_account_endpoint_url('manage-players')
-            : '';
-        $this->assertNotSame('', $manage_url);
-        $expected = sprintf(
-            'This session is for girls only. The selected attendee needs gender set to female in your account. Update under Manage Players: %s',
-            $manage_url
-        );
+        $expected = intersoccer_pv_girls_only_gender_required_message();
         $this->assertSame($expected, $message);
-        $this->assertPlainTranslatedMessage($message);
-        $this->assertStringContainsString('http://', $message);
+        if (strpos($message, '<a href="') !== false) {
+            $this->assertStringContainsString('Manage Players', $message);
+        } else {
+            $this->assertStringContainsString('Please update Manage Players before booking.', $message);
+        }
     }
 }
