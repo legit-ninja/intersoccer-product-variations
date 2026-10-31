@@ -172,20 +172,21 @@ class CourseInfoAjaxTest extends TestCase {
         $this->assertArrayHasKey('holidays', $data, 'Response must include holidays array');
 
         // Verify values
-        $this->assertTrue($data['is_course']);
-        $this->assertEquals('January 6, 2025', $data['start_date']);
+        $this->assertEquals('2025-01-06', $data['start_date']);
+        $this->assertArrayHasKey('start_date_display', $data);
+        $this->assertSame('6 January 2025', $data['start_date_display']);
         $this->assertArrayHasKey('end_date', $data);
         $this->assertIsString($data['end_date'], 'end_date must be a string (may be empty without WC schedule context)');
         $this->assertEquals(12, $data['total_weeks']);
         $this->assertIsInt($data['remaining_sessions']);
         $this->assertGreaterThanOrEqual(0, $data['remaining_sessions']);
-        $this->assertIsArray($data['holidays']);
-        $this->assertCount(3, $data['holidays'], 'Should return 3 formatted holidays');
-        
-        // Verify holidays are formatted correctly
-        $this->assertEquals('February 17, 2025', $data['holidays'][0]);
-        $this->assertEquals('March 24, 2025', $data['holidays'][1]);
-        $this->assertEquals('April 21, 2025', $data['holidays'][2]);
+        $this->assertCount(3, $data['holidays'], 'Should return 3 ISO holidays');
+        $this->assertSame(['2025-02-17', '2025-03-24', '2025-04-21'], $data['holidays']);
+        $this->assertArrayHasKey('holidays_display', $data);
+        $this->assertCount(3, $data['holidays_display']);
+        $this->assertSame('17 February 2025', $data['holidays_display'][0]);
+        $this->assertSame('24 March 2025', $data['holidays_display'][1]);
+        $this->assertSame('21 April 2025', $data['holidays_display'][2]);
     }
 
     /**
@@ -350,8 +351,9 @@ class CourseInfoAjaxTest extends TestCase {
         // Should still process valid dates
         $this->assertArrayHasKey('holidays', $data);
         $this->assertIsArray($data['holidays']);
-        // All dates should be formatted (invalid one returns as-is per current logic)
-        $this->assertCount(3, $data['holidays']);
+        $this->assertCount(2, $data['holidays']);
+        $this->assertSame(['2025-02-17', '2025-03-24'], $data['holidays']);
+        $this->assertCount(2, $data['holidays_display']);
     }
 
     /**

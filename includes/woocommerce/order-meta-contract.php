@@ -2354,21 +2354,16 @@ function intersoccer_pv_customer_display_date_format_msgid() {
 }
 
 /**
- * date_i18n format for persisting course order-line dates (EN keeps legacy US-style storage).
+ * English storage format for order-line course dates (all checkout locales).
  *
  * @return string
  */
 function intersoccer_pv_order_line_date_format_for_storage() {
-    if (function_exists('intersoccer_pv_is_fr_de_customer_text_locale')
-        && intersoccer_pv_is_fr_de_customer_text_locale()) {
-        return intersoccer_pv_customer_display_date_format_msgid();
-    }
-
     return 'F j, Y';
 }
 
 /**
- * Format a Y-m-d (or parseable) course date for order meta / customer-facing payloads.
+ * Format a Y-m-d course meta value for English order-line storage.
  *
  * @param string $date Raw date from variation meta.
  * @return string
@@ -2388,28 +2383,82 @@ function intersoccer_pv_format_order_line_date_for_storage($date) {
 }
 
 /**
- * Course product-page dates: WP date_format for EN, locale order-line format for FR/DE.
+ * Customer-facing course/order date from canonical Y-m-d (display helper only).
  *
- * @param string $date Y-m-d from variation meta.
+ * @param string $ymd Date in Y-m-d form.
  * @return string
  */
-function intersoccer_pv_format_course_product_page_date($date) {
-    $date = trim((string) $date);
-    if ($date === '') {
-        return '';
+function intersoccer_pv_format_ymd_for_customer_display($ymd) {
+    $ymd = trim((string) $ymd);
+    if ($ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+        return $ymd;
     }
 
-    if (function_exists('intersoccer_pv_is_fr_de_customer_text_locale')
-        && intersoccer_pv_is_fr_de_customer_text_locale()) {
-        return intersoccer_pv_format_order_line_date_for_storage($date);
-    }
-
-    $ts = strtotime($date);
+    $ts = strtotime($ymd);
     if ($ts === false) {
-        return $date;
+        return $ymd;
     }
 
-    return date_i18n(get_option('date_format'), $ts);
+    return date_i18n(intersoccer_pv_customer_display_date_format_msgid(), $ts);
+}
+
+/**
+ * ISO + localized display strings for a course date field (variation/AJAX/cart payloads).
+ *
+ * @param string $ymd Date in Y-m-d form.
+ * @return array{iso:string,display:string}
+ */
+function intersoccer_pv_course_customer_date_fields($ymd) {
+    $ymd = trim((string) $ymd);
+    if ($ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+        return ['iso' => '', 'display' => ''];
+    }
+
+    return [
+        'iso' => $ymd,
+        'display' => intersoccer_pv_format_ymd_for_customer_display($ymd),
+    ];
+}
+
+/**
+ * ISO + display lists for course holiday payloads.
+ *
+ * @param array<int,mixed> $holiday_ymds
+ * @return array{isos:array<int,string>,displays:array<int,string>}
+ */
+function intersoccer_pv_course_holiday_customer_date_lists(array $holiday_ymds) {
+    $isos = [];
+    $displays = [];
+    foreach ($holiday_ymds as $holiday) {
+        $holiday = trim((string) $holiday);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
+            continue;
+        }
+        $isos[] = $holiday;
+        $displays[] = intersoccer_pv_format_ymd_for_customer_display($holiday);
+    }
+
+    return ['isos' => $isos, 'displays' => $displays];
+}
+
+/**
+ * Add ISO + display course date fields to an AJAX/cart payload.
+ *
+ * @param array<string,mixed> $target     Payload (by reference).
+ * @param string              $start_ymd  Start Y-m-d.
+ * @param string              $end_ymd    End Y-m-d.
+ * @param array<int,mixed>      $holidays   Holiday Y-m-d list.
+ */
+function intersoccer_pv_merge_course_date_response_fields(array &$target, $start_ymd, $end_ymd, array $holidays) {
+    $start = intersoccer_pv_course_customer_date_fields($start_ymd);
+    $target['start_date'] = $start['iso'];
+    $target['start_date_display'] = $start['display'];
+    $end = intersoccer_pv_course_customer_date_fields($end_ymd);
+    $target['end_date'] = $end['iso'];
+    $target['end_date_display'] = $end['display'];
+    $lists = intersoccer_pv_course_holiday_customer_date_lists($holidays);
+    $target['holidays'] = $lists['isos'];
+    $target['holidays_display'] = $lists['displays'];
 }
 
 /**
@@ -2473,9 +2522,11 @@ function intersoccer_pv_parse_stored_order_date_to_timestamp($text) {
         }
     }
 
-    if (preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $text, $m)) {
-        $ts = strtotime($m[1] . ' ' . $m[2] . ', ' . $m[3]);
-        return $ts !== false ? $ts : false;
+    if (preg_match('/^(\p{L}+)\s+(\d{1,2}),\s+(\d{4})$/u', $text, $m)) {
+        $month = intersoccer_pv_localized_order_date_month_map()[function_exists('mb_strtolower') ? mb_strtolower($m[1], 'UTF-8') : strtolower($m[1])] ?? 0;
+        if ($month > 0) {
+            return mktime(0, 0, 0, $month, (int) $m[2], (int) $m[3]);
+        }
     }
 
     $ts = strtotime($text);
@@ -2507,7 +2558,7 @@ function intersoccer_pv_format_stored_order_date_for_display($text) {
  * @return string
  */
 function intersoccer_pv_stored_english_order_date_token_pattern() {
-    return '/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}|\d{1,2}\.?\s+\p{L}+\s+\d{4}|\d{4}-\d{2}-\d{2}/u';
+    return '/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}|\p{L}+\s+\d{1,2},\s+\d{4}|\d{1,2}\.?\s+\p{L}+\s+\d{4}|\d{4}-\d{2}-\d{2}/u';
 }
 
 /**

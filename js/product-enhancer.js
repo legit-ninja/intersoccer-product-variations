@@ -472,14 +472,18 @@
             }
 
             let html = '<div class="intersoccer-course-details">';
+            const courseDateLabel = (iso, display) => (display || iso || '');
             if (courseData.start_date) {
-                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${courseData.start_date}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${courseDateLabel(courseData.start_date, courseData.start_date_display)}</p>`;
             }
             if (courseData.end_date) {
-                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${courseData.end_date}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${courseDateLabel(courseData.end_date, courseData.end_date_display)}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
-                const holidays = courseData.holidays.join(', ');
+                const holidayLabels = courseData.holidays_display && courseData.holidays_display.length === courseData.holidays.length
+                    ? courseData.holidays_display
+                    : courseData.holidays;
+                const holidays = holidayLabels.join(', ');
                 html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}${getLabelValueSeparator()}</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {

@@ -145,14 +145,14 @@ class CourseInfoDisplayTest extends TestCase {
         // Assertions
         $this->assertStringContainsString('Course Information', $output);
         $this->assertStringContainsString('Start Date:', $output);
-        $this->assertStringContainsString('December 1, 2025', $output); // Formatted date
+        $this->assertStringContainsString('1 December 2025', $output); // j F Y display
         $this->assertStringContainsString('Total Sessions:', $output);
         $this->assertStringContainsString('10', $output);
         // Remaining Sessions is omitted when remaining === total_weeks (see intersoccer_render_course_info).
         // Real InterSoccer_Course is loaded by bootstrap; do not assert the obsolete half-weeks mock.
         $this->assertStringContainsString('Holidays:', $output);
-        $this->assertStringContainsString('December 25, 2025', $output);
-        $this->assertStringContainsString('January 1, 2026', $output);
+        $this->assertStringContainsString('25 December 2025', $output);
+        $this->assertStringContainsString('1 January 2026', $output);
     }
 
     public function testRenderCourseInfoWithNoVariationId() {

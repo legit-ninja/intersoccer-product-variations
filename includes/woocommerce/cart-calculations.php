@@ -914,19 +914,13 @@ function intersoccer_inject_course_prorated_price($variation_data, $product, $va
     }
     
     // Inject course info into variation data
-    $variation_data['course_info'] = [
+    $course_info = [
         'is_course' => true,
-        'start_date' => $start_date ? intersoccer_pv_format_order_line_date_for_storage($start_date) : '',
-        'end_date' => $end_date ? intersoccer_pv_format_order_line_date_for_storage($end_date) : '',
         'total_weeks' => $total_weeks,
         'remaining_sessions' => $remaining_sessions,
-        'holidays' => array_map(function($holiday) {
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                return intersoccer_pv_format_order_line_date_for_storage($holiday);
-            }
-            return $holiday;
-        }, $holidays)
     ];
+    intersoccer_pv_merge_course_date_response_fields($course_info, $start_date, $end_date, $holidays);
+    $variation_data['course_info'] = $course_info;
     
     return $variation_data;
 }
