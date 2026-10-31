@@ -77,6 +77,7 @@ function intersoccer_grant_download_permissions($order_id) {
 /**
  * Helper function to get player details from user metadata
  */
+if (!function_exists('intersoccer_get_player_details')) {
 function intersoccer_get_player_details($user_id, $player_index) {
     $players = function_exists('intersoccer_get_user_players') 
         ? intersoccer_get_user_players($user_id) 
@@ -116,11 +117,12 @@ function intersoccer_get_player_details($user_id, $player_index) {
         'player_id' => '',
     ];
 }
+}
 
 /**
  * Helper function to get parent product attributes (excluding variation attributes)
  */
-function intersoccer_get_parent_product_attributes($product_id, $variation_id = null) {
+function intersoccer_get_parent_product_attributes($product_id, $variation_id = null, $order = null) {
     $parent_product = wc_get_product($product_id);
     $variation_product = $variation_id ? wc_get_product($variation_id) : null;
     
@@ -130,10 +132,18 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
         }
         return [];
     }
+
+    $display_language = function_exists('intersoccer_order_line_time_range_language')
+        ? intersoccer_order_line_time_range_language($order)
+        : (defined('ICL_LANGUAGE_CODE') ? ICL_LANGUAGE_CODE : 'en');
     
     $attributes = [];
-    $parent_attributes = $parent_product->get_attributes();
-    $variation_attributes = $variation_product ? $variation_product->get_variation_attributes() : [];
+    $parent_attributes = method_exists($parent_product, 'get_attributes')
+        ? $parent_product->get_attributes()
+        : [];
+    $variation_attributes = ($variation_product && method_exists($variation_product, 'get_variation_attributes'))
+        ? $variation_product->get_variation_attributes()
+        : [];
 
     $label_map = intersoccer_attr_order_meta_label_map();
 
@@ -198,13 +208,20 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                         if ($term && !is_wp_error($term)) {
                             $translated_name = $term->name;
                             if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
+                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, $display_language);
                                 if ($translated_term_id && $translated_term_id != $term->term_id) {
                                     $translated_term = get_term($translated_term_id, $attribute_name);
                                     if ($translated_term && !is_wp_error($translated_term)) {
                                         $translated_name = $translated_term->name;
                                     }
                                 }
+                            }
+                            if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
+                                $translated_name = intersoccer_format_order_line_time_attribute_label(
+                                    $translated_name,
+                                    $attribute_name,
+                                    $display_language
+                                );
                             }
                             $names[] = $translated_name;
                         }
@@ -217,13 +234,20 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                         if ($term && !is_wp_error($term)) {
                             $translated_name = $term->name;
                             if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
+                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, $display_language);
                                 if ($translated_term_id && $translated_term_id != $term->term_id) {
                                     $translated_term = get_term($translated_term_id, $attribute_name);
                                     if ($translated_term && !is_wp_error($translated_term)) {
                                         $translated_name = $translated_term->name;
                                     }
                                 }
+                            }
+                            if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
+                                $translated_name = intersoccer_format_order_line_time_attribute_label(
+                                    $translated_name,
+                                    $attribute_name,
+                                    $display_language
+                                );
                             }
                             $names[] = $translated_name;
                         }
@@ -258,6 +282,13 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                     $terms = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'names']);
                     if (is_array($terms) && count($terms) === 1) {
                         $value = $terms[0];
+                        if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
+                            $value = intersoccer_format_order_line_time_attribute_label(
+                                $value,
+                                $attribute_name,
+                                $display_language
+                            );
+                        }
                     } else {
                         // Skip ambiguous parent lists to avoid dumping all venues, etc.
                         if (defined('WP_DEBUG') && WP_DEBUG) {
