@@ -201,6 +201,8 @@ class ExpressCheckoutPlayerGateTest extends TestCase
     {
         $css = intersoccer_express_gate_css();
         $this->assertStringNotContainsString('!important', $css);
+        $this->assertStringNotContainsString('.wc-stripe-product-checkout-container', $css);
+        $this->assertStringNotContainsString('margin:', $css);
         // Stripe's inline margin-top can't be beaten without !important, so the hidden box leaves the flow instead.
         $this->assertStringContainsString('position: absolute', $css);
         $this->assertStringContainsString('left: 0', $css);
