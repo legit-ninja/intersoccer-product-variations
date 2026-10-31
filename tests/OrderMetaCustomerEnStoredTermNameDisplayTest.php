@@ -87,7 +87,8 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
             $GLOBALS['intersoccer_test_is_admin'],
             $GLOBALS['intersoccer_test_terms'],
             $GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'],
-            $GLOBALS['intersoccer_test_wpml_current_language']
+            $GLOBALS['intersoccer_test_wpml_current_language'],
+            $GLOBALS['intersoccer_test_get_term_by_name_case_insensitive']
         );
         MockFilters::reset();
         parent::tearDown();
@@ -143,25 +144,28 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
     }
 
     public function test_case_only_near_match_returns_stored_value_unchanged(): void {
+        $GLOBALS['intersoccer_test_get_term_by_name_case_insensitive'] = true;
         $this->setLanguage('fr');
         $stored = '5-13Y (Full Day)';
         $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+        unset($GLOBALS['intersoccer_test_get_term_by_name_case_insensitive']);
     }
 
-    public function test_fr_translated_name_when_fr_slug_differs_from_en_slug(): void {
+    public function test_fr_name_path_does_not_leak_en_slug_when_localized_slugs_differ(): void {
         $this->setLanguage('fr');
-        $this->assertSame(
-            '5-13 ans (journée complète)',
-            $this->displayValue('5-13y (Full Day)', 'Age Group')
-        );
+        $result = $this->displayValue('5-13y (Full Day)', 'Age Group');
+        $this->assertSame('5-13 ans (journée complète)', $result);
+        $this->assertNotSame('5-13y-full-day', $result);
     }
 
-    public function test_de_translated_name_when_de_slug_differs_from_en_slug(): void {
+    public function test_static_cache_returns_correct_label_per_language_in_one_request(): void {
+        $stored = '5-13y (Full Day)';
+        $this->setLanguage('fr');
+        $this->assertSame('5-13 ans (journée complète)', $this->displayValue($stored, 'Age Group'));
         $this->setLanguage('de');
-        $this->assertSame(
-            '5-13 Jahre (Ganztag)',
-            $this->displayValue('5-13y (Full Day)', 'Age Group')
-        );
+        $this->assertSame('5-13 Jahre (Ganztag)', $this->displayValue($stored, 'Age Group'));
+        $this->setLanguage('en');
+        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
     }
 
     /**

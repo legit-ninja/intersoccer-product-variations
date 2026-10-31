@@ -879,8 +879,15 @@ if (!function_exists('get_term_by')) {
                 if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
                     continue;
                 }
-                if ($field === 'name' && isset($row['name']) && (string) $row['name'] === (string) $value) {
-                    return get_term((int) $term_id, $taxonomy);
+                if ($field === 'name' && isset($row['name'])) {
+                    $stored_name = (string) $row['name'];
+                    $needle = (string) $value;
+                    $name_matches = !empty($GLOBALS['intersoccer_test_get_term_by_name_case_insensitive'])
+                        ? strcasecmp($stored_name, $needle) === 0
+                        : $stored_name === $needle;
+                    if ($name_matches) {
+                        return get_term((int) $term_id, $taxonomy);
+                    }
                 }
                 if ($field === 'slug') {
                     $slug = $row['slug'] ?? sanitize_title($row['name'] ?? '');
