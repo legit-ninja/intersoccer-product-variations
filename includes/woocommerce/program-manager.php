@@ -322,6 +322,22 @@ class InterSoccer_Program_Manager {
 			$missing[] = '_regular_price';
 		}
 
+		if ($product_type === 'camp' || $product_type === 'course') {
+			$parent_id = (int) $variation->get_parent_id();
+			$program_year = function_exists('intersoccer_get_product_program_year')
+				? intersoccer_pm_normalize_program_year((string) intersoccer_get_product_program_year($parent_id))
+				: '';
+			if ($program_year !== '' && ctype_digit($program_year)) {
+				$start_key = ($product_type === 'camp') ? '_camp_start_date' : '_course_start_date';
+				$start     = (string) get_post_meta($variation_id, $start_key, true);
+				if ($start !== '' && preg_match('/^(\d{4})-\d{2}-\d{2}$/', $start, $start_match)) {
+					if ((int) $start_match[1] < (int) $program_year) {
+						$missing[] = '_schedule_start_year_before_program_year';
+					}
+				}
+			}
+		}
+
 		return [
 			'is_healthy' => empty($missing),
 			'missing'    => $missing,
@@ -2488,7 +2504,10 @@ class InterSoccer_Program_Manager {
 				'variations_missing'     => $new_variations_count === 0,
 				'message'                => sprintf(
 					/* translators: 1: source product ID, 2: new product ID, 3: year */
-					__('Duplicated #%1$d → #%2$d (year %3$s).', 'intersoccer-product-variations'),
+					__(
+						'Duplicated #%1$d → #%2$d (year %3$s). Prices and dates were copied from the source; review camp/course dates for the new year.',
+						'intersoccer-product-variations'
+					),
 					$product_id,
 					(int) $new_id,
 					$target_year
@@ -2822,21 +2841,12 @@ class InterSoccer_Program_Manager {
 			$new_var->set_parent_id($new_id);
 			$new_var->set_attributes($source_var->get_attributes());
 			$new_var->set_status('publish');
+			self::copy_variation_prices_from_source($new_var, $source_var);
+			// Stock quantity is intentionally not copied — remaining places must not roll to a new season.
 			$new_var_id = $new_var->save();
 
 			if ($new_var_id) {
-				$late_pickup = get_post_meta($source_var_id, '_intersoccer_enable_late_pickup', true);
-				if ($late_pickup) {
-					update_post_meta($new_var_id, '_intersoccer_enable_late_pickup', $late_pickup);
-				}
-				$camp_days = get_post_meta($source_var_id, '_intersoccer_camp_days_available', true);
-				if ($camp_days) {
-					update_post_meta($new_var_id, '_intersoccer_camp_days_available', $camp_days);
-				}
-				$lp_days = get_post_meta($source_var_id, '_intersoccer_late_pickup_days_available', true);
-				if ($lp_days) {
-					update_post_meta($new_var_id, '_intersoccer_late_pickup_days_available', $lp_days);
-				}
+				self::copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $type);
 			}
 		}
 
@@ -3509,24 +3519,110 @@ class InterSoccer_Program_Manager {
 				}
 				update_post_meta($var_id, $meta_key, $value);
 			}
-			if (function_exists('intersoccer_sync_course_metadata_to_translations')) {
-				$start = (string) get_post_meta($var_id, '_course_start_date', true);
-				$weeks = (int) get_post_meta($var_id, '_course_total_weeks', true);
-				$holidays = get_post_meta($var_id, '_course_holiday_dates', true);
-				$discount = get_post_meta($var_id, '_course_weekly_discount', true);
-				$end = (string) get_post_meta($var_id, '_end_date', true);
-				intersoccer_sync_course_metadata_to_translations(
-					$var_id,
-					$start,
-					$weeks,
-					is_array($holidays) ? $holidays : [],
-					is_numeric($discount) ? (float) $discount : 0.0,
-					$end
-				);
-			}
+			self::sync_course_variation_translations_from_meta($var_id);
 		}
 
 		return $var_id;
+	}
+
+	/**
+	 * Copy regular/sale/active price from a source variation onto a new variation (before save()).
+	 *
+	 * @param WC_Product_Variation $new_var
+	 * @param WC_Product_Variation $source_var
+	 */
+	private static function copy_variation_prices_from_source($new_var, $source_var) {
+		if (!($new_var instanceof WC_Product_Variation) || !($source_var instanceof WC_Product_Variation)) {
+			return;
+		}
+
+		$regular = $source_var->get_regular_price('edit');
+		if ($regular !== '' && $regular !== null) {
+			$new_var->set_regular_price((string) $regular);
+		}
+
+		$sale = $source_var->get_sale_price('edit');
+		if ($sale !== '' && $sale !== null) {
+			$new_var->set_sale_price((string) $sale);
+			if (method_exists($source_var, 'get_date_on_sale_from')) {
+				$from = $source_var->get_date_on_sale_from('edit');
+				if ($from) {
+					$new_var->set_date_on_sale_from($from);
+				}
+			}
+			if (method_exists($source_var, 'get_date_on_sale_to')) {
+				$to = $source_var->get_date_on_sale_to('edit');
+				if ($to) {
+					$new_var->set_date_on_sale_to($to);
+				}
+			}
+		}
+
+		$active = $source_var->get_price('edit');
+		if ($active !== '' && $active !== null) {
+			$new_var->set_price((string) $active);
+		} elseif ($regular !== '' && $regular !== null) {
+			$new_var->set_price((string) $regular);
+		}
+	}
+
+	/**
+	 * Copy camp/course variation meta used by booking and Program Manager completeness.
+	 *
+	 * @param int    $new_var_id
+	 * @param int    $source_var_id
+	 * @param string $product_type
+	 */
+	private static function copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $product_type) {
+		$new_var_id     = (int) $new_var_id;
+		$source_var_id  = (int) $source_var_id;
+		$product_type   = strtolower((string) $product_type);
+
+		if ($new_var_id <= 0 || $source_var_id <= 0 || !function_exists('intersoccer_pm_duplicate_variation_meta_keys')) {
+			return;
+		}
+
+		foreach (intersoccer_pm_duplicate_variation_meta_keys($product_type) as $meta_key) {
+			$value = get_post_meta($source_var_id, $meta_key, true);
+			if ($value === '' || $value === null || $value === false) {
+				continue;
+			}
+			if (is_array($value) && $value === []) {
+				continue;
+			}
+			update_post_meta($new_var_id, $meta_key, $value);
+		}
+
+		if ($product_type === 'course') {
+			self::sync_course_variation_translations_from_meta($new_var_id);
+		}
+	}
+
+	/**
+	 * Push course schedule meta to WPML translation variations when the sync helper exists.
+	 *
+	 * @param int $variation_id
+	 */
+	private static function sync_course_variation_translations_from_meta($variation_id) {
+		if (!function_exists('intersoccer_sync_course_metadata_to_translations')) {
+			return;
+		}
+
+		$variation_id = (int) $variation_id;
+		$start        = (string) get_post_meta($variation_id, '_course_start_date', true);
+		$weeks        = (int) get_post_meta($variation_id, '_course_total_weeks', true);
+		$holidays     = get_post_meta($variation_id, '_course_holiday_dates', true);
+		$discount     = get_post_meta($variation_id, '_course_weekly_discount', true);
+		$end          = (string) get_post_meta($variation_id, '_end_date', true);
+
+		intersoccer_sync_course_metadata_to_translations(
+			$variation_id,
+			$start,
+			$weeks,
+			is_array($holidays) ? $holidays : [],
+			is_numeric($discount) ? (float) $discount : 0.0,
+			$end
+		);
 	}
 
 	/**
