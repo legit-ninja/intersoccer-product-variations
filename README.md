@@ -6,8 +6,8 @@ This plugin enhances the WooCommerce booking system for InterSoccer Switzerland 
 Taxonomy standard (attributes, term shapes, order-meta keys, distressed bands): InterSoccer Project Context — `docs/taxonomy-standard.md`.
 
 ## Version
-- **Version: 2.10.30.1**
-- Release Date: October 30, 2026
+- **Version: 2.10.31**
+- Release Date: October 31, 2026
 
 ## Camp schedule meta (2.7.18+)
 
