@@ -1439,6 +1439,24 @@ class OrderMetaContractTest extends TestCase {
     }
 
     public function test_stored_french_and_german_month_dates_parse_for_display(): void {
+        $mars_wrong = strtotime('1 mars 2026');
+        $this->assertNotSame(
+            mktime(0, 0, 0, 3, 1, 2026),
+            $mars_wrong,
+            'strtotime must not be used for FR month-name strings (mis-parses day)'
+        );
+        $this->assertSame(
+            mktime(0, 0, 0, 3, 1, 2026),
+            intersoccer_pv_parse_stored_order_date_to_timestamp('1 mars 2026')
+        );
+        $this->assertSame(
+            mktime(0, 0, 0, 9, 15, 2026),
+            intersoccer_pv_parse_stored_order_date_to_timestamp('15 septembre 2026')
+        );
+        $this->assertSame(
+            mktime(0, 0, 0, 3, 1, 2026),
+            intersoccer_pv_parse_stored_order_date_to_timestamp('1. März 2026')
+        );
         $this->assertSame(
             strtotime('2026-09-27'),
             intersoccer_pv_parse_stored_order_date_to_timestamp('27 septembre 2026')

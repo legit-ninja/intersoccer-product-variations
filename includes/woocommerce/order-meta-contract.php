@@ -2388,6 +2388,31 @@ function intersoccer_pv_format_order_line_date_for_storage($date) {
 }
 
 /**
+ * Course product-page dates: WP date_format for EN, locale order-line format for FR/DE.
+ *
+ * @param string $date Y-m-d from variation meta.
+ * @return string
+ */
+function intersoccer_pv_format_course_product_page_date($date) {
+    $date = trim((string) $date);
+    if ($date === '') {
+        return '';
+    }
+
+    if (function_exists('intersoccer_pv_is_fr_de_customer_text_locale')
+        && intersoccer_pv_is_fr_de_customer_text_locale()) {
+        return intersoccer_pv_format_order_line_date_for_storage($date);
+    }
+
+    $ts = strtotime($date);
+    if ($ts === false) {
+        return $date;
+    }
+
+    return date_i18n(get_option('date_format'), $ts);
+}
+
+/**
  * Map localized FR/DE month names (any case) to month number.
  *
  * @return array<string,int>
@@ -2434,16 +2459,6 @@ function intersoccer_pv_parse_stored_order_date_to_timestamp($text) {
         return $ts !== false ? $ts : false;
     }
 
-    $ts = strtotime($text);
-    if ($ts !== false) {
-        return $ts;
-    }
-
-    if (preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $text, $m)) {
-        $ts = strtotime($m[1] . ' ' . $m[2] . ', ' . $m[3]);
-        return $ts !== false ? $ts : false;
-    }
-
     if (preg_match('/^(\d{1,2})\.\s+(\p{L}+)\s+(\d{4})$/u', $text, $m)) {
         $month = intersoccer_pv_localized_order_date_month_map()[function_exists('mb_strtolower') ? mb_strtolower($m[2], 'UTF-8') : strtolower($m[2])] ?? 0;
         if ($month > 0) {
@@ -2456,6 +2471,16 @@ function intersoccer_pv_parse_stored_order_date_to_timestamp($text) {
         if ($month > 0) {
             return mktime(0, 0, 0, $month, (int) $m[1], (int) $m[3]);
         }
+    }
+
+    if (preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $text, $m)) {
+        $ts = strtotime($m[1] . ' ' . $m[2] . ', ' . $m[3]);
+        return $ts !== false ? $ts : false;
+    }
+
+    $ts = strtotime($text);
+    if ($ts !== false) {
+        return $ts;
     }
 
     return false;
