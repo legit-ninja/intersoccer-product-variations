@@ -123,6 +123,12 @@ PHP
 		if (!defined('HOUR_IN_SECONDS')) {
 			define('HOUR_IN_SECONDS', 3600);
 		}
+		if (!defined('DAY_IN_SECONDS')) {
+			define('DAY_IN_SECONDS', 86400);
+		}
+		if (!defined('WEEK_IN_SECONDS')) {
+			define('WEEK_IN_SECONDS', 604800);
+		}
 
 		if (!function_exists('wp_parse_args')) {
 			function wp_parse_args($args, $defaults = []) {
@@ -259,6 +265,15 @@ PHP
 
 		if (!class_exists('WC_Product_Variation', false)) {
 			eval(<<<'PHP'
+class WC_DateTime {
+	private int $timestamp;
+	public function __construct(int $timestamp) {
+		$this->timestamp = $timestamp;
+	}
+	public function getTimestamp(): int {
+		return $this->timestamp;
+	}
+}
 class WC_Product_Variation {
 	public int $id = 0;
 	public int $parent_id = 0;
@@ -484,6 +499,7 @@ PHP
 		]);
 
 		$this->assertStringContainsString('review camp/course dates', strtolower($result['message']));
+		$this->assertStringContainsString('sync all languages', strtolower($result['message']));
 		$this->assertStringContainsString('2027', $result['message']);
 
 		$this->assertSame('2027', $GLOBALS['intersoccer_test_product_terms'][$result['new_product_id']]['pa_program-year'][0] ?? '');
@@ -550,6 +566,163 @@ PHP
 
 		$ok = InterSoccer_Program_Manager::get_variation_completeness($var_ok, 'course');
 		$this->assertNotContains('_schedule_start_year_before_program_year', $ok['missing']);
+	}
+
+	public function test_completeness_allows_cross_year_course_schedule_for_program_year(): void {
+		$parent_id = 920010;
+		$var_id    = 920110;
+
+		$GLOBALS['intersoccer_test_product_terms'][$parent_id]['pa_program-year'] = ['2026'];
+		$GLOBALS['intersoccer_test_product_terms'][$parent_id]['pa_program-season'] = ['Autumn'];
+
+		$variation = new WC_Product_Variation();
+		$variation->id = $var_id;
+		$variation->parent_id = $parent_id;
+		$variation->regular_price = '200';
+		self::$wc_products[$var_id] = $variation;
+
+		MockMetaData::$data[$var_id]['_course_start_date'] = '2026-09-01';
+		MockMetaData::$data[$var_id]['_end_date']          = '2027-01-15';
+
+		$result = InterSoccer_Program_Manager::get_variation_completeness($var_id, 'course');
+		$this->assertNotContains('_schedule_start_year_before_program_year', $result['missing']);
+	}
+
+	public function test_completeness_allows_course_start_in_next_calendar_year_for_program_year(): void {
+		$parent_id = 920011;
+		$var_id    = 920111;
+
+		$GLOBALS['intersoccer_test_product_terms'][$parent_id]['pa_program-year'] = ['2026'];
+		$GLOBALS['intersoccer_test_product_terms'][$parent_id]['pa_program-season'] = ['Autumn'];
+
+		$variation = new WC_Product_Variation();
+		$variation->id = $var_id;
+		$variation->parent_id = $parent_id;
+		$variation->regular_price = '200';
+		self::$wc_products[$var_id] = $variation;
+
+		MockMetaData::$data[$var_id]['_course_start_date'] = '2027-01-08';
+		MockMetaData::$data[$var_id]['_end_date']          = '2027-04-01';
+
+		$result = InterSoccer_Program_Manager::get_variation_completeness($var_id, 'course');
+		$this->assertNotContains('_schedule_start_year_before_program_year', $result['missing']);
+	}
+
+	public function test_completeness_flags_schedule_wholly_before_program_year(): void {
+		$parent_id = 920012;
+		$var_id    = 920112;
+
+		$GLOBALS['intersoccer_test_product_terms'][$parent_id]['pa_program-year'] = ['2027'];
+
+		$variation = new WC_Product_Variation();
+		$variation->id = $var_id;
+		$variation->parent_id = $parent_id;
+		$variation->regular_price = '200';
+		self::$wc_products[$var_id] = $variation;
+
+		MockMetaData::$data[$var_id]['_course_start_date'] = '2026-09-01';
+		MockMetaData::$data[$var_id]['_end_date']          = '2026-12-15';
+
+		$result = InterSoccer_Program_Manager::get_variation_completeness($var_id, 'course');
+		$this->assertContains('_schedule_start_year_before_program_year', $result['missing']);
+	}
+
+	public function test_duplicate_program_resolves_wpml_default_language_source(): void {
+		$en_parent = 930001;
+		$fr_parent = 930002;
+		$en_var    = 930101;
+		$fr_var    = 930102;
+
+		$this->seedSourceCampVariation($en_parent, $en_var, [
+			'_camp_start_date' => '2026-07-01',
+			'_camp_end_date'   => '2026-07-05',
+		], ['pa_booking-type' => 'full-week'], [
+			'regular' => '888',
+			'active'  => '888',
+		]);
+
+		$fr_var_obj = clone self::$wc_products[$en_var];
+		$fr_var_obj->id = $fr_var;
+		$fr_var_obj->parent_id = $fr_parent;
+		$fr_var_obj->regular_price = '111';
+		$fr_var_obj->price = '111';
+		self::$wc_products[$fr_var] = $fr_var_obj;
+
+		$fr_parent_obj = clone self::$wc_products[$en_parent];
+		$fr_parent_obj->id = $fr_parent;
+		$fr_parent_obj->children = [$fr_var];
+		self::$wc_products[$fr_parent] = $fr_parent_obj;
+		self::$children_by_parent[$fr_parent] = [$fr_var];
+		self::$product_types[$fr_parent] = 'camp';
+		self::$product_types[$en_parent] = 'camp';
+
+		MockFilters::$filters['wpml_default_language'] = static function () {
+			return 'en';
+		};
+		MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($en_parent, $fr_parent) {
+			if ($type === 'product' && (int) $id === $fr_parent && $lang === 'en') {
+				return $en_parent;
+			}
+			return $id;
+		};
+
+		$new_id = InterSoccer_Program_Manager::duplicate_program($fr_parent, 'FR clone', []);
+		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
+		$this->assertSame('888', self::$wc_products[$new_var_id]->get_regular_price());
+	}
+
+	public function test_copy_variation_prices_skips_expired_sale_window(): void {
+		$method = new \ReflectionMethod(InterSoccer_Program_Manager::class, 'copy_variation_prices_from_source');
+		$method->setAccessible(true);
+
+		$source = new WC_Product_Variation();
+		$source->regular_price = '300';
+		$source->sale_price = '250';
+		$source->price = '250';
+		$source->date_on_sale_to = new WC_DateTime(time() - DAY_IN_SECONDS);
+
+		$target = new WC_Product_Variation();
+		$method->invoke(null, $target, $source);
+
+		$this->assertSame('300', $target->get_regular_price());
+		$this->assertSame('', $target->get_sale_price());
+		$this->assertSame('300', $target->get_price());
+		$this->assertNull($target->get_date_on_sale_to());
+	}
+
+	public function test_copy_variation_prices_copies_future_sale_window(): void {
+		$method = new \ReflectionMethod(InterSoccer_Program_Manager::class, 'copy_variation_prices_from_source');
+		$method->setAccessible(true);
+
+		$future = new WC_DateTime(time() + WEEK_IN_SECONDS);
+		$source = new WC_Product_Variation();
+		$source->regular_price = '300';
+		$source->sale_price = '250';
+		$source->price = '250';
+		$source->date_on_sale_to = $future;
+
+		$target = new WC_Product_Variation();
+		$method->invoke(null, $target, $source);
+
+		$this->assertSame('250', $target->get_sale_price());
+		$this->assertSame('250', $target->get_price());
+		$this->assertSame($future, $target->get_date_on_sale_to());
+	}
+
+	public function test_copy_variation_prices_copies_sale_without_end_date(): void {
+		$method = new \ReflectionMethod(InterSoccer_Program_Manager::class, 'copy_variation_prices_from_source');
+		$method->setAccessible(true);
+
+		$source = new WC_Product_Variation();
+		$source->regular_price = '300';
+		$source->sale_price = '275';
+		$source->price = '275';
+
+		$target = new WC_Product_Variation();
+		$method->invoke(null, $target, $source);
+
+		$this->assertSame('275', $target->get_sale_price());
+		$this->assertSame('275', $target->get_price());
 	}
 
 	public function test_shared_meta_key_lists_match_expectations(): void {

@@ -329,9 +329,16 @@ class InterSoccer_Program_Manager {
 				: '';
 			if ($program_year !== '' && ctype_digit($program_year)) {
 				$start_key = ($product_type === 'camp') ? '_camp_start_date' : '_course_start_date';
+				$end_key   = ($product_type === 'camp') ? '_camp_end_date' : '_end_date';
 				$start     = (string) get_post_meta($variation_id, $start_key, true);
 				if ($start !== '' && preg_match('/^(\d{4})-\d{2}-\d{2}$/', $start, $start_match)) {
-					if ((int) $start_match[1] < (int) $program_year) {
+					$schedule_year = (int) $start_match[1];
+					$end           = (string) get_post_meta($variation_id, $end_key, true);
+					if ($end !== '' && preg_match('/^(\d{4})-\d{2}-\d{2}$/', $end, $end_match)) {
+						$schedule_year = max($schedule_year, (int) $end_match[1]);
+					}
+					// Stale year-roll: entire schedule ends before pa_program-year (cross-year runs are OK).
+					if ($schedule_year < (int) $program_year) {
 						$missing[] = '_schedule_start_year_before_program_year';
 					}
 				}
@@ -2505,7 +2512,7 @@ class InterSoccer_Program_Manager {
 				'message'                => sprintf(
 					/* translators: 1: source product ID, 2: new product ID, 3: year */
 					__(
-						'Duplicated #%1$d → #%2$d (year %3$s). Prices and dates were copied from the source; review camp/course dates for the new year.',
+						'Duplicated #%1$d → #%2$d (year %3$s). Prices and dates were copied from the source; review camp/course dates for the new year. FR/DE translations were not created — run Sync all languages (WPML) before publishing.',
 						'intersoccer-product-variations'
 					),
 					$product_id,
@@ -2708,9 +2715,14 @@ class InterSoccer_Program_Manager {
 	}
 
 	/**
-	 * Duplicate a variable program as a Draft (structure + late-pickup flags; optional year/season).
+	 * Duplicate a variable program as a Draft (structure, prices, schedule meta; optional year/season).
 	 *
-	 * Does not copy prices or camp/course schedule dates. Does not create WPML translations.
+	 * Copies variation regular/sale/active prices (including sale schedule when still valid),
+	 * camp/course schedule meta (see intersoccer_pm_duplicate_variation_meta_keys()), and
+	 * late-pickup flags. Resolves the source to the WPML default-language product when WPML is active.
+	 *
+	 * Does not copy stock quantity, legacy `_camp_times`, variation attribute term assignments
+	 * beyond cloned attribute slugs, or WPML translations — run Sync all languages after duplicate.
 	 * Never creates year-qualified season terms (e.g. "Autumn 2027").
 	 *
 	 * @param int    $source_id Source product ID.
@@ -2730,6 +2742,14 @@ class InterSoccer_Program_Manager {
 		]);
 
 		$source_id  = absint($source_id);
+		$default_lang = apply_filters('wpml_default_language', null);
+		$source_id    = (int) apply_filters('wpml_object_id', $source_id, 'product', true, $default_lang);
+		if ($source_id <= 0) {
+			return new WP_Error(
+				'missing_args',
+				__('Source ID and name are required.', 'intersoccer-product-variations')
+			);
+		}
 		$new_name   = sanitize_text_field((string) $new_name);
 		$new_season = sanitize_text_field((string) $opts['season']);
 		$new_year   = self::normalize_program_year($opts['year']);
@@ -3542,8 +3562,18 @@ class InterSoccer_Program_Manager {
 			$new_var->set_regular_price((string) $regular);
 		}
 
-		$sale = $source_var->get_sale_price('edit');
-		if ($sale !== '' && $sale !== null) {
+		$sale       = $source_var->get_sale_price('edit');
+		$copy_sale  = ($sale !== '' && $sale !== null);
+		if ($copy_sale && method_exists($source_var, 'get_date_on_sale_to')) {
+			$to = $source_var->get_date_on_sale_to('edit');
+			if ($to && is_object($to) && method_exists($to, 'getTimestamp')) {
+				if ($to->getTimestamp() < time()) {
+					$copy_sale = false;
+				}
+			}
+		}
+
+		if ($copy_sale) {
 			$new_var->set_sale_price((string) $sale);
 			if (method_exists($source_var, 'get_date_on_sale_from')) {
 				$from = $source_var->get_date_on_sale_from('edit');
@@ -3559,9 +3589,13 @@ class InterSoccer_Program_Manager {
 			}
 		}
 
-		$active = $source_var->get_price('edit');
-		if ($active !== '' && $active !== null) {
-			$new_var->set_price((string) $active);
+		if ($copy_sale) {
+			$active = $source_var->get_price('edit');
+			if ($active !== '' && $active !== null) {
+				$new_var->set_price((string) $active);
+			} elseif ($regular !== '' && $regular !== null) {
+				$new_var->set_price((string) $regular);
+			}
 		} elseif ($regular !== '' && $regular !== null) {
 			$new_var->set_price((string) $regular);
 		}
