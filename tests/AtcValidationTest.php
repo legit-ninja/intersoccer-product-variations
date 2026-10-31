@@ -407,7 +407,7 @@ class AtcValidationTest extends TestCase
     public function testRequiresAttendeeAcceptsVariationObjectUsesParentWithoutWarning()
     {
         if (!class_exists('WC_Product_Variation', false)) {
-            eval('class WC_Product_Variation {}');
+            eval('class WC_Product_Variation { public function get_attributes() { return []; } }');
         }
 
         unset($GLOBALS['intersoccer_test_product_type']);
