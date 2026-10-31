@@ -1360,4 +1360,109 @@ class OrderMetaContractTest extends TestCase {
         }
     }
 
+    public function test_order_line_date_storage_format_en_unchanged(): void {
+        $GLOBALS['intersoccer_test_locale'] = 'en_US';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::$data[200]['_course_start_date'] = '2026-09-27';
+        }
+        $this->assertSame('F j, Y', intersoccer_pv_order_line_date_format_for_storage());
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 200,
+            'product_type' => 'course',
+            'cart_values' => [],
+        ]);
+        $this->assertSame('September 27, 2026', $built['updates']['Start Date'] ?? null);
+        if (class_exists('MockMetaData')) {
+            unset(MockMetaData::$data[200]);
+        }
+    }
+
+    public function test_order_line_date_storage_format_fr_uses_j_f_y(): void {
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['wpml_current_language'] = static function () {
+                return 'fr';
+            };
+        }
+        $GLOBALS['intersoccer_test_locale'] = 'fr_FR';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::$data[201]['_course_start_date'] = '2026-09-27';
+        }
+        $this->assertSame('j F Y', intersoccer_pv_order_line_date_format_for_storage());
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 201,
+            'product_type' => 'course',
+            'cart_values' => [],
+        ]);
+        $this->assertSame('27 September 2026', $built['updates']['Start Date'] ?? null);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+        if (class_exists('MockMetaData')) {
+            unset(MockMetaData::$data[201]);
+        }
+        unset($GLOBALS['intersoccer_test_locale']);
+    }
+
+    public function test_order_line_date_storage_format_de_uses_j_dot_f_y(): void {
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'j. F Y';
+                }
+                return $translation;
+            };
+            MockFilters::$filters['wpml_current_language'] = static function () {
+                return 'de';
+            };
+        }
+        $GLOBALS['intersoccer_test_locale'] = 'de_DE';
+        if (class_exists('MockMetaData')) {
+            MockMetaData::$data[202]['_course_start_date'] = '2026-09-27';
+        }
+        $this->assertSame('j. F Y', intersoccer_pv_order_line_date_format_for_storage());
+        $built = intersoccer_build_order_line_meta([
+            'product_id' => 100,
+            'variation_id' => 202,
+            'product_type' => 'course',
+            'cart_values' => [],
+        ]);
+        $this->assertSame('27. September 2026', $built['updates']['Start Date'] ?? null);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+        if (class_exists('MockMetaData')) {
+            unset(MockMetaData::$data[202]);
+        }
+        unset($GLOBALS['intersoccer_test_locale']);
+    }
+
+    public function test_stored_french_and_german_month_dates_parse_for_display(): void {
+        $this->assertSame(
+            strtotime('2026-09-27'),
+            intersoccer_pv_parse_stored_order_date_to_timestamp('27 septembre 2026')
+        );
+        $this->assertSame(
+            strtotime('2026-09-27'),
+            intersoccer_pv_parse_stored_order_date_to_timestamp('27. September 2026')
+        );
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        if (class_exists('MockFilters')) {
+            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
+                if ($text === 'j F Y') {
+                    return 'Y-m-d';
+                }
+                return $translation;
+            };
+        }
+        $display_fr = intersoccer_pv_format_stored_order_date_for_display('27 septembre 2026');
+        $this->assertSame('2026-09-27', $display_fr);
+        $display_de = intersoccer_pv_format_stored_order_date_for_display('27. Oktober 2026');
+        $this->assertSame('2026-10-27', $display_de);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+    }
+
 }

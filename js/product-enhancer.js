@@ -473,15 +473,13 @@
 
             let html = '<div class="intersoccer-course-details">';
             if (courseData.start_date) {
-                const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${startDate}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${courseData.start_date}</p>`;
             }
             if (courseData.end_date) {
-                const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${endDate}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${courseData.end_date}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
-                const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
+                const holidays = courseData.holidays.join(', ');
                 html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}${getLabelValueSeparator()}</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {

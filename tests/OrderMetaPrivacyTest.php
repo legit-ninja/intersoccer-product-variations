@@ -311,6 +311,29 @@ class OrderMetaPrivacyTest extends TestCase {
         $this->assertNotContains('Medical Conditions', $keys);
     }
 
+    public function test_my_account_omits_none_medical_row_but_shows_real_value(): void {
+        $GLOBALS['intersoccer_test_is_order_received_page'] = false;
+        $item = new WC_Order_Item_Product([
+            'Medical Conditions' => 'None',
+            'Attendee DOB' => '2015-01-01',
+        ]);
+        $meta_none = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'None', 'display_value' => 'None'],
+            (object) ['key' => 'Attendee DOB', 'display_key' => 'Attendee DOB', 'value' => '2015-01-01', 'display_value' => '2015-01-01'],
+        ];
+        $filtered_none = intersoccer_filter_customer_order_item_meta($meta_none, $item);
+        $keys_none = array_map(static fn($m) => $m->key, $filtered_none);
+        $this->assertNotContains('Medical Conditions', $keys_none);
+
+        $item_real = new WC_Order_Item_Product(['Medical Conditions' => 'Bee sting allergy']);
+        $meta_real = [
+            (object) ['key' => 'Medical Conditions', 'display_key' => 'Medical Conditions', 'value' => 'Bee sting allergy', 'display_value' => 'Bee sting allergy'],
+        ];
+        $filtered_real = intersoccer_filter_customer_order_item_meta($meta_real, $item_real);
+        $map = $this->meta_map($filtered_real);
+        $this->assertSame('Bee sting allergy', $map['Medical Conditions']);
+    }
+
     public function test_french_privacy_strings_via_wpml_language_fallback(): void {
         MockFilters::$filters['wpml_current_language'] = static function () {
             return 'fr';
