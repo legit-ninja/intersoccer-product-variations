@@ -14,12 +14,12 @@
 
 # SSH credentials
 SERVER_USER="your-ssh-username"
-SERVER_HOST="intersoccer.legit.ninja"
+SERVER_HOST="YOUR_SSH_HOST"
 SSH_PORT="22"
 SSH_KEY="~/.ssh/id_rsa"
 
 # Plugin path on server (absolute path)
-SERVER_PATH="/var/www/html/wp-content/plugins/intersoccer-product-variations"
+SERVER_PATH="/path/to/wp-content/plugins/intersoccer-product-variations"
 
 # Optional: Custom rsync options
 # RSYNC_EXTRA_OPTS="--verbose"
