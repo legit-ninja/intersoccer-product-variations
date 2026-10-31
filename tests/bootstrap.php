@@ -11,6 +11,7 @@ if (!defined('OBJECT')) {
 
 // Load Composer autoloader.
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/IntersoccerPvTestDateI18n.php';
 
 // Shared meta store for tests (must include reset(); define before test files).
 if (!class_exists('MockMetaData')) {

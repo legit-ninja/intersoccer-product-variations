@@ -127,6 +127,7 @@ class CourseInfoAjaxTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        IntersoccerPvTestDateI18n::reset();
         $GLOBALS['intersoccer_test_json_capture'] = false;
         parent::tearDown();
     }
@@ -149,6 +150,9 @@ class CourseInfoAjaxTest extends TestCase {
         $_POST['product_id'] = $product_id;
         $_POST['variation_id'] = $variation_id;
         $_POST['nonce'] = 'test_nonce';
+
+        IntersoccerPvTestDateI18n::set_locale('fr');
+        IntersoccerPvTestDateI18n::enable();
 
         // Call AJAX handler
         try {
@@ -174,7 +178,7 @@ class CourseInfoAjaxTest extends TestCase {
         // Verify values
         $this->assertEquals('2025-01-06', $data['start_date']);
         $this->assertArrayHasKey('start_date_display', $data);
-        $this->assertSame('6 January 2025', $data['start_date_display']);
+        $this->assertSame('6 janvier 2025', $data['start_date_display']);
         $this->assertArrayHasKey('end_date', $data);
         $this->assertIsString($data['end_date'], 'end_date must be a string (may be empty without WC schedule context)');
         $this->assertEquals(12, $data['total_weeks']);
@@ -184,9 +188,9 @@ class CourseInfoAjaxTest extends TestCase {
         $this->assertSame(['2025-02-17', '2025-03-24', '2025-04-21'], $data['holidays']);
         $this->assertArrayHasKey('holidays_display', $data);
         $this->assertCount(3, $data['holidays_display']);
-        $this->assertSame('17 February 2025', $data['holidays_display'][0]);
-        $this->assertSame('24 March 2025', $data['holidays_display'][1]);
-        $this->assertSame('21 April 2025', $data['holidays_display'][2]);
+        $this->assertSame('17 février 2025', $data['holidays_display'][0]);
+        $this->assertSame('24 mars 2025', $data['holidays_display'][1]);
+        $this->assertSame('21 avril 2025', $data['holidays_display'][2]);
     }
 
     /**

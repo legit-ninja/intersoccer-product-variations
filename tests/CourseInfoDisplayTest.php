@@ -42,6 +42,11 @@ if (!class_exists('InterSoccer_Course')) {
 
 class CourseInfoDisplayTest extends TestCase {
 
+    protected function tearDown(): void {
+        IntersoccerPvTestDateI18n::reset();
+        parent::tearDown();
+    }
+
     protected function setUp(): void {
         // Clear mock data for each test
         MockMetaData::$data = [];
@@ -137,6 +142,9 @@ class CourseInfoDisplayTest extends TestCase {
         update_post_meta($variation_id, '_course_total_weeks', 10);
         update_post_meta($variation_id, '_course_holiday_dates', ['2025-12-25', '2026-01-01']);
 
+        IntersoccerPvTestDateI18n::set_locale('fr');
+        IntersoccerPvTestDateI18n::enable();
+
         // Capture output
         ob_start();
         intersoccer_render_course_info(123, $variation_id);
@@ -145,14 +153,14 @@ class CourseInfoDisplayTest extends TestCase {
         // Assertions
         $this->assertStringContainsString('Course Information', $output);
         $this->assertStringContainsString('Start Date:', $output);
-        $this->assertStringContainsString('1 December 2025', $output); // j F Y display
+        $this->assertStringContainsString('1 décembre 2025', $output);
         $this->assertStringContainsString('Total Sessions:', $output);
         $this->assertStringContainsString('10', $output);
         // Remaining Sessions is omitted when remaining === total_weeks (see intersoccer_render_course_info).
         // Real InterSoccer_Course is loaded by bootstrap; do not assert the obsolete half-weeks mock.
         $this->assertStringContainsString('Holidays:', $output);
-        $this->assertStringContainsString('25 December 2025', $output);
-        $this->assertStringContainsString('1 January 2026', $output);
+        $this->assertStringContainsString('25 décembre 2025', $output);
+        $this->assertStringContainsString('1 janvier 2026', $output);
     }
 
     public function testRenderCourseInfoWithNoVariationId() {

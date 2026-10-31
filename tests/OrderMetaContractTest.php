@@ -1504,17 +1504,44 @@ class OrderMetaContractTest extends TestCase {
         }
         $this->assertSame('5 March 2026', intersoccer_pv_format_ymd_for_customer_display('2026-03-05'));
 
-        if (class_exists('MockFilters')) {
-            MockFilters::$filters['gettext_intersoccer-product-variations'] = static function ($translation, $text, $domain) {
-                if ($text === 'j F Y') {
-                    return 'j. F Y';
-                }
-                return $translation;
-            };
+        IntersoccerPvTestDateI18n::set_locale('de');
+        IntersoccerPvTestDateI18n::enable();
+        IntersoccerPvTestDateI18n::enable_de_customer_date_format_gettext();
+        try {
+            $this->assertSame('5. März 2026', intersoccer_pv_format_ymd_for_customer_display('2026-03-05'));
+        } finally {
+            IntersoccerPvTestDateI18n::reset();
+            if (class_exists('MockFilters')) {
+                MockFilters::reset();
+            }
         }
-        $this->assertSame('5. March 2026', intersoccer_pv_format_ymd_for_customer_display('2026-03-05'));
-        if (class_exists('MockFilters')) {
-            MockFilters::reset();
+    }
+
+    public function test_legacy_capitalized_french_stored_month_displays_in_fr_and_de(): void {
+        IntersoccerPvTestDateI18n::set_locale('fr');
+        IntersoccerPvTestDateI18n::enable();
+        try {
+            $this->assertSame(
+                '1 février 2027',
+                intersoccer_pv_format_stored_order_date_for_display('Février 1, 2027')
+            );
+        } finally {
+            IntersoccerPvTestDateI18n::reset();
+        }
+
+        IntersoccerPvTestDateI18n::set_locale('de');
+        IntersoccerPvTestDateI18n::enable();
+        IntersoccerPvTestDateI18n::enable_de_customer_date_format_gettext();
+        try {
+            $this->assertSame(
+                '1. Februar 2027',
+                intersoccer_pv_format_stored_order_date_for_display('Février 1, 2027')
+            );
+        } finally {
+            IntersoccerPvTestDateI18n::reset();
+            if (class_exists('MockFilters')) {
+                MockFilters::reset();
+            }
         }
     }
 
