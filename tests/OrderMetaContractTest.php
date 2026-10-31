@@ -757,6 +757,7 @@ class OrderMetaContractTest extends TestCase {
             (object) ['key' => 'assigned_player', 'display_key' => 'assigned_player', 'value' => '1'],
             (object) ['key' => 'assigned_player_id', 'display_key' => 'assigned_player_id', 'value' => 'uuid-123'],
             (object) ['key' => 'attribute_pa_age-group', 'display_key' => 'Age Group', 'value' => '5-13y'],
+            (object) ['key' => 'Age Group', 'display_key' => 'Age Group', 'value' => '5-13y'],
             (object) ['key' => 'pa_intersoccer-venues', 'display_key' => 'Venues', 'value' => 'geneva'],
             (object) ['key' => '_camp_start_date', 'display_key' => 'Camp Start', 'value' => '2026-07-27'],
             (object) ['key' => 'Sites InterSoccer', 'display_key' => 'Sites InterSoccer', 'value' => 'Geneva'],
@@ -783,6 +784,7 @@ class OrderMetaContractTest extends TestCase {
             (object) ['key' => 'Activity Type', 'value' => 'Camp'],
             (object) ['key' => 'assigned_player', 'value' => '1'],
             (object) ['key' => 'Assigned Attendee', 'value' => 'Child'],
+            (object) ['key' => 'Age Group', 'value' => '5-13y (Full Day)'],
             (object) ['key' => 'attribute_pa_age-group', 'value' => '5-13y'],
             (object) ['key' => 'Camp Start Date', 'value' => '2026-07-27'],
         ];
@@ -790,10 +792,11 @@ class OrderMetaContractTest extends TestCase {
         $item = new WC_Order_Item_Product([]);
         $filtered = intersoccer_filter_customer_order_item_meta($formatted_meta, $item);
 
-        $this->assertCount(3, $filtered);
+        $this->assertCount(4, $filtered);
         $this->assertSame('Activity Type', $filtered[0]->key);
         $this->assertSame('Assigned Attendee', $filtered[1]->key);
-        $this->assertSame('Camp Start Date', $filtered[2]->key);
+        $this->assertSame('Age Group', $filtered[2]->key);
+        $this->assertSame('Camp Start Date', $filtered[3]->key);
     }
 
     public function test_apply_assigned_player_dual_writes_underscore_keys() {
@@ -998,6 +1001,55 @@ class OrderMetaContractTest extends TestCase {
         $en = intersoccer_translate_stored_order_meta_display_value($raw, 'Note');
         $this->assertSame($raw, $en);
         unset($GLOBALS['intersoccer_pv_test_determine_locale']);
+    }
+
+    public function test_note_slug_resolved_term_dash_mojibake_repaired_in_german_display_locale() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $term_name = 'Sie können jederzeit einsteigen ? die Preise werden anteilig berechnet';
+        $GLOBALS['intersoccer_test_terms'] = [
+            555 => [
+                'taxonomy' => 'pa_note',
+                'slug' => 'join-anytime',
+                'name' => $term_name,
+            ],
+        ];
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'de_DE';
+        $display = intersoccer_translate_stored_order_meta_display_value('join-anytime', 'Note');
+        $this->assertStringContainsString('–', $display);
+        $this->assertStringNotContainsString(' ? ', $display);
+        unset($GLOBALS['intersoccer_test_terms'], $GLOBALS['intersoccer_pv_test_determine_locale']);
+    }
+
+    public function test_note_slug_resolved_term_dash_mojibake_unchanged_in_english_display_locale() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $term_name = 'Sie können jederzeit einsteigen ? die Preise werden anteilig berechnet';
+        $GLOBALS['intersoccer_test_terms'] = [
+            555 => [
+                'taxonomy' => 'pa_note',
+                'slug' => 'join-anytime',
+                'name' => $term_name,
+            ],
+        ];
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'en_US';
+        $display = intersoccer_translate_stored_order_meta_display_value('join-anytime', 'Note');
+        $this->assertSame($term_name, $display);
+        unset($GLOBALS['intersoccer_test_terms'], $GLOBALS['intersoccer_pv_test_determine_locale']);
+    }
+
+    public function test_note_slug_resolved_term_keeps_legitimate_trailing_question_in_german() {
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $term_name = 'Haben Sie noch Fragen?';
+        $GLOBALS['intersoccer_test_terms'] = [
+            556 => [
+                'taxonomy' => 'pa_note',
+                'slug' => 'questions',
+                'name' => $term_name,
+            ],
+        ];
+        $GLOBALS['intersoccer_pv_test_determine_locale'] = 'de_DE';
+        $display = intersoccer_translate_stored_order_meta_display_value('questions', 'Note');
+        $this->assertSame($term_name, $display);
+        unset($GLOBALS['intersoccer_test_terms'], $GLOBALS['intersoccer_pv_test_determine_locale']);
     }
 
     public function test_course_date_display_localized_in_customer_context() {

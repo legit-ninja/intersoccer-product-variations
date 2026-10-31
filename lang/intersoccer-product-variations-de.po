@@ -576,7 +576,7 @@ msgstr ""
 
 # wpml-name: 6adf97f83acf6453d4a6a4b1070f3754
 msgid "None"
-msgstr ""
+msgstr "Keine"
 
 # wpml-name: 0efaf5aeb4fd4b8bf06fb531f73c1d7d
 msgid "An error occurred while updating orders."
@@ -725,6 +725,29 @@ msgstr "Kanton / Region"
 msgid "City"
 msgstr "Stadt"
 
+msgid "Year"
+msgstr "Jahr"
+
+msgid "Course Day"
+msgstr "Kurstag"
+
+msgid "Course Times"
+msgstr "Kurszeiten"
+
+msgctxt "feminine noun"
+msgid "None"
+msgstr "Keine"
+
+msgctxt "masculine noun"
+msgid "None"
+msgstr "Keine"
+
+msgid "Age Group"
+msgstr "Altersgruppe"
+
+msgid "Days of Week"
+msgstr "Wochentage"
+
 msgid "Booking Type"
 msgstr "Buchungstyp"
 
@@ -732,7 +755,7 @@ msgid "Discount Amount"
 msgstr "Rabattbetrag"
 
 msgid "Sites InterSoccer"
-msgstr "InterSoccer Standorte"
+msgstr "InterSoccer-Standorte"
 
 msgid "Medical Conditions"
 msgstr "Medizinische Angaben"
