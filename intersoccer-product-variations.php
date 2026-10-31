@@ -559,7 +559,9 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
     if ($product_type === 'course') {
         $variation_id = $variation->get_id();
         $course_start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        $data['course_start_date'] = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
+        $start_fields = intersoccer_pv_course_customer_date_fields($course_start_date);
+        $data['course_start_date'] = $start_fields['iso'];
+        $data['course_start_date_display'] = $start_fields['display'];
         $end_date = get_post_meta($variation_id, '_end_date', true);
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
@@ -577,11 +579,13 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                 intersoccer_warning('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
             }
         }
-        $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
-        
-        $data['course_holiday_dates'] = array_map(function($date) {
-            return date_i18n('F j, Y', strtotime($date));
-        }, $holidays);
+        $end_fields = intersoccer_pv_course_customer_date_fields($end_date);
+        $data['end_date'] = $end_fields['iso'];
+        $data['end_date_display'] = $end_fields['display'];
+
+        $holiday_lists = intersoccer_pv_course_holiday_customer_date_lists(is_array($holidays) ? $holidays : []);
+        $data['course_holiday_dates'] = $holiday_lists['isos'];
+        $data['course_holiday_dates_display'] = $holiday_lists['displays'];
         $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
         intersoccer_debug('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', sessions=' . $data['remaining_sessions']);
     }

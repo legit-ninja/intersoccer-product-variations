@@ -11,6 +11,7 @@ if (!defined('OBJECT')) {
 
 // Load Composer autoloader.
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/IntersoccerPvTestDateI18n.php';
 
 // Shared meta store for tests (must include reset(); define before test files).
 if (!class_exists('MockMetaData')) {
@@ -422,6 +423,10 @@ if (!function_exists('date_i18n')) {
     function date_i18n($format, $timestamp = false, $gmt = false) {
         if ($timestamp === false) {
             $timestamp = time();
+        }
+        if (!empty($GLOBALS['intersoccer_test_date_i18n_override'])
+            && is_callable($GLOBALS['intersoccer_test_date_i18n_override'])) {
+            return $GLOBALS['intersoccer_test_date_i18n_override']($format, $timestamp, $gmt);
         }
         return date($format, (int) $timestamp);
     }

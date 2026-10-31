@@ -718,13 +718,13 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
 
     // Start Date
     if ($start_date) {
-        $formatted_start = date_i18n(get_option('date_format'), strtotime($start_date));
+        $formatted_start = intersoccer_pv_format_ymd_for_customer_display($start_date);
         echo '<p><strong>' . __('Start Date:', 'intersoccer-product-variations') . '</strong> ' . esc_html($formatted_start) . '</p>';
     }
 
     // End Date
     if ($end_date) {
-        $formatted_end = date_i18n(get_option('date_format'), strtotime($end_date));
+        $formatted_end = intersoccer_pv_format_ymd_for_customer_display($end_date);
         echo '<p><strong>' . __('End Date:', 'intersoccer-product-variations') . '</strong> ' . esc_html($formatted_end) . '</p>';
     }
 
@@ -742,7 +742,7 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
         echo '<ul style="margin-left: 20px;">';
         foreach ($holidays as $holiday) {
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                $formatted_holiday = date_i18n(get_option('date_format'), strtotime($holiday));
+                $formatted_holiday = intersoccer_pv_format_ymd_for_customer_display($holiday);
                 echo '<li>' . esc_html($formatted_holiday) . '</li>';
             }
         }
