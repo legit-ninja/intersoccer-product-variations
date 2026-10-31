@@ -290,6 +290,41 @@ function intersoccer_billing_phone_incomplete_message() {
 }
 
 /**
+ * Drop a national trunk "0" (from "(0)" or " 0") immediately after a country calling code in digit form.
+ *
+ * @param string $digits Digits only, starting with the country code (e.g. 41791234567).
+ * @param string $country_code Country calling code without "+" (e.g. "41").
+ * @return string
+ */
+function intersoccer_phone_strip_trunk_after_country_digits($digits, $country_code) {
+    $country_code = (string) $country_code;
+    $digits = (string) $digits;
+    if ($country_code === '' || strpos($digits, $country_code) !== 0) {
+        return $digits;
+    }
+    $national = substr($digits, strlen($country_code));
+    if ($national !== '' && $national[0] === '0' && strlen($national) > 9) {
+        $national = substr($national, 1);
+    }
+    return $country_code . $national;
+}
+
+/**
+ * Throw a Store API checkout error (RouteException when available, otherwise Exception with code 400).
+ *
+ * @param string $error_code
+ * @param string $message
+ * @throws Exception
+ */
+function intersoccer_store_api_throw_route_error($error_code, $message) {
+    $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
+    if (class_exists($route_exception)) {
+        throw new $route_exception($error_code, $message, 400);
+    }
+    throw new Exception($message, 400);
+}
+
+/**
  * Whether a billing phone looks complete enough for express checkout (no third-party validator on Store API).
  *
  * @param string $phone
@@ -314,9 +349,11 @@ function intersoccer_phone_is_complete($phone, $country = 'CH') {
             return false;
         }
         if (strpos($digits, '41') === 0) {
+            $digits = intersoccer_phone_strip_trunk_after_country_digits($digits, '41');
             return (bool) preg_match('/^41\d{9}$/', $digits);
         }
         if (strpos($digits, '33') === 0) {
+            $digits = intersoccer_phone_strip_trunk_after_country_digits($digits, '33');
             return (bool) preg_match('/^33\d{9}$/', $digits);
         }
         $len = strlen($digits);
@@ -392,19 +429,11 @@ function intersoccer_store_api_require_billing_phone($order, $request = null) {
             return;
         }
         intersoccer_warning('Store API checkout refused: no billing phone');
-        $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
-        if (class_exists($route_exception)) {
-            throw new $route_exception('intersoccer_billing_phone_required', intersoccer_billing_phone_required_message(), 400);
-        }
-        throw new Exception(intersoccer_billing_phone_required_message(), 400);
+        intersoccer_store_api_throw_route_error('intersoccer_billing_phone_required', intersoccer_billing_phone_required_message());
     }
     if (!intersoccer_phone_is_complete($phone, intersoccer_store_api_billing_country($order, $request))) {
         intersoccer_warning('Store API checkout refused: incomplete billing phone');
-        $route_exception = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
-        if (class_exists($route_exception)) {
-            throw new $route_exception('intersoccer_billing_phone_incomplete', intersoccer_billing_phone_incomplete_message(), 400);
-        }
-        throw new Exception(intersoccer_billing_phone_incomplete_message(), 400);
+        intersoccer_store_api_throw_route_error('intersoccer_billing_phone_incomplete', intersoccer_billing_phone_incomplete_message());
     }
 }
 
