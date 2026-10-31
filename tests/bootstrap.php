@@ -231,6 +231,24 @@ if (!function_exists('add_shortcode')) {
     }
 }
 
+if (!function_exists('intersoccer_test_action_callbacks_equal')) {
+    function intersoccer_test_action_callbacks_equal($registered, $requested) {
+        if ($registered === $requested) {
+            return true;
+        }
+        if (!is_array($registered) || !is_array($requested)) {
+            return false;
+        }
+        if (count($registered) !== 2 || count($requested) !== 2) {
+            return false;
+        }
+        if ($registered[0] !== $requested[0]) {
+            return false;
+        }
+        return $registered[1] === $requested[1];
+    }
+}
+
 if (!function_exists('add_action')) {
     function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
         if (!isset($GLOBALS['intersoccer_test_actions'][$hook][$priority])) {
@@ -238,6 +256,53 @@ if (!function_exists('add_action')) {
         }
         $GLOBALS['intersoccer_test_actions'][$hook][$priority][] = $callback;
         return true;
+    }
+}
+
+if (!function_exists('remove_action')) {
+    function remove_action($hook, $callback, $priority = 10) {
+        if (!isset($GLOBALS['intersoccer_test_removed_actions'])) {
+            $GLOBALS['intersoccer_test_removed_actions'] = [];
+        }
+        $GLOBALS['intersoccer_test_removed_actions'][] = [
+            'hook' => $hook,
+            'callback' => $callback,
+            'priority' => $priority,
+        ];
+
+        if (!empty($GLOBALS['intersoccer_test_actions'][$hook][$priority])) {
+            foreach ($GLOBALS['intersoccer_test_actions'][$hook][$priority] as $index => $registered) {
+                if (intersoccer_test_action_callbacks_equal($registered, $callback)) {
+                    unset($GLOBALS['intersoccer_test_actions'][$hook][$priority][$index]);
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('has_action')) {
+    function has_action($hook, $callback = false, $priority = false) {
+        if ($callback === false) {
+            return !empty($GLOBALS['intersoccer_test_actions'][$hook]);
+        }
+        if (!isset($GLOBALS['intersoccer_test_actions'][$hook])) {
+            return false;
+        }
+        $priorities = $priority === false
+            ? $GLOBALS['intersoccer_test_actions'][$hook]
+            : (isset($GLOBALS['intersoccer_test_actions'][$hook][$priority])
+                ? [$priority => $GLOBALS['intersoccer_test_actions'][$hook][$priority]]
+                : []);
+        foreach ($priorities as $callbacks) {
+            foreach ($callbacks as $registered) {
+                if (intersoccer_test_action_callbacks_equal($registered, $callback)) {
+                    return $priority === false ? 10 : $priority;
+                }
+            }
+        }
+        return false;
     }
 }
 
