@@ -100,8 +100,8 @@ class TimeRangeFormatTest extends TestCase
 
         $out = [];
         foreach ($rows as [$raw, $start, $end]) {
-            $fr_start = str_replace(':', 'h', $start);
-            $fr_end   = str_replace(':', 'h', $end);
+            $fr_start = self::frTime($start);
+            $fr_end   = self::frTime($end);
             $out[$raw] = [
                 $raw,
                 $en($start, $end),
@@ -110,6 +110,76 @@ class TimeRangeFormatTest extends TestCase
         }
 
         return $out;
+    }
+
+    /** "08:30" -> "8h30" (G\hi: no leading zero on the hour). */
+    private static function frTime(string $time): string
+    {
+        [$h, $m] = explode(':', $time);
+
+        return ((int) $h) . 'h' . $m;
+    }
+
+    /**
+     * Reed's audit: the 28 non-strict pa_camp-times terms (term_id, name, language)
+     * from ui-audit/camp-times-nonstrict-terms-2026-10-30.md, each with the label
+     * shown in that term's own language.
+     *
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function reedNonStrictTerms(): array
+    {
+        $d = "\u{2013}";
+        $rows = [
+            [210, '09:00-16:00', 'en', '09:00' . $d . '16:00'],
+            [211, '09:30-12:00', 'en', '09:30' . $d . '12:00'],
+            [279, '08:30-16:00', 'en', '08:30' . $d . '16:00'],
+            [280, '08:30-12:00', 'en', '08:30' . $d . '12:00'],
+            [281, '12:30-16:00', 'en', '12:30' . $d . '16:00'],
+            [439, '8h30-12h00', 'fr', '8h30' . $d . '12h00'],
+            [440, '8h30-16h00', 'fr', '8h30' . $d . '16h00'],
+            [441, '09h00-16h00', 'fr', '9h00' . $d . '16h00'],
+            [442, '09h30-12h00', 'fr', '9h30' . $d . '12h00'],
+            [443, '12h30-16h00', 'fr', '12h30' . $d . '16h00'],
+            [444, '10h00-11h30', 'fr', '10h00' . $d . '11h30'],
+            [445, '10h00-15h00', 'fr', '10h00' . $d . '15h00'],
+            [446, '11h00-12h30', 'fr', '11h00' . $d . '12h30'],
+            [525, '08:00-12:00', 'en', '08:00' . $d . '12:00'],
+            [526, '08:00-16:00', 'en', '08:00' . $d . '16:00'],
+            [527, '12:00-16:00', 'en', '12:00' . $d . '16:00'],
+            [538, '08:00-12:00', 'fr', '8h00' . $d . '12h00'],
+            [539, '08:00-16:00', 'fr', '8h00' . $d . '16h00'],
+            [540, '12:00-16:00', 'fr', '12h00' . $d . '16h00'],
+            [642, '08:00-12:00', 'de', '08:00' . $d . '12:00'],
+            [643, '08:00-16:00', 'de', '08:00' . $d . '16:00'],
+            [644, '12:00-16:00', 'de', '12:00' . $d . '16:00'],
+            [695, '09:00-16:00', 'de', '09:00' . $d . '16:00'],
+            [696, '09:30-12:00', 'de', '09:30' . $d . '12:00'],
+            [732, '12:30-16:00', 'de', '12:30' . $d . '16:00'],
+            [733, '08:30-16:00', 'de', '08:30' . $d . '16:00'],
+            [734, '08:30-12:00', 'de', '08:30' . $d . '12:00'],
+            [1003, '09:30-16:30', 'en', '09:30' . $d . '16:30'],
+        ];
+        $out = [];
+        foreach ($rows as [$id, $name, $lang, $expected]) {
+            $out["term $id $lang $name"] = [$name, $lang, $expected];
+        }
+
+        return $out;
+    }
+
+    #[DataProvider('reedNonStrictTerms')]
+    public function testReedNonStrictTermsInTheirLanguage(string $name, string $lang, string $expected): void
+    {
+        MockFilters::$filters['wpml_current_language'] = static fn () => $lang;
+        $this->assertSame($expected, intersoccer_format_time_range($name));
+        $term = (object) ['taxonomy' => 'pa_camp-times'];
+        $this->assertSame($expected, intersoccer_variation_option_time_range($name, $term, 'pa_camp-times', null));
+    }
+
+    public function testReedListHas28Terms(): void
+    {
+        $this->assertCount(28, self::reedNonStrictTerms());
     }
 
     #[DataProvider('campTimeFixtures')]
@@ -145,13 +215,25 @@ class TimeRangeFormatTest extends TestCase
             'equal times compact'      => ['1000-1000'],
             'out of range hours'       => ['2500-2600'],
             'out of range minutes'     => ['1060-1230'],
+            'half day suffix fr'       => ['10h00-12h30 (demi-journée)'],
+            'full day suffix colon'    => ['08:30-16:00 (Full Day)'],
+            'wpml fr slug suffix'      => ['1000-1230-fr'],
+            'wpml de slug suffix'      => ['0800-1200-de'],
+            'wpml numeric suffix'      => ['1000-1700-2'],
+            'de Uhr suffix'            => ['10:00-12:30 Uhr'],
+            'de Uhr both ends'         => ['10:00 Uhr - 12:30 Uhr'],
+            'fr h with text'           => ['de 8h30 à 12h00'],
+            'leading label'            => ['Morning 0900-1200'],
         ];
     }
 
     #[DataProvider('unchangedValues')]
     public function testInvalidOrNonRangeUnchanged(string $raw): void
     {
-        $this->assertSame($raw, intersoccer_format_time_range($raw));
+        foreach (['en', 'de', 'fr'] as $lang) {
+            MockFilters::$filters['wpml_current_language'] = static fn () => $lang;
+            $this->assertSame($raw, intersoccer_format_time_range($raw), $lang);
+        }
     }
 
     public function testFallbackValidatorRejectsEndBeforeStart(): void
@@ -170,7 +252,7 @@ class TimeRangeFormatTest extends TestCase
             return 'H:i';
         };
         $this->assertSame("10:00\u{2013}12:30", intersoccer_format_time_range('1000-1230'));
-        $this->assertSame(['H\hi', 'fr'], $seen);
+        $this->assertSame(['G\hi', 'fr'], $seen);
     }
 
     public function testSeparatorFilter(): void

@@ -7,8 +7,9 @@
  * selects on the storefront; admin, REST, Store API, and JSON requests keep raw
  * term names. Slugs, order meta, and stored titles are never rewritten.
  *
- * Display uses fixed 24h formats per language: H:i (en, de, default), H\hi for fr
- * (e.g. 10h00). Override via {@see intersoccer_time_range_format} filter.
+ * Display uses fixed 24h formats per language: H:i (en, de, default), G\hi for fr
+ * (e.g. 8h30, 10h00: no leading zero, like the FR term names). Override via
+ * the {@see intersoccer_time_range_format} filter.
  *
  * @package InterSoccer_Product_Variations
  */
@@ -68,7 +69,7 @@ function intersoccer_time_range_format($language = null) {
         $language = 'en';
     }
 
-    $default_format = ($language === 'fr') ? 'H\hi' : 'H:i';
+    $default_format = ($language === 'fr') ? 'G\hi' : 'H:i';
 
     return (string) apply_filters('intersoccer_time_range_format', $default_format, $language);
 }
