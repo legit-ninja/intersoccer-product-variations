@@ -89,6 +89,9 @@ class ExpressCheckoutPhoneValidationTest extends TestCase
         return [
             ['079 123'],
             ['+41 79 12'],
+            ['+41 079 123 45 6'],
+            ['+41 00 000 00 00'],
+            ['+33 06 12 34 56 7'],
             ['12345'],
             ['+41 79 123 45 678'],
             ['abc'],

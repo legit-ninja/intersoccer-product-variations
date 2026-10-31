@@ -291,6 +291,7 @@ function intersoccer_billing_phone_incomplete_message() {
 
 /**
  * Drop a national trunk "0" (from "(0)" or " 0") immediately after a country calling code in digit form.
+ * The trunk digit is never counted toward the required nine national digits.
  *
  * @param string $digits Digits only, starting with the country code (e.g. 41791234567).
  * @param string $country_code Country calling code without "+" (e.g. "41").
@@ -303,7 +304,7 @@ function intersoccer_phone_strip_trunk_after_country_digits($digits, $country_co
         return $digits;
     }
     $national = substr($digits, strlen($country_code));
-    if ($national !== '' && $national[0] === '0' && strlen($national) > 9) {
+    if ($national !== '' && $national[0] === '0') {
         $national = substr($national, 1);
     }
     return $country_code . $national;
