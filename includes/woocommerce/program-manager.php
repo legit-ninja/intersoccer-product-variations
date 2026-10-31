@@ -3055,10 +3055,11 @@ class InterSoccer_Program_Manager {
 			return $label !== '' ? $label : $key;
 		}
 		$meta_labels = [
-			'_regular_price'   => __('Regular price', 'intersoccer-product-variations'),
-			'_camp_start_date' => __('Camp start date', 'intersoccer-product-variations'),
-			'_camp_end_date'   => __('Camp end date', 'intersoccer-product-variations'),
-			'_camp_week_index' => __('Camp week', 'intersoccer-product-variations'),
+			'_regular_price'                              => __('Regular price', 'intersoccer-product-variations'),
+			'_camp_start_date'                            => __('Camp start date', 'intersoccer-product-variations'),
+			'_camp_end_date'                              => __('Camp end date', 'intersoccer-product-variations'),
+			'_camp_week_index'                            => __('Camp week', 'intersoccer-product-variations'),
+			'_schedule_start_year_before_program_year'    => __('Start date is before the program year (review dates)', 'intersoccer-product-variations'),
 		];
 		return $meta_labels[$key] ?? $key;
 	}

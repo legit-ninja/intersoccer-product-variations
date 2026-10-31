@@ -511,6 +511,17 @@ PHP
 		$this->assertSame('', self::$wc_products[$new_var_id]->get_sale_price());
 	}
 
+	public function test_format_missing_key_label_for_schedule_start_year_before_program_year(): void {
+		$method = new \ReflectionMethod(InterSoccer_Program_Manager::class, 'format_missing_key_label');
+		$method->setAccessible(true);
+
+		$label = $method->invoke(null, '_schedule_start_year_before_program_year');
+		$this->assertSame(
+			'Start date is before the program year (review dates)',
+			$label
+		);
+	}
+
 	public function test_completeness_flags_start_year_before_program_year(): void {
 		$parent_id = 920001;
 		$var_old   = 920101;
