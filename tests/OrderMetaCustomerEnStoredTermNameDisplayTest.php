@@ -52,13 +52,13 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
             ],
             self::TERM_FR => [
                 'taxonomy' => 'pa_age-group',
-                'slug' => '5-13y-full-day',
+                'slug' => '5-13y-full-day-fr',
                 'name' => '5-13 ans (journée complète)',
                 'wpml_lang' => 'fr',
             ],
             self::TERM_DE => [
                 'taxonomy' => 'pa_age-group',
-                'slug' => '5-13y-full-day',
+                'slug' => '5-13y-full-day-de',
                 'name' => '5-13 Jahre (Ganztag)',
                 'wpml_lang' => 'de',
             ],
@@ -132,7 +132,7 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
         $this->setLanguage('fr');
         $this->assertSame(
             '5-13 ans (journée complète)',
-            $this->displayValue('5-13y-full-day', 'Age Group')
+            $this->displayValue('5-13y-full-day-fr', 'Age Group')
         );
     }
 
@@ -140,6 +140,28 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
         $this->setLanguage('fr');
         $unknown = 'Not A Real Term Label';
         $this->assertSame($unknown, $this->displayValue($unknown, 'Age Group'));
+    }
+
+    public function test_case_only_near_match_returns_stored_value_unchanged(): void {
+        $this->setLanguage('fr');
+        $stored = '5-13Y (Full Day)';
+        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+    }
+
+    public function test_fr_translated_name_when_fr_slug_differs_from_en_slug(): void {
+        $this->setLanguage('fr');
+        $this->assertSame(
+            '5-13 ans (journée complète)',
+            $this->displayValue('5-13y (Full Day)', 'Age Group')
+        );
+    }
+
+    public function test_de_translated_name_when_de_slug_differs_from_en_slug(): void {
+        $this->setLanguage('de');
+        $this->assertSame(
+            '5-13 Jahre (Ganztag)',
+            $this->displayValue('5-13y (Full Day)', 'Age Group')
+        );
     }
 
     /**
