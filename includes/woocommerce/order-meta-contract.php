@@ -2947,6 +2947,10 @@ function intersoccer_pv_order_meta_customer_display_value_with_readable_slug_fal
 
     $readable = intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $meta_key);
     if (is_scalar($readable) && trim((string) $readable) !== '' && (string) $readable !== $before) {
+        if (intersoccer_pv_order_meta_key_is($meta_key, 'Note')) {
+            return intersoccer_pv_repair_utf8_dash_mojibake_in_note((string) $readable);
+        }
+
         return $readable;
     }
 
