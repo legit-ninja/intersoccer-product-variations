@@ -553,6 +553,9 @@ msgstr ""
 msgid "20% Sibling Discount Applied"
 msgstr ""
 
+msgid "%d%% Sibling Discount Applied"
+msgstr ""
+
 # wpml-name: saved
 msgid "saved"
 msgstr ""
@@ -753,6 +756,109 @@ msgstr ""
 msgid "Assigned Attendee"
 msgstr ""
 
+msgid "Booking details"
+msgstr ""
+
+# wpml-name: Late Pickup Days
+msgid "Late Pickup Days"
+msgstr ""
+
+# wpml-name: Activity Type
+msgid "Activity Type"
+msgstr ""
+
+# wpml-name: Attendee DOB
+msgid "Attendee DOB"
+msgstr ""
+
+# wpml-name: Attendee Gender
+msgid "Attendee Gender"
+msgstr ""
+
+# wpml-name: Late Pickup Cost
+msgid "Late Pickup Cost"
+msgstr ""
+
+# wpml-name: Camp Start Date
+msgid "Camp Start Date"
+msgstr ""
+
+# wpml-name: Camp End Date
+msgid "Camp End Date"
+msgstr ""
+
+# wpml-name: Camp Times
+msgid "Camp Times"
+msgstr ""
+
+# wpml-name: Canton/Region
+msgid "Canton/Region"
+msgstr ""
+
+# wpml-name: Canton / Region
+msgid "Canton / Region"
+msgstr ""
+
+# wpml-name: City
+msgid "City"
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "Course Day"
+msgstr ""
+
+msgid "Course Times"
+msgstr ""
+
+msgctxt "feminine noun"
+msgid "None"
+msgstr ""
+
+msgctxt "masculine noun"
+msgid "None"
+msgstr ""
+
+msgid "Age Group"
+msgstr ""
+
+msgid "Days of Week"
+msgstr ""
+
+# wpml-name: Booking Type
+msgid "Booking Type"
+msgstr ""
+
+# wpml-name: Discount Amount
+msgid "Discount Amount"
+msgstr ""
+
+# wpml-name: Sites InterSoccer
+msgid "Sites InterSoccer"
+msgstr ""
+
+# wpml-name: Medical Conditions
+msgid "Medical Conditions"
+msgstr ""
+
+# wpml-name: Season
+msgid "Season"
+msgstr ""
+
+#, php-format
+msgid "This attendee is %1$d years old on the program start date, which is outside the allowed age range (%2$s) for this session."
+msgstr ""
+
+msgid "The age group for this program could not be read. Please contact us or choose another session."
+msgstr ""
+
+msgid "The program start date could not be determined, so age cannot be verified. Please contact us or try another option."
+msgstr ""
+
+msgid "The attendee date of birth is invalid or is after the program start date."
+msgstr ""
+
 # wpml-name: 50% Same-Season Course Discount
 msgid "50% Same-Season Course Discount"
 msgstr ""
@@ -838,4 +944,168 @@ msgstr ""
 
 # wpml-name: Request failed
 msgid "Request failed"
+msgstr ""
+
+#, php-format
+# wpml-name: The selected attendee needs a valid date of birth. Update it under Manage Players: %s
+#. translators: %s: URL to Manage Players
+msgid "The selected attendee needs a valid date of birth. Update it under Manage Players: %s"
+msgstr ""
+
+msgid "Booking data is still saving. Please wait a moment, then try Add to cart again."
+msgstr ""
+
+# wpml-name: Select Days
+msgid "Select Days"
+msgstr ""
+
+# wpml-name: Select late pick up option (optional)
+msgid "Select late pick up option (optional)"
+msgstr ""
+
+# wpml-name: No Late Pickup
+msgid "No Late Pickup"
+msgstr ""
+
+# wpml-name: Single Days
+msgid "Single Days"
+msgstr ""
+
+# wpml-name: No late pick up selected
+msgid "No late pick up selected"
+msgstr ""
+
+# wpml-name: Full Week (5 days): 
+msgid "Full Week (5 days): "
+msgstr ""
+
+# wpml-name: Select at least one day
+msgid "Select at least one day"
+msgstr ""
+
+# wpml-name: %d day: 
+#. Translators: %d is the day count for late pickup cost display.
+#, php-format
+msgid "%d day: "
+msgid_plural "%d days: "
+msgstr[0] ""
+msgstr[1] ""
+
+# wpml-name: Invalid selection
+msgid "Invalid selection"
+msgstr ""
+
+# wpml-name: Total Sessions
+msgid "Total Sessions"
+msgstr ""
+
+# wpml-name: Holidays (No Session)
+msgid "Holidays (No Session)"
+msgstr ""
+
+#. Translators: 1: remaining session count, 2: total session count.
+#, php-format
+msgid "%1$s of %2$s"
+msgstr ""
+
+# wpml-name: Please select an attendee.
+msgid "Please select an attendee."
+msgstr ""
+
+
+msgid "Remaining Sessions"
+msgstr ""
+
+#. translators: label/value separator
+msgctxt "label/value separator"
+msgid ":"
+msgstr ""
+
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking."
+msgstr ""
+
+#, php-format
+#. translators: %s: URL to Manage Players
+msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
+msgstr ""
+
+msgid "%d%% Camp Week %d+ Discount"
+msgstr ""
+
+msgid "%d%% Camp Week 2 Discount"
+msgstr ""
+
+msgid "%d%% Same Season Course Discount"
+msgstr ""
+
+msgid "%d%% Tournament Multiple Days Discount"
+msgstr ""
+
+msgid "%s%% Camp Sibling Discount"
+msgstr ""
+
+msgid "%s%% Course Sibling Discount"
+msgstr ""
+
+msgid "%s%% Tournament Sibling Discount"
+msgstr ""
+
+msgid "Autumn"
+msgstr ""
+
+msgid "Birthday Party"
+msgstr ""
+
+msgid "Camp Terms"
+msgstr ""
+
+msgid "Discount"
+msgstr ""
+
+msgid "Female"
+msgstr ""
+
+msgid "Full Term"
+msgstr ""
+
+msgid "Girls Only"
+msgstr ""
+
+msgid "Late Pickup"
+msgstr ""
+
+msgid "Male"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Single Day(s)"
+msgstr ""
+
+msgid "Spring"
+msgstr ""
+
+msgid "Summer"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
+msgid "Tournament"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Winter"
+msgstr ""
+
+msgid "j F Y"
 msgstr ""

@@ -140,7 +140,7 @@ function intersoccer_enqueue_discount_admin_assets($hook) {
             ['value' => 'birthday', 'label' => __('Birthday', 'intersoccer-product-variations')],
         ],
         'conditions' => [
-            ['value' => 'none', 'label' => __('None', 'intersoccer-product-variations')],
+            ['value' => 'none', 'label' => intersoccer_pv_translate_none_feminine_label()],
             ['value' => '2nd_child', 'label' => __('2nd Child', 'intersoccer-product-variations')],
             ['value' => '3rd_plus_child', 'label' => __('3rd or Additional Child', 'intersoccer-product-variations')],
             ['value' => 'same_season_course', 'label' => __('Same Season Course (Same Child)', 'intersoccer-product-variations')],
@@ -220,7 +220,7 @@ class InterSoccer_Discounts_Table extends WP_List_Table {
             case 'type':
                 return esc_html(ucfirst($item['type']));
             case 'condition':
-                return esc_html($item['condition'] === 'none' ? __('None', 'intersoccer-product-variations') : ucwords(str_replace('_', ' ', $item['condition'])));
+                return esc_html($item['condition'] === 'none' ? intersoccer_pv_translate_none_feminine_label() : ucwords(str_replace('_', ' ', $item['condition'])));
             case 'rate':
                 return esc_html($item['rate']);
             case 'active':
@@ -753,7 +753,7 @@ function intersoccer_render_enhanced_discounts_page() {
                             </td>
                             <td>
                                 <select name="intersoccer_discount_rules[<?php echo esc_attr($rule_id); ?>][condition]">
-                                    <option value="none" <?php selected($rule['condition'], 'none'); ?>><?php _e('None', 'intersoccer-product-variations'); ?></option>
+                                    <option value="none" <?php selected($rule['condition'], 'none'); ?>><?php echo esc_html(intersoccer_pv_translate_none_feminine_label()); ?></option>
                                     <option value="2nd_child" <?php selected($rule['condition'], '2nd_child'); ?>><?php _e('2nd Child', 'intersoccer-product-variations'); ?></option>
                                     <option value="3rd_plus_child" <?php selected($rule['condition'], '3rd_plus_child'); ?>><?php _e('3rd+ Child', 'intersoccer-product-variations'); ?></option>
                                     <option value="same_season_course" <?php selected($rule['condition'], 'same_season_course'); ?>><?php _e('Same Season Course (Same Child)', 'intersoccer-product-variations'); ?></option>
@@ -1071,7 +1071,9 @@ class InterSoccer_Order_Preview_Table extends WP_List_Table {
                 $existing_meta = $item->get_meta_data();
                 $existing_keys = array_map(function($meta) { return $meta->key; }, $existing_meta);
                 
-                $existing_activity_type = in_array('Activity Type', $existing_keys) ? $item->get_meta('Activity Type', true) : '';
+                $existing_activity_type = function_exists('intersoccer_pv_order_item_get_meta_by_canonical_key')
+                    ? (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type')
+                    : (in_array('Activity Type', $existing_keys) ? $item->get_meta('Activity Type', true) : '');
 
                 $built = intersoccer_build_order_line_meta([
                     'order' => $order,
@@ -2076,9 +2078,9 @@ function intersoccer_analyze_item_metadata($order, $item, $product_type) {
     $missing = [];
     $proposed = [];
 
-    $existing_activity_type = in_array('Activity Type', $existing_keys, true)
-        ? $item->get_meta('Activity Type', true)
-        : '';
+    $existing_activity_type = function_exists('intersoccer_pv_order_item_get_meta_by_canonical_key')
+        ? (string) intersoccer_pv_order_item_get_meta_by_canonical_key($item, 'Activity Type')
+        : (in_array('Activity Type', $existing_keys, true) ? $item->get_meta('Activity Type', true) : '');
 
     $built = intersoccer_build_order_line_meta([
         'order' => $order,
@@ -2265,7 +2267,7 @@ class InterSoccer_Variation_Health_Table extends WP_List_Table {
                 foreach ($item['attributes'] as $key => $value) {
                     if ($value instanceof WC_Product_Attribute) {
                         $terms = $value->get_terms();
-                        $value = $terms ? implode(', ', wp_list_pluck($terms, 'name')) : __('None', 'intersoccer-product-variations');
+                        $value = $terms ? implode(', ', wp_list_pluck($terms, 'name')) : intersoccer_pv_translate_none_masculine_label();
                     } elseif (is_array($value)) {
                         $value = implode(', ', $value);
                     }

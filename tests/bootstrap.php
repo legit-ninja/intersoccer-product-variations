@@ -113,7 +113,103 @@ if (!function_exists('esc_attr')) {
 
 if (!function_exists('__')) {
     function __($text, $domain = 'default') {
-        return $text;
+        $translation = $text;
+        if (class_exists('MockFilters') && isset(MockFilters::$filters['gettext_' . $domain])) {
+            return call_user_func(MockFilters::$filters['gettext_' . $domain], $translation, $text, $domain);
+        }
+        if (function_exists('translate')) {
+            return translate($text, $domain);
+        }
+        return $translation;
+    }
+}
+
+if (!function_exists('is_textdomain_loaded')) {
+    function is_textdomain_loaded($domain) {
+        global $intersoccer_pv_test_textdomain_loaded;
+        return !empty($intersoccer_pv_test_textdomain_loaded[$domain])
+            || !empty($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+    }
+}
+
+if (!function_exists('unload_textdomain')) {
+    function unload_textdomain($domain, $reloadable = false) {
+        $GLOBALS['intersoccer_test_textdomain_unload_reloadable'][$domain] = (bool) $reloadable;
+        unset($GLOBALS['intersoccer_test_textdomain_loaded'][$domain]);
+        global $intersoccer_pv_test_textdomain_loaded;
+        unset($intersoccer_pv_test_textdomain_loaded[$domain]);
+    }
+}
+
+if (!function_exists('load_plugin_textdomain')) {
+    function load_plugin_textdomain($domain, $deprecated, $path) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'path' => $path,
+            'locale' => function_exists('determine_locale') ? determine_locale() : 'en_US',
+            'via' => 'load_plugin_textdomain',
+        ];
+        return true;
+    }
+}
+
+if (!function_exists('load_textdomain')) {
+    function load_textdomain($domain, $mofile, $locale = null) {
+        $GLOBALS['intersoccer_test_textdomain_loaded'][$domain] = [
+            'mofile' => $mofile,
+            'locale' => $locale ?: (function_exists('determine_locale') ? determine_locale() : 'en_US'),
+            'via' => 'load_textdomain',
+        ];
+        return true;
+    }
+}
+
+if (!function_exists('_n')) {
+    function _n($single, $plural, $number, $domain = 'default') {
+        $index = (int) $number === 1 ? 0 : 1;
+        if (function_exists('translate')) {
+            $key = $single . "\0" . $plural;
+            $translated = translate($key, $domain);
+            if ($translated !== $key && str_contains($translated, "\0")) {
+                $parts = explode("\0", $translated);
+                if (isset($parts[$index])) {
+                    return $parts[$index];
+                }
+            }
+        }
+        return $index === 0 ? $single : $plural;
+    }
+}
+
+if (!function_exists('_x')) {
+    function _x($text, $context, $domain = 'default') {
+        if (function_exists('translate')) {
+            $key = $context . "\4" . $text;
+            $translated = translate($key, $domain);
+            if ($translated !== $key) {
+                return $translated;
+            }
+        }
+        return __($text, $domain);
+    }
+}
+
+if (!function_exists('wp_kses')) {
+    function wp_kses($string, $allowed_html, $allowed_protocols = []) {
+        $string = (string) $string;
+        if ($allowed_html === [] || $allowed_html === null) {
+            return wp_strip_all_tags($string);
+        }
+        if (isset($allowed_html['a']['href']) && preg_match_all('/<a\\s+[^>]*href=(["\'])([^"\']*)\\1[^>]*>(.*?)<\\/a>/is', $string, $matches, PREG_SET_ORDER)) {
+            $out = $string;
+            foreach ($matches as $match) {
+                $href = esc_url($match[2]);
+                $inner = $match[3];
+                $replacement = '<a href="' . $href . '">' . $inner . '</a>';
+                $out = str_replace($match[0], $replacement, $out);
+            }
+            return preg_replace('/<(?!\/?a\b)[^>]+>/', '', $out);
+        }
+        return wp_strip_all_tags($string);
     }
 }
 
@@ -137,6 +233,10 @@ if (!function_exists('add_shortcode')) {
 
 if (!function_exists('add_action')) {
     function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
+        if (!isset($GLOBALS['intersoccer_test_actions'][$hook][$priority])) {
+            $GLOBALS['intersoccer_test_actions'][$hook][$priority] = [];
+        }
+        $GLOBALS['intersoccer_test_actions'][$hook][$priority][] = $callback;
         return true;
     }
 }
@@ -155,7 +255,13 @@ if (!function_exists('intersoccer_info')) {
 
 if (!function_exists('intersoccer_warning')) {
     function intersoccer_warning($message) {
-        return;
+        $GLOBALS['intersoccer_test_warnings'][] = (string) $message;
+    }
+}
+
+if (!function_exists('intersoccer_error')) {
+    function intersoccer_error($message) {
+        $GLOBALS['intersoccer_test_errors'][] = (string) $message;
     }
 }
 
@@ -183,18 +289,56 @@ if (!class_exists('WP_Error')) {
                 }
             }
         }
+
+        public function get_error_code() {
+            $codes = array_keys($this->errors);
+            return $codes[0] ?? '';
+        }
+
+        public function get_error_message($code = '') {
+            if ($code === '') {
+                $code = $this->get_error_code();
+            }
+            if ($code === '' || empty($this->errors[$code])) {
+                return '';
+            }
+            return (string) $this->errors[$code][0];
+        }
+    }
+}
+
+if (!function_exists('intersoccer_test_object_cache_get_store')) {
+    function &intersoccer_test_object_cache_get_store() {
+        if (!isset($GLOBALS['intersoccer_test_object_cache']) || !is_array($GLOBALS['intersoccer_test_object_cache'])) {
+            $GLOBALS['intersoccer_test_object_cache'] = [];
+        }
+        return $GLOBALS['intersoccer_test_object_cache'];
     }
 }
 
 if (!function_exists('wp_cache_get')) {
     function wp_cache_get($key, $group = '', $force = false, &$found = null) {
-        $found = false;
-        return false;
+        $store = intersoccer_test_object_cache_get_store();
+        $found = isset($store[$group][$key]);
+        return $found ? $store[$group][$key] : false;
     }
 }
 
 if (!function_exists('wp_cache_set')) {
     function wp_cache_set($key, $data, $group = '', $expire = 0) {
+        $store = &intersoccer_test_object_cache_get_store();
+        $store[$group][$key] = $data;
+        return true;
+    }
+}
+
+if (!function_exists('wp_cache_add')) {
+    function wp_cache_add($key, $data, $group = '', $expire = 0) {
+        $store = intersoccer_test_object_cache_get_store();
+        if (isset($store[$group][$key])) {
+            return false;
+        }
+        $store[$group][$key] = $data;
         return true;
     }
 }
@@ -325,7 +469,41 @@ if (!function_exists('delete_option')) {
 
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
+        if ($hook === 'wpml_switch_language') {
+            $GLOBALS['intersoccer_test_wpml_switch_language_count'] = (int) ($GLOBALS['intersoccer_test_wpml_switch_language_count'] ?? 0) + 1;
+            if (isset($args[0]) && array_key_exists('intersoccer_test_wpml_current_language', $GLOBALS)) {
+                $GLOBALS['intersoccer_test_wpml_current_language'] = $args[0];
+            }
+        }
+        if (!empty($GLOBALS['intersoccer_test_actions'][$hook]) && is_array($GLOBALS['intersoccer_test_actions'][$hook])) {
+            ksort($GLOBALS['intersoccer_test_actions'][$hook]);
+            foreach ($GLOBALS['intersoccer_test_actions'][$hook] as $callbacks) {
+                foreach ($callbacks as $callback) {
+                    if (is_callable($callback)) {
+                        call_user_func_array($callback, $args);
+                    }
+                }
+            }
+        }
         return;
+    }
+}
+
+if (!function_exists('is_admin')) {
+    function is_admin() {
+        return !empty($GLOBALS['intersoccer_test_is_admin']);
+    }
+}
+
+if (!function_exists('wp_doing_ajax')) {
+    function wp_doing_ajax() {
+        return !empty($GLOBALS['intersoccer_test_doing_ajax']);
+    }
+}
+
+if (!function_exists('did_action')) {
+    function did_action($hook) {
+        return 0;
     }
 }
 
@@ -491,13 +669,32 @@ if (!function_exists('update_postmeta_cache')) {
 
 if (!function_exists('wp_cache_delete')) {
     function wp_cache_delete($key, $group = '') {
-        return true;
+        $store = &intersoccer_test_object_cache_get_store();
+        if (isset($store[$group][$key])) {
+            unset($store[$group][$key]);
+            return true;
+        }
+        return false;
     }
 }
 
 if (!function_exists('get_post_field')) {
     function get_post_field($field, $post = null, $context = 'display') {
         return '';
+    }
+}
+
+if (!function_exists('wp_get_post_parent_id')) {
+    function wp_get_post_parent_id($post_id) {
+        $post_id = (int) $post_id;
+        $map = $GLOBALS['intersoccer_test_wp_get_post_parent_id_map'] ?? null;
+        if (is_array($map) && array_key_exists($post_id, $map)) {
+            return (int) $map[$post_id];
+        }
+        if (isset($GLOBALS['intersoccer_test_wp_get_post_parent_id_default'])) {
+            return (int) $GLOBALS['intersoccer_test_wp_get_post_parent_id_default'];
+        }
+        return 0;
     }
 }
 
@@ -528,6 +725,10 @@ if (!function_exists('wc_add_notice')) {
 
 if (!function_exists('wc_get_account_endpoint_url')) {
     function wc_get_account_endpoint_url($endpoint) {
+        global $intersoccer_test_myaccount_permalink;
+        if (isset($intersoccer_test_myaccount_permalink) && $intersoccer_test_myaccount_permalink === '') {
+            return '';
+        }
         return 'http://example.com/my-account/' . $endpoint . '/';
     }
 }
@@ -625,6 +826,15 @@ if (!function_exists('maybe_unserialize')) {
     }
 }
 
+if (!function_exists('maybe_serialize')) {
+    function maybe_serialize($data) {
+        if (is_array($data) || is_object($data)) {
+            return serialize($data);
+        }
+        return $data;
+    }
+}
+
 if (!function_exists('taxonomy_exists')) {
     function taxonomy_exists($taxonomy) {
         return true;
@@ -633,13 +843,83 @@ if (!function_exists('taxonomy_exists')) {
 
 if (!function_exists('get_term')) {
     function get_term($term, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        $term_id = is_object($term) ? (int) ($term->term_id ?? 0) : (int) $term;
+        if (
+            $term_id > 0
+            && !empty($GLOBALS['intersoccer_test_wpml_simulate_term_filters'])
+            && empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters'])
+            && isset($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+            && is_callable($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'])
+        ) {
+            $term_id = (int) call_user_func($GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'], $term_id);
+        }
+        if ($term_id > 0 && !empty($GLOBALS['intersoccer_test_terms'][$term_id])) {
+            $row = $GLOBALS['intersoccer_test_terms'][$term_id];
+            return (object) [
+                'term_id' => $term_id,
+                'name' => $row['name'] ?? '',
+                'slug' => $row['slug'] ?? sanitize_title($row['name'] ?? ''),
+                'taxonomy' => $row['taxonomy'] ?? $taxonomy,
+            ];
+        }
         return null;
     }
 }
 
 if (!function_exists('get_term_by')) {
     function get_term_by($field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
+        if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+            $current_lang = !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'])
+                ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
+                : '';
+            foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
+                if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
+                    continue;
+                }
+                if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+                    continue;
+                }
+                if ($field === 'name' && isset($row['name']) && (string) $row['name'] === (string) $value) {
+                    return get_term((int) $term_id, $taxonomy);
+                }
+                if ($field === 'slug') {
+                    $slug = $row['slug'] ?? sanitize_title($row['name'] ?? '');
+                    if ((string) $slug === (string) $value) {
+                        return get_term((int) $term_id, $taxonomy);
+                    }
+                }
+            }
+        }
         return false;
+    }
+}
+
+if (!function_exists('get_terms')) {
+    function get_terms($args = []) {
+        $taxonomy = is_array($args) ? (string) ($args['taxonomy'] ?? '') : '';
+        if ($taxonomy === '' || empty($GLOBALS['intersoccer_test_terms']) || !is_array($GLOBALS['intersoccer_test_terms'])) {
+            return [];
+        }
+        $suppress = !empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters']);
+        $current_lang = (!$suppress && !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language']))
+            ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
+            : '';
+        $out = [];
+        foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
+            if (!is_array($row) || ($row['taxonomy'] ?? '') !== $taxonomy) {
+                continue;
+            }
+            if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+                continue;
+            }
+            $out[] = (object) [
+                'term_id' => (int) $term_id,
+                'name' => $row['name'] ?? '',
+                'slug' => $row['slug'] ?? sanitize_title($row['name'] ?? ''),
+                'taxonomy' => $taxonomy,
+            ];
+        }
+        return $out;
     }
 }
 
@@ -706,15 +986,13 @@ if (!function_exists('clean_post_cache')) {
     }
 }
 
-if (!function_exists('wp_cache_delete')) {
-    function wp_cache_delete($key, $group = '') {
-        return true;
-    }
-}
-
 if (!function_exists('wc_get_product_terms')) {
     function wc_get_product_terms($product_id, $taxonomy, $args = []) {
         $product_id = (int) $product_id;
+        $fields = isset($args['fields']) ? $args['fields'] : 'names';
+        if ($fields === 'ids' && isset($GLOBALS['intersoccer_test_product_term_ids'][$product_id][$taxonomy])) {
+            return $GLOBALS['intersoccer_test_product_term_ids'][$product_id][$taxonomy];
+        }
         if (isset($GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy])) {
             return $GLOBALS['intersoccer_test_product_terms'][$product_id][$taxonomy];
         }
@@ -724,6 +1002,32 @@ if (!function_exists('wc_get_product_terms')) {
 
 if (!function_exists('wc_get_orders')) {
     function wc_get_orders($args = []) {
+        if (isset($GLOBALS['intersoccer_test_wc_get_orders']) && is_callable($GLOBALS['intersoccer_test_wc_get_orders'])) {
+            return call_user_func($GLOBALS['intersoccer_test_wc_get_orders'], $args);
+        }
         return [];
+    }
+}
+
+if (!function_exists('wc_get_order')) {
+    function wc_get_order($order_id) {
+        $order_id = (int) $order_id;
+        if (isset($GLOBALS['intersoccer_test_orders'][$order_id])) {
+            return $GLOBALS['intersoccer_test_orders'][$order_id];
+        }
+        return null;
+    }
+}
+
+if (!function_exists('remove_accents')) {
+    function remove_accents($text) {
+        $text = (string) $text;
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                return $converted;
+            }
+        }
+        return $text;
     }
 }
