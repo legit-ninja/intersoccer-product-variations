@@ -6,6 +6,7 @@
  * Run: php vendor/bin/phpunit --no-configuration --do-not-cache-result tests/GirlsOnlySwitchTermLanguageTest.php
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 if (!defined('ABSPATH')) {
@@ -65,7 +66,7 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         ];
     }
 
-    /** @dataProvider apostropheYesLabels */
+    #[DataProvider('apostropheYesLabels')]
     public function test_apostrophe_yes_label_is_girls_only($slug, $name) {
         $this->assertTrue(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
     }
@@ -79,12 +80,12 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         ];
     }
 
-    /** @dataProvider negatedGirlsOnlySlugs */
+    #[DataProvider('negatedGirlsOnlySlugs')]
     public function test_leading_negation_slug_is_not_girls_only($slug, $name) {
         $this->assertFalse(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
     }
 
-    /** @dataProvider noValues */
+    #[DataProvider('noValues')]
     public function test_no_value_allows_boys($slug, $name) {
         $this->assertFalse(
             intersoccer_switch_term_indicates_girls_only_session($slug, $name),
@@ -92,7 +93,7 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         );
     }
 
-    /** @dataProvider noValues */
+    #[DataProvider('noValues')]
     public function test_no_value_writes_no_girls_only_order_meta($slug, $name) {
         // order-meta-contract.php intersoccer_format_girls_only_meta_value() shares the same check.
         $this->assertSame('', (string) intersoccer_format_girls_only_meta_value($slug, $name),
@@ -101,8 +102,8 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
 
     /**
      * Control: yes stays girls-only.
-     * @dataProvider yesValues
      */
+    #[DataProvider('yesValues')]
     public function test_yes_value_is_girls_only($slug, $name) {
         $this->assertTrue(intersoccer_switch_term_indicates_girls_only_session($slug, $name));
     }
@@ -114,12 +115,13 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
             'EN label Full Week' => ['Full Week'],
             'FR slug semaine-complete' => ['semaine-complete'],
             'FR label Semaine complète' => ['Semaine complète'],
+            'FR label semaine complète (lowercase)' => ['semaine complète'],
             'DE slug ganze-woche' => ['ganze-woche'],
             'DE label Ganze Woche' => ['Ganze Woche'],
         ];
     }
 
-    /** @dataProvider fullWeekValues */
+    #[DataProvider('fullWeekValues')]
     public function test_canonical_booking_type_full_week($raw) {
         $this->assertSame('full-week', intersoccer_normalize_canonical_booking_type($raw),
             "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
@@ -136,7 +138,7 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
         ];
     }
 
-    /** @dataProvider unknownNotGirlsOnlyValues */
+    #[DataProvider('unknownNotGirlsOnlyValues')]
     public function test_unknown_value_is_not_girls_only($slug, $name) {
         $this->assertFalse(
             intersoccer_switch_term_indicates_girls_only_session($slug, $name),
@@ -150,12 +152,26 @@ class GirlsOnlySwitchTermLanguageTest extends TestCase {
             'EN slug single-days' => ['single-days'],
             'DE slug einzelner-tage' => ['einzelner-tage'],
             'FR slug a-la-journee' => ['a-la-journee'],
+            'FR label À la journée' => ['À la journée'],
+            'FR label Journée' => ['Journée'],
         ];
     }
 
-    /** @dataProvider singleDaysValues */
+    #[DataProvider('singleDaysValues')]
     public function test_canonical_booking_type_single_days($raw) {
         $this->assertSame('single-days', intersoccer_normalize_canonical_booking_type($raw),
+            "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
+    }
+
+    public static function fullTermValues(): array {
+        return [
+            'FR label Trimestre complet' => ['Trimestre complet'],
+        ];
+    }
+
+    #[DataProvider('fullTermValues')]
+    public function test_canonical_booking_type_full_term($raw) {
+        $this->assertSame('full-term', intersoccer_normalize_canonical_booking_type($raw),
             "order-meta-contract.php intersoccer_normalize_canonical_booking_type('{$raw}')");
     }
 }
