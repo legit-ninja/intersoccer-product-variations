@@ -5,7 +5,9 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.10.30.1] - 2026-10-30
+## [2.10.31] - 2026-10-31
+
+Note: v2.10.30.1 failed to publish because the publish workflow rejects four-part versions, so nothing shipped under it. This release ships the same changes.
 
 ### Fixed
 - Order display: show each line-item attribute once (#127).
