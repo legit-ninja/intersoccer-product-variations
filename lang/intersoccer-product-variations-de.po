@@ -946,7 +946,7 @@ msgid "This session is for girls only. The selected attendee needs gender set to
 msgstr "Diese Veranstaltung ist nur für Mädchen. Für den ausgewählten Teilnehmer muss im Konto das Geschlecht „weiblich“ hinterlegt sein. Bitte aktualisieren Sie dies unter <a href=\"%s\">Teilnehmer verwalten</a>."
 
 msgid "This session is for girls only. Please choose a female attendee or pick a different session."
-msgstr "Diese Veranstaltung ist nur für Mädchen. Bitte wählen Sie eine Spielerin oder eine andere Veranstaltung."
+msgstr "Diese Veranstaltung ist nur für Mädchen. Bitte wählen Sie eine Teilnehmerin oder eine andere Veranstaltung."
 
 msgid "%d%% Camp Week %d+ Discount"
 msgstr "%d%% Camp-Rabatt Woche %d+"
