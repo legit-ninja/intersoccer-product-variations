@@ -85,6 +85,10 @@ if (!class_exists('WC_Product')) {
         public function get_price() {
             return 0;
         }
+
+        public function get_attributes() {
+            return [];
+        }
     }
 }
 

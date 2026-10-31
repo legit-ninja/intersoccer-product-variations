@@ -1,12 +1,13 @@
 <?php
 /**
  * Program Manager duplicate_program: price + camp/course variation meta.
- *
- * @runTestsInSeparateProcesses
- * @preserveGlobalState disabled
  */
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 class ProgramManagerDuplicatePriceMetaTest extends TestCase {
 	/** @var int */
 	public static int $next_product_id = 910000;
