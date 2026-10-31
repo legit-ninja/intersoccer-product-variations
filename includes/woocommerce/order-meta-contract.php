@@ -3812,10 +3812,25 @@ function intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $met
 
     $term = get_term_by('slug', $text, $taxonomy);
     if (!$term || is_wp_error($term) || (string) $term->slug !== $text) {
-        return $value;
+        $term = get_term_by('name', $text, $taxonomy);
+        if (!$term || is_wp_error($term) || (string) $term->name !== $text) {
+            if (function_exists('intersoccer_discount_wpml_execute_in_language') && function_exists('apply_filters')) {
+                $default_lang = apply_filters('wpml_default_language', null);
+                if ($default_lang) {
+                    $term = intersoccer_discount_wpml_execute_in_language($default_lang, static function () use ($text, $taxonomy) {
+                        $resolved = get_term_by('name', $text, $taxonomy);
+                        return ($resolved && !is_wp_error($resolved) && (string) $resolved->name === $text) ? $resolved : null;
+                    });
+                }
+            }
+        }
+        if (!$term || is_wp_error($term)) {
+            return $value;
+        }
     }
 
-    $readable = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $text);
+    $term_slug = isset($term->slug) ? trim((string) $term->slug) : '';
+    $readable = intersoccer_pv_readable_term_name_for_taxonomy_slug($taxonomy, $term_slug !== '' ? $term_slug : $text);
 
     return $readable !== '' ? $readable : $value;
 }
