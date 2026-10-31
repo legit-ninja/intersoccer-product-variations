@@ -734,6 +734,29 @@ msgstr "Canton / région"
 msgid "City"
 msgstr "Ville"
 
+msgid "Year"
+msgstr "Année"
+
+msgid "Course Day"
+msgstr "Jour de cours"
+
+msgid "Course Times"
+msgstr "Horaires du cours"
+
+msgctxt "feminine noun"
+msgid "None"
+msgstr "Aucune"
+
+msgctxt "masculine noun"
+msgid "None"
+msgstr "Aucun"
+
+msgid "Age Group"
+msgstr "Groupe d'âge"
+
+msgid "Days of Week"
+msgstr "Jours de la semaine"
+
 msgid "Booking Type"
 msgstr "Type de réservation"
 
