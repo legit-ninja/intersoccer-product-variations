@@ -5,6 +5,14 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.1] - 2026-11-01
+
+### Fixed
+- Customer UI now inherits the Cloe Brooks theme and WooCommerce styles (#126).
+- FR checkout shows course-time labels in French format (#158).
+- Variation prices pass through correctly after the price-callback signature fix (#169, issue #166).
+- DE course days resolve through the WPML English term, so proration works for German orders (#168, issue #167).
+
 ## [2.10.31] - 2026-10-31
 
 Note: v2.10.30.1 failed to publish because the publish workflow rejects four-part versions, so nothing shipped under it. This release ships the same changes.
