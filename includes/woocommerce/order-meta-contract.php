@@ -3709,13 +3709,16 @@ function intersoccer_pv_taxonomy_from_slug_meta_key($meta_key) {
  * @return string
  */
 function intersoccer_pv_wpml_current_language_code() {
+    $lang = function_exists('apply_filters') ? apply_filters('wpml_current_language', null) : null;
+    if (is_string($lang) && trim($lang) !== '') {
+        return trim($lang);
+    }
+
     if (defined('ICL_LANGUAGE_CODE') && ICL_LANGUAGE_CODE) {
         return (string) ICL_LANGUAGE_CODE;
     }
 
-    $lang = apply_filters('wpml_current_language', null);
-
-    return is_string($lang) ? trim($lang) : '';
+    return '';
 }
 
 /**
@@ -3822,8 +3825,13 @@ function intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $met
     if ($term && !is_wp_error($term) && (string) $term->slug === $text) {
         $resolved_by_slug = true;
     } else {
-        $term = intersoccer_pv_term_by_exact_name_for_attr_display($text, $taxonomy);
+        $resolved_via_default_language = false;
+        $term = intersoccer_pv_term_by_exact_name_for_attr_display($text, $taxonomy, $resolved_via_default_language);
         if (!$term || is_wp_error($term)) {
+            $readable_attr_cache[$cache_key] = $value;
+            return $value;
+        }
+        if (!$resolved_via_default_language) {
             $readable_attr_cache[$cache_key] = $value;
             return $value;
         }
@@ -3874,9 +3882,14 @@ function intersoccer_pv_customer_readable_attr_value_if_stored_slug($value, $met
  *
  * @param string $text     Stored value.
  * @param string $taxonomy pa_* taxonomy.
+ * @param bool|null $resolved_via_default_language Set true when the match used default-language lookup.
  * @return WP_Term|null|false
  */
-function intersoccer_pv_term_by_exact_name_for_attr_display($text, $taxonomy) {
+function intersoccer_pv_term_by_exact_name_for_attr_display($text, $taxonomy, &$resolved_via_default_language = null) {
+    if ($resolved_via_default_language !== null) {
+        $resolved_via_default_language = false;
+    }
+
     $term = get_term_by('name', $text, $taxonomy);
     if ($term && !is_wp_error($term) && (string) $term->name === $text) {
         return $term;
@@ -3890,6 +3903,9 @@ function intersoccer_pv_term_by_exact_name_for_attr_display($text, $taxonomy) {
                 return ($resolved && !is_wp_error($resolved) && (string) $resolved->name === $text) ? $resolved : null;
             });
             if ($term && !is_wp_error($term)) {
+                if ($resolved_via_default_language !== null) {
+                    $resolved_via_default_language = true;
+                }
                 return $term;
             }
         }

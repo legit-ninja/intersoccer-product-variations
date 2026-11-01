@@ -88,7 +88,8 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
             $GLOBALS['intersoccer_test_terms'],
             $GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'],
             $GLOBALS['intersoccer_test_wpml_current_language'],
-            $GLOBALS['intersoccer_test_get_term_by_name_case_insensitive']
+            $GLOBALS['intersoccer_test_get_term_by_name_case_insensitive'],
+            $GLOBALS['intersoccer_sensitive_order_meta_email']
         );
         MockFilters::reset();
         parent::tearDown();
@@ -165,6 +166,28 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
         $this->setLanguage('de');
         $this->assertSame('5-13 Jahre (Ganztag)', $this->displayValue($stored, 'Age Group'));
         $this->setLanguage('en');
+        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+    }
+
+    private function ensureIclLanguageCodeEn(): void {
+        if (!defined('ICL_LANGUAGE_CODE')) {
+            define('ICL_LANGUAGE_CODE', 'en');
+        }
+    }
+
+    public function test_fr_stored_localized_name_unchanged_when_wpml_fr_and_icl_en(): void {
+        $this->ensureIclLanguageCodeEn();
+        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+        $this->setLanguage('fr');
+        $stored = '5-13 ans (journée complète)';
+        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+    }
+
+    public function test_de_stored_localized_name_unchanged_when_wpml_de_and_icl_en(): void {
+        $this->ensureIclLanguageCodeEn();
+        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+        $this->setLanguage('de');
+        $stored = '5-13 Jahre (Ganztag)';
         $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
     }
 
