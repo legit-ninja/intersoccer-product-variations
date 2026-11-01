@@ -639,6 +639,18 @@ function intersoccer_booking_type_accent_transliteration_map() {
 }
 
 /**
+ * Strip Unicode combining marks when intl NFC is unavailable or failed.
+ *
+ * @param string $text Raw label after html_entity_decode/trim.
+ * @return string
+ */
+function intersoccer_booking_type_strip_combining_marks($text) {
+    $text = (string) $text;
+    $stripped = preg_replace('/\p{Mn}/u', '', $text);
+    return $stripped !== null ? $stripped : $text;
+}
+
+/**
  * NFC-normalize booking-type labels (NFD-safe) before accent removal.
  *
  * @param string $text Raw label after html_entity_decode/trim.
@@ -646,19 +658,13 @@ function intersoccer_booking_type_accent_transliteration_map() {
  */
 function intersoccer_booking_type_unicode_compose($text) {
     $text = (string) $text;
-    $force_fallback = apply_filters('intersoccer_booking_type_unicode_compose_force_fallback', false, $text);
-    if (!$force_fallback && (class_exists('Normalizer') || function_exists('normalizer_normalize'))) {
-        if (class_exists('Normalizer')) {
-            $normalized = Normalizer::normalize($text, Normalizer::FORM_C);
-        } else {
-            $normalized = normalizer_normalize($text, Normalizer::FORM_C);
-        }
+    if (class_exists('Normalizer')) {
+        $normalized = Normalizer::normalize($text, Normalizer::FORM_C);
         if ($normalized !== false) {
             return $normalized;
         }
     }
-    $stripped = preg_replace('/\p{Mn}/u', '', $text);
-    return $stripped !== null ? $stripped : $text;
+    return intersoccer_booking_type_strip_combining_marks($text);
 }
 
 /**
