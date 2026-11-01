@@ -4,6 +4,14 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', dirname(__DIR__) . '/');
 }
 
+// Isolated checkout integration tests set this via putenv before the child process starts.
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT')) {
+    $load_real_checkout = getenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+    if ($load_real_checkout !== false && $load_real_checkout !== '' && $load_real_checkout !== '0') {
+        define('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT', true);
+    }
+}
+
 // WordPress constants used by some functions
 if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
@@ -529,7 +537,7 @@ if (!function_exists('get_current_user_id')) {
 }
 
 // Test doubles for player enrichment (OrderMeta*). Prefer globals so suite load order cannot shadow mocks.
-if (!function_exists('intersoccer_get_player_details')) {
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT') && !function_exists('intersoccer_get_player_details')) {
     function intersoccer_get_player_details($user_id, $player_index) {
         if (isset($GLOBALS['intersoccer_test_player_details']) && is_array($GLOBALS['intersoccer_test_player_details'])) {
             return $GLOBALS['intersoccer_test_player_details'];

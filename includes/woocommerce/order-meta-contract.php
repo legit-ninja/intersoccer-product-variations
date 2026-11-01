@@ -546,7 +546,7 @@ function intersoccer_build_order_line_meta($args) {
     }
 
     if (function_exists('intersoccer_get_parent_product_attributes')) {
-        $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id);
+        $attributes = intersoccer_get_parent_product_attributes($product_id, $variation_id, $order);
         foreach ($attributes as $label => $value) {
             if (in_array($label, ['Activity Type', 'Season'], true)) {
                 continue;
