@@ -39,6 +39,9 @@ if (!function_exists('intersoccer_weekday_slug_map')) {
             'freitag' => 5,
             'samstag' => 6,
             'sonntag' => 7,
+            'mittwou' => 3,
+            'mantig' => 1,
+            'fritig' => 5,
         ];
     }
 }
@@ -59,8 +62,76 @@ if (!class_exists('InterSoccer_Course_Schedule_Calculator')) {
             }
 
             $day_map = intersoccer_weekday_slug_map();
+            $slug_lower = strtolower((string) $attribute_slug);
 
-            return $day_map[strtolower($attribute_slug)] ?? 0;
+            $from_en_term = $this->resolve_weekday_via_wpml_en_term($slug_lower, $day_map);
+            if ($from_en_term > 0) {
+                return $from_en_term;
+            }
+
+            return $day_map[$slug_lower] ?? 0;
+        }
+
+        /**
+         * Map a localized course-day slug to a weekday number via the EN WPML term twin.
+         *
+         * @param string       $slug_lower
+         * @param array<string,int> $day_map
+         * @return int
+         */
+        protected function resolve_weekday_via_wpml_en_term($slug_lower, array $day_map) {
+            if (!function_exists('get_term_by')) {
+                return 0;
+            }
+
+            $taxonomy = 'pa_course-day';
+            $previous_lang = null;
+            $switched = false;
+            if (function_exists('apply_filters') && function_exists('do_action')) {
+                $previous_lang = apply_filters('wpml_current_language', null);
+                do_action('wpml_switch_language', 'all');
+                $switched = true;
+            }
+
+            try {
+                $term = get_term_by('slug', $slug_lower, $taxonomy);
+                if (!$term || (function_exists('is_wp_error') && is_wp_error($term))) {
+                    return 0;
+                }
+
+                $term_id = (int) $term->term_id;
+                $en_term_id = 0;
+                if (function_exists('apply_filters')) {
+                    $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, false, 'en');
+                }
+                if ($en_term_id <= 0 && function_exists('icl_object_id')) {
+                    $en_term_id = (int) icl_object_id($term_id, $taxonomy, false, 'en');
+                }
+                if ($en_term_id <= 0 || !function_exists('get_term')) {
+                    return 0;
+                }
+
+                $en_term = get_term($en_term_id, $taxonomy);
+                if (!$en_term || (function_exists('is_wp_error') && is_wp_error($en_term))) {
+                    return 0;
+                }
+
+                $en_slug = strtolower((string) $en_term->slug);
+                if (isset($day_map[$en_slug])) {
+                    return (int) $day_map[$en_slug];
+                }
+
+                $en_name = isset($en_term->name) ? strtolower(trim((string) $en_term->name)) : '';
+                if ($en_name !== '' && isset($day_map[$en_name])) {
+                    return (int) $day_map[$en_name];
+                }
+
+                return 0;
+            } finally {
+                if ($switched) {
+                    do_action('wpml_switch_language', $previous_lang);
+                }
+            }
         }
 
         /**
