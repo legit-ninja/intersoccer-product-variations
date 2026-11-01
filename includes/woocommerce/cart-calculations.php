@@ -832,18 +832,23 @@ function intersoccer_modify_price_html($price_html, $product) {
  * Calculates prorated price directly without session dependency
  */
 add_filter('woocommerce_get_variation_price', 'intersoccer_modify_variation_price', 10, 4);
-function intersoccer_modify_variation_price($price, $variation, $product, $min_or_max) {
-    $product_type = InterSoccer_Product_Types::get_product_type($product->get_id());
+function intersoccer_modify_variation_price($price, $product, $min_or_max, $for_display) {
+    $product_id = $product->get_id();
+    $product_type = InterSoccer_Product_Types::get_product_type($product_id);
 
     // Only modify for course products
     if ($product_type !== 'course') {
         return $price;
     }
 
-    // Calculate prorated price directly
-    $prorated_price = InterSoccer_Course::calculate_price($product->get_id(), $variation->get_id());
-    
-    return $prorated_price;
+    $prices = $product->get_variation_prices($for_display);
+    if (empty($prices['price'])) {
+        return $price;
+    }
+
+    $variation_id = 'min' === $min_or_max ? (int) key($prices['price']) : (int) array_key_last($prices['price']);
+
+    return InterSoccer_Course::calculate_price($product_id, $variation_id);
 }
 
 /**
