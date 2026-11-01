@@ -39,6 +39,9 @@ if (!function_exists('intersoccer_weekday_slug_map')) {
             'freitag' => 5,
             'samstag' => 6,
             'sonntag' => 7,
+            'mittwou' => 3,
+            'mantig' => 1,
+            'fritig' => 5,
         ];
     }
 }
@@ -82,39 +85,53 @@ if (!class_exists('InterSoccer_Course_Schedule_Calculator')) {
             }
 
             $taxonomy = 'pa_course-day';
-            $term = get_term_by('slug', $slug_lower, $taxonomy);
-            if (!$term || (function_exists('is_wp_error') && is_wp_error($term))) {
+            $previous_lang = null;
+            $switched = false;
+            if (function_exists('apply_filters') && function_exists('do_action')) {
+                $previous_lang = apply_filters('wpml_current_language', null);
+                do_action('wpml_switch_language', 'all');
+                $switched = true;
+            }
+
+            try {
+                $term = get_term_by('slug', $slug_lower, $taxonomy);
+                if (!$term || (function_exists('is_wp_error') && is_wp_error($term))) {
+                    return 0;
+                }
+
+                $term_id = (int) $term->term_id;
+                $en_term_id = 0;
+                if (function_exists('apply_filters')) {
+                    $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, false, 'en');
+                }
+                if ($en_term_id <= 0 && function_exists('icl_object_id')) {
+                    $en_term_id = (int) icl_object_id($term_id, $taxonomy, false, 'en');
+                }
+                if ($en_term_id <= 0 || !function_exists('get_term')) {
+                    return 0;
+                }
+
+                $en_term = get_term($en_term_id, $taxonomy);
+                if (!$en_term || (function_exists('is_wp_error') && is_wp_error($en_term))) {
+                    return 0;
+                }
+
+                $en_slug = strtolower((string) $en_term->slug);
+                if (isset($day_map[$en_slug])) {
+                    return (int) $day_map[$en_slug];
+                }
+
+                $en_name = isset($en_term->name) ? strtolower(trim((string) $en_term->name)) : '';
+                if ($en_name !== '' && isset($day_map[$en_name])) {
+                    return (int) $day_map[$en_name];
+                }
+
                 return 0;
+            } finally {
+                if ($switched) {
+                    do_action('wpml_switch_language', $previous_lang);
+                }
             }
-
-            $term_id = (int) $term->term_id;
-            $en_term_id = 0;
-            if (function_exists('apply_filters')) {
-                $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, false, 'en');
-            }
-            if ($en_term_id <= 0 && function_exists('icl_object_id')) {
-                $en_term_id = (int) icl_object_id($term_id, $taxonomy, false, 'en');
-            }
-            if ($en_term_id <= 0 || !function_exists('get_term')) {
-                return 0;
-            }
-
-            $en_term = get_term($en_term_id, $taxonomy);
-            if (!$en_term || (function_exists('is_wp_error') && is_wp_error($en_term))) {
-                return 0;
-            }
-
-            $en_slug = strtolower((string) $en_term->slug);
-            if (isset($day_map[$en_slug])) {
-                return (int) $day_map[$en_slug];
-            }
-
-            $en_name = isset($en_term->name) ? strtolower(trim((string) $en_term->name)) : '';
-            if ($en_name !== '' && isset($day_map[$en_name])) {
-                return (int) $day_map[$en_name];
-            }
-
-            return 0;
         }
 
         /**

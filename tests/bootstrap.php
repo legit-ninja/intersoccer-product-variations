@@ -876,7 +876,7 @@ if (!function_exists('get_term_by')) {
                 if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
                     continue;
                 }
-                if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+                if ($current_lang !== '' && $current_lang !== 'all' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
                     continue;
                 }
                 if ($field === 'name' && isset($row['name']) && (string) $row['name'] === (string) $value) {
@@ -909,7 +909,7 @@ if (!function_exists('get_terms')) {
             if (!is_array($row) || ($row['taxonomy'] ?? '') !== $taxonomy) {
                 continue;
             }
-            if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+            if ($current_lang !== '' && $current_lang !== 'all' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
                 continue;
             }
             $out[] = (object) [
