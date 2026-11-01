@@ -70,17 +70,33 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
         MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) {
             unset($type, $return_original);
             $id = (int) $id;
-            $map = [
-                'fr' => [self::TERM_EN => self::TERM_FR],
-                'de' => [self::TERM_EN => self::TERM_DE],
-            ];
-            if ($lang !== null && isset($map[$lang][$id])) {
-                return $map[$lang][$id];
+            $lang = $lang !== null ? (string) $lang : '';
+            if ($lang === 'en') {
+                if ($id === self::TERM_FR || $id === self::TERM_DE) {
+                    return self::TERM_EN;
+                }
+            }
+            if ($lang === 'fr' && $id === self::TERM_EN) {
+                return self::TERM_FR;
+            }
+            if ($lang === 'de' && $id === self::TERM_EN) {
+                return self::TERM_DE;
             }
 
             return $id;
         };
     }
+
+    /**
+     * Order email context: WCML uses wpml_current_language; admin bootstrap keeps ICL at EN.
+     */
+    private function simulateOrderEmailWithWpmlLanguageAndIclEn(string $wpml_lang): void {
+        $this->ensureIclLanguageCodeEn();
+        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
+        $this->setLanguage($wpml_lang);
+    }
+
+    private const EN_AGE_GROUP_NAME = '5-13y (Full Day)';
 
     protected function tearDown(): void {
         unset(
@@ -176,19 +192,19 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
     }
 
     public function test_fr_stored_localized_name_unchanged_when_wpml_fr_and_icl_en(): void {
-        $this->ensureIclLanguageCodeEn();
-        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
-        $this->setLanguage('fr');
+        $this->simulateOrderEmailWithWpmlLanguageAndIclEn('fr');
         $stored = '5-13 ans (journée complète)';
-        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+        $display = $this->displayValue($stored, 'Age Group');
+        $this->assertSame($stored, $display);
+        $this->assertNotSame(self::EN_AGE_GROUP_NAME, $display);
     }
 
     public function test_de_stored_localized_name_unchanged_when_wpml_de_and_icl_en(): void {
-        $this->ensureIclLanguageCodeEn();
-        $GLOBALS['intersoccer_sensitive_order_meta_email'] = true;
-        $this->setLanguage('de');
+        $this->simulateOrderEmailWithWpmlLanguageAndIclEn('de');
         $stored = '5-13 Jahre (Ganztag)';
-        $this->assertSame($stored, $this->displayValue($stored, 'Age Group'));
+        $display = $this->displayValue($stored, 'Age Group');
+        $this->assertSame($stored, $display);
+        $this->assertNotSame(self::EN_AGE_GROUP_NAME, $display);
     }
 
     /**
@@ -226,8 +242,13 @@ class OrderMetaCustomerEnStoredTermNameDisplayTest extends TestCase {
         ];
         $prior = MockFilters::$filters['wpml_object_id'] ?? null;
         MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($en_id, $fr_id, $prior) {
-            if ($lang === 'fr' && (int) $id === $en_id) {
+            $id = (int) $id;
+            $lang = $lang !== null ? (string) $lang : '';
+            if ($lang === 'fr' && $id === $en_id) {
                 return $fr_id;
+            }
+            if ($lang === 'en' && $id === $fr_id) {
+                return $en_id;
             }
             if (is_callable($prior)) {
                 return $prior($id, $type, $return_original, $lang);
