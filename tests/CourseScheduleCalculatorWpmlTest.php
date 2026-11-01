@@ -3,6 +3,7 @@
  * Regression: localized pa_course-day slugs resolve via WPML EN twin for proration.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class CourseScheduleCalculatorWpmlTest extends TestCase {
@@ -98,9 +99,7 @@ class CourseScheduleCalculatorWpmlTest extends TestCase {
         ];
     }
 
-    /**
-     * @dataProvider localizedWednesdaySlugsProvider
-     */
+    #[DataProvider('localizedWednesdaySlugsProvider')]
     public function testLocalizedCourseDaySlugProratesLikeEnglish($attribute_slug, $term_id) {
         $variation_id = 16710 + (int) $term_id;
         $start_date = '2025-09-03';
