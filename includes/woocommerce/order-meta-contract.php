@@ -617,22 +617,61 @@ function intersoccer_normalize_canonical_activity_type($product_type) {
 }
 
 /**
+ * Accent folding map when WordPress remove_accents() is unavailable (tests / early bootstrap).
+ *
+ * @return array<string,string>
+ */
+function intersoccer_booking_type_accent_transliteration_map() {
+    return [
+        'à' => 'a', 'â' => 'a', 'ä' => 'a', 'á' => 'a',
+        'À' => 'A', 'Â' => 'A', 'Ä' => 'A', 'Á' => 'A',
+        'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+        'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+        'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ú' => 'u',
+        'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U', 'Ú' => 'U',
+        'ô' => 'o', 'ö' => 'o', 'ó' => 'o',
+        'Ô' => 'O', 'Ö' => 'O', 'Ó' => 'O',
+        'î' => 'i', 'ï' => 'i', 'í' => 'i',
+        'Î' => 'I', 'Ï' => 'I', 'Í' => 'I',
+        'ç' => 'c', 'Ç' => 'C',
+        'ß' => 'ss',
+    ];
+}
+
+/**
+ * NFC-normalize booking-type labels (NFD-safe) before accent removal.
+ *
+ * @param string $text Raw label after html_entity_decode/trim.
+ * @return string
+ */
+function intersoccer_booking_type_unicode_compose($text) {
+    $text = (string) $text;
+    $force_fallback = apply_filters('intersoccer_booking_type_unicode_compose_force_fallback', false, $text);
+    if (!$force_fallback && (class_exists('Normalizer') || function_exists('normalizer_normalize'))) {
+        if (class_exists('Normalizer')) {
+            $normalized = Normalizer::normalize($text, Normalizer::FORM_C);
+        } else {
+            $normalized = normalizer_normalize($text, Normalizer::FORM_C);
+        }
+        if ($normalized !== false) {
+            return $normalized;
+        }
+    }
+    $stripped = preg_replace('/\p{Mn}/u', '', $text);
+    return $stripped !== null ? $stripped : $text;
+}
+
+/**
  * @param mixed $raw Slug or display label.
  * @return string full-week|single-days|full-term|buyclub|other|''
  */
 function intersoccer_normalize_canonical_booking_type($raw) {
     $raw = html_entity_decode(trim((string) $raw), ENT_QUOTES, 'UTF-8');
+    $raw = intersoccer_booking_type_unicode_compose($raw);
     if (function_exists('remove_accents')) {
         $raw = remove_accents($raw);
     } else {
-        $raw = strtr($raw, [
-            'à' => 'a', 'â' => 'a', 'ä' => 'a', 'á' => 'a',
-            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
-            'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ú' => 'u',
-            'ô' => 'o', 'ö' => 'o', 'ó' => 'o',
-            'î' => 'i', 'ï' => 'i', 'í' => 'i',
-            'ç' => 'c',
-        ]);
+        $raw = strtr($raw, intersoccer_booking_type_accent_transliteration_map());
     }
     $raw = strtolower($raw);
     if ($raw === '') {
