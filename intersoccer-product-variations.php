@@ -428,7 +428,6 @@ $includes = [
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/express-checkout-player-gate.php',
     'includes/woocommerce/time-format.php',
-    'includes/woocommerce/checkout-player-details.php',
     'includes/woocommerce/checkout-calculations.php',
     'includes/woocommerce/age-group-verification.php',
     'includes/woocommerce/age-restriction-settings.php',

@@ -529,7 +529,7 @@ if (!function_exists('get_current_user_id')) {
 }
 
 // Test doubles for player enrichment (OrderMeta*). Prefer globals so suite load order cannot shadow mocks.
-if (!function_exists('intersoccer_get_player_details')) {
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT') && !function_exists('intersoccer_get_player_details')) {
     function intersoccer_get_player_details($user_id, $player_index) {
         if (isset($GLOBALS['intersoccer_test_player_details']) && is_array($GLOBALS['intersoccer_test_player_details'])) {
             return $GLOBALS['intersoccer_test_player_details'];

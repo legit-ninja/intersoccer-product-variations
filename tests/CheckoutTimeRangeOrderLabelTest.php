@@ -3,6 +3,11 @@
  * Checkout order-line course time labels: FR compact → FR style; camp and EN/DE unchanged.
  */
 
+// PHPUnit isolated child loads this file before tests/bootstrap.php; skip the player-details test double.
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT') && !class_exists('MockMetaData', false)) {
+    define('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT', true);
+}
+
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;

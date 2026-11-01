@@ -53,7 +53,6 @@ if (!function_exists('icl_object_id')) {
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/time-format.php';
-require_once dirname(__DIR__, 2) . '/includes/woocommerce/checkout-player-details.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/checkout-calculations.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/order-meta-contract.php';
 
