@@ -7,24 +7,45 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname(__DIR__) . '/tests/bootstrap.php';
-require_once dirname(__DIR__) . '/includes/woocommerce/time-format.php';
-
 class CheckoutTimeRangeOrderLabelTest extends TestCase
 {
     private const PA_COURSE = 'pa_course-times';
     private const PA_CAMP = 'pa_camp-times';
 
+    private const INTEGRATION_PROCESS_TESTS = [
+        'test_fr_order_uses_icl_language_code_for_taxonomies_and_order_lang_for_time',
+        'test_order_language_overrides_request_language_for_course_attributes',
+        'test_build_order_line_meta_keeps_slug_contract_meta',
+        'test_fr_camp_times_unchanged_on_fr_order',
+        'test_en_order_keeps_en_course_compact',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
+        if (in_array($this->name(), self::INTEGRATION_PROCESS_TESTS, true)) {
+            return;
+        }
+        if (!class_exists('MockFilters', false)) {
+            require_once __DIR__ . '/bootstrap.php';
+        }
+        if (!function_exists('intersoccer_format_order_line_time_attribute_label')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/time-format.php';
+        }
         MockFilters::reset();
         MockFilters::$filters['wpml_current_language'] = static fn () => 'en';
     }
 
+    private function loadCheckoutTimeRangeIntegrationBootstrap(): void
+    {
+        require __DIR__ . '/fixtures/checkout-time-range-integration-bootstrap.php';
+    }
+
     protected function tearDown(): void
     {
-        MockFilters::reset();
+        if (class_exists('MockFilters', false)) {
+            MockFilters::reset();
+        }
         parent::tearDown();
     }
 
@@ -102,9 +123,31 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
 
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
+    public function test_fr_order_uses_icl_language_code_for_taxonomies_and_order_lang_for_time(): void
+    {
+        $this->loadCheckoutTimeRangeIntegrationBootstrap();
+
+        seed_checkout_time_range_course_product('1115-1245', '1115-1245');
+
+        $order = new CheckoutTimeRangeMockOrder('fr');
+        $attributes = intersoccer_get_parent_product_attributes(5001, 5002, $order);
+
+        $this->assertSame('11h15-12h45', $attributes['Course Times'] ?? null);
+        $this->assertSame('Fixture Venue EN', $attributes['Sites InterSoccer'] ?? null);
+        $this->assertSame('Fixture Age EN', $attributes['Age Group'] ?? null);
+
+        $icl_calls = $GLOBALS['intersoccer_test_icl_object_id_calls'] ?? [];
+        $this->assertNotEmpty($icl_calls);
+        foreach ($icl_calls as $call) {
+            $this->assertSame('en', $call['language_code'] ?? null, 'icl_object_id must use ICL_LANGUAGE_CODE for taxonomy labels');
+        }
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function test_order_language_overrides_request_language_for_course_attributes(): void
     {
-        require dirname(__DIR__) . '/tests/fixtures/checkout-time-range-integration-bootstrap.php';
+        $this->loadCheckoutTimeRangeIntegrationBootstrap();
 
         seed_checkout_time_range_course_product('1115-1245', '1115-1245');
 
@@ -117,7 +160,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     #[PreserveGlobalState(false)]
     public function test_build_order_line_meta_keeps_slug_contract_meta(): void
     {
-        require dirname(__DIR__) . '/tests/fixtures/checkout-time-range-integration-bootstrap.php';
+        $this->loadCheckoutTimeRangeIntegrationBootstrap();
 
         seed_checkout_time_range_course_product('1115-1245', '1115-1245');
 
@@ -138,7 +181,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     #[PreserveGlobalState(false)]
     public function test_fr_camp_times_unchanged_on_fr_order(): void
     {
-        require dirname(__DIR__) . '/tests/fixtures/checkout-time-range-integration-bootstrap.php';
+        $this->loadCheckoutTimeRangeIntegrationBootstrap();
 
         $parent = new CheckoutTimeRangeMockParentProduct(6001, ['pa_booking-type', 'pa_camp-times']);
         $variation = new CheckoutTimeRangeMockVariationProduct(6002, [
@@ -160,7 +203,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     #[PreserveGlobalState(false)]
     public function test_en_order_keeps_en_course_compact(): void
     {
-        require dirname(__DIR__) . '/tests/fixtures/checkout-time-range-integration-bootstrap.php';
+        $this->loadCheckoutTimeRangeIntegrationBootstrap();
 
         seed_checkout_time_range_course_product('1115-1245', '1115-1245');
 

@@ -75,51 +75,6 @@ function intersoccer_grant_download_permissions($order_id) {
 }
 
 /**
- * Helper function to get player details from user metadata
- */
-if (!function_exists('intersoccer_get_player_details')) {
-function intersoccer_get_player_details($user_id, $player_index) {
-    $players = function_exists('intersoccer_get_user_players') 
-        ? intersoccer_get_user_players($user_id) 
-        : (get_user_meta($user_id, 'intersoccer_players', true) ?: []);
-
-    if (!is_array($players)) {
-        $players = [];
-    }
-    $slot = function_exists('intersoccer_resolve_intersoccer_players_meta_key')
-        ? intersoccer_resolve_intersoccer_players_meta_key($players, $player_index)
-        : (array_key_exists($player_index, $players) ? $player_index : null);
-
-    if ($slot !== null && isset($players[$slot])) {
-        $player = $players[$slot];
-        $gender_val = isset($player['gender']) ? trim((string) ($player['gender'])) : '';
-        if ($gender_val === '' && isset($player['player_gender'])) {
-            $gender_val = trim((string) $player['player_gender']);
-        }
-        return [
-            'first_name' => $player['first_name'] ?? '',
-            'last_name' => $player['last_name'] ?? '',
-            'name' => trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? '')),
-            'dob' => $player['dob'] ?? '',
-            'gender' => $gender_val,
-            'medical_conditions' => $player['medical_conditions'] ?? '',
-            'player_id' => (string) ($player['player_id'] ?? ''),
-        ];
-    }
-    
-    return [
-        'first_name' => 'Unknown',
-        'last_name' => 'Player',
-        'name' => 'Unknown Player',
-        'dob' => '',
-        'gender' => '',
-        'medical_conditions' => '',
-        'player_id' => '',
-    ];
-}
-}
-
-/**
  * Helper function to get parent product attributes (excluding variation attributes)
  */
 function intersoccer_get_parent_product_attributes($product_id, $variation_id = null, $order = null) {
@@ -138,12 +93,8 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
         : (defined('ICL_LANGUAGE_CODE') ? ICL_LANGUAGE_CODE : 'en');
     
     $attributes = [];
-    $parent_attributes = method_exists($parent_product, 'get_attributes')
-        ? $parent_product->get_attributes()
-        : [];
-    $variation_attributes = ($variation_product && method_exists($variation_product, 'get_variation_attributes'))
-        ? $variation_product->get_variation_attributes()
-        : [];
+    $parent_attributes = $parent_product->get_attributes();
+    $variation_attributes = $variation_product ? $variation_product->get_variation_attributes() : [];
 
     $label_map = intersoccer_attr_order_meta_label_map();
 
@@ -208,7 +159,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                         if ($term && !is_wp_error($term)) {
                             $translated_name = $term->name;
                             if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, $display_language);
+                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
                                 if ($translated_term_id && $translated_term_id != $term->term_id) {
                                     $translated_term = get_term($translated_term_id, $attribute_name);
                                     if ($translated_term && !is_wp_error($translated_term)) {
@@ -234,7 +185,7 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                         if ($term && !is_wp_error($term)) {
                             $translated_name = $term->name;
                             if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, $display_language);
+                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
                                 if ($translated_term_id && $translated_term_id != $term->term_id) {
                                     $translated_term = get_term($translated_term_id, $attribute_name);
                                     if ($translated_term && !is_wp_error($translated_term)) {

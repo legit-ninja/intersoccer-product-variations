@@ -16,9 +16,44 @@ if (!defined('WP_DEBUG')) {
 }
 
 require_once dirname(__DIR__) . '/bootstrap.php';
+
+$GLOBALS['intersoccer_test_icl_object_id_calls'] = [];
+$GLOBALS['intersoccer_test_icl_translations'] = [];
+
+if (!function_exists('icl_object_id')) {
+    /**
+     * @param int|string $element_id
+     * @param string     $element_type
+     * @param bool       $return_original_if_missing
+     * @param string|null $language_code
+     * @return int|null
+     */
+    function icl_object_id($element_id, $element_type = 'post', $return_original_if_missing = false, $language_code = null)
+    {
+        $element_id = (int) $element_id;
+        $lang = $language_code !== null && $language_code !== ''
+            ? (string) $language_code
+            : (defined('ICL_LANGUAGE_CODE') ? (string) ICL_LANGUAGE_CODE : 'en');
+
+        $GLOBALS['intersoccer_test_icl_object_id_calls'][] = [
+            'element_id' => $element_id,
+            'element_type' => (string) $element_type,
+            'language_code' => $lang,
+        ];
+
+        $map = $GLOBALS['intersoccer_test_icl_translations'] ?? [];
+        if (isset($map[$element_id][$lang])) {
+            return (int) $map[$element_id][$lang];
+        }
+
+        return $return_original_if_missing ? $element_id : null;
+    }
+}
+
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/attribute-registry.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/girls-only-verification.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/time-format.php';
+require_once dirname(__DIR__, 2) . '/includes/woocommerce/checkout-player-details.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/checkout-calculations.php';
 require_once dirname(__DIR__, 2) . '/includes/woocommerce/order-meta-contract.php';
 
@@ -158,12 +193,27 @@ function seed_checkout_time_range_camp_product($slug, $term_name): void
  */
 function seed_checkout_time_range_course_product($slug, $term_name): void
 {
-    $parent = new CheckoutTimeRangeMockParentProduct(5001, ['pa_course-times']);
+    $parent = new CheckoutTimeRangeMockParentProduct(5001, [
+        'pa_course-times',
+        'pa_intersoccer-venues',
+        'pa_age-group',
+    ]);
     $variation = new CheckoutTimeRangeMockVariationProduct(5002, [
         'attribute_pa_course-times' => $slug,
+        'attribute_pa_intersoccer-venues' => 'fixture-venue-a',
+        'attribute_pa_age-group' => 'fixture-age-full-day',
     ]);
     $GLOBALS['intersoccer_test_products'] = [5001 => $parent, 5002 => $variation];
     $GLOBALS['intersoccer_test_terms'] = [
         8001 => ['name' => $term_name, 'slug' => $slug, 'taxonomy' => 'pa_course-times'],
+        8101 => ['name' => 'Fixture Venue EN', 'slug' => 'fixture-venue-a', 'taxonomy' => 'pa_intersoccer-venues'],
+        8102 => ['name' => 'Fixture Venue FR', 'slug' => 'fixture-venue-a-fr', 'taxonomy' => 'pa_intersoccer-venues'],
+        8201 => ['name' => 'Fixture Age EN', 'slug' => 'fixture-age-full-day', 'taxonomy' => 'pa_age-group'],
+        8202 => ['name' => 'Fixture Age FR', 'slug' => 'fixture-age-full-day-fr', 'taxonomy' => 'pa_age-group'],
     ];
+    $GLOBALS['intersoccer_test_icl_translations'] = [
+        8101 => ['en' => 8101, 'fr' => 8102],
+        8201 => ['en' => 8201, 'fr' => 8202],
+    ];
+    $GLOBALS['intersoccer_test_icl_object_id_calls'] = [];
 }
