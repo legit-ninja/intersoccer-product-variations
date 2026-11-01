@@ -1021,13 +1021,9 @@ if (!function_exists('wc_get_order')) {
 
 if (!function_exists('remove_accents')) {
     function remove_accents($text) {
-        $text = (string) $text;
-        if (function_exists('iconv')) {
-            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-            if ($converted !== false) {
-                return $converted;
-            }
+        if (!function_exists('intersoccer_booking_type_accent_transliteration_map')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
         }
-        return $text;
+        return strtr((string) $text, intersoccer_booking_type_accent_transliteration_map());
     }
 }
