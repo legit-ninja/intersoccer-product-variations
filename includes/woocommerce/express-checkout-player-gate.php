@@ -28,7 +28,8 @@ function intersoccer_express_gate_body_class_name() {
 }
 
 /**
- * Stripe containers to hide while a player is missing.
+ * Stripe containers kept invisible while a gate applies (fallback only; the
+ * PV wrapper does the hiding and holds the layout).
  * WooCommerce Stripe Gateway (woocommerce-gateway-stripe): Express Checkout Element
  * and legacy Payment Request button markup only.
  *
@@ -76,41 +77,103 @@ function intersoccer_express_gate_body_class($classes) {
 }
 
 /**
- * CSS that hides the express buttons while the body class is set.
+ * Class of the PV-owned wrapper printed around Stripe's product-page express container.
+ *
+ * @return string
+ */
+function intersoccer_express_gate_wrapper_class() {
+    return 'intersoccer-express-gate';
+}
+
+/**
+ * Open-wrapper counter, so a close is only printed after a matching open.
+ *
+ * @param int $delta +1 on open, -1 on close, 0 to read.
+ * @return int Current depth.
+ */
+function intersoccer_express_gate_wrapper_depth($delta = 0) {
+    static $depth = 0;
+    $depth = max(0, $depth + (int) $delta);
+    return $depth;
+}
+
+/**
+ * Wrap Stripe's express container on product pages.
+ *
+ * WooCommerce Stripe Gateway prints #wc-stripe-express-checkout-element on
+ * woocommerce_after_add_to_cart_form at priority 1 and has no before/after
+ * hook of its own, so the wrapper opens at priority 0 and closes at 2 on the
+ * same action. Stripe's markup, inline styles and blockUI are left alone.
+ * Printed on every product page because the "cart has programs" gate can
+ * apply to any product.
+ *
+ * @return void
+ */
+add_action('woocommerce_after_add_to_cart_form', 'intersoccer_express_gate_wrapper_open', 0);
+function intersoccer_express_gate_wrapper_open() {
+    if (!function_exists('is_product') || !is_product()) {
+        return;
+    }
+    intersoccer_express_gate_wrapper_depth(1);
+    echo '<div class="' . intersoccer_express_gate_wrapper_class() . '">';
+}
+
+add_action('woocommerce_after_add_to_cart_form', 'intersoccer_express_gate_wrapper_close', 2);
+function intersoccer_express_gate_wrapper_close() {
+    if (intersoccer_express_gate_wrapper_depth() < 1) {
+        return;
+    }
+    intersoccer_express_gate_wrapper_depth(-1);
+    echo '</div>';
+}
+
+/**
+ * CSS that hides the express buttons while a gate body class is set.
+ *
+ * The rules sit on the PV wrapper, not on Stripe's container. Stripe writes
+ * inline margin-top and display on its container, and blockUI writes inline
+ * position on it while Stripe loads product data; inline styles beat any
+ * stylesheet rule without an important flag. The wrapper has no inline
+ * styles, so plain rules hold: height 0 with overflow hidden contains
+ * Stripe's margin and leaves no gap, whatever Stripe or blockUI set inline.
  *
  * Uses visibility + zero height rather than display:none: Stripe Elements
  * needs a laid-out container to mount its iframe, and a display:none parent
- * can leave the buttons blank or unmounted. The rule sits on body, so it also
- * covers a container Stripe renders or re-mounts later.
+ * can leave the buttons blank or unmounted.
  *
- * Plain specificity only: body class + ID outranks Stripe's own ID rules.
- * Stripe's inline margin-top cannot be overridden without an important flag. While
- * hidden, the container is out of the document flow (position: absolute),
- * positioned against the nearest positioned ancestor, with left and right 0
- * so it does not cause sideways scroll; that margin then pushes nothing.
+ * Stripe's own IDs only get visibility/opacity/pointer-events, as a fallback
+ * if a template prints the container outside the wrapper. No position,
+ * height or margin rules touch Stripe's elements.
+ *
+ * When no gate class is set, nothing applies: the wrapper is a plain block
+ * (height auto, overflow visible) and does not change the button's layout
+ * or click target.
  *
  * @return string
  */
 function intersoccer_express_gate_css() {
-    $selectors = [];
+    $wrapper   = [];
+    $fallback  = [];
+    $gate_body = ['intersoccer-express-needs-player', intersoccer_express_gate_cart_programs_class_name()];
     // Hidden while no player is chosen, and while the cart already holds program lines.
-    foreach (['intersoccer-express-needs-player', 'intersoccer-express-cart-has-programs'] as $body_class) {
-        $prefix = 'body.' . $body_class . ' ';
+    foreach ($gate_body as $body_class) {
+        $prefix    = 'body.' . $body_class . ' ';
+        $wrapper[] = $prefix . '.' . intersoccer_express_gate_wrapper_class();
         foreach (intersoccer_express_gate_selectors() as $sel) {
-            $selectors[] = $prefix . $sel;
+            $fallback[] = $prefix . $sel;
         }
     }
-    return implode(",\n", $selectors) . " {\n"
-        . "    position: absolute;\n"
-        . "    left: 0;\n"
-        . "    right: 0;\n"
+    return implode(",\n", $wrapper) . " {\n"
+        . "    height: 0;\n"
+        . "    overflow: hidden;\n"
         . "    visibility: hidden;\n"
         . "    opacity: 0;\n"
         . "    pointer-events: none;\n"
-        . "    height: 0;\n"
-        . "    min-height: 0;\n"
-        . "    padding: 0;\n"
-        . "    overflow: hidden;\n"
+        . "}\n"
+        . implode(",\n", $fallback) . " {\n"
+        . "    visibility: hidden;\n"
+        . "    opacity: 0;\n"
+        . "    pointer-events: none;\n"
         . "}\n";
 }
 

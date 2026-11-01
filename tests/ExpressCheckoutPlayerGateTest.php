@@ -13,6 +13,12 @@ require_once dirname(__DIR__) . '/tests/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/express-checkout-player-gate.php';
 
+if (!function_exists('is_product')) {
+    function is_product() {
+        return !empty($GLOBALS['intersoccer_test_is_product']);
+    }
+}
+
 class ExpressCheckoutPlayerGateTest extends TestCase
 {
     private const CAMP_ID = 880101;
@@ -191,23 +197,100 @@ class ExpressCheckoutPlayerGateTest extends TestCase
     public function testCssHidesWithoutDisplayNone()
     {
         $css = intersoccer_express_gate_css();
-        $this->assertStringContainsString('body.intersoccer-express-needs-player #wc-stripe-express-checkout-element', $css);
+        $this->assertStringContainsString('body.intersoccer-express-needs-player .intersoccer-express-gate', $css);
         $this->assertStringContainsString('visibility: hidden', $css);
         $this->assertStringContainsString('height: 0', $css);
         $this->assertStringNotContainsString('display', $css, 'display:none can stop Stripe mounting its iframe');
     }
 
-    public function testCssUsesNoImportant()
+    public function testCssUsesNoImportantAndNoMargin()
     {
         $css = intersoccer_express_gate_css();
         $this->assertStringNotContainsString('!important', $css);
+        $this->assertStringNotContainsString('important', $css);
+        $this->assertStringNotContainsString('margin', $css);
+        $this->assertStringNotContainsString('position', $css, 'Stripe/blockUI set position inline; the gate must not depend on it');
         $this->assertStringNotContainsString('.wc-stripe-product-checkout-container', $css);
-        $this->assertStringNotContainsString('margin:', $css);
-        // Stripe's inline margin-top can't be beaten without !important, so the hidden box leaves the flow instead.
-        $this->assertStringContainsString('position: absolute', $css);
-        $this->assertStringContainsString('left: 0', $css);
-        $this->assertStringContainsString('right: 0', $css);
-        $this->assertStringContainsString('body.intersoccer-express-cart-has-programs #wc-stripe-express-checkout-button-separator', $css);
+    }
+
+    /** Parse "selectors { decls }" blocks into [selector list, declarations]. */
+    private function cssBlocks(string $css): array
+    {
+        preg_match_all('/([^{}]+)\{([^}]*)\}/', $css, $m, PREG_SET_ORDER);
+        $blocks = [];
+        foreach ($m as $b) {
+            $sels = array_map('trim', explode(',', $b[1]));
+            $decls = [];
+            foreach (array_filter(array_map('trim', explode(';', $b[2]))) as $d) {
+                [$k, $v] = array_map('trim', explode(':', $d, 2));
+                $decls[$k] = $v;
+            }
+            $blocks[] = [$sels, $decls];
+        }
+        return $blocks;
+    }
+
+    public function testHiddenStateRulesSitOnTheWrapper()
+    {
+        $blocks = $this->cssBlocks(intersoccer_express_gate_css());
+        $wrapper = null;
+        foreach ($blocks as [$sels, $decls]) {
+            if (in_array('body.intersoccer-express-needs-player .intersoccer-express-gate', $sels, true)) {
+                $wrapper = [$sels, $decls];
+            }
+        }
+        $this->assertNotNull($wrapper, 'wrapper rule missing');
+        [$sels, $decls] = $wrapper;
+        $this->assertContains('body.intersoccer-express-cart-has-programs .intersoccer-express-gate', $sels);
+        $this->assertSame(
+            ['height' => '0', 'overflow' => 'hidden', 'visibility' => 'hidden', 'opacity' => '0', 'pointer-events' => 'none'],
+            $decls
+        );
+        foreach ($sels as $sel) {
+            $this->assertStringNotContainsString('#wc-stripe', $sel, 'height/overflow must not land on Stripe elements');
+        }
+    }
+
+    public function testStripeElementsOnlyGetVisibilityFallback()
+    {
+        $found = false;
+        foreach ($this->cssBlocks(intersoccer_express_gate_css()) as [$sels, $decls]) {
+            if (!in_array('body.intersoccer-express-needs-player #wc-stripe-express-checkout-element', $sels, true)) {
+                continue;
+            }
+            $found = true;
+            $this->assertContains('body.intersoccer-express-cart-has-programs #wc-stripe-express-checkout-element', $sels);
+            $this->assertSame(['visibility' => 'hidden', 'opacity' => '0', 'pointer-events' => 'none'], $decls);
+        }
+        $this->assertTrue($found);
+    }
+
+    public function testWrapperOpensAndClosesAroundStripeHookOnProductPages()
+    {
+        $actions = $GLOBALS['intersoccer_test_actions']['woocommerce_after_add_to_cart_form'] ?? [];
+        $this->assertContains('intersoccer_express_gate_wrapper_open', $actions[0] ?? []);
+        $this->assertContains('intersoccer_express_gate_wrapper_close', $actions[2] ?? [], 'Stripe prints at priority 1');
+
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        ob_start();
+        intersoccer_express_gate_wrapper_open();
+        echo '<div id="wc-stripe-express-checkout-element"></div>';
+        intersoccer_express_gate_wrapper_close();
+        $html = ob_get_clean();
+        unset($GLOBALS['intersoccer_test_is_product']);
+        $this->assertSame('<div class="intersoccer-express-gate"><div id="wc-stripe-express-checkout-element"></div></div>', $html);
+        $this->assertStringNotContainsString('style=', $html);
+    }
+
+    public function testWrapperSkipsNonProductPagesAndNeverClosesUnopened()
+    {
+        unset($GLOBALS['intersoccer_test_is_product']);
+        ob_start();
+        intersoccer_express_gate_wrapper_open();
+        intersoccer_express_gate_wrapper_close();
+        intersoccer_express_gate_wrapper_close();
+        $this->assertSame('', ob_get_clean());
+        $this->assertSame(0, intersoccer_express_gate_wrapper_depth());
     }
 
     public function testFrontEndTogglesGateFromPlayerChoice()
