@@ -4,6 +4,14 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', dirname(__DIR__) . '/');
 }
 
+// Isolated checkout integration tests set this via putenv before the child process starts.
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT')) {
+    $load_real_checkout = getenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+    if ($load_real_checkout !== false && $load_real_checkout !== '' && $load_real_checkout !== '0') {
+        define('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT', true);
+    }
+}
+
 // WordPress constants used by some functions
 if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');

@@ -3,12 +3,10 @@
  * Checkout order-line course time labels: FR compact → FR style; camp and EN/DE unchanged.
  */
 
-// Propagate to PHPUnit isolated children (see GlobalState::getConstantsAsString) so bootstrap skips the player-details double before checkout-calculations.php loads.
-if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT')) {
-    define('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT', true);
-}
+// Child PHPUnit processes inherit this env var so tests/bootstrap.php skips the player-details double before checkout-calculations.php loads.
+putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+$_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
 
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
@@ -17,25 +15,10 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     private const PA_COURSE = 'pa_course-times';
     private const PA_CAMP = 'pa_camp-times';
 
-    public static function setUpBeforeClass(): void
+    public static function tearDownAfterClass(): void
     {
-        $pluginRoot = dirname(__DIR__);
-        $exclude = [
-            $pluginRoot . '/includes/woocommerce/program-manager.php',
-        ];
-        foreach (glob($pluginRoot . '/tests/*Test.php') ?: [] as $file) {
-            $exclude[] = $file;
-        }
-        foreach (glob($pluginRoot . '/tests/*/*Test.php') ?: [] as $file) {
-            $exclude[] = $file;
-        }
-        if (!isset($GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']) || !is_array($GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'])) {
-            $GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = [];
-        }
-        $GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = array_values(array_unique(array_merge(
-            $GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'],
-            $exclude
-        )));
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+        unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
     }
 
     private const INTEGRATION_PROCESS_TESTS = [
@@ -148,7 +131,6 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[PreserveGlobalState(true)]
     public function test_fr_order_uses_icl_language_code_for_taxonomies_and_order_lang_for_time(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
@@ -170,7 +152,6 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[PreserveGlobalState(true)]
     public function test_order_language_overrides_request_language_for_course_attributes(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
@@ -183,7 +164,6 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[PreserveGlobalState(true)]
     public function test_build_order_line_meta_keeps_slug_contract_meta(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
@@ -204,7 +184,6 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[PreserveGlobalState(true)]
     public function test_fr_camp_times_unchanged_on_fr_order(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
@@ -226,7 +205,6 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[PreserveGlobalState(true)]
     public function test_en_order_keeps_en_course_compact(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
