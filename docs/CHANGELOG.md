@@ -5,6 +5,12 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.2] - 2026-11-01
+
+### Fixed
+- Orders that store EN term names now show the FR/DE term names (#143, issue #138).
+- FR/DE order dates display correctly, and My Account no longer shows a None medical row (#144, issue #139).
+
 ## [2.11.1] - 2026-11-01
 
 ### Fixed
