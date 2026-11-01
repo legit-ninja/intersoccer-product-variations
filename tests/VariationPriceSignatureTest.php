@@ -11,13 +11,6 @@ require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php';
 
 class VariationPriceSignatureTest extends TestCase {
-    protected function tearDown(): void {
-        if (class_exists('InterSoccer_Course')) {
-            InterSoccer_Course::reset_runtime_cache();
-        }
-        parent::tearDown();
-    }
-
     private function setProductType(int $product_id, string $type): void {
         delete_transient('intersoccer_type_' . $product_id);
         set_transient('intersoccer_type_' . $product_id, $type, 3600);
@@ -48,10 +41,10 @@ class VariationPriceSignatureTest extends TestCase {
 
     public static function embedVariationPriceProvider(): array {
         return [
-            'camp min' => ['camp', 5001, 'min', false, '120', 120.0],
-            'camp max display' => ['camp', 5002, 'max', true, '200', 200.0],
-            'course min' => ['course', 6001, 'min', false, '100', 100.0],
-            'course max display' => ['course', 6002, 'max', true, '150', 100.0],
+            'camp min' => ['camp', 5001, 'min', false, '120'],
+            'camp max display' => ['camp', 5002, 'max', true, '200'],
+            'course min' => ['course', 6001, 'min', false, '100'],
+            'course max display' => ['course', 6002, 'max', true, '150'],
         ];
     }
 
@@ -61,8 +54,7 @@ class VariationPriceSignatureTest extends TestCase {
         int $product_id,
         string $min_or_max,
         bool $for_display,
-        string $incoming_price,
-        float $expected
+        string $incoming_price
     ): void {
         $this->assertTrue(function_exists('intersoccer_modify_variation_price'));
 
@@ -82,6 +74,23 @@ class VariationPriceSignatureTest extends TestCase {
             $for_display
         );
 
-        $this->assertSame($expected, (float) $result);
+        $this->assertSame($incoming_price, $result);
+    }
+
+    /**
+     * Shop/archive variable price ranges use woocommerce_variation_prices, not woocommerce_get_variation_price.
+     */
+    public function testCourseShopRangeStillUsesVariationPricesHook() {
+        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/cart-calculations.php');
+        $this->assertStringContainsString(
+            "add_filter('woocommerce_variation_prices', 'intersoccer_modify_variation_prices'",
+            $src
+        );
+        $this->assertStringContainsString(
+            'InterSoccer_Course::calculate_price($product_id, $variation_id)',
+            $src
+        );
+        $this->assertStringContainsString('function intersoccer_modify_variation_price($price, $product, $min_or_max, $for_display)', $src);
+        $this->assertStringContainsString('return $price;', $src);
     }
 }
