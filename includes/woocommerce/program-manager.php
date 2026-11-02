@@ -2983,6 +2983,10 @@ class InterSoccer_Program_Manager {
 			wp_send_json_error(['message' => __('Term name is required.', 'intersoccer-product-variations')]);
 		}
 
+		if ($taxonomy === 'pa_camp-times' && function_exists('intersoccer_attr_canonicalize_camp_time_input')) {
+			$term_name = intersoccer_attr_canonicalize_camp_time_input($term_name);
+		}
+
 		$validated = function_exists('intersoccer_attr_validate_new_term')
 			? intersoccer_attr_validate_new_term($taxonomy, $term_name)
 			: true;

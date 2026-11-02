@@ -265,6 +265,28 @@ class AttributeEnforcementTest extends TestCase {
         $this->assertSame('0830-1530', $good);
     }
 
+    public function test_camp_time_input_canonicalized_to_hhmm() {
+        $cases = [
+            '08:30-15:30' => '0830-1530',
+            '10:00-15:30' => '1000-1530',
+            '8:30 - 15:30' => '0830-1530',
+            "08:30\u{2013}15:30" => '0830-1530',
+            '10h00-15h30' => '1000-1530',
+            '0830-1530' => '0830-1530',
+            'abc' => 'abc',
+        ];
+        foreach ($cases as $in => $expected) {
+            $this->assertSame($expected, intersoccer_attr_canonicalize_camp_time_input($in), 'Input: ' . $in);
+        }
+    }
+
+    public function test_pre_insert_term_accepts_colon_camp_times() {
+        $this->assertSame('0830-1530', intersoccer_attr_pre_insert_term('08:30-15:30', 'pa_camp-times'));
+        $this->assertSame('1000-1530', intersoccer_attr_pre_insert_term('10:00-15:30', 'pa_camp-times'));
+        $this->assertInstanceOf(WP_Error::class, intersoccer_attr_pre_insert_term('15:30-08:30', 'pa_camp-times'));
+        $this->assertInstanceOf(WP_Error::class, intersoccer_attr_pre_insert_term('25:00-26:00', 'pa_camp-times'));
+    }
+
     public function test_camp_times_not_on_locked_slug_list() {
         $this->assertNotContains('camp-times', intersoccer_attr_locked_term_attribute_slugs());
     }
