@@ -890,20 +890,57 @@ function intersoccer_pv_order_meta_term_display_name($term, $taxonomy, $display_
         $target_lang = 'en';
     }
 
+    $term_id = (int) $term->term_id;
+    $translated_term_id = 0;
+
     if (function_exists('icl_object_id')) {
-        $translated_term_id = icl_object_id((int) $term->term_id, $taxonomy, false, $target_lang);
-        if ($translated_term_id && function_exists('get_term')) {
-            $translated_term = get_term((int) $translated_term_id, $taxonomy);
-            if ($translated_term && !is_wp_error($translated_term) && !empty($translated_term->name)) {
-                $translated_name = (string) $translated_term->name;
-            }
-        } elseif ($target_lang !== 'en') {
-            $en_term_id = (int) icl_object_id((int) $term->term_id, $taxonomy, true, 'en');
-            if ($en_term_id > 0 && function_exists('get_term')) {
-                $en_term = get_term($en_term_id, $taxonomy);
-                if ($en_term && !is_wp_error($en_term) && !empty($en_term->name)) {
-                    $translated_name = (string) $en_term->name;
+        $direct = icl_object_id($term_id, $taxonomy, false, $target_lang);
+        if ($direct) {
+            $translated_term_id = (int) $direct;
+        }
+    }
+
+    if ($translated_term_id <= 0 && $target_lang !== 'en') {
+        $en_term_id = 0;
+        if (function_exists('apply_filters')) {
+            $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, true, 'en');
+        }
+        if ($en_term_id <= 0) {
+            $en_term_id = $term_id;
+        }
+        if ($en_term_id > 0) {
+            if (function_exists('apply_filters')) {
+                $via_en = (int) apply_filters('wpml_object_id', $en_term_id, $taxonomy, true, $target_lang);
+                if ($via_en > 0) {
+                    $translated_term_id = $via_en;
                 }
+            }
+            if ($translated_term_id <= 0 && function_exists('icl_object_id')) {
+                $via_en = icl_object_id($en_term_id, $taxonomy, false, $target_lang);
+                if ($via_en) {
+                    $translated_term_id = (int) $via_en;
+                }
+            }
+        }
+    }
+
+    if ($translated_term_id > 0 && function_exists('get_term')) {
+        $translated_term = get_term($translated_term_id, $taxonomy);
+        if ($translated_term && !is_wp_error($translated_term) && !empty($translated_term->name)) {
+            $translated_name = (string) $translated_term->name;
+        }
+    } elseif ($target_lang !== 'en') {
+        $en_term_id = 0;
+        if (function_exists('apply_filters')) {
+            $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, true, 'en');
+        }
+        if ($en_term_id <= 0) {
+            $en_term_id = $term_id;
+        }
+        if ($en_term_id > 0 && function_exists('get_term')) {
+            $en_term = get_term($en_term_id, $taxonomy);
+            if ($en_term && !is_wp_error($en_term) && !empty($en_term->name)) {
+                $translated_name = (string) $en_term->name;
             }
         }
     }
