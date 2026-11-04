@@ -195,29 +195,16 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                 $slugs = array_map('trim', explode(',', $selected));
                 // For days-of-week, respect canonical ordering
                 if (in_array($attribute_name, $day_order_taxonomies, true)) {
-                    $ordered = array_values(array_intersect($canonical_days, array_map('strtolower', $slugs)));
+                    $ordered = function_exists('intersoccer_pv_order_weekday_slugs_in_canonical_order')
+                        ? intersoccer_pv_order_weekday_slugs_in_canonical_order($slugs, $attribute_name)
+                        : array_values(array_intersect($canonical_days, array_map('strtolower', $slugs)));
                     $names = [];
                     foreach ($ordered as $slug) {
-                        $term = get_term_by('slug', $slug, $attribute_name);
-                        if ($term && !is_wp_error($term)) {
-                            $translated_name = $term->name;
-                            if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
-                                if ($translated_term_id && $translated_term_id != $term->term_id) {
-                                    $translated_term = get_term($translated_term_id, $attribute_name);
-                                    if ($translated_term && !is_wp_error($translated_term)) {
-                                        $translated_name = $translated_term->name;
-                                    }
-                                }
-                            }
-                            if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
-                                $translated_name = intersoccer_format_order_line_time_attribute_label(
-                                    $translated_name,
-                                    $attribute_name,
-                                    $display_language
-                                );
-                            }
-                            $names[] = $translated_name;
+                        $display = function_exists('intersoccer_pv_order_weekday_display_name')
+                            ? intersoccer_pv_order_weekday_display_name($slug, $attribute_name, $display_language)
+                            : '';
+                        if ($display !== '') {
+                            $names[] = $display;
                         }
                     }
                     $value = !empty($names) ? implode(', ', $names) : '';
@@ -226,23 +213,9 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                     foreach ($slugs as $slug) {
                         $term = get_term_by('slug', $slug, $attribute_name);
                         if ($term && !is_wp_error($term)) {
-                            $translated_name = $term->name;
-                            if (function_exists('icl_object_id')) {
-                                $translated_term_id = icl_object_id($term->term_id, $attribute_name, false, ICL_LANGUAGE_CODE);
-                                if ($translated_term_id && $translated_term_id != $term->term_id) {
-                                    $translated_term = get_term($translated_term_id, $attribute_name);
-                                    if ($translated_term && !is_wp_error($translated_term)) {
-                                        $translated_name = $translated_term->name;
-                                    }
-                                }
-                            }
-                            if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
-                                $translated_name = intersoccer_format_order_line_time_attribute_label(
-                                    $translated_name,
-                                    $attribute_name,
-                                    $display_language
-                                );
-                            }
+                            $translated_name = function_exists('intersoccer_pv_order_meta_term_display_name')
+                                ? intersoccer_pv_order_meta_term_display_name($term, $attribute_name, $display_language)
+                                : $term->name;
                             $names[] = $translated_name;
                         }
                     }
@@ -262,12 +235,16 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                 // Days-of-week get canonical ordered list
                 if (in_array($attribute_name, $day_order_taxonomies, true)) {
                     $term_slugs = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'slugs']);
-                    $ordered_slugs = array_values(array_intersect($canonical_days, $term_slugs));
+                    $ordered_slugs = function_exists('intersoccer_pv_order_weekday_slugs_in_canonical_order')
+                        ? intersoccer_pv_order_weekday_slugs_in_canonical_order($term_slugs, $attribute_name)
+                        : array_values(array_intersect($canonical_days, $term_slugs));
                     $names = [];
                     foreach ($ordered_slugs as $slug) {
-                        $term = get_term_by('slug', $slug, $attribute_name);
-                        if ($term && !is_wp_error($term)) {
-                            $names[] = $term->name;
+                        $display = function_exists('intersoccer_pv_order_weekday_display_name')
+                            ? intersoccer_pv_order_weekday_display_name($slug, $attribute_name, $display_language)
+                            : '';
+                        if ($display !== '') {
+                            $names[] = $display;
                         }
                     }
                     $value = !empty($names) ? implode(', ', $names) : '';

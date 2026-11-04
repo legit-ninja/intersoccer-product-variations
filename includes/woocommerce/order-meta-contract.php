@@ -773,6 +773,159 @@ function intersoccer_canonical_term_slug_value($raw) {
 }
 
 /**
+ * WPML default-language slug for a taxonomy term (falls back to sanitized input when WPML absent).
+ *
+ * @param string $raw_slug   Stored or localized term slug.
+ * @param string $taxonomy   pa_* taxonomy.
+ * @return string
+ */
+function intersoccer_pv_wpml_canonical_term_slug($raw_slug, $taxonomy) {
+    $slug = intersoccer_canonical_term_slug_value($raw_slug);
+    if ($slug === '' || !function_exists('get_term_by')) {
+        return $slug;
+    }
+
+    $taxonomy = (string) $taxonomy;
+    $previous_lang = null;
+    $switched = false;
+    if (function_exists('apply_filters') && function_exists('do_action')) {
+        $previous_lang = apply_filters('wpml_current_language', null);
+        do_action('wpml_switch_language', 'all');
+        $switched = true;
+    }
+
+    try {
+        $term = get_term_by('slug', $slug, $taxonomy);
+        if (!$term || is_wp_error($term)) {
+            return $slug;
+        }
+
+        $canonical_id = function_exists('intersoccer_discount_wpml_canonical_term_id')
+            ? intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy)
+            : (int) $term->term_id;
+        if ($canonical_id <= 0 || !function_exists('get_term')) {
+            return $slug;
+        }
+
+        $canonical = get_term($canonical_id, $taxonomy);
+        if (!$canonical || is_wp_error($canonical)) {
+            return $slug;
+        }
+
+        return intersoccer_canonical_term_slug_value($canonical->slug);
+    } finally {
+        if ($switched) {
+            do_action('wpml_switch_language', $previous_lang);
+        }
+    }
+}
+
+/**
+ * Order weekday slugs in canonical EN sequence (maps localized WPML slugs first).
+ *
+ * @param array<int,string> $slugs
+ * @param string            $taxonomy pa_days-of-week or pa_course-day.
+ * @return array<int,string>
+ */
+function intersoccer_pv_order_weekday_slugs_in_canonical_order(array $slugs, $taxonomy) {
+    $canonical_days = intersoccer_attr_canonical_weekday_slugs();
+    $en_slugs = [];
+    foreach ($slugs as $slug) {
+        $slug = strtolower(trim((string) $slug));
+        if ($slug === '') {
+            continue;
+        }
+        $en = function_exists('intersoccer_pv_wpml_canonical_term_slug')
+            ? intersoccer_pv_wpml_canonical_term_slug($slug, $taxonomy)
+            : $slug;
+        if ($en !== '' && in_array($en, $canonical_days, true)) {
+            $en_slugs[] = $en;
+        }
+    }
+
+    return array_values(array_intersect($canonical_days, array_unique($en_slugs)));
+}
+
+/**
+ * Customer-facing term name for order meta at creation (order language, not request default).
+ *
+ * @param object|WP_Term $term
+ * @param string         $taxonomy
+ * @param string         $display_language en|fr|de
+ * @return string
+ */
+function intersoccer_pv_order_meta_term_display_name($term, $taxonomy, $display_language) {
+    if (!$term || is_wp_error($term)) {
+        return '';
+    }
+
+    $translated_name = isset($term->name) ? (string) $term->name : '';
+    $target_lang = trim((string) $display_language);
+    if ($target_lang === '' && function_exists('intersoccer_pv_wpml_current_language_code')) {
+        $target_lang = intersoccer_pv_wpml_current_language_code();
+    }
+    if ($target_lang === '') {
+        $target_lang = 'en';
+    }
+
+    if (function_exists('icl_object_id')) {
+        $translated_term_id = icl_object_id((int) $term->term_id, $taxonomy, false, $target_lang);
+        if ($translated_term_id && (int) $translated_term_id !== (int) $term->term_id && function_exists('get_term')) {
+            $translated_term = get_term((int) $translated_term_id, $taxonomy);
+            if ($translated_term && !is_wp_error($translated_term) && !empty($translated_term->name)) {
+                $translated_name = (string) $translated_term->name;
+            }
+        }
+    }
+
+    if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
+        $translated_name = intersoccer_format_order_line_time_attribute_label(
+            $translated_name,
+            $taxonomy,
+            $display_language !== '' ? $display_language : $target_lang
+        );
+    }
+
+    return $translated_name;
+}
+
+/**
+ * Display label for a canonical EN weekday slug on an order line.
+ *
+ * @param string $en_slug
+ * @param string $taxonomy
+ * @param string $display_language
+ * @return string
+ */
+function intersoccer_pv_order_weekday_display_name($en_slug, $taxonomy, $display_language) {
+    $en_slug = intersoccer_canonical_term_slug_value($en_slug);
+    if ($en_slug === '' || !function_exists('get_term_by')) {
+        return '';
+    }
+
+    $previous_lang = null;
+    $switched = false;
+    if (function_exists('apply_filters') && function_exists('do_action')) {
+        $previous_lang = apply_filters('wpml_current_language', null);
+        do_action('wpml_switch_language', 'all');
+        $switched = true;
+    }
+
+    try {
+        $term = get_term_by('slug', $en_slug, $taxonomy);
+        if (!$term || is_wp_error($term)) {
+            return '';
+        }
+
+        return intersoccer_pv_order_meta_term_display_name($term, $taxonomy, $display_language);
+    } finally {
+        if ($switched) {
+            do_action('wpml_switch_language', $previous_lang);
+        }
+    }
+}
+
+/**
  * Resolve a line's term slug from variation meta, then parent terms.
  *
  * @param int    $product_id
@@ -788,6 +941,13 @@ function intersoccer_resolve_line_term_slug($product_id, $variation_id, $attr_sl
     if ($variation_id > 0 && function_exists('intersoccer_attr_get_variation_value')) {
         $from_var = intersoccer_attr_get_variation_value($variation_id, $attr_slug);
         if (is_string($from_var) && $from_var !== '') {
+            $taxonomy = function_exists('intersoccer_attr_taxonomy')
+                ? intersoccer_attr_taxonomy($attr_slug)
+                : ('pa_' . $attr_slug);
+            if (function_exists('intersoccer_pv_wpml_canonical_term_slug')) {
+                return intersoccer_pv_wpml_canonical_term_slug($from_var, $taxonomy);
+            }
+
             return intersoccer_canonical_term_slug_value($from_var);
         }
     }
@@ -804,6 +964,10 @@ function intersoccer_resolve_line_term_slug($product_id, $variation_id, $attr_sl
         if (!empty($terms) && !is_wp_error($terms)) {
             $first = reset($terms);
             if (is_string($first) && $first !== '') {
+                if (function_exists('intersoccer_pv_wpml_canonical_term_slug')) {
+                    return intersoccer_pv_wpml_canonical_term_slug($first, $taxonomy);
+                }
+
                 return intersoccer_canonical_term_slug_value($first);
             }
         }

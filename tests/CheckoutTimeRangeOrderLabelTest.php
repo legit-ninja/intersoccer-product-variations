@@ -147,7 +147,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
         $icl_calls = $GLOBALS['intersoccer_test_icl_object_id_calls'] ?? [];
         $this->assertNotEmpty($icl_calls);
         foreach ($icl_calls as $call) {
-            $this->assertSame('en', $call['language_code'] ?? null, 'icl_object_id must use ICL_LANGUAGE_CODE for taxonomy labels');
+            $this->assertSame('fr', $call['language_code'] ?? null, 'icl_object_id must use order display language for taxonomy labels');
         }
     }
 
