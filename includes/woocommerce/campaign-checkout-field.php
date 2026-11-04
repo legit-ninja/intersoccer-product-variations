@@ -469,12 +469,6 @@ function intersoccer_campaign_save_joining_meta($order_id) {
             update_post_meta((int) $order_id, intersoccer_campaign_joining_email_meta_key(), $email);
         }
     }
-    if (function_exists('wc_get_order') && function_exists('intersoccer_campaign_link_joining_user')) {
-        $linked = wc_get_order($order_id);
-        if ($linked) {
-            intersoccer_campaign_link_joining_user($linked);
-        }
-    }
 }
 
 add_action('woocommerce_admin_order_data_after_billing_address', 'intersoccer_campaign_display_joining_admin', 10, 1);

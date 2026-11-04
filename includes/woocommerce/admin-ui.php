@@ -3739,6 +3739,125 @@ function intersoccer_is_admin_player_assignment_item($item, $product = null) {
     return false;
 }
 
+/**
+ * Resolve admin player-assignment dropdown value from order item meta and customer players.
+ *
+ * @param object              $item    Order line item.
+ * @param array<int,mixed>    $players Customer players from PM / usermeta.
+ * @return array{option_value:string,player_index:int|null,player_uuid:string,attendee_name:string,legacy_index:mixed}
+ */
+function intersoccer_admin_resolve_item_player_assignment($item, array $players) {
+    $attendee_name = trim((string) $item->get_meta('Assigned Attendee'));
+    $legacy_index = $item->get_meta('assigned_player');
+    $player_uuid = (string) $item->get_meta('assigned_player_id');
+
+    if ($legacy_index === '' || $legacy_index === null) {
+        $legacy_index = $item->get_meta('intersoccer_player_index');
+    }
+    if ($legacy_index === '' || $legacy_index === null) {
+        $legacy_index = $item->get_meta('Player Index');
+    }
+
+    $matched_index = null;
+    $matched_player = null;
+
+    foreach ($players as $index => $player) {
+        if (!is_array($player)) {
+            continue;
+        }
+        $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
+        if ($attendee_name === $player_name || $legacy_index == $index
+            || ($player_uuid !== '' && !empty($player['player_id']) && $player_uuid === (string) $player['player_id'])) {
+            $matched_index = $index;
+            $matched_player = $player;
+            break;
+        }
+    }
+
+    $option_value = '';
+    $resolved_uuid = '';
+    if (is_array($matched_player)) {
+        $resolved_uuid = !empty($matched_player['player_id']) ? (string) $matched_player['player_id'] : '';
+        $option_value = $resolved_uuid !== '' ? $resolved_uuid : (string) $matched_index;
+    }
+
+    return [
+        'option_value' => $option_value,
+        'player_index' => $matched_index,
+        'player_uuid' => $resolved_uuid,
+        'attendee_name' => $attendee_name,
+        'legacy_index' => $legacy_index,
+    ];
+}
+
+/**
+ * Resolve a posted admin player-assignment select value to index and UUID.
+ *
+ * @return array{index:int|null,uuid:string,player:array}|null
+ */
+function intersoccer_admin_resolve_posted_player_assignment($selected_raw, $customer_id, array $players) {
+    $selected_raw = (string) $selected_raw;
+    if ($selected_raw === '') {
+        return null;
+    }
+
+    $player = null;
+    $resolved_index = null;
+
+    if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $selected_raw)
+        && function_exists('intersoccer_get_player_by_id')) {
+        $by_id = intersoccer_get_player_by_id($customer_id, $selected_raw);
+        if ($by_id !== null) {
+            $player = $by_id['player'];
+            $resolved_index = $by_id['key'];
+        }
+    } else {
+        $resolved_index = absint($selected_raw);
+        if (isset($players[$resolved_index])) {
+            $player = $players[$resolved_index];
+        }
+    }
+
+    if (!is_array($player)) {
+        return null;
+    }
+
+    return [
+        'index' => $resolved_index,
+        'uuid' => !empty($player['player_id']) ? (string) $player['player_id'] : '',
+        'player' => $player,
+    ];
+}
+
+/**
+ * Whether the posted assignment matches the dropdown default for this item (no admin change).
+ */
+function intersoccer_admin_player_assignment_unchanged($selected_raw, array $default_resolution, $customer_id, array $players) {
+    if ($default_resolution['option_value'] === '') {
+        return false;
+    }
+    if ((string) $selected_raw === (string) $default_resolution['option_value']) {
+        return true;
+    }
+
+    $posted = intersoccer_admin_resolve_posted_player_assignment($selected_raw, $customer_id, $players);
+    if ($posted === null) {
+        return false;
+    }
+
+    if ($default_resolution['player_uuid'] !== '' && $posted['uuid'] !== ''
+        && strcasecmp($default_resolution['player_uuid'], $posted['uuid']) === 0) {
+        return true;
+    }
+
+    if ($default_resolution['player_index'] !== null && $posted['index'] !== null
+        && (string) $default_resolution['player_index'] === (string) $posted['index']) {
+        return true;
+    }
+
+    return false;
+}
+
 add_action('woocommerce_before_order_itemmeta', 'intersoccer_add_player_assignment_dropdown_admin', 10, 3);
 function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $product) {
     // Only show in admin
@@ -3781,16 +3900,9 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
         return;
     }
     
-    // Get current assignment
-    $current_attendee = $item->get_meta('Assigned Attendee');
-    $current_player_index = $item->get_meta('assigned_player');
-    $current_player_id = $item->get_meta('assigned_player_id');
-    if ($current_player_index === '' || $current_player_index === null) {
-        $current_player_index = $item->get_meta('intersoccer_player_index');
-    }
-    if ($current_player_index === '' || $current_player_index === null) {
-        $current_player_index = $item->get_meta('Player Index');
-    }
+    $assignment = intersoccer_admin_resolve_item_player_assignment($item, $players);
+    $current_attendee = $assignment['attendee_name'];
+    $current_player_index = $assignment['legacy_index'];
     
     ?>
     <div class="player-assignment-dropdown" style="margin-top: 10px; padding: 10px; background: #f0f6fc; border: 1px solid #c3dafe; border-radius: 4px;">
@@ -3809,13 +3921,10 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
             
             <?php foreach ($players as $index => $player) : 
                 $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
-                $selected = '';
-                
-                // Check if this player is currently assigned (by name or index)
-                if ($current_attendee === $player_name || $current_player_index == $index
-                    || ($current_player_id !== '' && !empty($player['player_id']) && $current_player_id === $player['player_id'])) {
-                    $selected = 'selected';
-                }
+                $option_value = !empty($player['player_id']) ? $player['player_id'] : $index;
+                $selected = ($assignment['option_value'] !== '' && (string) $option_value === (string) $assignment['option_value'])
+                    ? 'selected'
+                    : '';
                 
                 $player_dob = $player['dob'] ?? '';
                 $player_gender = $player['gender'] ?? '';
@@ -3833,7 +3942,6 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
                     }
                     $display_info .= ')';
                 }
-                $option_value = !empty($player['player_id']) ? $player['player_id'] : $index;
                 ?>
                 <option value="<?php echo esc_attr($option_value); ?>" data-player-index="<?php echo esc_attr($index); ?>" <?php echo $selected; ?>>
                     <?php echo esc_html($display_info); ?>
@@ -3889,66 +3997,27 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             continue;
         }
 
-        $stored_player_index = $item->get_meta('assigned_player', true);
-        $stored_player_uuid = (string) $item->get_meta('assigned_player_id', true);
-        
-        // Empty selection - clear assignment
-        if ($selected_index === '') {
-            if (($stored_player_index === '' || $stored_player_index === null) && $stored_player_uuid === '') {
-                continue;
-            }
-            $item->delete_meta_data('Assigned Attendee');
-            $item->delete_meta_data('intersoccer_player_index');
-            $item->delete_meta_data('Player Index');
-            $item->delete_meta_data('assigned_player');
-            $item->delete_meta_data('assigned_player_id');
-            $item->delete_meta_data('Attendee DOB');
-            $item->delete_meta_data('Attendee Gender');
-            $item->delete_meta_data('Medical Conditions');
-            $item->save();
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Cleared player assignment for order item ' . $item_id);
-            }
+        $default_assignment = intersoccer_admin_resolve_item_player_assignment($item, $players);
+        $selected_raw = (string) $selected_index;
+
+        if ($selected_raw === '') {
             continue;
         }
-        $selected_raw = (string) $selected_index;
-        $player = null;
-        $resolved_index = null;
 
-        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $selected_raw)
-            && function_exists('intersoccer_get_player_by_id')) {
-            $by_id = intersoccer_get_player_by_id($customer_id, $selected_raw);
-            if ($by_id !== null) {
-                $player = $by_id['player'];
-                $resolved_index = $by_id['key'];
-            }
-        } else {
-            $resolved_index = absint($selected_index);
-            if (isset($players[$resolved_index])) {
-                $player = $players[$resolved_index];
-            }
+        if (intersoccer_admin_player_assignment_unchanged($selected_raw, $default_assignment, $customer_id, $players)) {
+            continue;
         }
 
-        if (!is_array($player)) {
+        $posted = intersoccer_admin_resolve_posted_player_assignment($selected_raw, $customer_id, $players);
+        if ($posted === null) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Invalid player selection ' . $selected_raw . ' for customer ' . $customer_id);
             }
             continue;
         }
 
-        $resolved_uuid = !empty($player['player_id']) ? (string) $player['player_id'] : '';
-        $same_assignment = false;
-        if ($resolved_uuid !== '' && $stored_player_uuid !== '' && strcasecmp($resolved_uuid, $stored_player_uuid) === 0) {
-            $same_assignment = true;
-        } elseif ($resolved_uuid === '' && $stored_player_uuid === '' && (string) $resolved_index === (string) $stored_player_index) {
-            $same_assignment = true;
-        } elseif ($resolved_uuid !== '' && $stored_player_uuid === '' && (string) $resolved_index === (string) $stored_player_index) {
-            $same_assignment = true;
-        }
-        if ($same_assignment) {
-            continue;
-        }
+        $player = $posted['player'];
+        $resolved_index = $posted['index'];
         
         $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
         

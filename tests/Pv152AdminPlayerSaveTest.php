@@ -290,4 +290,63 @@ class Pv152AdminPlayerSaveTest extends TestCase
         $this->assertSame(2, (int) $item->meta['assigned_player']);
         $this->assertSame('88015227-0000-4000-8000-000000000004', $item->meta['assigned_player_id']);
     }
+
+    /**
+     * Legacy order meta keys only (no assigned_player / assigned_player_id): unchanged admin Update must not rewrite attendee fields.
+     */
+    public function test_pv152_admin_save_legacy_keys_only_unchanged_makes_no_writes(): void
+    {
+        $item = new Pv152AdminPlayerSaveTestItem();
+        $item->meta = [
+            'Assigned Attendee' => 'Alex Player',
+            'Player Index' => 1,
+            'Attendee DOB' => '2014-01-01',
+            'Attendee Gender' => 'Female',
+            'Medical Conditions' => 'None',
+        ];
+
+        $GLOBALS['intersoccer_test_orders'][self::ORDER_ID] = new Pv152AdminPlayerSaveTestOrder(
+            self::CUSTOMER_ID,
+            [self::ITEM_ID => $item]
+        );
+
+        $_POST['player_assignment'] = [self::ITEM_ID => self::PLAYER_UUID];
+
+        intersoccer_save_player_assignment_from_admin(self::ORDER_ID, []);
+
+        $this->assertSame(0, $item->save_count);
+        $this->assertSame([], $item->delete_log);
+        $this->assertSame([], $item->update_log);
+        $this->assertSame('None', $item->meta['Medical Conditions']);
+    }
+
+    /**
+     * Empty dropdown submit when stored attendee exists (e.g. deleted player): must not clear meta.
+     */
+    public function test_pv152_admin_save_empty_selection_preserves_stored_attendee(): void
+    {
+        $item = new Pv152AdminPlayerSaveTestItem();
+        $item->meta = [
+            'Assigned Attendee' => 'Legacy Only Name',
+            'Player Index' => 99,
+            'Attendee DOB' => '2012-06-15',
+            'Attendee Gender' => 'Male',
+            'Medical Conditions' => 'Peanuts',
+        ];
+
+        $GLOBALS['intersoccer_test_orders'][self::ORDER_ID] = new Pv152AdminPlayerSaveTestOrder(
+            self::CUSTOMER_ID,
+            [self::ITEM_ID => $item]
+        );
+
+        $_POST['player_assignment'] = [self::ITEM_ID => ''];
+
+        intersoccer_save_player_assignment_from_admin(self::ORDER_ID, []);
+
+        $this->assertSame(0, $item->save_count);
+        $this->assertSame([], $item->delete_log);
+        $this->assertSame([], $item->update_log);
+        $this->assertSame('Legacy Only Name', $item->meta['Assigned Attendee']);
+        $this->assertSame('Peanuts', $item->meta['Medical Conditions']);
+    }
 }
