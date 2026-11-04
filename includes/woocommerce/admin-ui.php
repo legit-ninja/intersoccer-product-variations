@@ -3761,16 +3761,37 @@ function intersoccer_admin_resolve_item_player_assignment($item, array $players)
     $matched_index = null;
     $matched_player = null;
 
-    foreach ($players as $index => $player) {
-        if (!is_array($player)) {
-            continue;
+    if ($player_uuid !== '') {
+        foreach ($players as $index => $player) {
+            if (!is_array($player)) {
+                continue;
+            }
+            if (!empty($player['player_id']) && $player_uuid === (string) $player['player_id']) {
+                $matched_index = $index;
+                $matched_player = $player;
+                break;
+            }
         }
-        $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
-        if ($attendee_name === $player_name || $legacy_index == $index
-            || ($player_uuid !== '' && !empty($player['player_id']) && $player_uuid === (string) $player['player_id'])) {
-            $matched_index = $index;
-            $matched_player = $player;
-            break;
+    }
+
+    if ($matched_player === null && $legacy_index !== '' && $legacy_index !== null) {
+        if (isset($players[$legacy_index]) && is_array($players[$legacy_index])) {
+            $matched_index = $legacy_index;
+            $matched_player = $players[$legacy_index];
+        }
+    }
+
+    if ($matched_player === null && $attendee_name !== '') {
+        foreach ($players as $index => $player) {
+            if (!is_array($player)) {
+                continue;
+            }
+            $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
+            if ($attendee_name === $player_name) {
+                $matched_index = $index;
+                $matched_player = $player;
+                break;
+            }
         }
     }
 

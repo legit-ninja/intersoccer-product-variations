@@ -134,6 +134,8 @@ class Pv152AdminPlayerSaveTest extends TestCase
     private const CUSTOMER_ID = 88015222;
     private const ITEM_ID = 88015223;
     private const PLAYER_UUID = '88015224-0000-4000-8000-000000000002';
+    private const PLAYER_UUID_NAME_COLLISION = '88015228-0000-4000-8000-000000000005';
+    private const PLAYER_UUID_STORED_ON_ITEM = '88015229-0000-4000-8000-000000000006';
 
     /** @var array<int|string,mixed> */
     private $savedGlobals = [];
@@ -323,6 +325,65 @@ class Pv152AdminPlayerSaveTest extends TestCase
     /**
      * Empty dropdown submit when stored attendee exists (e.g. deleted player): must not clear meta.
      */
+    /**
+     * Stored assigned_player_id must win over Assigned Attendee name match (dropdown default + unchanged save).
+     */
+    public function test_pv152_resolve_stored_player_id_wins_over_attendee_name(): void
+    {
+        $players = [
+            1 => [
+                'player_id' => self::PLAYER_UUID_NAME_COLLISION,
+                'first_name' => 'Alex',
+                'last_name' => 'Player',
+                'dob' => '2014-01-01',
+                'gender' => 'Female',
+                'medical_conditions' => '',
+            ],
+            2 => [
+                'player_id' => self::PLAYER_UUID_STORED_ON_ITEM,
+                'first_name' => 'Bob',
+                'last_name' => 'Other',
+                'dob' => '2013-03-03',
+                'gender' => 'Male',
+                'medical_conditions' => 'Asthma',
+            ],
+        ];
+        $GLOBALS['pv152_admin_test_players'][self::CUSTOMER_ID] = $players;
+        $GLOBALS['pv152_admin_test_players_by_uuid'][self::CUSTOMER_ID] = [
+            self::PLAYER_UUID_NAME_COLLISION => ['key' => 1, 'player' => $players[1]],
+            self::PLAYER_UUID_STORED_ON_ITEM => ['key' => 2, 'player' => $players[2]],
+        ];
+
+        $item = new Pv152AdminPlayerSaveTestItem();
+        $item->meta = [
+            'Assigned Attendee' => 'Alex Player',
+            'assigned_player' => 2,
+            'assigned_player_id' => self::PLAYER_UUID_STORED_ON_ITEM,
+            'Attendee DOB' => '2013-03-03',
+            'Attendee Gender' => 'Male',
+            'Medical Conditions' => 'Asthma',
+        ];
+
+        $resolution = intersoccer_admin_resolve_item_player_assignment($item, $players);
+
+        $this->assertSame(self::PLAYER_UUID_STORED_ON_ITEM, $resolution['option_value']);
+        $this->assertSame(2, $resolution['player_index']);
+        $this->assertSame(self::PLAYER_UUID_STORED_ON_ITEM, $resolution['player_uuid']);
+
+        $GLOBALS['intersoccer_test_orders'][self::ORDER_ID] = new Pv152AdminPlayerSaveTestOrder(
+            self::CUSTOMER_ID,
+            [self::ITEM_ID => $item]
+        );
+
+        $_POST['player_assignment'] = [self::ITEM_ID => self::PLAYER_UUID_STORED_ON_ITEM];
+
+        intersoccer_save_player_assignment_from_admin(self::ORDER_ID, []);
+
+        $this->assertSame(0, $item->save_count);
+        $this->assertSame([], $item->delete_log);
+        $this->assertSame([], $item->update_log);
+    }
+
     public function test_pv152_admin_save_empty_selection_preserves_stored_attendee(): void
     {
         $item = new Pv152AdminPlayerSaveTestItem();
