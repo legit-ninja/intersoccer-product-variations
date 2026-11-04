@@ -211,12 +211,11 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                 } else {
                     $names = [];
                     foreach ($slugs as $slug) {
-                        $term = get_term_by('slug', $slug, $attribute_name);
-                        if ($term && !is_wp_error($term)) {
-                            $translated_name = function_exists('intersoccer_pv_order_meta_term_display_name')
-                                ? intersoccer_pv_order_meta_term_display_name($term, $attribute_name, $display_language)
-                                : $term->name;
-                            $names[] = $translated_name;
+                        $label = function_exists('intersoccer_pv_order_meta_term_label_for_slug')
+                            ? intersoccer_pv_order_meta_term_label_for_slug($slug, $attribute_name, $display_language)
+                            : '';
+                        if ($label !== '') {
+                            $names[] = $label;
                         }
                     }
                     $value = !empty($names) ? implode(', ', $names) : '';
@@ -250,20 +249,16 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
                     $value = !empty($names) ? implode(', ', $names) : '';
                 } else {
                     // For other taxonomy attributes, only include if unambiguous (single parent term)
-                    $terms = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'names']);
-                    if (is_array($terms) && count($terms) === 1) {
-                        $value = $terms[0];
-                        if (function_exists('intersoccer_format_order_line_time_attribute_label')) {
-                            $value = intersoccer_format_order_line_time_attribute_label(
-                                $value,
-                                $attribute_name,
-                                $display_language
-                            );
-                        }
+                    $term_slugs = wc_get_product_terms($product_id, $attribute_name, ['fields' => 'slugs']);
+                    if (is_array($term_slugs) && count($term_slugs) === 1) {
+                        $parent_slug = reset($term_slugs);
+                        $value = function_exists('intersoccer_pv_order_meta_term_label_for_slug')
+                            ? intersoccer_pv_order_meta_term_label_for_slug($parent_slug, $attribute_name, $display_language)
+                            : '';
                     } else {
                         // Skip ambiguous parent lists to avoid dumping all venues, etc.
                         if (defined('WP_DEBUG') && WP_DEBUG) {
-                            intersoccer_debug('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent terms: ' . print_r($terms, true) . ')');
+                            intersoccer_debug('InterSoccer: Skipping ambiguous parent taxonomy ' . $attribute_name . ' (parent terms: ' . print_r($term_slugs, true) . ')');
                         }
                         $value = '';
                     }
