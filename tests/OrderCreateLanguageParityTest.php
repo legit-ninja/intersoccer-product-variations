@@ -41,6 +41,13 @@ class OrderCreateLanguageParityTest extends TestCase
         MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static fn () => false;
     }
 
+    public static function setUpBeforeClass(): void
+    {
+        // Re-set in the parent before child processes start: another class's tearDownAfterClass may have cleared it.
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+        $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
+    }
+
     public static function tearDownAfterClass(): void
     {
         putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
