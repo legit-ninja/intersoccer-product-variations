@@ -79,6 +79,7 @@ class OrderCreateLanguageParityTest extends TestCase
         unset($unused_camp_slug, $unused_camp_label);
 
         $this->seedCourseCatalog($course_day_slug, $canton_slug);
+        $this->useCheckoutRequestLanguage($order_lang);
         $built = intersoccer_build_order_line_meta([
             'order' => new OrderCreateLanguageMockOrder($order_lang),
             'product_id' => self::PARENT_COURSE,
@@ -108,6 +109,7 @@ class OrderCreateLanguageParityTest extends TestCase
         unset($unused_course_slug, $unused_course_label);
 
         $this->seedCampCatalog($camp_day_slug, $canton_slug);
+        $this->useCheckoutRequestLanguage($order_lang);
         $built = intersoccer_build_order_line_meta([
             'order' => new OrderCreateLanguageMockOrder($order_lang),
             'product_id' => self::PARENT_CAMP,
@@ -131,6 +133,7 @@ class OrderCreateLanguageParityTest extends TestCase
         foreach (self::localizedOrderLanguageProvider() as $case) {
             [$order_lang, $course_day_slug, , $canton_slug] = $case;
             $this->seedCourseCatalog($course_day_slug, $canton_slug);
+            $this->useCheckoutRequestLanguage($order_lang);
             $built = intersoccer_build_order_line_meta([
                 'order' => new OrderCreateLanguageMockOrder($order_lang),
                 'product_id' => self::PARENT_COURSE,
@@ -156,6 +159,14 @@ class OrderCreateLanguageParityTest extends TestCase
             $this->assertSame($reference_canonical, $canonical, 'Canonical facets must match EN for language ' . $order_lang);
             $this->assertSame('geneva', $built['updates']['_intersoccer_canonical_canton'] ?? null);
         }
+    }
+
+    /**
+     * At checkout the WPML request language is the order's language.
+     */
+    private function useCheckoutRequestLanguage(string $order_lang): void
+    {
+        $GLOBALS['intersoccer_test_wpml_current_language'] = $order_lang;
     }
 
     private function seedCourseCatalog(string $course_day_slug, string $canton_slug): void

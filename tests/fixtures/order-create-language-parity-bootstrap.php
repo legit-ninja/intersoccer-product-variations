@@ -140,7 +140,7 @@ if (!function_exists('order_create_language_register_wpml_term_twins')) {
 
         MockFilters::reset();
         MockFilters::$filters['wpml_default_language'] = static fn () => 'en';
-        MockFilters::$filters['wpml_current_language'] = static fn () => 'en';
+        MockFilters::$filters['wpml_current_language'] = static fn () => $GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en';
         MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($en_map) {
             unset($type, $return_original);
             $id = (int) $id;
