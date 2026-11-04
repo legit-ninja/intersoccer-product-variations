@@ -135,9 +135,25 @@ class Pv152AdminPlayerSaveTest extends TestCase
     private const ITEM_ID = 88015223;
     private const PLAYER_UUID = '88015224-0000-4000-8000-000000000002';
 
+    /** @var array<int|string,mixed> */
+    private $savedGlobals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->pv152SnapshotGlobals([
+            'intersoccer_test_actions',
+            'intersoccer_test_is_admin',
+            'intersoccer_test_current_user_can',
+            'intersoccer_test_orders',
+            'intersoccer_test_locale',
+            'intersoccer_pv_textdomain_locale',
+            'intersoccer_pv_test_determine_locale',
+            'intersoccer_test_textdomain_loaded',
+            'intersoccer_test_textdomain_unload_reloadable',
+            'intersoccer_test_mo_translations',
+            'intersoccer_pv_textdomain_test_actions',
+        ]);
         $GLOBALS['intersoccer_test_is_admin'] = true;
         $GLOBALS['intersoccer_test_current_user_can'] = ['edit_shop_orders' => true];
         $GLOBALS['pv152_admin_test_players'] = [
@@ -165,14 +181,34 @@ class Pv152AdminPlayerSaveTest extends TestCase
     protected function tearDown(): void
     {
         unset(
-            $GLOBALS['intersoccer_test_is_admin'],
-            $GLOBALS['intersoccer_test_current_user_can'],
             $GLOBALS['pv152_admin_test_players'],
             $GLOBALS['pv152_admin_test_players_by_uuid'],
-            $GLOBALS['intersoccer_test_orders'],
             $_POST
         );
+        $this->pv152RestoreGlobals();
         parent::tearDown();
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function pv152SnapshotGlobals(array $keys): void
+    {
+        foreach ($keys as $key) {
+            $this->savedGlobals[$key] = array_key_exists($key, $GLOBALS) ? $GLOBALS[$key] : null;
+        }
+    }
+
+    private function pv152RestoreGlobals(): void
+    {
+        foreach ($this->savedGlobals as $key => $value) {
+            if ($value === null) {
+                unset($GLOBALS[$key]);
+            } else {
+                $GLOBALS[$key] = $value;
+            }
+        }
+        $this->savedGlobals = [];
     }
 
     private function itemWithStoredAssignment(): Pv152AdminPlayerSaveTestItem

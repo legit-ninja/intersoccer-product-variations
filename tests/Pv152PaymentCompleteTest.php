@@ -42,13 +42,6 @@ if (!function_exists('has_action')) {
     }
 }
 
-if (!function_exists('get_user_by')) {
-    function get_user_by($field, $value) {
-        $key = strtolower((string) $value);
-        return $GLOBALS['pv152_test_users_by_email'][$key] ?? false;
-    }
-}
-
 if (!class_exists('Pv152PaymentCompleteTestOrder')) {
     class Pv152PaymentCompleteTestOrder {
         public $meta = [];
@@ -70,19 +63,36 @@ if (!class_exists('Pv152PaymentCompleteTestOrder')) {
     }
 }
 
-require_once dirname(__DIR__) . '/includes/woocommerce/campaign-leads.php';
-require_once dirname(__DIR__) . '/includes/woocommerce/campaign-checkout-field.php';
-
 class Pv152PaymentCompleteTest extends TestCase
 {
     private const ORDER_ID = 88015201;
     private const LINKED_USER = 88015202;
 
+    /** @var array<int|string,mixed> */
+    private $savedGlobals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
-        $GLOBALS['intersoccer_test_actions'] = [];
-        $GLOBALS['pv152_test_users_by_email'] = [
+        $this->pv152SnapshotGlobals([
+            'intersoccer_test_actions',
+            'intersoccer_test_users_by_email',
+            'intersoccer_test_orders',
+            'intersoccer_test_locale',
+            'intersoccer_pv_textdomain_locale',
+            'intersoccer_pv_test_determine_locale',
+            'intersoccer_test_textdomain_loaded',
+            'intersoccer_test_textdomain_unload_reloadable',
+            'intersoccer_test_mo_translations',
+            'intersoccer_pv_textdomain_test_actions',
+        ]);
+
+        if (!function_exists('intersoccer_campaign_save_joining_meta')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/campaign-leads.php';
+            require_once dirname(__DIR__) . '/includes/woocommerce/campaign-checkout-field.php';
+        }
+
+        $GLOBALS['intersoccer_test_users_by_email'] = [
             'guardian.peer@example.com' => (object) ['ID' => self::LINKED_USER],
         ];
         unset($GLOBALS['intersoccer_test_orders']);
@@ -90,13 +100,31 @@ class Pv152PaymentCompleteTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset(
-            $GLOBALS['intersoccer_test_actions'],
-            $GLOBALS['pv152_test_users_by_email'],
-            $GLOBALS['intersoccer_test_orders'],
-            $_POST
-        );
+        unset($_POST);
+        $this->pv152RestoreGlobals();
         parent::tearDown();
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function pv152SnapshotGlobals(array $keys): void
+    {
+        foreach ($keys as $key) {
+            $this->savedGlobals[$key] = array_key_exists($key, $GLOBALS) ? $GLOBALS[$key] : null;
+        }
+    }
+
+    private function pv152RestoreGlobals(): void
+    {
+        foreach ($this->savedGlobals as $key => $value) {
+            if ($value === null) {
+                unset($GLOBALS[$key]);
+            } else {
+                $GLOBALS[$key] = $value;
+            }
+        }
+        $this->savedGlobals = [];
     }
 
     public function test_pv152_payment_complete_does_not_write_order(): void

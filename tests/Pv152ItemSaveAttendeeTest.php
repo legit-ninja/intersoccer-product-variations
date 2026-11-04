@@ -54,9 +54,26 @@ class Pv152ItemSaveAttendeeTest extends TestCase
     private const CUSTOMER_ID = 88015212;
     private const PLAYER_UUID = '88015213-0000-4000-8000-000000000001';
 
+    /** @var array<int|string,mixed> */
+    private $savedGlobals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->pv152SnapshotGlobals([
+            'intersoccer_test_actions',
+            'intersoccer_test_player_by_id',
+            'intersoccer_test_user_id',
+            'intersoccer_test_product_type',
+            'intersoccer_test_product_name',
+            'intersoccer_test_locale',
+            'intersoccer_pv_textdomain_locale',
+            'intersoccer_pv_test_determine_locale',
+            'intersoccer_test_textdomain_loaded',
+            'intersoccer_test_textdomain_unload_reloadable',
+            'intersoccer_test_mo_translations',
+            'intersoccer_pv_textdomain_test_actions',
+        ]);
         $GLOBALS['intersoccer_test_user_id'] = self::CUSTOMER_ID;
         $GLOBALS['intersoccer_test_product_type'] = 'camp';
         $GLOBALS['intersoccer_test_product_name'] = 'Fixture Camp';
@@ -79,13 +96,30 @@ class Pv152ItemSaveAttendeeTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset(
-            $GLOBALS['intersoccer_test_player_by_id'],
-            $GLOBALS['intersoccer_test_user_id'],
-            $GLOBALS['intersoccer_test_product_type'],
-            $GLOBALS['intersoccer_test_product_name']
-        );
+        $this->pv152RestoreGlobals();
         parent::tearDown();
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function pv152SnapshotGlobals(array $keys): void
+    {
+        foreach ($keys as $key) {
+            $this->savedGlobals[$key] = array_key_exists($key, $GLOBALS) ? $GLOBALS[$key] : null;
+        }
+    }
+
+    private function pv152RestoreGlobals(): void
+    {
+        foreach ($this->savedGlobals as $key => $value) {
+            if ($value === null) {
+                unset($GLOBALS[$key]);
+            } else {
+                $GLOBALS[$key] = $value;
+            }
+        }
+        $this->savedGlobals = [];
     }
 
     private function orderStub(): object
