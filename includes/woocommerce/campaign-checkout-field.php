@@ -453,10 +453,10 @@ function intersoccer_campaign_save_joining_meta($order_id) {
             if ($email !== '') {
                 $order->update_meta_data(intersoccer_campaign_joining_email_meta_key(), $email);
             }
-            $order->save();
             if (function_exists('intersoccer_campaign_link_joining_user')) {
                 intersoccer_campaign_link_joining_user($order);
             }
+            $order->save();
             return;
         }
     }
@@ -467,12 +467,6 @@ function intersoccer_campaign_save_joining_meta($order_id) {
         }
         if ($email !== '') {
             update_post_meta((int) $order_id, intersoccer_campaign_joining_email_meta_key(), $email);
-        }
-    }
-    if (function_exists('wc_get_order') && function_exists('intersoccer_campaign_link_joining_user')) {
-        $linked = wc_get_order($order_id);
-        if ($linked) {
-            intersoccer_campaign_link_joining_user($linked);
         }
     }
 }

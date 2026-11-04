@@ -233,24 +233,6 @@ if (!function_exists('intersoccer_campaign_link_joining_user')) {
         }
         $user_id = intersoccer_campaign_lookup_user_id_by_email($email);
         $order->update_meta_data(intersoccer_campaign_joining_user_meta_key(), $user_id);
-        if (method_exists($order, 'save')) {
-            $order->save();
-        }
-    }
-}
-
-if (!function_exists('intersoccer_campaign_link_joining_user_on_payment')) {
-    /**
-     * @param int $order_id
-     */
-    function intersoccer_campaign_link_joining_user_on_payment($order_id) {
-        if (!function_exists('wc_get_order')) {
-            return;
-        }
-        $order = wc_get_order((int) $order_id);
-        if ($order) {
-            intersoccer_campaign_link_joining_user($order);
-        }
     }
 }
 
@@ -319,8 +301,6 @@ if (!function_exists('intersoccer_campaign_collect_leads')) {
         return $rows;
     }
 }
-
-add_action('woocommerce_payment_complete', 'intersoccer_campaign_link_joining_user_on_payment', 10, 1);
 
 add_action('admin_init', 'intersoccer_campaign_maybe_export_leads', 5);
 function intersoccer_campaign_maybe_export_leads() {
