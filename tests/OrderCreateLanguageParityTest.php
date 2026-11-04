@@ -29,14 +29,38 @@ class OrderCreateLanguageParityTest extends TestCase
     private const FR_CANTON_ID = 136202;
     private const DE_CANTON_ID = 136203;
 
+    /** @var array{env: string|false, superglobal: mixed}|null */
+    private $savedLoadRealCheckoutEnv = null;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->savedLoadRealCheckoutEnv = [
+            'env' => getenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'),
+            'superglobal' => $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] ?? null,
+        ];
         putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
         $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
         require __DIR__ . '/fixtures/order-create-language-parity-bootstrap.php';
         TestProductTypeRegistry::reset();
         MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static fn () => false;
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->savedLoadRealCheckoutEnv !== null) {
+            if ($this->savedLoadRealCheckoutEnv['env'] === false) {
+                putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+            } else {
+                putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=' . $this->savedLoadRealCheckoutEnv['env']);
+            }
+            if ($this->savedLoadRealCheckoutEnv['superglobal'] === null) {
+                unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
+            } else {
+                $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = $this->savedLoadRealCheckoutEnv['superglobal'];
+            }
+        }
+        parent::tearDown();
     }
 
     public static function setUpBeforeClass(): void

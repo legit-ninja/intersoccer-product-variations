@@ -23,6 +23,11 @@ class OrderCreateLanguageLabelTest extends TestCase
     private const FR_CANTON_ID = 137202;
     private const DE_CANTON_ID = 137203;
 
+    private const EN_ONLY_VENUE_ID = 137104;
+
+    /** @var array{env: string|false, superglobal: mixed}|null */
+    private $savedLoadRealCheckoutEnv = null;
+
     public static function setUpBeforeClass(): void
     {
         putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
@@ -38,20 +43,41 @@ class OrderCreateLanguageLabelTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->savedLoadRealCheckoutEnv = [
+            'env' => getenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'),
+            'superglobal' => $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] ?? null,
+        ];
         putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
         $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
         require __DIR__ . '/fixtures/order-create-language-parity-bootstrap.php';
         MockFilters::reset();
     }
 
+    protected function tearDown(): void
+    {
+        if ($this->savedLoadRealCheckoutEnv !== null) {
+            if ($this->savedLoadRealCheckoutEnv['env'] === false) {
+                putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+            } else {
+                putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=' . $this->savedLoadRealCheckoutEnv['env']);
+            }
+            if ($this->savedLoadRealCheckoutEnv['superglobal'] === null) {
+                unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
+            } else {
+                $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = $this->savedLoadRealCheckoutEnv['superglobal'];
+            }
+        }
+        parent::tearDown();
+    }
+
     /**
-     * @return array<string,array{0:string,1:string,2:string,3:string}>
+     * @return array<string,array{0:string,1:string,2:string,3:string,4:string,5:string}>
      */
     public static function requestVsOrderLanguageProvider(): array
     {
         return [
-            'request_en_order_fr' => ['en', 'fr', 'geneve', 'Genève', 'Fixture Venue FR'],
-            'request_fr_order_de' => ['fr', 'de', 'genf', 'Genf', 'Fixture Venue DE'],
+            'request_en_order_fr' => ['en', 'fr', 'geneva', 'fixture-venue-a', 'Genève', 'Fixture Venue FR'],
+            'request_fr_order_de' => ['fr', 'de', 'geneve', 'fixture-venue-fr', 'Genf', 'Fixture Venue DE'],
         ];
     }
 
@@ -60,6 +86,7 @@ class OrderCreateLanguageLabelTest extends TestCase
         string $request_lang,
         string $order_lang,
         string $canton_slug,
+        string $venue_slug,
         string $expected_canton_label,
         string $expected_venue_label
     ): void {
@@ -67,7 +94,6 @@ class OrderCreateLanguageLabelTest extends TestCase
         $this->setRequestLanguage($request_lang);
 
         $parent = new OrderCreateLanguageMockParentProduct(13701, [self::TAX_VENUE, self::TAX_CANTON]);
-        $venue_slug = $order_lang === 'de' ? 'fixture-venue-de' : ($order_lang === 'fr' ? 'fixture-venue-fr' : 'fixture-venue-a');
         $variation = new OrderCreateLanguageMockVariationProduct(13702, [
             'attribute_pa_intersoccer-venues' => $venue_slug,
             'attribute_pa_canton-region' => $canton_slug,
@@ -104,6 +130,29 @@ class OrderCreateLanguageLabelTest extends TestCase
             new OrderCreateLanguageMockOrder('fr')
         );
 
+        $this->assertSame('Genève', $attributes['Canton / Region'] ?? null);
+    }
+
+    public function test_en_only_venue_label_falls_back_to_english_when_order_has_no_translation(): void
+    {
+        $this->registerVenueAndCantonTerms();
+        $this->registerEnOnlyVenueTerm();
+        $this->setRequestLanguage('en');
+
+        $parent = new OrderCreateLanguageMockParentProduct(13721, [self::TAX_VENUE, self::TAX_CANTON]);
+        $variation = new OrderCreateLanguageMockVariationProduct(13722, [
+            'attribute_pa_intersoccer-venues' => 'fixture-venue-en-only',
+            'attribute_pa_canton-region' => 'geneva',
+        ]);
+        $GLOBALS['intersoccer_test_products'] = [13721 => $parent, 13722 => $variation];
+
+        $attributes = intersoccer_get_parent_product_attributes(
+            13721,
+            13722,
+            new OrderCreateLanguageMockOrder('fr')
+        );
+
+        $this->assertSame('Fixture Venue EN Only', $attributes['Sites InterSoccer'] ?? null);
         $this->assertSame('Genève', $attributes['Canton / Region'] ?? null);
     }
 
@@ -162,5 +211,15 @@ class OrderCreateLanguageLabelTest extends TestCase
                 self::EN_CANTON_ID => ['fr' => self::FR_CANTON_ID, 'de' => self::DE_CANTON_ID],
             ]
         );
+    }
+
+    private function registerEnOnlyVenueTerm(): void
+    {
+        $GLOBALS['intersoccer_test_terms'][self::EN_ONLY_VENUE_ID] = [
+            'slug' => 'fixture-venue-en-only',
+            'name' => 'Fixture Venue EN Only',
+            'taxonomy' => self::TAX_VENUE,
+            'wpml_lang' => 'en',
+        ];
     }
 }
