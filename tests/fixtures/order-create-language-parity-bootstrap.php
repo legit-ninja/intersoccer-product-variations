@@ -141,32 +141,38 @@ if (!function_exists('order_create_language_register_wpml_term_twins')) {
         MockFilters::reset();
         MockFilters::$filters['wpml_default_language'] = static fn () => 'en';
         MockFilters::$filters['wpml_current_language'] = static fn () => $GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en';
-        MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($en_map) {
-            unset($type, $return_original);
-            $id = (int) $id;
-            if ($lang !== 'en') {
-                return $id;
+
+        $translation_groups = [];
+        foreach ($en_map as $en_id => $twins) {
+            $group = array_merge(['en' => (int) $en_id], $twins);
+            foreach ($group as $member_id) {
+                $translation_groups[(int) $member_id] = $group;
             }
-            foreach ($en_map as $canonical_en => $twins) {
-                if ($id === (int) $canonical_en) {
-                    return (int) $canonical_en;
-                }
-                foreach ($twins as $twin_id) {
-                    if ($id === (int) $twin_id) {
-                        return (int) $canonical_en;
-                    }
-                }
+        }
+
+        MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($translation_groups) {
+            unset($type);
+            $id = (int) $id;
+            $lang = $lang !== null && $lang !== '' ? (string) $lang : 'en';
+            $return_original = (bool) $return_original;
+
+            if (!isset($translation_groups[$id])) {
+                return $return_original ? $id : null;
             }
 
-            return $id;
+            $group = $translation_groups[$id];
+            if (isset($group[$lang])) {
+                return (int) $group[$lang];
+            }
+
+            return $return_original ? $id : null;
         };
 
         $icl = [];
         foreach ($en_map as $en_id => $twins) {
-            $icl[(int) $en_id] = array_merge(['en' => (int) $en_id], $twins);
-            foreach ($twins as $lang => $twin_id) {
-                $icl[(int) $twin_id][$lang] = (int) $twin_id;
-                $icl[(int) $twin_id]['en'] = (int) $en_id;
+            $group = array_merge(['en' => (int) $en_id], $twins);
+            foreach ($group as $member_id) {
+                $icl[(int) $member_id] = $group;
             }
         }
         $GLOBALS['intersoccer_test_icl_translations'] = $icl;
