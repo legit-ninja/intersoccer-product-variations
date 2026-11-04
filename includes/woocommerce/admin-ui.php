@@ -3888,9 +3888,15 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
         if (!$item) {
             continue;
         }
+
+        $stored_player_index = $item->get_meta('assigned_player', true);
+        $stored_player_uuid = (string) $item->get_meta('assigned_player_id', true);
         
         // Empty selection - clear assignment
         if ($selected_index === '') {
+            if (($stored_player_index === '' || $stored_player_index === null) && $stored_player_uuid === '') {
+                continue;
+            }
             $item->delete_meta_data('Assigned Attendee');
             $item->delete_meta_data('intersoccer_player_index');
             $item->delete_meta_data('Player Index');
@@ -3928,6 +3934,19 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 intersoccer_debug('InterSoccer: Invalid player selection ' . $selected_raw . ' for customer ' . $customer_id);
             }
+            continue;
+        }
+
+        $resolved_uuid = !empty($player['player_id']) ? (string) $player['player_id'] : '';
+        $same_assignment = false;
+        if ($resolved_uuid !== '' && $stored_player_uuid !== '' && strcasecmp($resolved_uuid, $stored_player_uuid) === 0) {
+            $same_assignment = true;
+        } elseif ($resolved_uuid === '' && $stored_player_uuid === '' && (string) $resolved_index === (string) $stored_player_index) {
+            $same_assignment = true;
+        } elseif ($resolved_uuid !== '' && $stored_player_uuid === '' && (string) $resolved_index === (string) $stored_player_index) {
+            $same_assignment = true;
+        }
+        if ($same_assignment) {
             continue;
         }
         

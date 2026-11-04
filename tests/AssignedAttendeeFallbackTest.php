@@ -40,6 +40,10 @@ if (!class_exists('IntersoccerAssignedAttendeeFallbackTestItem')) {
         public function get_order() {
             return $this->order;
         }
+
+        public function get_id() {
+            return 0;
+        }
     }
 }
 

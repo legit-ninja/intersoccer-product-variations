@@ -453,10 +453,10 @@ function intersoccer_campaign_save_joining_meta($order_id) {
             if ($email !== '') {
                 $order->update_meta_data(intersoccer_campaign_joining_email_meta_key(), $email);
             }
-            $order->save();
             if (function_exists('intersoccer_campaign_link_joining_user')) {
                 intersoccer_campaign_link_joining_user($order);
             }
+            $order->save();
             return;
         }
     }
