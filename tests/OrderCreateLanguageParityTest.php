@@ -3,6 +3,10 @@
  * Regression #136: EN/FR/DE order-create line meta keys and canonical slugs must match.
  */
 
+// Child PHPUnit processes inherit this env var so tests/bootstrap.php skips the player-details double before checkout-calculations.php loads.
+putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+$_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
+
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -32,18 +36,15 @@ class OrderCreateLanguageParityTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
-        $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
         require __DIR__ . '/fixtures/order-create-language-parity-bootstrap.php';
         TestProductTypeRegistry::reset();
         MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static fn () => false;
     }
 
-    protected function tearDown(): void
+    public static function tearDownAfterClass(): void
     {
         putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
         unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
-        parent::tearDown();
     }
 
     /**
