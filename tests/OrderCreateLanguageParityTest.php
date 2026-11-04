@@ -3,15 +3,12 @@
  * Regression #136: EN/FR/DE order-create line meta keys and canonical slugs must match.
  */
 
-putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
-$_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
-
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 
-#[RunInSeparateProcess]
+#[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
 class OrderCreateLanguageParityTest extends TestCase
 {
@@ -32,18 +29,21 @@ class OrderCreateLanguageParityTest extends TestCase
     private const FR_CANTON_ID = 136202;
     private const DE_CANTON_ID = 136203;
 
-    public static function tearDownAfterClass(): void
-    {
-        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
-        unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+        $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
         require __DIR__ . '/fixtures/order-create-language-parity-bootstrap.php';
         TestProductTypeRegistry::reset();
         MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static fn () => false;
+    }
+
+    protected function tearDown(): void
+    {
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+        unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
+        parent::tearDown();
     }
 
     /**

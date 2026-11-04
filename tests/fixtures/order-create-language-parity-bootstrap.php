@@ -144,15 +144,16 @@ if (!function_exists('order_create_language_register_wpml_term_twins')) {
         MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($en_map) {
             unset($type, $return_original);
             $id = (int) $id;
-            if ($lang === null || $lang === '' || $lang === 'en') {
-                foreach ($en_map as $canonical_en => $twins) {
-                    if ($id === (int) $canonical_en) {
+            if ($lang !== 'en') {
+                return $id;
+            }
+            foreach ($en_map as $canonical_en => $twins) {
+                if ($id === (int) $canonical_en) {
+                    return (int) $canonical_en;
+                }
+                foreach ($twins as $twin_id) {
+                    if ($id === (int) $twin_id) {
                         return (int) $canonical_en;
-                    }
-                    foreach ($twins as $twin_id) {
-                        if ($id === (int) $twin_id) {
-                            return (int) $canonical_en;
-                        }
                     }
                 }
             }

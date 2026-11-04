@@ -773,7 +773,7 @@ function intersoccer_canonical_term_slug_value($raw) {
 }
 
 /**
- * WPML default-language slug for a taxonomy term (falls back to sanitized input when WPML absent).
+ * English catalog slug for a taxonomy term (WPML EN twin; falls back when WPML absent).
  *
  * @param string $raw_slug   Stored or localized term slug.
  * @param string $taxonomy   pa_* taxonomy.
@@ -800,19 +800,27 @@ function intersoccer_pv_wpml_canonical_term_slug($raw_slug, $taxonomy) {
             return $slug;
         }
 
-        $canonical_id = function_exists('intersoccer_discount_wpml_canonical_term_id')
-            ? intersoccer_discount_wpml_canonical_term_id((int) $term->term_id, $taxonomy)
-            : (int) $term->term_id;
-        if ($canonical_id <= 0 || !function_exists('get_term')) {
+        $term_id = (int) $term->term_id;
+        $en_term_id = 0;
+        if (function_exists('apply_filters')) {
+            $en_term_id = (int) apply_filters('wpml_object_id', $term_id, $taxonomy, true, 'en');
+        }
+        if ($en_term_id <= 0 && function_exists('icl_object_id')) {
+            $en_term_id = (int) icl_object_id($term_id, $taxonomy, true, 'en');
+        }
+        if ($en_term_id <= 0) {
+            $en_term_id = $term_id;
+        }
+        if ($en_term_id <= 0 || !function_exists('get_term')) {
             return $slug;
         }
 
-        $canonical = get_term($canonical_id, $taxonomy);
-        if (!$canonical || is_wp_error($canonical)) {
+        $en_term = get_term($en_term_id, $taxonomy);
+        if (!$en_term || is_wp_error($en_term)) {
             return $slug;
         }
 
-        return intersoccer_canonical_term_slug_value($canonical->slug);
+        return intersoccer_canonical_term_slug_value($en_term->slug);
     } finally {
         if ($switched) {
             do_action('wpml_switch_language', $previous_lang);
