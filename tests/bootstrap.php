@@ -879,12 +879,37 @@ if (!function_exists('get_term')) {
     }
 }
 
+if (!function_exists('intersoccer_test_wpml_term_query_language')) {
+    /**
+     * Language get_term_by/get_terms should honor.
+     *
+     * Raw "all" normally means every language. When the storefront flag is set,
+     * "all" is not legal and the query uses wpml_current_language (the default).
+     */
+    function intersoccer_test_wpml_term_query_language() {
+        if (empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'])) {
+            return '';
+        }
+        $lang = (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en');
+        if (
+            $lang === 'all'
+            && !empty($GLOBALS['intersoccer_test_wpml_storefront_all_is_default'])
+            && function_exists('apply_filters')
+        ) {
+            $effective = apply_filters('wpml_current_language', 'en');
+            if (is_string($effective) && $effective !== '') {
+                return $effective;
+            }
+        }
+
+        return $lang;
+    }
+}
+
 if (!function_exists('get_term_by')) {
     function get_term_by($field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
         if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
-            $current_lang = !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'])
-                ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
-                : '';
+            $current_lang = intersoccer_test_wpml_term_query_language();
             foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
                 if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
                     continue;
@@ -920,9 +945,8 @@ if (!function_exists('get_terms')) {
         if ($taxonomy === '' || empty($GLOBALS['intersoccer_test_terms']) || !is_array($GLOBALS['intersoccer_test_terms'])) {
             return [];
         }
-        $suppress = !empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters']);
-        $current_lang = (!$suppress && !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language']))
-            ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
+        $current_lang = empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters'])
+            ? intersoccer_test_wpml_term_query_language()
             : '';
         $out = [];
         foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
