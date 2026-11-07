@@ -6,7 +6,9 @@
  * term id still comes back with the default-language name unless the read
  * itself runs in the order language.
  *
- * Synthetic terms only. Expected labels are the fixture term names.
+ * The double treats storefront language "all" as the default language for
+ * get_term_by, the same way a non-admin request does. Synthetic terms only.
+ * Expected labels are the fixture term names. This does not run real WPML.
  */
 
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -91,7 +93,9 @@ class OrderCreateTermLabelWpmlAdjustTest extends TestCase
         require __DIR__ . '/fixtures/order-create-language-parity-bootstrap.php';
         TestProductTypeRegistry::reset();
         $GLOBALS['intersoccer_test_is_admin'] = false;
-        $GLOBALS['intersoccer_test_get_term_throw_on_adjust'] = false;
+        $GLOBALS['intersoccer_test_wpml_storefront_all_is_default'] = false;
+        $GLOBALS['intersoccer_test_throw_when_language'] = '';
+        $GLOBALS['intersoccer_test_helper_term_reads'] = [];
         unset($GLOBALS['intersoccer_test_language_during_throw']);
     }
 
@@ -209,27 +213,62 @@ class OrderCreateTermLabelWpmlAdjustTest extends TestCase
         );
 
         $this->assertSame('Fixture Venue EN Only', $updates['Sites InterSoccer'] ?? null);
+        $display_langs = [];
+        foreach ($GLOBALS['intersoccer_test_helper_term_reads'] ?? [] as $row) {
+            if (($row[0] ?? 0) === 1364801 && ($row[2] ?? '') === 'display') {
+                $display_langs[] = $row[1] ?? '';
+            }
+        }
+        $this->assertSame(['en'], $display_langs);
     }
 
-    public function test_language_is_restored_when_term_read_throws(): void
+    public function test_storefront_all_hides_non_default_slugs_from_get_term_by(): void
     {
         $this->seedGroups([
             $this->weekdayGroup(self::TAX_COURSE_DAY, 1364100, 6),
         ]);
-        $this->setRequestLanguage('fr');
-        $GLOBALS['intersoccer_test_get_term_throw_on_adjust'] = true;
+        $GLOBALS['intersoccer_test_wpml_current_language'] = 'all';
+        $GLOBALS['intersoccer_test_is_admin'] = false;
 
-        $en_id = 1364100 + 1;
-        $term = (object) [
-            'term_id' => $en_id,
-            'name' => self::WEEKDAY_NAMES['en'][6],
-            'slug' => self::WEEKDAY_SLUGS['en'][6],
-            'taxonomy' => self::TAX_COURSE_DAY,
+        $this->assertFalse(get_term_by('slug', 'dimanche', self::TAX_COURSE_DAY));
+        $this->assertNotFalse(get_term_by('slug', 'sunday', self::TAX_COURSE_DAY));
+        $this->assertSame('en', $this->effectiveLanguage());
+        $this->assertSame('all', $GLOBALS['intersoccer_test_wpml_current_language'] ?? null);
+    }
+
+    public function test_creation_restores_language_when_order_language_term_read_throws(): void
+    {
+        $this->seedGroups([
+            $this->weekdayGroup(self::TAX_COURSE_DAY, 1364100, 6),
+            $this->cantonGroup(1364200, self::GENEVA),
+        ]);
+        $this->setRequestLanguage('fr');
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $GLOBALS['intersoccer_test_throw_when_language'] = 'de';
+        $GLOBALS['intersoccer_test_products'] = [
+            self::PARENT_COURSE => new OrderCreateLanguageMockParentProduct(self::PARENT_COURSE, [
+                self::TAX_COURSE_DAY,
+                self::TAX_CANTON,
+            ]),
+            self::VAR_COURSE => new OrderCreateLanguageMockVariationProduct(self::VAR_COURSE, [
+                'attribute_pa_course-day' => self::WEEKDAY_SLUGS['fr'][6],
+                'attribute_pa_canton-region' => self::GENEVA['fr']['slug'],
+            ]),
         ];
+        TestProductTypeRegistry::set(self::PARENT_COURSE, 'course');
+        MockFilters::$filters['intersoccer_order_activity_type_is_girls_only'] = static fn () => false;
 
         try {
-            intersoccer_pv_order_meta_term_display_name($term, self::TAX_COURSE_DAY, 'de');
-            $this->fail('Term read failure should surface to the caller.');
+            intersoccer_build_order_line_meta([
+                'order' => new OrderCreateLanguageMockOrder('de'),
+                'product_id' => self::PARENT_COURSE,
+                'variation_id' => self::VAR_COURSE,
+                'product_type' => 'course',
+                'cart_values' => [
+                    'assigned_attendee' => self::ATTENDEE,
+                ],
+            ]);
+            $this->fail('Term read failure should surface from order creation.');
         } catch (RuntimeException $exception) {
             $this->assertSame('term-adjust', $exception->getMessage());
         }
@@ -369,17 +408,38 @@ class OrderCreateTermLabelWpmlAdjustTest extends TestCase
     {
         $GLOBALS['intersoccer_test_wpml_simulate_term_filters'] = true;
         $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = false;
+        $GLOBALS['intersoccer_test_wpml_storefront_all_is_default'] = true;
         $GLOBALS['intersoccer_test_is_admin'] = false;
+        $GLOBALS['intersoccer_test_helper_term_reads'] = [];
         $GLOBALS['intersoccer_test_wpml_term_id_for_current_lang'] = static function ($term_id) {
             $current = function_exists('apply_filters')
                 ? (string) apply_filters('wpml_current_language', 'en')
                 : 'en';
-            if (!empty($GLOBALS['intersoccer_test_get_term_throw_on_adjust'])) {
+            $term_id = (int) $term_id;
+            $caller = 'other';
+            foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15) as $frame) {
+                $function = $frame['function'] ?? '';
+                if ($function === 'intersoccer_pv_order_meta_term_display_name') {
+                    $caller = 'display';
+                    break;
+                }
+            }
+            $in_helper = false;
+            foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15) as $frame) {
+                if (($frame['function'] ?? '') === 'intersoccer_pv_order_meta_get_term_in_language') {
+                    $in_helper = true;
+                    break;
+                }
+            }
+            if ($in_helper) {
+                $GLOBALS['intersoccer_test_helper_term_reads'][] = [$term_id, $current, $caller];
+            }
+            $throw_lang = (string) ($GLOBALS['intersoccer_test_throw_when_language'] ?? '');
+            if ($throw_lang !== '' && $current === $throw_lang) {
                 $GLOBALS['intersoccer_test_language_during_throw'] = $current;
                 throw new RuntimeException('term-adjust');
             }
 
-            $term_id = (int) $term_id;
             if ($current === 'all') {
                 return $term_id;
             }
