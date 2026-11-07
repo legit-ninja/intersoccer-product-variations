@@ -1064,14 +1064,54 @@ if (!function_exists('wc_get_order')) {
 }
 
 if (!function_exists('remove_accents')) {
-    function remove_accents($text) {
+    /**
+     * Deterministic stand-in for WordPress remove_accents().
+     *
+     * The table is the WordPress 6.7.1 UTF-8 map for French and German letters,
+     * including the de* overrides (ä -> ae, ß -> ss). It is not WordPress's full
+     * table, ISO-8859-1 branch, or intl NFC normalization. iconv transliteration
+     * is not used, because glibc turns "è" into a backtick on some images.
+     *
+     * @param string $text
+     * @param string $locale Empty uses get_locale() when that function exists.
+     */
+    function remove_accents($text, $locale = '') {
         $text = (string) $text;
-        if (function_exists('iconv')) {
-            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-            if ($converted !== false) {
-                return $converted;
-            }
+        if (!preg_match('/[\x80-\xff]/', $text)) {
+            return $text;
         }
-        return $text;
+
+        if ($locale === '' && function_exists('get_locale')) {
+            $locale = (string) get_locale();
+        }
+
+        $chars = [
+            'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A', 'Å' => 'A',
+            'Æ' => 'AE', 'Ç' => 'C',
+            'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+            'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I',
+            'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O', 'Ø' => 'O',
+            'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U',
+            'Ý' => 'Y', 'ß' => 's',
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+            'æ' => 'ae', 'ç' => 'c',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ø' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ý' => 'y', 'ÿ' => 'y',
+            'Œ' => 'OE', 'œ' => 'oe',
+        ];
+        if (str_starts_with($locale, 'de')) {
+            $chars['Ä'] = 'Ae';
+            $chars['ä'] = 'ae';
+            $chars['Ö'] = 'Oe';
+            $chars['ö'] = 'oe';
+            $chars['Ü'] = 'Ue';
+            $chars['ü'] = 'ue';
+            $chars['ß'] = 'ss';
+        }
+
+        return strtr($text, $chars);
     }
 }
