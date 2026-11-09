@@ -3,6 +3,8 @@
  * Admin player switch: selected-child snapshot only.
  *
  * Synthetic order items. In-memory readback after save(), not a database or browser session.
+ * rosterGenderFallback() only models the roster gender read order. It does not load or run
+ * the reports-rosters plugin.
  */
 
 use PHPUnit\Framework\TestCase;
@@ -375,6 +377,72 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertMetaAbsent($read, 'Medizinische Bedingungen');
     }
 
+    public function test_known_fr_de_gender_and_medical_aliases_are_replaced_with_selected_child(): void
+    {
+        $item = $this->storedFullChildItemWithKnownFrDeAliases();
+        $this->bindOrder($item);
+
+        $this->savePosted([self::ITEM_ID => '0']);
+
+        $read = $this->readBack(self::ITEM_ID);
+        $this->assertSame('Male', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Male', $read->get_meta('Genre du participant'));
+        $this->assertSame('Male', $read->get_meta('Geschlecht des Teilnehmers'));
+        $this->assertNotSame('Female', $read->get_meta('Genre du participant'));
+        $this->assertNotSame('Female', $read->get_meta('Geschlecht des Teilnehmers'));
+        $this->assertSame('Hay fever', $read->get_meta('Medical Conditions'));
+        $this->assertSame('Hay fever', $read->get_meta('Conditions médicales'));
+        $this->assertSame('Hay fever', $read->get_meta('Medizinische Angaben'));
+        $this->assertSame('Hay fever', $read->get_meta('Medizinische Bedingungen'));
+        $this->assertNotSame('Asthma', $read->get_meta('Conditions médicales'));
+        $this->assertNotSame('Asthma', $read->get_meta('Medizinische Angaben'));
+        $this->assertNotSame('Asthma', $read->get_meta('Medizinische Bedingungen'));
+        $this->assertUnrelatedMetaKept($read);
+    }
+
+    public function test_known_fr_de_gender_and_medical_aliases_are_removed_when_selected_child_has_none(): void
+    {
+        $item = $this->storedFullChildItemWithKnownFrDeAliases();
+        $this->bindOrder($item);
+
+        $this->savePosted([self::ITEM_ID => '2']);
+
+        $read = $this->readBack(self::ITEM_ID);
+        $this->assertMetaAbsent($read, 'Attendee Gender');
+        $this->assertMetaAbsent($read, 'Genre du participant');
+        $this->assertMetaAbsent($read, 'Geschlecht des Teilnehmers');
+        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertFalse(intersoccer_order_meta_medical_conditions_has_value($read->get_meta('Medical Conditions')));
+        $this->assertMetaAbsent($read, 'Conditions médicales');
+        $this->assertMetaAbsent($read, 'Medizinische Angaben');
+        $this->assertMetaAbsent($read, 'Medizinische Bedingungen');
+        // Local model of the roster read order only. This does not load or run reports-rosters.
+        $this->assertSame('', $this->rosterGenderFallback($read));
+        $this->assertUnrelatedMetaKept($read);
+    }
+
+    public function test_same_player_resave_keeps_known_fr_de_gender_and_medical_aliases(): void
+    {
+        $item = $this->storedFullChildItemWithKnownFrDeAliases();
+        $before = $item->meta;
+        $this->bindOrder($item);
+
+        $this->savePosted([self::ITEM_ID => '1']);
+
+        $read = $this->readBack(self::ITEM_ID);
+        $this->assertSame(0, $read->save_count);
+        $this->assertSame([], $read->update_log);
+        $this->assertSame([], $read->delete_log);
+        $this->assertSame($before, $read->meta);
+        $this->assertSame('Female', $read->get_meta('Genre du participant'));
+        $this->assertSame('Female', $read->get_meta('Geschlecht des Teilnehmers'));
+        $this->assertSame('Asthma', $read->get_meta('Conditions médicales'));
+        $this->assertSame('Asthma', $read->get_meta('Medizinische Angaben'));
+        $this->assertSame('Asthma', $read->get_meta('Medizinische Bedingungen'));
+        $this->assertSame('Female', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Asthma', $read->get_meta('Medical Conditions'));
+    }
+
     public function test_same_player_uuid_resave_does_not_erase_snapshot(): void
     {
         $item = $this->storedFullChildItem();
@@ -577,6 +645,21 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         return $item;
     }
 
+    /**
+     * French and German gender and medical keys already recognized by the player-switch writer.
+     */
+    private function storedFullChildItemWithKnownFrDeAliases(): PlayerSwitchAssignmentMetaTestItem
+    {
+        $item = $this->storedFullChildItem();
+        $item->meta['Genre du participant'] = 'Female';
+        $item->meta['Geschlecht des Teilnehmers'] = 'Female';
+        $item->meta['Conditions médicales'] = 'Asthma';
+        $item->meta['Medizinische Angaben'] = 'Asthma';
+        $item->meta['Medizinische Bedingungen'] = 'Asthma';
+
+        return $item;
+    }
+
     private function bindOrder(PlayerSwitchAssignmentMetaTestItem $item): void
     {
         $GLOBALS['intersoccer_test_orders'][self::ORDER_ID] = new PlayerSwitchAssignmentMetaTestOrder(
@@ -603,7 +686,10 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
     }
 
     /**
-     * Same candidate order as the roster field reader: Attendee Gender, then gender, then Player Gender.
+     * Local stand-in for a roster gender read that checks Attendee Gender, then gender, then Player Gender.
+     *
+     * This does not load or execute reports-rosters. An empty result only means those three keys on this
+     * in-memory item would not yield a value to a reader that stops at the first non-empty one.
      */
     private function rosterGenderFallback(PlayerSwitchAssignmentMetaTestItem $item): string
     {
