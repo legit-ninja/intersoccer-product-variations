@@ -56,6 +56,7 @@ function intersoccer_get_current_language() {
  * 
  * @return array Array of language_code => language_name
  */
+if (!function_exists('intersoccer_get_available_languages')) {
 function intersoccer_get_available_languages() {
     if (defined('WP_DEBUG') && WP_DEBUG) {
         intersoccer_debug('InterSoccer: intersoccer_get_available_languages() called');
@@ -105,6 +106,7 @@ function intersoccer_get_available_languages() {
         intersoccer_debug('InterSoccer: Using fallback languages: ' . print_r($fallback, true));
     }
     return $fallback;
+}
 }
 
 /**

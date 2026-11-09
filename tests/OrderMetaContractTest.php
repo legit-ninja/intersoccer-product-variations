@@ -100,7 +100,9 @@ if (!function_exists('get_locale')) {
 
 if (!function_exists('determine_locale')) {
     function determine_locale() {
-        return get_locale();
+        return function_exists('intersoccer_pv_test_resolve_locale')
+            ? intersoccer_pv_test_resolve_locale()
+            : get_locale();
     }
 }
 

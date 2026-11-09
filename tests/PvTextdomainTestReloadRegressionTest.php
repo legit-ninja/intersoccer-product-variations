@@ -42,6 +42,14 @@ if (!function_exists('apply_filters')) {
 
 if (!function_exists('determine_locale')) {
     function determine_locale() {
+        if (function_exists('intersoccer_pv_test_resolve_locale')) {
+            return intersoccer_pv_test_resolve_locale();
+        }
+        $override = $GLOBALS['intersoccer_pv_test_determine_locale'] ?? null;
+        if (is_string($override) && $override !== '') {
+            return $override;
+        }
+
         return $GLOBALS['intersoccer_test_locale'] ?? 'en_US';
     }
 }

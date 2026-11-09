@@ -21,6 +21,45 @@ if (!defined('OBJECT')) {
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/IntersoccerPvTestDateI18n.php';
 
+/**
+ * Locale used by determine_locale() in this harness.
+ *
+ * intersoccer_pv_test_determine_locale wins when it is a non-empty string.
+ * Otherwise intersoccer_test_locale is used. The default is en_US.
+ * PHPUnit loads this file before any test file, so later per-file stubs do not
+ * replace it and file order cannot change the result.
+ */
+function intersoccer_pv_test_resolve_locale() {
+    $override = $GLOBALS['intersoccer_pv_test_determine_locale'] ?? null;
+    if (is_string($override) && $override !== '') {
+        return $override;
+    }
+
+    $locale = $GLOBALS['intersoccer_test_locale'] ?? null;
+    if (is_string($locale) && $locale !== '') {
+        return $locale;
+    }
+
+    return 'en_US';
+}
+
+if (!function_exists('determine_locale')) {
+    function determine_locale() {
+        return intersoccer_pv_test_resolve_locale();
+    }
+}
+
+if (!function_exists('get_locale')) {
+    function get_locale() {
+        $locale = $GLOBALS['intersoccer_test_locale'] ?? null;
+        if (is_string($locale) && $locale !== '') {
+            return $locale;
+        }
+
+        return 'en_US';
+    }
+}
+
 // Shared meta store for tests (must include reset(); define before test files).
 if (!class_exists('MockMetaData')) {
     class MockMetaData {

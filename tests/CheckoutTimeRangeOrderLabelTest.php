@@ -1,17 +1,24 @@
 <?php
 /**
  * Checkout order-line course time labels: FR compact → FR style; camp and EN/DE unchanged.
+ *
+ * Separate-process tests need INTERSOCCER_TEST_LOAD_REAL_CHECKOUT set in the parent
+ * before the child starts, so bootstrap skips the player-details double and the real
+ * checkout function can load. setUpBeforeClass sets it again because another class
+ * may have cleared the variable after this file was loaded.
  */
-
-// Child PHPUnit processes inherit this env var so tests/bootstrap.php skips the player-details double before checkout-calculations.php loads.
-putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
-$_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
 
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 class CheckoutTimeRangeOrderLabelTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+        $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
+    }
+
     private const PA_COURSE = 'pa_course-times';
     private const PA_CAMP = 'pa_camp-times';
 

@@ -63,10 +63,19 @@ if (!function_exists('wc_get_endpoint_url')) {
 
 if (!function_exists('determine_locale')) {
     function determine_locale() {
+        if (function_exists('intersoccer_pv_test_resolve_locale')) {
+            return intersoccer_pv_test_resolve_locale();
+        }
         global $intersoccer_pv_test_determine_locale;
-        return is_string($intersoccer_pv_test_determine_locale) && $intersoccer_pv_test_determine_locale !== ''
-            ? $intersoccer_pv_test_determine_locale
-            : 'en_US';
+        if (is_string($intersoccer_pv_test_determine_locale) && $intersoccer_pv_test_determine_locale !== '') {
+            return $intersoccer_pv_test_determine_locale;
+        }
+        $locale = $GLOBALS['intersoccer_test_locale'] ?? null;
+        if (is_string($locale) && $locale !== '') {
+            return $locale;
+        }
+
+        return 'en_US';
     }
 }
 
