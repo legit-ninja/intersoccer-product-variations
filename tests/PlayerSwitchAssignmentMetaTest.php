@@ -198,12 +198,16 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertMetaAbsent($read, 'Player DOB');
         $this->assertMetaAbsent($read, 'Date de naissance du participant');
         $this->assertMetaAbsent($read, 'Attendee Gender');
+        $this->assertMetaAbsent($read, 'gender');
+        $this->assertMetaAbsent($read, 'Player Gender');
         $this->assertMetaAbsent($read, 'player_gender');
-        $this->assertMetaAbsent($read, 'Medical Conditions');
+        $this->assertSame('', $this->rosterGenderFallback($read));
+        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertFalse(intersoccer_order_meta_medical_conditions_has_value($read->get_meta('Medical Conditions')));
         $this->assertMetaAbsent($read, 'Player Medical');
         $this->assertMetaAbsent($read, 'medical_conditions');
+        $this->assertMetaAbsent($read, 'Medizinische Bedingungen');
         $this->assertMetaAbsent($read, '_player_dob');
-        $this->assertMetaAbsent($read, 'Player Gender');
         $this->assertUnrelatedMetaKept($read);
         $this->assertPreviousUuidCannotResolve($read, 2, 'Gamma Child');
     }
@@ -227,9 +231,13 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertSame('2015-05-05', $read->get_meta('Player DOB'));
         $this->assertSame('2015-05-05', $read->get_meta('Date de naissance du participant'));
         $this->assertSame('Male', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Male', $read->get_meta('gender'));
+        $this->assertSame('Male', $read->get_meta('Player Gender'));
         $this->assertSame('Male', $read->get_meta('player_gender'));
+        $this->assertSame('Male', $this->rosterGenderFallback($read));
         $this->assertNotSame('Female', $read->get_meta('Attendee Gender'));
         $this->assertSame('Hay fever', $read->get_meta('Medical Conditions'));
+        $this->assertSame('Hay fever', $read->get_meta('Medizinische Bedingungen'));
         $this->assertSame('Hay fever', $read->get_meta('Player Medical'));
         $this->assertSame('Hay fever', $read->get_meta('medical_conditions'));
         $this->assertNotSame('Asthma', $read->get_meta('Medical Conditions'));
@@ -257,6 +265,8 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertSame('2016-06-06', $read->get_meta('Attendee DOB'));
         $this->assertSame('2016-06-06', $read->get_meta('Player DOB'));
         $this->assertSame('Male', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Male', $read->get_meta('gender'));
+        $this->assertSame('Male', $this->rosterGenderFallback($read));
         $this->assertNotSame('Female', $read->get_meta('Attendee Gender'));
         $this->assertSame('Nut allergy', $read->get_meta('Medical Conditions'));
         $this->assertSame('Nut allergy', $read->get_meta('Player Medical'));
@@ -280,7 +290,9 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $read = $this->readBack(self::ITEM_ID);
         $this->assertSame('Zeta Child', $read->get_meta('Assigned Attendee'));
         $this->assertSame('Male', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Male', $read->get_meta('gender'));
         $this->assertSame('Male', $read->get_meta('player_gender'));
+        $this->assertSame('Male', $this->rosterGenderFallback($read));
         $this->assertNotSame('Female', $read->get_meta('Attendee Gender'));
         $this->assertSame('Eczema', $read->get_meta('Medical Conditions'));
         $this->assertSame('Eczema', $read->get_meta('Player Medical'));
@@ -304,9 +316,14 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertMetaAbsent($read, 'Attendee DOB');
         $this->assertMetaAbsent($read, 'Player DOB');
         $this->assertMetaAbsent($read, 'Attendee Gender');
+        $this->assertMetaAbsent($read, 'gender');
+        $this->assertMetaAbsent($read, 'Player Gender');
         $this->assertMetaAbsent($read, 'player_gender');
-        $this->assertMetaAbsent($read, 'Medical Conditions');
+        $this->assertSame('', $this->rosterGenderFallback($read));
+        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertFalse(intersoccer_order_meta_medical_conditions_has_value($read->get_meta('Medical Conditions')));
         $this->assertMetaAbsent($read, 'Player Medical');
+        $this->assertMetaAbsent($read, 'Medizinische Bedingungen');
         $this->assertMetaAbsent($read, 'assigned_player_id');
         $this->assertMetaAbsent($read, '_assigned_player_id');
         $this->assertSame(4, $read->get_meta('assigned_player'));
@@ -330,7 +347,32 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertSame(self::OLD_UUID, $read->get_meta('_assigned_player_id'));
         $this->assertSame('2012-02-02', $read->get_meta('Attendee DOB'));
         $this->assertSame('Female', $read->get_meta('Attendee Gender'));
+        $this->assertSame('Female', $read->get_meta('gender'));
         $this->assertSame('Asthma', $read->get_meta('Medical Conditions'));
+    }
+
+    public function test_missing_gender_switch_clears_plain_gender_before_reader_fallback(): void
+    {
+        $item = $this->storedFullChildItem();
+        $item->meta['gender'] = 'Female';
+        $item->meta['Player Gender'] = 'Female';
+        $item->meta['Genre du participant'] = 'Female';
+        $item->meta['Geschlecht des Teilnehmers'] = 'Female';
+        $this->bindOrder($item);
+
+        $this->savePosted([self::ITEM_ID => '2']);
+
+        $read = $this->readBack(self::ITEM_ID);
+        $this->assertMetaAbsent($read, 'Attendee Gender');
+        $this->assertMetaAbsent($read, 'gender');
+        $this->assertMetaAbsent($read, 'Player Gender');
+        $this->assertMetaAbsent($read, 'Genre du participant');
+        $this->assertMetaAbsent($read, 'Geschlecht des Teilnehmers');
+        $this->assertSame('', $this->rosterGenderFallback($read));
+        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertFalse(intersoccer_order_meta_medical_conditions_has_value('None'));
+        $this->assertMetaAbsent($read, 'Player Medical');
+        $this->assertMetaAbsent($read, 'Medizinische Bedingungen');
     }
 
     public function test_same_player_uuid_resave_does_not_erase_snapshot(): void
@@ -520,10 +562,13 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
             'Player DOB' => '2012-02-02',
             'Date de naissance du participant' => '2012-02-02',
             'Attendee Gender' => 'Female',
+            'gender' => 'Female',
+            'Player Gender' => 'Female',
             'player_gender' => 'Female',
             'Medical Conditions' => 'Asthma',
             'Player Medical' => 'Asthma',
             'medical_conditions' => 'Asthma',
+            'Medizinische Bedingungen' => 'Asthma',
             'Activity Type' => 'Camp',
             'Season' => 'Summer',
             'Base Price' => '100',
@@ -555,6 +600,24 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $item = $order->get_item($item_id);
         $this->assertInstanceOf(PlayerSwitchAssignmentMetaTestItem::class, $item);
         return $item;
+    }
+
+    /**
+     * Same candidate order as the roster field reader: Attendee Gender, then gender, then Player Gender.
+     */
+    private function rosterGenderFallback(PlayerSwitchAssignmentMetaTestItem $item): string
+    {
+        foreach (['Attendee Gender', 'gender', 'Player Gender'] as $key) {
+            if (!array_key_exists($key, $item->meta)) {
+                continue;
+            }
+            $value = trim((string) $item->meta[$key]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     private function assertMetaAbsent(PlayerSwitchAssignmentMetaTestItem $item, string $key): void

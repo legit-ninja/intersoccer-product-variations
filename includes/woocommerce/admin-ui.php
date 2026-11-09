@@ -4094,10 +4094,9 @@ function intersoccer_admin_player_switch_field_alias_keys($canonical, array $see
 /**
  * On an admin player switch, persist only the selected child's assignment, DOB, gender, and medical snapshot.
  *
- * Non-empty values replace the previous child. Missing DOB, gender, medical text, and player UUIDs
- * are removed, including hidden assignment ids, so a later UUID-first read cannot resolve the previous child.
- * Checkout creation may still store the Medical Conditions placeholder "None"; this switch path does not.
- * Customer display already hides medical meta with no user-provided value, so a removed key stays blank.
+ * Non-empty values replace the previous child. Missing DOB, gender, and player UUIDs are removed,
+ * including hidden assignment ids and the gender keys a roster reader checks after Attendee Gender.
+ * Absent medical keeps the creation sentinel "None" on Medical Conditions; other medical aliases are removed.
  * Callers must not use this for an empty or unchanged selection.
  *
  * @param object               $item
@@ -4154,7 +4153,15 @@ function intersoccer_admin_apply_switched_player_item_meta($item, array $player,
     intersoccer_admin_put_or_drop_order_item_meta($item, 'Attendee Gender', $details['gender']);
     foreach (intersoccer_admin_player_switch_field_alias_keys(
         'Attendee Gender',
-        ['Player Gender', 'player_gender', '_attendee_gender', '_player_gender'],
+        [
+            'gender',
+            'Player Gender',
+            'player_gender',
+            '_attendee_gender',
+            '_player_gender',
+            'Genre du participant',
+            'Geschlecht des Teilnehmers',
+        ],
         ''
     ) as $gender_alias) {
         if (!intersoccer_admin_order_item_meta_is_present($item, $gender_alias)) {
@@ -4167,7 +4174,7 @@ function intersoccer_admin_apply_switched_player_item_meta($item, array $player,
         $item->update_meta_data('Medical Conditions', $details['medical_conditions']);
         $medical_alias_value = $details['medical_conditions'];
     } else {
-        intersoccer_admin_put_or_drop_order_item_meta($item, 'Medical Conditions', '');
+        $item->update_meta_data('Medical Conditions', 'None');
         $medical_alias_value = '';
     }
     foreach (intersoccer_admin_player_switch_field_alias_keys(
@@ -4180,6 +4187,7 @@ function intersoccer_admin_apply_switched_player_item_meta($item, array $player,
             '_player_medical',
             'Conditions médicales',
             'Medizinische Angaben',
+            'Medizinische Bedingungen',
         ],
         'intersoccer_sensitive_order_meta_medical_keys'
     ) as $medical_alias) {
