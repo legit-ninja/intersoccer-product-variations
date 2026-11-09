@@ -4094,9 +4094,10 @@ function intersoccer_admin_player_switch_field_alias_keys($canonical, array $see
 /**
  * On an admin player switch, persist only the selected child's assignment, DOB, gender, and medical snapshot.
  *
- * Non-empty values replace the previous child. Missing DOB, gender, and player UUIDs are removed,
- * including hidden assignment ids, so a later UUID-first read cannot resolve the previous child.
- * Empty medical is the contract placeholder "None" on Medical Conditions; other medical aliases are removed.
+ * Non-empty values replace the previous child. Missing DOB, gender, medical text, and player UUIDs
+ * are removed, including hidden assignment ids, so a later UUID-first read cannot resolve the previous child.
+ * Checkout creation may still store the Medical Conditions placeholder "None"; this switch path does not.
+ * Customer display already hides medical meta with no user-provided value, so a removed key stays blank.
  * Callers must not use this for an empty or unchanged selection.
  *
  * @param object               $item
@@ -4166,7 +4167,7 @@ function intersoccer_admin_apply_switched_player_item_meta($item, array $player,
         $item->update_meta_data('Medical Conditions', $details['medical_conditions']);
         $medical_alias_value = $details['medical_conditions'];
     } else {
-        $item->update_meta_data('Medical Conditions', 'None');
+        intersoccer_admin_put_or_drop_order_item_meta($item, 'Medical Conditions', '');
         $medical_alias_value = '';
     }
     foreach (intersoccer_admin_player_switch_field_alias_keys(

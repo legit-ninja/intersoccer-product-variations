@@ -199,7 +199,7 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertMetaAbsent($read, 'Date de naissance du participant');
         $this->assertMetaAbsent($read, 'Attendee Gender');
         $this->assertMetaAbsent($read, 'player_gender');
-        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertMetaAbsent($read, 'Medical Conditions');
         $this->assertMetaAbsent($read, 'Player Medical');
         $this->assertMetaAbsent($read, 'medical_conditions');
         $this->assertMetaAbsent($read, '_player_dob');
@@ -305,7 +305,7 @@ class PlayerSwitchAssignmentMetaTest extends TestCase
         $this->assertMetaAbsent($read, 'Player DOB');
         $this->assertMetaAbsent($read, 'Attendee Gender');
         $this->assertMetaAbsent($read, 'player_gender');
-        $this->assertSame('None', $read->get_meta('Medical Conditions'));
+        $this->assertMetaAbsent($read, 'Medical Conditions');
         $this->assertMetaAbsent($read, 'Player Medical');
         $this->assertMetaAbsent($read, 'assigned_player_id');
         $this->assertMetaAbsent($read, '_assigned_player_id');
