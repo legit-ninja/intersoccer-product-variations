@@ -3984,6 +3984,221 @@ function intersoccer_add_player_assignment_dropdown_admin($item_id, $item, $prod
 }
 
 /**
+ * Normalize the selected child the same way order-line creation does.
+ *
+ * @param array<string,mixed> $player
+ * @return array{first_name:string,last_name:string,name:string,dob:string,gender:string,medical_conditions:string,player_id:string}
+ */
+function intersoccer_admin_selected_player_details(array $player) {
+    if (function_exists('intersoccer_format_player_details_row')) {
+        $details = intersoccer_format_player_details_row($player);
+    } else {
+        $gender = isset($player['gender']) ? trim((string) $player['gender']) : '';
+        if ($gender === '' && isset($player['player_gender'])) {
+            $gender = trim((string) $player['player_gender']);
+        }
+        $details = [
+            'first_name' => (string) ($player['first_name'] ?? ''),
+            'last_name' => (string) ($player['last_name'] ?? ''),
+            'name' => trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? '')),
+            'dob' => (string) ($player['dob'] ?? ''),
+            'gender' => $gender,
+            'medical_conditions' => (string) ($player['medical_conditions'] ?? ''),
+            'player_id' => (string) ($player['player_id'] ?? ''),
+        ];
+    }
+
+    if (!is_array($details)) {
+        $details = [];
+    }
+
+    foreach (['name', 'dob', 'gender', 'medical_conditions', 'player_id'] as $field) {
+        $details[$field] = trim((string) ($details[$field] ?? ''));
+    }
+
+    return $details;
+}
+
+/**
+ * @param object $item Order line item.
+ * @param string $key
+ * @return bool
+ */
+function intersoccer_admin_order_item_meta_is_present($item, $key) {
+    if (!is_object($item) || !method_exists($item, 'get_meta')) {
+        return false;
+    }
+    $value = $item->get_meta($key, true);
+    return $value !== null && $value !== '';
+}
+
+/**
+ * Write a non-empty snapshot value, or remove the key when the selected child has none.
+ *
+ * @param object $item
+ * @param string $key
+ * @param mixed  $value
+ */
+function intersoccer_admin_put_or_drop_order_item_meta($item, $key, $value) {
+    if (!is_object($item) || !method_exists($item, 'update_meta_data')) {
+        return;
+    }
+    $text = is_scalar($value) ? trim((string) $value) : '';
+    if ($text !== '') {
+        $item->update_meta_data($key, $text);
+        return;
+    }
+    if (intersoccer_admin_order_item_meta_is_present($item, $key) && method_exists($item, 'delete_meta_data')) {
+        $item->delete_meta_data($key);
+    }
+}
+
+/**
+ * Alias keys for one snapshot field, excluding the canonical key.
+ *
+ * Seeds cover stored variants. Contract helpers add the same lists checkout and
+ * privacy redaction already treat as that field, when those helpers are loaded.
+ *
+ * @param string              $canonical
+ * @param array<int,string>   $seed
+ * @param string              $list_function
+ * @return array<int,string>
+ */
+function intersoccer_admin_player_switch_field_alias_keys($canonical, array $seed, $list_function) {
+    $keys = $seed;
+    if ($list_function !== '' && function_exists($list_function)) {
+        $listed = call_user_func($list_function);
+        if (is_array($listed)) {
+            $keys = array_merge($keys, $listed);
+        }
+    }
+    if (function_exists('intersoccer_pv_order_item_meta_canonical_key_variants')) {
+        $variants = intersoccer_pv_order_item_meta_canonical_key_variants($canonical);
+        if (is_array($variants)) {
+            $keys = array_merge($keys, $variants);
+        }
+    }
+
+    $out = [];
+    foreach ($keys as $key) {
+        $key = (string) $key;
+        if ($key === '' || $key === $canonical || isset($out[$key])) {
+            continue;
+        }
+        $out[$key] = $key;
+    }
+
+    return array_values($out);
+}
+
+/**
+ * On an admin player switch, persist only the selected child's assignment, DOB, gender, and medical snapshot.
+ *
+ * Non-empty values replace the previous child. Missing DOB, gender, and player UUIDs are removed,
+ * including hidden assignment ids and the gender keys a roster reader checks after Attendee Gender.
+ * Absent medical keeps the creation sentinel "None" on Medical Conditions; other medical aliases are removed.
+ * Callers must not use this for an empty or unchanged selection.
+ *
+ * @param object               $item
+ * @param array<string,mixed> $player
+ * @param int|string|null     $resolved_index
+ */
+function intersoccer_admin_apply_switched_player_item_meta($item, array $player, $resolved_index) {
+    if (!is_object($item) || !method_exists($item, 'update_meta_data')) {
+        return;
+    }
+
+    $details = intersoccer_admin_selected_player_details($player);
+
+    $item->update_meta_data('Assigned Attendee', $details['name']);
+    if (intersoccer_admin_order_item_meta_is_present($item, 'assigned_attendee')) {
+        intersoccer_admin_put_or_drop_order_item_meta($item, 'assigned_attendee', $details['name']);
+    }
+
+    $item->update_meta_data('assigned_player', $resolved_index);
+    $item->update_meta_data('_assigned_player', $resolved_index);
+    if ($resolved_index !== null && $resolved_index !== '') {
+        foreach (['Player Index', 'intersoccer_player_index'] as $index_alias) {
+            if (intersoccer_admin_order_item_meta_is_present($item, $index_alias)) {
+                $item->update_meta_data($index_alias, $resolved_index);
+            }
+        }
+    }
+
+    foreach (['assigned_player_id', '_assigned_player_id'] as $id_key) {
+        intersoccer_admin_put_or_drop_order_item_meta($item, $id_key, $details['player_id']);
+    }
+
+    intersoccer_admin_put_or_drop_order_item_meta($item, 'Attendee DOB', $details['dob']);
+    foreach (intersoccer_admin_player_switch_field_alias_keys(
+        'Attendee DOB',
+        [
+            'Player DOB',
+            'player_dob',
+            '_player_dob',
+            '_attendee_dob',
+            'Date de naissance',
+            'Geburtsdatum',
+            'Date de naissance du participant',
+            'Geburtsdatum des Teilnehmers',
+        ],
+        'intersoccer_sensitive_order_meta_dob_keys'
+    ) as $dob_alias) {
+        if (!intersoccer_admin_order_item_meta_is_present($item, $dob_alias)) {
+            continue;
+        }
+        intersoccer_admin_put_or_drop_order_item_meta($item, $dob_alias, $details['dob']);
+    }
+
+    intersoccer_admin_put_or_drop_order_item_meta($item, 'Attendee Gender', $details['gender']);
+    foreach (intersoccer_admin_player_switch_field_alias_keys(
+        'Attendee Gender',
+        [
+            'gender',
+            'Player Gender',
+            'player_gender',
+            '_attendee_gender',
+            '_player_gender',
+            'Genre du participant',
+            'Geschlecht des Teilnehmers',
+        ],
+        ''
+    ) as $gender_alias) {
+        if (!intersoccer_admin_order_item_meta_is_present($item, $gender_alias)) {
+            continue;
+        }
+        intersoccer_admin_put_or_drop_order_item_meta($item, $gender_alias, $details['gender']);
+    }
+
+    if (!empty($details['medical_conditions'])) {
+        $item->update_meta_data('Medical Conditions', $details['medical_conditions']);
+        $medical_alias_value = $details['medical_conditions'];
+    } else {
+        $item->update_meta_data('Medical Conditions', 'None');
+        $medical_alias_value = '';
+    }
+    foreach (intersoccer_admin_player_switch_field_alias_keys(
+        'Medical Conditions',
+        [
+            'Player Medical',
+            'medical_conditions',
+            '_medical_conditions',
+            'player_medical',
+            '_player_medical',
+            'Conditions médicales',
+            'Medizinische Angaben',
+            'Medizinische Bedingungen',
+        ],
+        'intersoccer_sensitive_order_meta_medical_keys'
+    ) as $medical_alias) {
+        if (!intersoccer_admin_order_item_meta_is_present($item, $medical_alias)) {
+            continue;
+        }
+        intersoccer_admin_put_or_drop_order_item_meta($item, $medical_alias, $medical_alias_value);
+    }
+}
+
+/**
  * Save player assignment when order is saved in admin
  */
 add_action('woocommerce_saved_order_items', 'intersoccer_save_player_assignment_from_admin', 10, 2);
@@ -4039,30 +4254,10 @@ function intersoccer_save_player_assignment_from_admin($order_id, $items) {
 
         $player = $posted['player'];
         $resolved_index = $posted['index'];
-        
         $player_name = trim(($player['first_name'] ?? '') . ' ' . ($player['last_name'] ?? ''));
-        
-        $item->update_meta_data('Assigned Attendee', $player_name);
-        $item->update_meta_data('assigned_player', $resolved_index);
-        if (!empty($player['player_id'])) {
-            $item->update_meta_data('assigned_player_id', $player['player_id']);
-        }
-        
-        // Update additional player details
-        if (!empty($player['dob'])) {
-            $item->update_meta_data('Attendee DOB', $player['dob']);
-        }
-        
-        if (!empty($player['gender'])) {
-            $item->update_meta_data('Attendee Gender', $player['gender']);
-        }
-        
-        if (!empty($player['medical_conditions'])) {
-            $item->update_meta_data('Medical Conditions', $player['medical_conditions']);
-        } else {
-            $item->update_meta_data('Medical Conditions', 'None');
-        }
-        
+
+        intersoccer_admin_apply_switched_player_item_meta($item, $player, $resolved_index);
+
         $item->save();
         
         if (defined('WP_DEBUG') && WP_DEBUG) {

@@ -5,6 +5,7 @@ vendor/
 
 # PHPUnit cache
 .phpunit.result.cache
+.phpunit.cache/
 
 # Debug and utility scripts (organized in utils/ folder, ignored for deployment)
 utils/debug-*.php
