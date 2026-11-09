@@ -879,12 +879,37 @@ if (!function_exists('get_term')) {
     }
 }
 
+if (!function_exists('intersoccer_test_wpml_term_query_language')) {
+    /**
+     * Language get_term_by/get_terms should honor.
+     *
+     * Raw "all" normally means every language. When the storefront flag is set,
+     * "all" is not legal and the query uses wpml_current_language (the default).
+     */
+    function intersoccer_test_wpml_term_query_language() {
+        if (empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'])) {
+            return '';
+        }
+        $lang = (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en');
+        if (
+            $lang === 'all'
+            && !empty($GLOBALS['intersoccer_test_wpml_storefront_all_is_default'])
+            && function_exists('apply_filters')
+        ) {
+            $effective = apply_filters('wpml_current_language', 'en');
+            if (is_string($effective) && $effective !== '') {
+                return $effective;
+            }
+        }
+
+        return $lang;
+    }
+}
+
 if (!function_exists('get_term_by')) {
     function get_term_by($field, $value, $taxonomy = '', $output = OBJECT, $filter = 'raw') {
         if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
-            $current_lang = !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'])
-                ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
-                : '';
+            $current_lang = intersoccer_test_wpml_term_query_language();
             foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
                 if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
                     continue;
@@ -920,9 +945,8 @@ if (!function_exists('get_terms')) {
         if ($taxonomy === '' || empty($GLOBALS['intersoccer_test_terms']) || !is_array($GLOBALS['intersoccer_test_terms'])) {
             return [];
         }
-        $suppress = !empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters']);
-        $current_lang = (!$suppress && !empty($GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language']))
-            ? (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? 'en')
+        $current_lang = empty($GLOBALS['intersoccer_test_wpml_suppress_term_filters'])
+            ? intersoccer_test_wpml_term_query_language()
             : '';
         $out = [];
         foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
@@ -1040,14 +1064,54 @@ if (!function_exists('wc_get_order')) {
 }
 
 if (!function_exists('remove_accents')) {
-    function remove_accents($text) {
+    /**
+     * Deterministic stand-in for WordPress remove_accents().
+     *
+     * The table is the WordPress 6.7.1 UTF-8 map for French and German letters,
+     * including the de* overrides (ä -> ae, ß -> ss). It is not WordPress's full
+     * table, ISO-8859-1 branch, or intl NFC normalization. iconv transliteration
+     * is not used, because glibc turns "è" into a backtick on some images.
+     *
+     * @param string $text
+     * @param string $locale Empty uses get_locale() when that function exists.
+     */
+    function remove_accents($text, $locale = '') {
         $text = (string) $text;
-        if (function_exists('iconv')) {
-            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-            if ($converted !== false) {
-                return $converted;
-            }
+        if (!preg_match('/[\x80-\xff]/', $text)) {
+            return $text;
         }
-        return $text;
+
+        if ($locale === '' && function_exists('get_locale')) {
+            $locale = (string) get_locale();
+        }
+
+        $chars = [
+            'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A', 'Å' => 'A',
+            'Æ' => 'AE', 'Ç' => 'C',
+            'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+            'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I',
+            'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O', 'Ø' => 'O',
+            'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U',
+            'Ý' => 'Y', 'ß' => 's',
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+            'æ' => 'ae', 'ç' => 'c',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ø' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ý' => 'y', 'ÿ' => 'y',
+            'Œ' => 'OE', 'œ' => 'oe',
+        ];
+        if (str_starts_with($locale, 'de')) {
+            $chars['Ä'] = 'Ae';
+            $chars['ä'] = 'ae';
+            $chars['Ö'] = 'Oe';
+            $chars['ö'] = 'oe';
+            $chars['Ü'] = 'Ue';
+            $chars['ü'] = 'ue';
+            $chars['ß'] = 'ss';
+        }
+
+        return strtr($text, $chars);
     }
 }

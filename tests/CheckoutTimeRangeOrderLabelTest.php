@@ -22,7 +22,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     private const INTEGRATION_PROCESS_TESTS = [
-        'test_fr_order_uses_icl_language_code_for_taxonomies_and_order_lang_for_time',
+        'test_fr_order_uses_order_language_for_taxonomies_and_time',
         'test_order_language_overrides_request_language_for_course_attributes',
         'test_build_order_line_meta_keeps_slug_contract_meta',
         'test_fr_camp_times_unchanged_on_fr_order',
@@ -131,7 +131,7 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    public function test_fr_order_uses_icl_language_code_for_taxonomies_and_order_lang_for_time(): void
+    public function test_fr_order_uses_order_language_for_taxonomies_and_time(): void
     {
         $this->loadCheckoutTimeRangeIntegrationBootstrap();
 
@@ -141,13 +141,13 @@ class CheckoutTimeRangeOrderLabelTest extends TestCase
         $attributes = intersoccer_get_parent_product_attributes(5001, 5002, $order);
 
         $this->assertSame('11h15-12h45', $attributes['Course Times'] ?? null);
-        $this->assertSame('Fixture Venue EN', $attributes['Sites InterSoccer'] ?? null);
-        $this->assertSame('Fixture Age EN', $attributes['Age Group'] ?? null);
+        $this->assertSame('Fixture Venue FR', $attributes['Sites InterSoccer'] ?? null);
+        $this->assertSame('Fixture Age FR', $attributes['Age Group'] ?? null);
 
         $icl_calls = $GLOBALS['intersoccer_test_icl_object_id_calls'] ?? [];
         $this->assertNotEmpty($icl_calls);
         foreach ($icl_calls as $call) {
-            $this->assertSame('en', $call['language_code'] ?? null, 'icl_object_id must use ICL_LANGUAGE_CODE for taxonomy labels');
+            $this->assertSame('fr', $call['language_code'] ?? null, 'icl_object_id must use order display language for taxonomy labels');
         }
     }
 
