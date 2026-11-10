@@ -60,7 +60,7 @@ class PmWpmlSyncTest extends TestCase {
 		$en_var = $this->en_var;
 
 		if (!class_exists('WC_Product_Variation', false)) {
-			eval('class WC_Product_Variation {}');
+			eval('class WC_Product_Variation { public function get_attributes() { return []; } }');
 		}
 		if (!class_exists('PmWpmlMockVariableProduct', false)) {
 			eval(<<<'PHP'

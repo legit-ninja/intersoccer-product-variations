@@ -650,3 +650,46 @@ function intersoccer_attr_wpml_copy_meta_keys() {
 function intersoccer_attr_all_taxonomies() {
     return array_map('intersoccer_attr_taxonomy', array_keys(intersoccer_attr_registry()));
 }
+
+/**
+ * Variation post meta keys copied when duplicating or year-rolling a program.
+ *
+ * Shared InterSoccer booking meta plus camp schedule or course schedule fields.
+ * Year-roll moves Y-m-d start and end values forward 364 days (52 weeks).
+ * Course holiday dates are left empty for the office.
+ * Prices use the WC_Product API; variation attributes use set_attributes().
+ *
+ * @param string $product_type camp|course|birthday|tournament
+ * @return array<int,string>
+ */
+function intersoccer_pm_duplicate_variation_meta_keys($product_type) {
+    $type = strtolower((string) $product_type);
+
+    $shared = [
+        '_intersoccer_enable_late_pickup',
+        '_intersoccer_camp_days_available',
+        '_intersoccer_late_pickup_days_available',
+    ];
+
+    if ($type === 'camp') {
+        $schedule = function_exists('intersoccer_camp_schedule_meta_keys')
+            ? array_values(intersoccer_camp_schedule_meta_keys())
+            : ['_camp_start_date', '_camp_end_date', '_camp_week_index'];
+
+        return array_values(array_unique(array_merge($shared, $schedule)));
+    }
+
+    if ($type === 'course') {
+        $course = [
+            '_course_start_date',
+            '_course_total_weeks',
+            '_course_holiday_dates',
+            '_course_weekly_discount',
+            '_end_date',
+        ];
+
+        return array_values(array_unique(array_merge($shared, $course)));
+    }
+
+    return $shared;
+}

@@ -382,6 +382,11 @@ class InterSoccer_Product_Types {
             if ($old_type !== $product_type) {
                 intersoccer_debug("Product type updated for product {$product_id}: '{$old_type}' -> '{$product_type}'");
             }
+        } elseif ($old_type && in_array($old_type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+            // Force-redetect deletes meta before attribute lookup. A later save that
+            // cannot see activity terms must keep the type already stored on the product.
+            update_post_meta($product_id, '_intersoccer_product_type', $old_type);
+            intersoccer_warning("Could not detect product type for product {$product_id}, kept '{$old_type}'");
         } elseif ($old_type) {
             intersoccer_warning("Could not detect product type for product {$product_id}, old type was '{$old_type}'");
         }
