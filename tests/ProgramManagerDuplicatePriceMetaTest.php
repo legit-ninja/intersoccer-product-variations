@@ -470,13 +470,14 @@ PHP
 		}
 	}
 
-	public function test_duplicate_to_year_message_and_unchanged_dates(): void {
+	public function test_duplicate_to_year_message_and_rolled_dates(): void {
 		$parent_id = 910003;
 		$var_id    = 910103;
 		$meta      = [
-			'_course_start_date'  => '2026-09-01',
-			'_course_total_weeks' => '12',
-			'_end_date'           => '2026-12-15',
+			'_course_start_date'    => '2026-09-01',
+			'_course_total_weeks'   => '12',
+			'_course_holiday_dates' => ['2026-12-25', '2027-01-01'],
+			'_end_date'             => '2026-12-15',
 		];
 		$this->seedSourceCampVariation($parent_id, $var_id, $meta, ['pa_course-day' => 'tuesday'], [
 			'regular' => '280',
@@ -499,14 +500,90 @@ PHP
 		]);
 
 		$this->assertStringContainsString('review camp/course dates', strtolower($result['message']));
+		$this->assertStringContainsString('moved forward one year', strtolower($result['message']));
 		$this->assertStringContainsString('sync all languages', strtolower($result['message']));
 		$this->assertStringContainsString('2027', $result['message']);
 
 		$this->assertSame('2027', $GLOBALS['intersoccer_test_product_terms'][$result['new_product_id']]['pa_program-year'][0] ?? '');
 
 		$new_var_id = (int) self::$wc_products[$result['new_product_id']]->get_children()[0];
-		$this->assertSame('2026-09-01', MockMetaData::$data[$new_var_id]['_course_start_date']);
+		$this->assertSame('2027-09-01', MockMetaData::$data[$new_var_id]['_course_start_date']);
+		$this->assertSame('2027-12-15', MockMetaData::$data[$new_var_id]['_end_date']);
+		$this->assertSame(['2027-12-25', '2028-01-01'], MockMetaData::$data[$new_var_id]['_course_holiday_dates']);
+		$this->assertSame('12', (string) MockMetaData::$data[$new_var_id]['_course_total_weeks']);
 		$this->assertSame('280', self::$wc_products[$new_var_id]->get_regular_price());
+		$this->assertSame('2026-09-01', MockMetaData::$data[$var_id]['_course_start_date']);
+	}
+
+	public function test_year_roll_shifts_camp_dates_and_keeps_week_index(): void {
+		$parent_id = 910013;
+		$var_id    = 910113;
+		$sale_end  = new WC_DateTime(time() + WEEK_IN_SECONDS);
+		$this->seedSourceCampVariation($parent_id, $var_id, [
+			'_camp_start_date' => '2026-07-06',
+			'_camp_end_date'   => '2026-07-10',
+			'_camp_week_index' => 4,
+		], ['pa_booking-type' => 'full-week'], [
+			'regular' => '450',
+			'sale'    => '399',
+			'active'  => '399',
+		]);
+		self::$wc_products[$var_id]->date_on_sale_to = $sale_end;
+
+		$new_id = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Camp Next Year', [
+			'year' => '2027',
+		]);
+		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
+
+		$this->assertSame('2027-07-06', MockMetaData::$data[$new_var_id]['_camp_start_date']);
+		$this->assertSame('2027-07-10', MockMetaData::$data[$new_var_id]['_camp_end_date']);
+		$this->assertSame(4, MockMetaData::$data[$new_var_id]['_camp_week_index']);
+		$this->assertSame('450', self::$wc_products[$new_var_id]->get_regular_price());
+		$this->assertSame('399', self::$wc_products[$new_var_id]->get_sale_price());
+		$this->assertSame($sale_end, self::$wc_products[$new_var_id]->get_date_on_sale_to());
+		$this->assertSame('2026-07-06', MockMetaData::$data[$var_id]['_camp_start_date']);
+	}
+
+	public function test_year_roll_clamps_leap_day_and_ignores_target_year_delta(): void {
+		$parent_id = 910014;
+		$var_id    = 910114;
+		$this->seedSourceCampVariation($parent_id, $var_id, [
+			'_camp_start_date' => '2024-02-29',
+			'_camp_end_date'   => '2024-03-01',
+			'_camp_week_index' => 1,
+		], ['pa_booking-type' => 'full-week'], [
+			'regular' => '100',
+			'active'  => '100',
+		]);
+
+		$new_id = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Leap Camp', [
+			'year' => '2029',
+		]);
+		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
+
+		$this->assertSame('2025-02-28', MockMetaData::$data[$new_var_id]['_camp_start_date']);
+		$this->assertSame('2025-03-01', MockMetaData::$data[$new_var_id]['_camp_end_date']);
+		$this->assertSame(1, MockMetaData::$data[$new_var_id]['_camp_week_index']);
+	}
+
+	public function test_year_roll_leaves_invalid_camp_date_unchanged(): void {
+		$parent_id = 910015;
+		$var_id    = 910115;
+		$this->seedSourceCampVariation($parent_id, $var_id, [
+			'_camp_start_date' => '2026-02-31',
+			'_camp_end_date'   => '2026-03-02',
+		], ['pa_booking-type' => 'full-week'], [
+			'regular' => '100',
+			'active'  => '100',
+		]);
+
+		$new_id = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Invalid Date Camp', [
+			'year' => '2027',
+		]);
+		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
+
+		$this->assertSame('2026-02-31', MockMetaData::$data[$new_var_id]['_camp_start_date']);
+		$this->assertSame('2027-03-02', MockMetaData::$data[$new_var_id]['_camp_end_date']);
 	}
 
 	public function test_absent_meta_and_sale_price_not_written(): void {

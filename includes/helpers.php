@@ -494,6 +494,92 @@ function intersoccer_pm_is_year_qualified_season_label($label) {
 }
 
 /**
+ * Move one Y-m-d calendar date forward one year.
+ *
+ * 29 February becomes 28 February when the following year is not a leap year.
+ * Anything that is not a real Y-m-d date is returned unchanged.
+ *
+ * @param mixed $value Raw meta value.
+ * @return mixed
+ */
+function intersoccer_pm_roll_ymd_one_year($value) {
+    if (!is_string($value)) {
+        return $value;
+    }
+    $value = trim($value);
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+        return $value;
+    }
+    $year  = (int) $matches[1];
+    $month = (int) $matches[2];
+    $day   = (int) $matches[3];
+    if (!checkdate($month, $day, $year)) {
+        return $value;
+    }
+    $target_year = $year + 1;
+    if (!checkdate($month, $day, $target_year)) {
+        $day = (int) gmdate('t', gmmktime(0, 0, 0, $month, 1, $target_year));
+    }
+    return sprintf('%04d-%02d-%02d', $target_year, $month, $day);
+}
+
+/**
+ * Roll schedule dates inside one duplicated variation meta value.
+ *
+ * Start/end keys and course holiday lists move forward one year.
+ * Week index and other non-date meta are left as stored.
+ *
+ * @param string $meta_key Variation meta key.
+ * @param mixed  $value    Raw meta value.
+ * @return mixed
+ */
+function intersoccer_pm_roll_variation_date_meta($meta_key, $value) {
+    $meta_key = (string) $meta_key;
+    $single_date_keys = [
+        '_camp_start_date',
+        '_camp_end_date',
+        '_course_start_date',
+        '_end_date',
+    ];
+    if (in_array($meta_key, $single_date_keys, true)) {
+        return intersoccer_pm_roll_ymd_one_year($value);
+    }
+    if ($meta_key !== '_course_holiday_dates') {
+        return $value;
+    }
+    if (is_array($value)) {
+        $rolled = [];
+        foreach ($value as $key => $item) {
+            $rolled[$key] = is_string($item) ? intersoccer_pm_roll_ymd_one_year($item) : $item;
+        }
+        return $rolled;
+    }
+    if (!is_string($value)) {
+        return $value;
+    }
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return $value;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed)) {
+        return intersoccer_pm_roll_ymd_one_year($trimmed);
+    }
+    if (!preg_match('/\d{4}-\d{2}-\d{2}/', $trimmed) || !preg_match('/[\r\n,]/', $trimmed)) {
+        return $value;
+    }
+    $parts = preg_split('/\s*[\r\n,]+\s*/', $trimmed) ?: [];
+    $rolled_parts = [];
+    foreach ($parts as $part) {
+        if ($part === '') {
+            continue;
+        }
+        $rolled_parts[] = intersoccer_pm_roll_ymd_one_year($part);
+    }
+    $separator = strpos($trimmed, "\n") !== false ? "\n" : ',';
+    return implode($separator, $rolled_parts);
+}
+
+/**
  * Compose a same-season discount key from season label + optional program year.
  *
  * When year is known (pa_program-year), returns "season|YYYY" so evergreen seasons

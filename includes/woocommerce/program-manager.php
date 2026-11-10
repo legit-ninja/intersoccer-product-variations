@@ -2512,7 +2512,7 @@ class InterSoccer_Program_Manager {
 				'message'                => sprintf(
 					/* translators: 1: source product ID, 2: new product ID, 3: year */
 					__(
-						'Duplicated #%1$d → #%2$d (year %3$s). Prices and dates were copied from the source; review camp/course dates for the new year. FR/DE translations were not created — run Sync all languages (WPML) before publishing.',
+						'Duplicated #%1$d → #%2$d (year %3$s). Prices were copied from the source. Camp and course dates were moved forward one year; review camp/course dates for the new year. FR/DE translations were not created — run Sync all languages (WPML) before publishing.',
 						'intersoccer-product-variations'
 					),
 					$product_id,
@@ -2719,7 +2719,10 @@ class InterSoccer_Program_Manager {
 	 *
 	 * Copies variation regular/sale/active prices (including sale schedule when still valid),
 	 * camp/course schedule meta (see intersoccer_pm_duplicate_variation_meta_keys()), and
-	 * late-pickup flags. Resolves the source to the WPML default-language product when WPML is active.
+	 * late-pickup flags. When a program year is set, start, end, and course holiday dates
+	 * move forward one year (29 February becomes 28 February in a non-leap year). Ordinary
+	 * duplicate with no year copies those dates unchanged. Resolves the source to the WPML
+	 * default-language product when WPML is active.
 	 *
 	 * Does not copy stock quantity, legacy `_camp_times`, variation attribute term assignments
 	 * beyond cloned attribute slugs, or WPML translations — run Sync all languages after duplicate.
@@ -2866,7 +2869,7 @@ class InterSoccer_Program_Manager {
 			$new_var_id = $new_var->save();
 
 			if ($new_var_id) {
-				self::copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $type);
+				self::copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $type, $new_year !== '');
 			}
 		}
 
@@ -3607,8 +3610,9 @@ class InterSoccer_Program_Manager {
 	 * @param int    $new_var_id
 	 * @param int    $source_var_id
 	 * @param string $product_type
+	 * @param bool   $roll_dates_one_year Year-roll shifts Y-m-d schedule dates forward one year.
 	 */
-	private static function copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $product_type) {
+	private static function copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $product_type, $roll_dates_one_year = false) {
 		$new_var_id     = (int) $new_var_id;
 		$source_var_id  = (int) $source_var_id;
 		$product_type   = strtolower((string) $product_type);
@@ -3619,6 +3623,15 @@ class InterSoccer_Program_Manager {
 
 		foreach (intersoccer_pm_duplicate_variation_meta_keys($product_type) as $meta_key) {
 			$value = get_post_meta($source_var_id, $meta_key, true);
+			if ($value === '' || $value === null || $value === false) {
+				continue;
+			}
+			if (is_array($value) && $value === []) {
+				continue;
+			}
+			if ($roll_dates_one_year && function_exists('intersoccer_pm_roll_variation_date_meta')) {
+				$value = intersoccer_pm_roll_variation_date_meta($meta_key, $value);
+			}
 			if ($value === '' || $value === null || $value === false) {
 				continue;
 			}
