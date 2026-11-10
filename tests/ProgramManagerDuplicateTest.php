@@ -131,17 +131,17 @@ class ProgramManagerDuplicateTest extends TestCase {
 		$this->assertSame('2028-01-14', intersoccer_pm_roll_variation_date_meta('_end_date', '2027-01-15'));
 		$this->assertSame('2027-07-09', intersoccer_pm_roll_variation_date_meta('_camp_end_date', '2026-07-10'));
 		$this->assertSame(
-			['2027-12-24', '2027-12-31', '2026-02-31'],
+			[],
 			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', ['2026-12-25', '2027-01-01', '2026-02-31'])
 		);
 		$this->assertRolled364Days('2026-12-25', '2027-12-24');
 		$this->assertRolled364Days('2027-01-01', '2027-12-31');
 		$this->assertSame(
-			"2027-12-24\n2027-12-31",
+			[],
 			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', "2026-12-25\n2027-01-01")
 		);
 		$this->assertSame(
-			'2027-12-24,2027-12-31',
+			[],
 			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', '2026-12-25,2027-01-01')
 		);
 		$this->assertSame(2, intersoccer_pm_roll_variation_date_meta('_camp_week_index', 2));

@@ -523,7 +523,8 @@ function intersoccer_pm_roll_ymd_one_year($value) {
 /**
  * Roll schedule dates inside one duplicated variation meta value.
  *
- * Start/end keys and course holiday lists move forward 364 days (52 weeks).
+ * Start/end keys move forward 364 days (52 weeks). Weekdays stay the same.
+ * Course holiday lists are cleared to an empty array for the office to enter.
  * Week index and other non-date meta are left as stored.
  *
  * @param string $meta_key Variation meta key.
@@ -541,39 +542,10 @@ function intersoccer_pm_roll_variation_date_meta($meta_key, $value) {
     if (in_array($meta_key, $single_date_keys, true)) {
         return intersoccer_pm_roll_ymd_one_year($value);
     }
-    if ($meta_key !== '_course_holiday_dates') {
-        return $value;
+    if ($meta_key === '_course_holiday_dates') {
+        return [];
     }
-    if (is_array($value)) {
-        $rolled = [];
-        foreach ($value as $key => $item) {
-            $rolled[$key] = is_string($item) ? intersoccer_pm_roll_ymd_one_year($item) : $item;
-        }
-        return $rolled;
-    }
-    if (!is_string($value)) {
-        return $value;
-    }
-    $trimmed = trim($value);
-    if ($trimmed === '') {
-        return $value;
-    }
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed)) {
-        return intersoccer_pm_roll_ymd_one_year($trimmed);
-    }
-    if (!preg_match('/\d{4}-\d{2}-\d{2}/', $trimmed) || !preg_match('/[\r\n,]/', $trimmed)) {
-        return $value;
-    }
-    $parts = preg_split('/\s*[\r\n,]+\s*/', $trimmed) ?: [];
-    $rolled_parts = [];
-    foreach ($parts as $part) {
-        if ($part === '') {
-            continue;
-        }
-        $rolled_parts[] = intersoccer_pm_roll_ymd_one_year($part);
-    }
-    $separator = strpos($trimmed, "\n") !== false ? "\n" : ',';
-    return implode($separator, $rolled_parts);
+    return $value;
 }
 
 /**

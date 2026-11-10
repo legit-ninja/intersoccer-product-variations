@@ -2512,7 +2512,7 @@ class InterSoccer_Program_Manager {
 				'message'                => sprintf(
 					/* translators: 1: source product ID, 2: new product ID, 3: year */
 					__(
-						'Duplicated #%1$d → #%2$d (year %3$s). Prices were copied from the source. Camp and course dates were shifted forward 52 weeks (364 days) so weekdays stay the same; review camp/course dates for the new year. FR/DE translations were not created — run Sync all languages (WPML) before publishing.',
+						'Duplicated #%1$d → #%2$d (year %3$s). Prices were copied from the source. Camp and course start and end dates were shifted forward 52 weeks (364 days) so weekdays stay the same. Holiday dates are left empty for the office; review camp/course dates for the new year. FR/DE translations were not created — run Sync all languages (WPML) before publishing.',
 						'intersoccer-product-variations'
 					),
 					$product_id,
@@ -2719,9 +2719,10 @@ class InterSoccer_Program_Manager {
 	 *
 	 * Copies variation regular/sale/active prices (including sale schedule when still valid),
 	 * camp/course schedule meta (see intersoccer_pm_duplicate_variation_meta_keys()), and
-	 * late-pickup flags. When a program year is set, start, end, and course holiday dates
-	 * move forward 364 days (52 weeks) so weekdays stay the same. Ordinary
-	 * duplicate with no year copies those dates unchanged. Resolves the source to the WPML
+	 * late-pickup flags. When a program year is set, start and end dates
+	 * move forward 364 days (52 weeks) so weekdays stay the same, and course
+	 * holiday dates are left empty for the office. Ordinary duplicate with no
+	 * year copies those dates, including holidays, unchanged. Resolves the source to the WPML
 	 * default-language product when WPML is active.
 	 *
 	 * Does not copy stock quantity, legacy `_camp_times`, variation attribute term assignments
@@ -3610,7 +3611,7 @@ class InterSoccer_Program_Manager {
 	 * @param int    $new_var_id
 	 * @param int    $source_var_id
 	 * @param string $product_type
-	 * @param bool   $roll_dates_one_year Year-roll shifts Y-m-d schedule dates forward 364 days (52 weeks).
+	 * @param bool   $roll_dates_one_year Year-roll shifts Y-m-d start and end dates forward 364 days (52 weeks). Course holidays are stored as an empty array.
 	 */
 	private static function copy_variation_booking_meta_from_source($new_var_id, $source_var_id, $product_type, $roll_dates_one_year = false) {
 		$new_var_id     = (int) $new_var_id;
@@ -3622,6 +3623,19 @@ class InterSoccer_Program_Manager {
 		}
 
 		foreach (intersoccer_pm_duplicate_variation_meta_keys($product_type) as $meta_key) {
+			// Empty arrays are skipped below. Year-roll still stores [] for holidays,
+			// matching the admin cleared-holiday value.
+			if ($roll_dates_one_year && $meta_key === '_course_holiday_dates') {
+				$cleared = [];
+				if (function_exists('intersoccer_pm_roll_variation_date_meta')) {
+					$cleared = intersoccer_pm_roll_variation_date_meta(
+						$meta_key,
+						get_post_meta($source_var_id, $meta_key, true)
+					);
+				}
+				update_post_meta($new_var_id, $meta_key, is_array($cleared) ? $cleared : []);
+				continue;
+			}
 			$value = get_post_meta($source_var_id, $meta_key, true);
 			if ($value === '' || $value === null || $value === false) {
 				continue;

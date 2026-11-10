@@ -24,7 +24,7 @@ When FR/DE variation siblings already exist, saving camp schedule, venue, course
 ## Catalogue year-roll (Bulk Duplicate)
 
 - Seasons stay **evergreen** (`pa_program-season`: Autumn/Winter/Spring/Summer). Year lives on **`pa_program-year`** and in product titles — do **not** create `Autumn 2027`-style season terms.
-- Select rows → Bulk Actions **Duplicate to year…** → year/season fields appear beside the dropdown → Apply. Creates **Draft** clones (checked rows only) with year/season/title updates. Prices are copied. Camp and course start, end, and holiday dates shift forward 52 weeks (364 days) so weekdays stay the same. Review dates, then **Sync all languages (WPML)**, then Publish.
+- Select rows → Bulk Actions **Duplicate to year…** → year/season fields appear beside the dropdown → Apply. Creates **Draft** clones (checked rows only) with year/season/title updates. Prices are copied. Camp and course start and end dates shift forward 52 weeks (364 days) so weekdays stay the same. Holiday dates are left empty for the office. Review dates, then **Sync all languages (WPML)**, then Publish.
 - List bulk actions (**Refresh**, **Scaffold**, **Duplicate to year**, **Sync WPML**) run one program at a time with a progress overlay (N of M, tallies, soft cancel). Without JavaScript, the classic full-page POST still works.
 - Lifecycle: **Publish** = live; **Private** = retired sold years (orders still resolve); **Draft** = WIP. No auto-close of products/variations; roster close remains Reports/Rosters-only.
 - Same-season course discounts and sibling season filters key on **`season|pa_program-year`** so evergreen Autumn does not cross-discount across years.

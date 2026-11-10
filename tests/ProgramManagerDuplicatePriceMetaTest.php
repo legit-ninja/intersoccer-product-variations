@@ -460,6 +460,10 @@ PHP
 				'Course meta key ' . $key
 			);
 		}
+		$this->assertSame(
+			['2026-12-25', '2027-01-01'],
+			MockMetaData::$data[$new_var_id]['_course_holiday_dates']
+		);
 
 		$this->assertSame('', self::$wc_products[$new_var_id]->get_sale_price());
 		if ($this->course_sync_spy_installed) {
@@ -502,6 +506,7 @@ PHP
 		$this->assertStringContainsString('review camp/course dates', strtolower($result['message']));
 		$this->assertStringContainsString('52 weeks (364 days)', strtolower($result['message']));
 		$this->assertStringContainsString('weekdays stay the same', strtolower($result['message']));
+		$this->assertStringContainsString('holiday dates are left empty for the office', strtolower($result['message']));
 		$this->assertStringNotContainsString('moved forward one year', strtolower($result['message']));
 		$this->assertStringContainsString('sync all languages', strtolower($result['message']));
 		$this->assertStringContainsString('2027', $result['message']);
@@ -512,9 +517,10 @@ PHP
 		$this->assertSame('2027-08-31', MockMetaData::$data[$new_var_id]['_course_start_date']);
 		$this->assertSameWeekday('2026-09-01', MockMetaData::$data[$new_var_id]['_course_start_date']);
 		$this->assertSame('2027-12-14', MockMetaData::$data[$new_var_id]['_end_date']);
-		$this->assertSame(['2027-12-24', '2027-12-31'], MockMetaData::$data[$new_var_id]['_course_holiday_dates']);
-		$this->assertSameWeekday('2026-12-25', '2027-12-24');
-		$this->assertSameWeekday('2027-01-01', '2027-12-31');
+		$this->assertSameWeekday('2026-12-15', MockMetaData::$data[$new_var_id]['_end_date']);
+		$this->assertArrayHasKey('_course_holiday_dates', MockMetaData::$data[$new_var_id]);
+		$this->assertSame([], MockMetaData::$data[$new_var_id]['_course_holiday_dates']);
+		$this->assertSame(['2026-12-25', '2027-01-01'], MockMetaData::$data[$var_id]['_course_holiday_dates']);
 		$this->assertSame('12', (string) MockMetaData::$data[$new_var_id]['_course_total_weeks']);
 		$this->assertSame('280', self::$wc_products[$new_var_id]->get_regular_price());
 		$this->assertSame('2026-09-01', MockMetaData::$data[$var_id]['_course_start_date']);
