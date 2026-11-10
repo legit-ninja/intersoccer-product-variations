@@ -655,7 +655,7 @@ function intersoccer_attr_all_taxonomies() {
  * Variation post meta keys copied when duplicating or year-rolling a program.
  *
  * Shared InterSoccer booking meta plus camp schedule or course schedule fields.
- * Year-roll moves Y-m-d start, end, and course holiday values forward one year.
+ * Year-roll moves Y-m-d start, end, and course holiday values forward 364 days (52 weeks).
  * Prices use the WC_Product API; variation attributes use set_attributes().
  *
  * @param string $product_type camp|course|birthday|tournament

@@ -101,18 +101,20 @@ class ProgramManagerDuplicateTest extends TestCase {
 		$this->assertTrue(intersoccer_pm_is_allowed_product_status('private'));
 	}
 
-	public function test_roll_ymd_one_year_shifts_calendar_dates(): void {
-		$this->assertSame('2027-07-06', intersoccer_pm_roll_ymd_one_year('2026-07-06'));
-		$this->assertSame('2027-01-31', intersoccer_pm_roll_ymd_one_year('2026-01-31'));
-		$this->assertSame('2027-12-31', intersoccer_pm_roll_ymd_one_year('2026-12-31'));
-		$this->assertSame('2024-02-28', intersoccer_pm_roll_ymd_one_year('2023-02-28'));
+	public function test_roll_ymd_one_year_shifts_364_days(): void {
+		// Mon–Fri 6–10 July 2026 → Mon–Fri 5–9 July 2027.
+		$this->assertRolled364Days('2026-07-06', '2027-07-05');
+		$this->assertRolled364Days('2026-07-10', '2027-07-09');
+		$this->assertRolled364Days('2026-01-31', '2027-01-30');
+		$this->assertRolled364Days('2026-12-31', '2027-12-30');
+		$this->assertRolled364Days('2023-02-28', '2024-02-27');
 	}
 
-	public function test_roll_ymd_one_year_clamps_leap_day(): void {
-		$this->assertSame('2025-02-28', intersoccer_pm_roll_ymd_one_year('2024-02-29'));
-		$this->assertSame('2021-02-28', intersoccer_pm_roll_ymd_one_year('2020-02-29'));
-		$this->assertSame('2029-02-28', intersoccer_pm_roll_ymd_one_year('2028-02-29'));
-		$this->assertSame('2025-02-28', intersoccer_pm_roll_ymd_one_year('2024-02-28'));
+	public function test_roll_ymd_one_year_shifts_leap_day_by_364_days(): void {
+		$this->assertRolled364Days('2024-02-29', '2025-02-27');
+		$this->assertRolled364Days('2020-02-29', '2021-02-27');
+		$this->assertRolled364Days('2028-02-29', '2029-02-27');
+		$this->assertRolled364Days('2024-02-28', '2025-02-26');
 	}
 
 	public function test_roll_ymd_one_year_leaves_invalid_values_unchanged(): void {
@@ -124,18 +126,45 @@ class ProgramManagerDuplicateTest extends TestCase {
 	}
 
 	public function test_roll_variation_date_meta_shifts_schedule_dates_only(): void {
-		$this->assertSame('2027-09-01', intersoccer_pm_roll_variation_date_meta('_course_start_date', '2026-09-01'));
-		$this->assertSame('2028-01-15', intersoccer_pm_roll_variation_date_meta('_end_date', '2027-01-15'));
-		$this->assertSame('2027-07-10', intersoccer_pm_roll_variation_date_meta('_camp_end_date', '2026-07-10'));
+		$this->assertSame('2027-08-31', intersoccer_pm_roll_variation_date_meta('_course_start_date', '2026-09-01'));
+		$this->assertRolled364Days('2026-09-01', '2027-08-31');
+		$this->assertSame('2028-01-14', intersoccer_pm_roll_variation_date_meta('_end_date', '2027-01-15'));
+		$this->assertSame('2027-07-09', intersoccer_pm_roll_variation_date_meta('_camp_end_date', '2026-07-10'));
 		$this->assertSame(
-			['2027-12-25', '2028-01-01', '2026-02-31'],
+			['2027-12-24', '2027-12-31', '2026-02-31'],
 			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', ['2026-12-25', '2027-01-01', '2026-02-31'])
 		);
+		$this->assertRolled364Days('2026-12-25', '2027-12-24');
+		$this->assertRolled364Days('2027-01-01', '2027-12-31');
 		$this->assertSame(
-			"2027-12-25\n2028-01-01",
+			"2027-12-24\n2027-12-31",
 			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', "2026-12-25\n2027-01-01")
+		);
+		$this->assertSame(
+			'2027-12-24,2027-12-31',
+			intersoccer_pm_roll_variation_date_meta('_course_holiday_dates', '2026-12-25,2027-01-01')
 		);
 		$this->assertSame(2, intersoccer_pm_roll_variation_date_meta('_camp_week_index', 2));
 		$this->assertSame('16', intersoccer_pm_roll_variation_date_meta('_course_total_weeks', '16'));
+	}
+
+	private function assertRolled364Days(string $source, string $expected): void {
+		$rolled = intersoccer_pm_roll_ymd_one_year($source);
+		$this->assertSame($expected, $rolled);
+		$source_ts = $this->utcMidnight($source);
+		$rolled_ts = $this->utcMidnight((string) $rolled);
+		$this->assertSame(gmdate('N', $source_ts), gmdate('N', $rolled_ts), $source . ' weekday');
+		$this->assertSame(364, (int) (($rolled_ts - $source_ts) / 86400));
+	}
+
+	private function utcMidnight(string $ymd): int {
+		return gmmktime(
+			0,
+			0,
+			0,
+			(int) substr($ymd, 5, 2),
+			(int) substr($ymd, 8, 2),
+			(int) substr($ymd, 0, 4)
+		);
 	}
 }

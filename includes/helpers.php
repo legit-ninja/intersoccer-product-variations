@@ -494,10 +494,11 @@ function intersoccer_pm_is_year_qualified_season_label($label) {
 }
 
 /**
- * Move one Y-m-d calendar date forward one year.
+ * Move one Y-m-d date forward 364 days (52 weeks).
  *
- * 29 February becomes 28 February when the following year is not a leap year.
- * Anything that is not a real Y-m-d date is returned unchanged.
+ * Weekdays stay the same. The shift is always 364 days and does not follow
+ * the target program year. Anything that is not a real Y-m-d date is returned
+ * unchanged.
  *
  * @param mixed $value Raw meta value.
  * @return mixed
@@ -516,17 +517,13 @@ function intersoccer_pm_roll_ymd_one_year($value) {
     if (!checkdate($month, $day, $year)) {
         return $value;
     }
-    $target_year = $year + 1;
-    if (!checkdate($month, $day, $target_year)) {
-        $day = (int) gmdate('t', gmmktime(0, 0, 0, $month, 1, $target_year));
-    }
-    return sprintf('%04d-%02d-%02d', $target_year, $month, $day);
+    return gmdate('Y-m-d', gmmktime(0, 0, 0, $month, $day + 364, $year));
 }
 
 /**
  * Roll schedule dates inside one duplicated variation meta value.
  *
- * Start/end keys and course holiday lists move forward one year.
+ * Start/end keys and course holiday lists move forward 364 days (52 weeks).
  * Week index and other non-date meta are left as stored.
  *
  * @param string $meta_key Variation meta key.

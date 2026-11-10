@@ -500,16 +500,21 @@ PHP
 		]);
 
 		$this->assertStringContainsString('review camp/course dates', strtolower($result['message']));
-		$this->assertStringContainsString('moved forward one year', strtolower($result['message']));
+		$this->assertStringContainsString('52 weeks (364 days)', strtolower($result['message']));
+		$this->assertStringContainsString('weekdays stay the same', strtolower($result['message']));
+		$this->assertStringNotContainsString('moved forward one year', strtolower($result['message']));
 		$this->assertStringContainsString('sync all languages', strtolower($result['message']));
 		$this->assertStringContainsString('2027', $result['message']);
 
 		$this->assertSame('2027', $GLOBALS['intersoccer_test_product_terms'][$result['new_product_id']]['pa_program-year'][0] ?? '');
 
 		$new_var_id = (int) self::$wc_products[$result['new_product_id']]->get_children()[0];
-		$this->assertSame('2027-09-01', MockMetaData::$data[$new_var_id]['_course_start_date']);
-		$this->assertSame('2027-12-15', MockMetaData::$data[$new_var_id]['_end_date']);
-		$this->assertSame(['2027-12-25', '2028-01-01'], MockMetaData::$data[$new_var_id]['_course_holiday_dates']);
+		$this->assertSame('2027-08-31', MockMetaData::$data[$new_var_id]['_course_start_date']);
+		$this->assertSameWeekday('2026-09-01', MockMetaData::$data[$new_var_id]['_course_start_date']);
+		$this->assertSame('2027-12-14', MockMetaData::$data[$new_var_id]['_end_date']);
+		$this->assertSame(['2027-12-24', '2027-12-31'], MockMetaData::$data[$new_var_id]['_course_holiday_dates']);
+		$this->assertSameWeekday('2026-12-25', '2027-12-24');
+		$this->assertSameWeekday('2027-01-01', '2027-12-31');
 		$this->assertSame('12', (string) MockMetaData::$data[$new_var_id]['_course_total_weeks']);
 		$this->assertSame('280', self::$wc_products[$new_var_id]->get_regular_price());
 		$this->assertSame('2026-09-01', MockMetaData::$data[$var_id]['_course_start_date']);
@@ -535,16 +540,18 @@ PHP
 		]);
 		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
 
-		$this->assertSame('2027-07-06', MockMetaData::$data[$new_var_id]['_camp_start_date']);
-		$this->assertSame('2027-07-10', MockMetaData::$data[$new_var_id]['_camp_end_date']);
+		$this->assertSame('2027-07-05', MockMetaData::$data[$new_var_id]['_camp_start_date']);
+		$this->assertSame('2027-07-09', MockMetaData::$data[$new_var_id]['_camp_end_date']);
+		$this->assertSameWeekday('2026-07-06', MockMetaData::$data[$new_var_id]['_camp_start_date']);
+		$this->assertSameWeekday('2026-07-10', MockMetaData::$data[$new_var_id]['_camp_end_date']);
 		$this->assertSame(4, MockMetaData::$data[$new_var_id]['_camp_week_index']);
 		$this->assertSame('450', self::$wc_products[$new_var_id]->get_regular_price());
 		$this->assertSame('399', self::$wc_products[$new_var_id]->get_sale_price());
-		$this->assertSame($sale_end, self::$wc_products[$new_var_id]->get_date_on_sale_to());
+		$this->assertSame($sale_end, self::$wc_products[$new_var_id]->get_date_on_sale_to(), 'Sale window stays unshifted');
 		$this->assertSame('2026-07-06', MockMetaData::$data[$var_id]['_camp_start_date']);
 	}
 
-	public function test_year_roll_clamps_leap_day_and_ignores_target_year_delta(): void {
+	public function test_year_roll_shifts_leap_day_364_days_and_ignores_target_year_delta(): void {
 		$parent_id = 910014;
 		$var_id    = 910114;
 		$this->seedSourceCampVariation($parent_id, $var_id, [
@@ -556,14 +563,28 @@ PHP
 			'active'  => '100',
 		]);
 
-		$new_id = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Leap Camp', [
+		$rolled_far = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Leap Camp', [
 			'year' => '2029',
 		]);
-		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
+		$rolled_near = InterSoccer_Program_Manager::duplicate_program($parent_id, 'Leap Camp Near', [
+			'year' => '2025',
+		]);
+		$far_var_id  = (int) self::$wc_products[$rolled_far]->get_children()[0];
+		$near_var_id = (int) self::$wc_products[$rolled_near]->get_children()[0];
 
-		$this->assertSame('2025-02-28', MockMetaData::$data[$new_var_id]['_camp_start_date']);
-		$this->assertSame('2025-03-01', MockMetaData::$data[$new_var_id]['_camp_end_date']);
-		$this->assertSame(1, MockMetaData::$data[$new_var_id]['_camp_week_index']);
+		$this->assertSame('2025-02-27', MockMetaData::$data[$far_var_id]['_camp_start_date']);
+		$this->assertSame('2025-02-28', MockMetaData::$data[$far_var_id]['_camp_end_date']);
+		$this->assertSameWeekday('2024-02-29', MockMetaData::$data[$far_var_id]['_camp_start_date']);
+		$this->assertSameWeekday('2024-03-01', MockMetaData::$data[$far_var_id]['_camp_end_date']);
+		$this->assertSame(
+			MockMetaData::$data[$far_var_id]['_camp_start_date'],
+			MockMetaData::$data[$near_var_id]['_camp_start_date']
+		);
+		$this->assertSame(
+			MockMetaData::$data[$far_var_id]['_camp_end_date'],
+			MockMetaData::$data[$near_var_id]['_camp_end_date']
+		);
+		$this->assertSame(1, MockMetaData::$data[$far_var_id]['_camp_week_index']);
 	}
 
 	public function test_year_roll_leaves_invalid_camp_date_unchanged(): void {
@@ -583,7 +604,7 @@ PHP
 		$new_var_id = (int) self::$wc_products[$new_id]->get_children()[0];
 
 		$this->assertSame('2026-02-31', MockMetaData::$data[$new_var_id]['_camp_start_date']);
-		$this->assertSame('2027-03-02', MockMetaData::$data[$new_var_id]['_camp_end_date']);
+		$this->assertSame('2027-03-01', MockMetaData::$data[$new_var_id]['_camp_end_date']);
 	}
 
 	public function test_absent_meta_and_sale_price_not_written(): void {
@@ -816,5 +837,25 @@ PHP
 		);
 		$this->assertContains('_course_weekly_discount', intersoccer_pm_duplicate_variation_meta_keys('course'));
 		$this->assertContains('_end_date', intersoccer_pm_duplicate_variation_meta_keys('course'));
+	}
+
+	private function assertSameWeekday(string $source, string $rolled): void {
+		$this->assertSame(
+			gmdate('N', $this->utcMidnight($source)),
+			gmdate('N', $this->utcMidnight($rolled)),
+			$source . ' weekday'
+		);
+		$this->assertSame(364, (int) (($this->utcMidnight($rolled) - $this->utcMidnight($source)) / 86400));
+	}
+
+	private function utcMidnight(string $ymd): int {
+		return gmmktime(
+			0,
+			0,
+			0,
+			(int) substr($ymd, 5, 2),
+			(int) substr($ymd, 8, 2),
+			(int) substr($ymd, 0, 4)
+		);
 	}
 }
