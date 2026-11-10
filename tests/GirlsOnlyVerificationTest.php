@@ -23,6 +23,8 @@ if (!function_exists('__')) {
     }
 }
 
+require_once dirname(__DIR__) . '/tests/bootstrap.php';
+require_once dirname(__DIR__) . '/includes/helpers.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/girls-only-verification.php';
 
 class GirlsOnlyVerificationTest extends TestCase {
@@ -72,5 +74,72 @@ class GirlsOnlyVerificationTest extends TestCase {
 
     public function test_activity_type_term_regex_only_girls_slug() {
         $this->assertTrue(intersoccer_activity_type_term_is_girls_only('only-girls', ''));
+    }
+
+    protected function tearDown(): void {
+        unset($GLOBALS['intersoccer_test_player_details']);
+        if (class_exists('MockFilters')) {
+            MockFilters::reset();
+        }
+        parent::tearDown();
+    }
+
+    private function girlsOnlyLineFilterAlwaysTrue(): void {
+        if (!class_exists('MockFilters')) {
+            $this->markTestSkipped('MockFilters requires tests/bootstrap.php');
+        }
+        MockFilters::$filters['intersoccer_line_is_girls_only_program'] = function ($is_girls_only, $product_id, $variation_id) {
+            return true;
+        };
+    }
+
+    private function wpErrorMessage($error, string $code): string {
+        $this->assertTrue(is_wp_error($error));
+        $this->assertArrayHasKey($code, $error->errors);
+        return (string) $error->errors[$code][0];
+    }
+
+    private function assertPlainTranslatedMessage(string $message): void {
+        $this->assertStringNotContainsString('&amp;', $message);
+        $this->assertStringNotContainsString('&#039;', $message);
+        $this->assertDoesNotMatchRegularExpression('/&(?:#x?[0-9a-f]+|amp|lt|gt|quot);/i', $message);
+    }
+
+    public function test_validate_line_player_girls_only_wrong_gender_message_is_plain_text() {
+        $this->girlsOnlyLineFilterAlwaysTrue();
+        $GLOBALS['intersoccer_test_player_details'] = [
+            'first_name' => 'Test',
+            'last_name' => 'Kid',
+            'gender' => 'male',
+        ];
+
+        $result = intersoccer_validate_line_player_girls_only(1, 0, 100, 0);
+        $message = $this->wpErrorMessage($result, 'intersoccer_girls_only_wrong_gender');
+
+        $this->assertSame(
+            'This session is for girls only. Please choose a female attendee or pick a different session.',
+            $message
+        );
+        $this->assertPlainTranslatedMessage($message);
+    }
+
+    public function test_validate_line_player_girls_only_gender_required_message_uses_manage_players_link() {
+        $this->girlsOnlyLineFilterAlwaysTrue();
+        $GLOBALS['intersoccer_test_player_details'] = [
+            'first_name' => 'Test',
+            'last_name' => 'Kid',
+            'gender' => '',
+        ];
+
+        $result = intersoccer_validate_line_player_girls_only(1, 0, 100, 0);
+        $message = $this->wpErrorMessage($result, 'intersoccer_girls_only_gender_required');
+
+        $expected = intersoccer_pv_girls_only_gender_required_message();
+        $this->assertSame($expected, $message);
+        if (strpos($message, '<a href="') !== false) {
+            $this->assertStringContainsString('Manage Players', $message);
+        } else {
+            $this->assertStringContainsString('Please update Manage Players before booking.', $message);
+        }
     }
 }

@@ -389,6 +389,38 @@ function intersoccer_normalize_player_gender_bucket($raw) {
 }
 
 /**
+ * Existing customer-facing girls-only decision for one gender value.
+ *
+ * Empty gender uses the gender-required notice. Any other non-female value uses
+ * the wrong-gender notice.
+ *
+ * @param string $gender_raw Stored gender, or empty when the attendee cannot be checked.
+ * @return true|WP_Error
+ */
+function intersoccer_girls_only_validation_result_for_gender($gender_raw) {
+    $gender_raw = trim((string) $gender_raw);
+    if ($gender_raw === '') {
+        $msg = function_exists('intersoccer_pv_girls_only_gender_required_message')
+            ? intersoccer_pv_girls_only_gender_required_message()
+            : __(
+                'This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking.',
+                'intersoccer-product-variations'
+            );
+        return new WP_Error('intersoccer_girls_only_gender_required', $msg);
+    }
+
+    $bucket = intersoccer_normalize_player_gender_bucket($gender_raw);
+    if ($bucket === 'female') {
+        return true;
+    }
+
+    return new WP_Error(
+        'intersoccer_girls_only_wrong_gender',
+        __('This session is for girls only. Please choose a female attendee or pick a different session.', 'intersoccer-product-variations')
+    );
+}
+
+/**
  * Validate assigned player gender for a girls-only product line.
  *
  * @param int $user_id      Customer user ID.
@@ -423,29 +455,99 @@ function intersoccer_validate_line_player_girls_only($user_id, $player_index, $p
     $player = intersoccer_get_player_details($user_id, $player_index);
     $gender_raw = isset($player['gender']) ? trim((string) $player['gender']) : '';
 
-    if ($gender_raw === '') {
-        $msg = function_exists('intersoccer_pv_girls_only_gender_required_message')
-            ? intersoccer_pv_girls_only_gender_required_message()
-            : __(
-                'This session is for girls only. The selected attendee needs gender set to female in your account. Please update Manage Players before booking.',
-                'intersoccer-product-variations'
-            );
-        return new WP_Error('intersoccer_girls_only_gender_required', $msg);
-    }
-
-    $bucket = intersoccer_normalize_player_gender_bucket($gender_raw);
-    if ($bucket === 'female') {
-        return true;
-    }
-
-    return new WP_Error(
-        'intersoccer_girls_only_wrong_gender',
-        __('This session is for girls only. Please choose a female attendee or pick a different session.', 'intersoccer-product-variations')
-    );
+    return intersoccer_girls_only_validation_result_for_gender($gender_raw);
 }
 
 /**
- * Add-to-cart: validate player gender for girls-only programs when player_assignment is posted.
+ * Resolve the attendee posted with add-to-cart.
+ *
+ * Storefront dropdowns post the player UUID. Older clients post a numeric
+ * intersoccer_players index. A non-empty value that matches neither is unresolved.
+ *
+ * @param int $user_id Customer user ID.
+ * @return array{state:string,gender?:string,index?:int|string|null}
+ */
+function intersoccer_resolve_posted_girls_only_attendee($user_id) {
+    $values = [];
+    foreach (['player_assignment', 'assigned_attendee', 'assigned_player_id'] as $field) {
+        if (!isset($_POST[$field])) {
+            continue;
+        }
+        $val = trim((string) wp_unslash($_POST[$field]));
+        if ($val !== '') {
+            $values[] = $val;
+        }
+    }
+    if ($values === []) {
+        return ['state' => 'absent'];
+    }
+
+    $user_id = (int) $user_id;
+    foreach ($values as $val) {
+        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $val)) {
+            continue;
+        }
+
+        $row = null;
+        $index = null;
+        if ($user_id > 0 && function_exists('intersoccer_get_player_by_id')) {
+            $by_id = intersoccer_get_player_by_id($user_id, $val);
+            if (is_array($by_id)) {
+                if (isset($by_id['player']) && is_array($by_id['player'])) {
+                    $row = $by_id['player'];
+                    if (array_key_exists('key', $by_id) && $by_id['key'] !== null && $by_id['key'] !== '') {
+                        $index = $by_id['key'];
+                    }
+                } elseif (
+                    array_key_exists('gender', $by_id)
+                    || array_key_exists('player_gender', $by_id)
+                    || array_key_exists('player_id', $by_id)
+                ) {
+                    $row = $by_id;
+                }
+            }
+        }
+
+        if (!is_array($row)) {
+            // UUID was posted and does not match this customer's players. Do not
+            // fall through to another posted index.
+            return ['state' => 'unresolved'];
+        }
+
+        $gender = isset($row['gender']) ? trim((string) $row['gender']) : '';
+        if ($gender === '' && isset($row['player_gender'])) {
+            $gender = trim((string) $row['player_gender']);
+        }
+
+        return [
+            'state' => 'uuid',
+            'gender' => $gender,
+            'index' => $index,
+        ];
+    }
+
+    if (function_exists('intersoccer_get_posted_player_assignment_index')) {
+        $index = intersoccer_get_posted_player_assignment_index();
+        if ($index !== null) {
+            return ['state' => 'index', 'index' => $index];
+        }
+    } else {
+        foreach ($values as $val) {
+            if (preg_match('/^\d+$/', $val)) {
+                return ['state' => 'index', 'index' => absint($val)];
+            }
+        }
+    }
+
+    return ['state' => 'unresolved'];
+}
+
+/**
+ * Add-to-cart: validate player gender for girls-only programs when an attendee is posted.
+ *
+ * A player UUID is resolved to that player's record. A numeric index still uses
+ * the existing index lookup. A posted value that cannot be resolved is rejected
+ * with the same notice as an attendee whose gender is missing.
  *
  * @param bool  $passed
  * @param int   $product_id
@@ -460,24 +562,46 @@ function intersoccer_validate_player_girls_only_on_add_to_cart($passed, $product
         return false;
     }
 
-    $user_id = get_current_user_id();
-    if (!$user_id) {
+    $user_id = (int) get_current_user_id();
+    if ($user_id <= 0) {
         return $passed;
     }
 
-    $is_go = intersoccer_line_is_girls_only_program((int) $product_id, (int) $variation_id);
-    if (!$is_go) {
+    $product_id = (int) $product_id;
+    $variation_id = absint($variation_id);
+    if (!intersoccer_line_is_girls_only_program($product_id, $variation_id)) {
         return $passed;
     }
 
-    if (!function_exists('intersoccer_get_posted_player_assignment_index')) {
+    $resolved = intersoccer_resolve_posted_girls_only_attendee($user_id);
+    if ($resolved['state'] === 'absent') {
         return $passed;
     }
-    $player_index = intersoccer_get_posted_player_assignment_index();
-    if ($player_index === null) {
+
+    $player_index = 0;
+    if (array_key_exists('index', $resolved) && $resolved['index'] !== null && $resolved['index'] !== '') {
+        $player_index = $resolved['index'];
+    }
+    $skip = (bool) apply_filters(
+        'intersoccer_skip_girls_only_validation',
+        false,
+        $user_id,
+        $player_index,
+        $product_id,
+        $variation_id
+    );
+    if ($skip) {
         return $passed;
     }
-    $result = intersoccer_validate_line_player_girls_only($user_id, $player_index, (int) $product_id, absint($variation_id));
+
+    if ($resolved['state'] === 'index') {
+        $result = intersoccer_validate_line_player_girls_only($user_id, $resolved['index'], $product_id, $variation_id);
+    } elseif ($resolved['state'] === 'uuid') {
+        $result = intersoccer_girls_only_validation_result_for_gender($resolved['gender']);
+    } else {
+        $result = intersoccer_girls_only_validation_result_for_gender('');
+    }
+
     if (is_wp_error($result)) {
         wc_add_notice($result->get_error_message(), 'error');
         return false;
