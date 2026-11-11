@@ -870,6 +870,23 @@ class InterSoccer_Program_Manager {
 			<div class="intersoccer-pm-camp-schedule-tools" style="margin: 12px 0; padding: 12px; background: #f6f7f7; border: 1px solid #ddd; border-radius: 4px; max-width: 900px;">
 				<h3 style="margin-top:0;"><?php esc_html_e('Camp Schedule', 'intersoccer-product-variations'); ?></h3>
 				<p class="description"><?php esc_html_e('Store start/end dates and week index on each variation. Labels in Camp Terms stay for storefront display.', 'intersoccer-product-variations'); ?></p>
+				<?php
+				$missing_dates_count = 0;
+				if (function_exists('intersoccer_camp_variation_missing_dates_flag')) {
+					foreach ($product->get_children() as $missing_var_id) {
+						if (intersoccer_camp_variation_missing_dates_flag($missing_var_id) !== '') {
+							$missing_dates_count++;
+						}
+					}
+				}
+				if ($missing_dates_count > 0) :
+				?>
+				<div class="notice notice-warning inline" style="margin: 8px 0;">
+					<p style="margin:0;">
+						<?php esc_html_e('Camp variations marked Missing dates have no start or end date, and the camp term cannot be parsed. Fill in the dates.', 'intersoccer-product-variations'); ?>
+					</p>
+				</div>
+				<?php endif; ?>
 				<p>
 					<label>
 						<?php esc_html_e('Week 1 start', 'intersoccer-product-variations'); ?>
@@ -1052,6 +1069,14 @@ class InterSoccer_Program_Manager {
 							<td>
 								<input type="date" class="intersoccer-pm-camp-end" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['end']); ?>" />
 								<span class="intersoccer-pm-schedule-status"></span>
+								<?php
+								$missing_dates_flag = function_exists('intersoccer_camp_variation_missing_dates_flag')
+									? intersoccer_camp_variation_missing_dates_flag($var_id)
+									: '';
+								if ($missing_dates_flag !== '') :
+								?>
+									<span class="intersoccer-pm-missing-dates" style="display:inline-block;margin-left:6px;color:#b32d2e;font-weight:600;"><?php echo esc_html($missing_dates_flag); ?></span>
+								<?php endif; ?>
 							</td>
 						<?php endif; ?>
 						<td>
