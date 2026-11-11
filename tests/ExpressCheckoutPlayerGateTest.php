@@ -201,11 +201,13 @@ class ExpressCheckoutPlayerGateTest extends TestCase
     {
         $root = dirname(__DIR__);
         $widgets = file_get_contents($root . '/includes/elementor-widgets.php');
-        $this->assertStringContainsString("toggleClass(intersoccerPvExpressGateClass, !hasPlayer)", $widgets);
+        $this->assertStringContainsString("toggleClass(intersoccerPvExpressGateClass, !shouldEnable)", $widgets);
+        $this->assertStringNotContainsString("toggleClass(intersoccerPvExpressGateClass, !hasPlayer)", $widgets);
         $this->assertStringContainsString("intersoccerStashSelectedPlayer('');", $widgets);
 
         $enhancer = file_get_contents($root . '/js/product-enhancer.js');
         $this->assertStringContainsString("intersoccer-express-needs-player", $enhancer);
+        $this->assertStringContainsString("toggleClass(expressGateClass, !canAddToCart)", $enhancer);
         $this->assertStringNotContainsString('$expressContainer.hide()', $enhancer);
 
         $main = file_get_contents($root . '/intersoccer-product-variations.php');

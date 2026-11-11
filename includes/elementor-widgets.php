@@ -2219,11 +2219,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     });
                 }
                 var hasPlayer = intersoccerPlayerIndexChosen(playerId);
-                // Apple Pay / Google Pay: show only once a player is chosen (index 0 is valid, #79).
-                if (intersoccerPvExpressGated) {
-                    $(document.body).toggleClass(intersoccerPvExpressGateClass, !hasPlayer);
-                }
-                
+
                 // For variable products, also check if variation is selected (variation may live on a different form.cart than layout)
                 var variationIdResolved = '';
                 var variationSelected = true;
@@ -2261,6 +2257,11 @@ $intersoccer_elementor_product_page_cb = function () {
                 
                 // Enable button only if player is selected AND (for variable products: variation is selected) AND (for single-day bookings: days are selected)
                 var shouldEnable = hasPlayer && variationSelected && daysSelected;
+                // Express pay uses the same readiness as Buy now, including a picked day
+                // on per-day camps. The cart-has-programs class is left alone.
+                if (intersoccerPvExpressGated) {
+                    $(document.body).toggleClass(intersoccerPvExpressGateClass, !shouldEnable);
+                }
                 
                 // Manage notifications based on what's missing (scope to this product's player row)
                 var $attendeeNotification = $playerSel.closest('.intersoccer-player-selection').find('.intersoccer-attendee-notification');

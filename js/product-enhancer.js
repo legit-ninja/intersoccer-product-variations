@@ -611,7 +611,7 @@
                 this.state.expressGated = $(document.body).hasClass(expressGateClass);
             }
             if (this.state.expressGated) {
-                $(document.body).toggleClass(expressGateClass, !(playerSelected && isLoggedIn));
+                $(document.body).toggleClass(expressGateClass, !canAddToCart);
             }
 
             // Update notification messages
