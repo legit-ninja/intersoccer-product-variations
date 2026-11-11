@@ -3,7 +3,7 @@
  * Plugin Name: InterSoccer Product Variations
  * Description: Enhanced WooCommerce product variations with dynamic pricing, AJAX updates, and Elementor integration for InterSoccer camps and courses.
  * Author: Jeremy Lee
- * Version: 2.10.31
+ * Version: 2.11.11
  * License: GPL v2 or later
  * Text Domain: intersoccer-product-variations
  * Domain Path: /languages
@@ -427,6 +427,7 @@ $includes = [
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/express-checkout-player-gate.php',
+    'includes/woocommerce/time-format.php',
     'includes/woocommerce/checkout-calculations.php',
     'includes/woocommerce/age-group-verification.php',
     'includes/woocommerce/age-restriction-settings.php',
@@ -493,15 +494,47 @@ add_action('wp_enqueue_scripts', function () {
         );
     }
 
-    wp_enqueue_style(
-        'intersoccer-styles',
-        INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
-        [],
-        '1.4.63' // Bumped to match JS version
-    );
-
     $on_checkout = function_exists('is_checkout') && is_checkout();
     $on_cart = function_exists('is_cart') && is_cart();
+    $on_product = function_exists('is_product') && is_product();
+    // Header mini-cart prints the same cart-meta markup on other pages once the cart has items.
+    $on_cart_widget = function_exists('WC') && WC()->cart && method_exists(WC()->cart, 'is_empty') && !WC()->cart->is_empty();
+    // A non-product page can still render the product form via a Woo shortcode or an Elementor add-to-cart widget.
+    $on_embedded_product = false;
+    if (!$on_product && function_exists('is_singular') && is_singular() && class_exists('WP_Post')) {
+        $embedded_post = get_post();
+        if ($embedded_post instanceof WP_Post) {
+            $embedded_content = (string) $embedded_post->post_content;
+            if ($embedded_content !== '' && function_exists('has_shortcode') && (
+                has_shortcode($embedded_content, 'product_page')
+                || has_shortcode($embedded_content, 'add_to_cart')
+            )) {
+                $on_embedded_product = true;
+            }
+            if (!$on_embedded_product) {
+                $elementor_data = get_post_meta($embedded_post->ID, '_elementor_data', true);
+                if (is_string($elementor_data) && strpos($elementor_data, 'woocommerce-product-add-to-cart') !== false) {
+                    $on_embedded_product = true;
+                }
+            }
+        }
+    }
+    if ($on_product || $on_cart || $on_checkout || $on_cart_widget || $on_embedded_product) {
+        $styles_path = INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'css/styles.css';
+        $styles_ver = '1.4.63';
+        if (file_exists($styles_path)) {
+            $styles_mtime = filemtime($styles_path);
+            if ($styles_mtime) {
+                $styles_ver = (string) $styles_mtime;
+            }
+        }
+        wp_enqueue_style(
+            'intersoccer-styles',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
+            [],
+            $styles_ver
+        );
+    }
     if ($on_checkout || $on_cart) {
         wp_enqueue_script(
             'intersoccer-campaign-checkout',
@@ -559,7 +592,9 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
     if ($product_type === 'course') {
         $variation_id = $variation->get_id();
         $course_start_date = intersoccer_get_course_meta($variation_id, '_course_start_date', '');
-        $data['course_start_date'] = $course_start_date ? date_i18n('F j, Y', strtotime($course_start_date)) : '';
+        $start_fields = intersoccer_pv_course_customer_date_fields($course_start_date);
+        $data['course_start_date'] = $start_fields['iso'];
+        $data['course_start_date_display'] = $start_fields['display'];
         $end_date = get_post_meta($variation_id, '_end_date', true);
         $total_weeks = (int) intersoccer_get_course_meta($variation_id, '_course_total_weeks', 0);
         $holidays = intersoccer_get_course_meta($variation_id, '_course_holiday_dates', []);
@@ -577,11 +612,13 @@ add_filter('woocommerce_available_variation', function($data, $product, $variati
                 intersoccer_warning('InterSoccer: Cannot calculate end_date for variation ' . $variation_id . ': missing start_date or total_weeks');
             }
         }
-        $data['end_date'] = $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '';
-        
-        $data['course_holiday_dates'] = array_map(function($date) {
-            return date_i18n('F j, Y', strtotime($date));
-        }, $holidays);
+        $end_fields = intersoccer_pv_course_customer_date_fields($end_date);
+        $data['end_date'] = $end_fields['iso'];
+        $data['end_date_display'] = $end_fields['display'];
+
+        $holiday_lists = intersoccer_pv_course_holiday_customer_date_lists(is_array($holidays) ? $holidays : []);
+        $data['course_holiday_dates'] = $holiday_lists['isos'];
+        $data['course_holiday_dates_display'] = $holiday_lists['displays'];
         $data['remaining_sessions'] = calculate_remaining_sessions($variation_id, $total_weeks);
         intersoccer_debug('Variation ' . $variation_id . ' data: start=' . $data['course_start_date'] . ', end=' . $data['end_date'] . ', sessions=' . $data['remaining_sessions']);
     }

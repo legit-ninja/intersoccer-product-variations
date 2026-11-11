@@ -1037,6 +1037,9 @@ msgstr ""
 msgid "This session is for girls only. The selected attendee needs gender set to female in your account. Please update it under <a href=\"%s\">Manage Players</a>."
 msgstr ""
 
+msgid "This session is for girls only. Please choose a female attendee or pick a different session."
+msgstr ""
+
 msgid "%d%% Camp Week %d+ Discount"
 msgstr ""
 

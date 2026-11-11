@@ -494,6 +494,61 @@ function intersoccer_pm_is_year_qualified_season_label($label) {
 }
 
 /**
+ * Move one Y-m-d date forward 364 days (52 weeks).
+ *
+ * Weekdays stay the same. The shift is always 364 days and does not follow
+ * the target program year. Anything that is not a real Y-m-d date is returned
+ * unchanged.
+ *
+ * @param mixed $value Raw meta value.
+ * @return mixed
+ */
+function intersoccer_pm_roll_ymd_one_year($value) {
+    if (!is_string($value)) {
+        return $value;
+    }
+    $value = trim($value);
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+        return $value;
+    }
+    $year  = (int) $matches[1];
+    $month = (int) $matches[2];
+    $day   = (int) $matches[3];
+    if (!checkdate($month, $day, $year)) {
+        return $value;
+    }
+    return gmdate('Y-m-d', gmmktime(0, 0, 0, $month, $day + 364, $year));
+}
+
+/**
+ * Roll schedule dates inside one duplicated variation meta value.
+ *
+ * Start/end keys move forward 364 days (52 weeks). Weekdays stay the same.
+ * Course holiday lists are cleared to an empty array for the office to enter.
+ * Week index and other non-date meta are left as stored.
+ *
+ * @param string $meta_key Variation meta key.
+ * @param mixed  $value    Raw meta value.
+ * @return mixed
+ */
+function intersoccer_pm_roll_variation_date_meta($meta_key, $value) {
+    $meta_key = (string) $meta_key;
+    $single_date_keys = [
+        '_camp_start_date',
+        '_camp_end_date',
+        '_course_start_date',
+        '_end_date',
+    ];
+    if (in_array($meta_key, $single_date_keys, true)) {
+        return intersoccer_pm_roll_ymd_one_year($value);
+    }
+    if ($meta_key === '_course_holiday_dates') {
+        return [];
+    }
+    return $value;
+}
+
+/**
  * Compose a same-season discount key from season label + optional program year.
  *
  * When year is known (pa_program-year), returns "season|YYYY" so evergreen seasons

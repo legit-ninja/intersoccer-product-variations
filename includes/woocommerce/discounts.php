@@ -668,6 +668,21 @@ function intersoccer_extract_camp_items_from_order($order) {
         if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
             $season = (string) intersoccer_discount_normalize_season_key($season);
         }
+        // Order-item Season / attribute meta, then a legacy season word in the camp term.
+        // New-style terms have no season word, so an empty season field stays empty.
+        if ($season === '') {
+            $season = intersoccer_resolve_camp_season_for_week_identity(array(
+                (string) ($item->get_meta('Season') ?: ''),
+                (string) ($item->get_meta('attribute_pa_program-season') ?: ''),
+                (string) ($item->get_meta('pa_program-season') ?: ''),
+            ), '');
+            if ($season !== '' && function_exists('intersoccer_discount_normalize_season_key')) {
+                $season = (string) intersoccer_discount_normalize_season_key($season);
+            }
+        }
+        if ($season === '') {
+            $season = intersoccer_legacy_season_token_from_camp_terms($camp_terms);
+        }
 
         $camp_items[] = [
             'order_id' => $order->get_id(),
@@ -680,6 +695,7 @@ function intersoccer_extract_camp_items_from_order($order) {
             'camp_terms' => $camp_terms,
             'booking_type' => $booking_type,
             'week_number' => $week_number,
+            'week_identity' => intersoccer_discount_camp_week_identity($season, $week_number),
             'season' => $season,
             'line_total' => intersoccer_discount_order_item_line_total($item),
             'quantity' => $item->get_quantity(),
@@ -703,12 +719,89 @@ function intersoccer_parse_camp_week_from_terms($camp_terms) {
         return null;
     }
 
-    // Slug: summer-week-2-june-24-... or display label: "Summer Week 2: July 1-5 (5 days)"
+    // Slug: summer-week-2-june-24-... or week-1-march-22-25-4-days[-camps]
+    // Label: "Summer Week 2: July 1-5 (5 days)" or "Week 1: March 22-25 (4 days camps)"
     if (preg_match('/week[\s\-]+(\d+)/i', (string) $camp_terms, $matches)) {
         return intval($matches[1]);
     }
 
     return null;
+}
+
+/**
+ * Season word baked into a legacy camp term, if any.
+ *
+ * Old slugs look like `summer-week-2-...` and old labels like `Summer Week 2: ...`.
+ * New-style `week-1-...` / `Week 1: ...` terms have no season and return empty.
+ *
+ * @param string $camp_terms Camp term slug or label.
+ * @return string
+ */
+function intersoccer_legacy_season_token_from_camp_terms($camp_terms) {
+    $raw = trim((string) $camp_terms);
+    if ($raw === '') {
+        return '';
+    }
+
+    if (preg_match('/(?:week|woche|semaine)\s+\d+\s*:/iu', $raw, $label_match, PREG_OFFSET_CAPTURE)) {
+        $prefix = trim(substr($raw, 0, (int) $label_match[0][1]));
+        $prefix = trim($prefix, " \t:-");
+        return $prefix;
+    }
+
+    if (preg_match('/(?:^|[\s])([\p{L}\p{N}]+)-(?:week|woche|semaine)-\d+\b/iu', $raw, $slug_match)) {
+        $token = (string) $slug_match[1];
+        if (!preg_match('/^(?:week|woche|semaine)$/iu', $token)) {
+            return $token;
+        }
+    }
+
+    return '';
+}
+
+/**
+ * First non-empty season field, otherwise the legacy camp-term season word.
+ *
+ * Pass candidates in priority order: pa_program-season / discount season key,
+ * then order-item Season and attribute meta. Camp-term text is used only when
+ * every candidate is empty.
+ *
+ * @param array|string $season_candidates Season field value or list of values.
+ * @param string       $camp_terms        Camp term slug or label.
+ * @return string
+ */
+function intersoccer_resolve_camp_season_for_week_identity($season_candidates, $camp_terms = '') {
+    if (!is_array($season_candidates)) {
+        $season_candidates = array($season_candidates);
+    }
+    foreach ($season_candidates as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+    return intersoccer_legacy_season_token_from_camp_terms($camp_terms);
+}
+
+/**
+ * Discount week identity: season field + week number.
+ *
+ * The season is the resolved program season, not a season word parsed out of a
+ * new-style camp term (those terms have none). Empty when the week is unknown.
+ *
+ * @param string    $season      Resolved season label or key.
+ * @param int|null  $week_number Week index.
+ * @return string
+ */
+function intersoccer_discount_camp_week_identity($season, $week_number) {
+    if ($week_number === null || $week_number === '' || !is_numeric($week_number)) {
+        return '';
+    }
+    $week = (int) $week_number;
+    if ($week <= 0) {
+        return '';
+    }
+    return strtolower(trim((string) $season)) . '|' . $week;
 }
 
 /**

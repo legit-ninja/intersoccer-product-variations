@@ -877,6 +877,26 @@ function intersoccer_attr_camp_time_range_from_slug($slug) {
 }
 
 /**
+ * Canonicalize admin-typed camp time input to stored HHMM-HHMM form.
+ *
+ * Accepts 08:30-15:30, 8:30 - 15:30, 08h30-15h30, 08.30–15.30, 0830-1530.
+ * Returns the input unchanged (trimmed) when it does not look like a time range,
+ * so strict validation can still reject it with a clear message.
+ *
+ * @param string $value Raw term name.
+ * @return string
+ */
+function intersoccer_attr_canonicalize_camp_time_input($value) {
+    $value = trim((string) $value);
+    $pattern = '/^(\d{1,2})\s*[h:.]?\s*(\d{2})\s*[-\x{2013}\x{2014}]\s*(\d{1,2})\s*[h:.]?\s*(\d{2})$/iu';
+    if (!preg_match($pattern, $value, $m)) {
+        return $value;
+    }
+
+    return sprintf('%02d%02d-%02d%02d', (int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4]);
+}
+
+/**
  * @param string $name Term name (must be literal HHMM-HHMM).
  * @return bool
  */
@@ -1137,13 +1157,13 @@ function intersoccer_attr_validate_new_term($taxonomy, $name, $slug = '') {
         if (!intersoccer_attr_strict_camp_time_name_is_valid($name)) {
             return new WP_Error(
                 'invalid_camp_time',
-                __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
+                __('Camp times must be a time range like 10:00-17:00 or 1000-1700, with start before end.', 'intersoccer-product-variations')
             );
         }
         if ($slug_explicit && !intersoccer_attr_camp_time_slug_with_suffix_is_valid($slug)) {
             return new WP_Error(
                 'invalid_camp_time',
-                __('Camp times must use HHMM-HHMM format (e.g. 1000-1700) with start before end.', 'intersoccer-product-variations')
+                __('Camp times must be a time range like 10:00-17:00 or 1000-1700, with start before end.', 'intersoccer-product-variations')
             );
         }
         return true;
@@ -1237,6 +1257,10 @@ function intersoccer_attr_pre_insert_term($term, $taxonomy) {
     }
     if (!function_exists('intersoccer_attr_slug_from_taxonomy') || !intersoccer_attr_slug_from_taxonomy($taxonomy)) {
         return $term;
+    }
+    if ($taxonomy === 'pa_camp-times') {
+        // Store typed forms like 08:30-15:30 as canonical 0830-1530.
+        $term = intersoccer_attr_canonicalize_camp_time_input((string) $term);
     }
     $validated = intersoccer_attr_validate_new_term($taxonomy, (string) $term);
     if (is_wp_error($validated)) {

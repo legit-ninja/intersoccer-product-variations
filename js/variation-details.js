@@ -64,15 +64,25 @@
         create(data) {
             return {
                 start_date: data.start_date || '',
+                start_date_display: data.start_date_display || '',
                 end_date: data.end_date || '',
+                end_date_display: data.end_date_display || '',
                 total_weeks: Number(data.total_weeks || data.total_sessions || 0) || 0,
                 remaining_sessions: Number(data.remaining_sessions || data.remaining_weeks || 0) || 0,
                 weekly_discount: Number(data.weekly_discount || 0) || 0,
                 holidays: Array.isArray(data.holidays) ? data.holidays : [],
+                holidays_display: Array.isArray(data.holidays_display) ? data.holidays_display : [],
                 is_course: Boolean(data.is_course)
             };
         }
     };
+
+    function intersoccerCourseDateLabel(isoValue, displayValue) {
+        if (displayValue) {
+            return displayValue;
+        }
+        return isoValue || '';
+    }
 
     class ApiClient {
         constructor(config) {
@@ -232,8 +242,8 @@
                 return false;
             }
 
-            this.updateRow('intersoccer-course-start-date', courseData.start_date ? this.valueTemplate(courseData.start_date) : null);
-            this.updateRow('intersoccer-course-end-date', courseData.end_date ? this.valueTemplate(courseData.end_date) : null);
+            this.updateRow('intersoccer-course-start-date', courseData.start_date ? this.valueTemplate(intersoccerCourseDateLabel(courseData.start_date, courseData.start_date_display)) : null);
+            this.updateRow('intersoccer-course-end-date', courseData.end_date ? this.valueTemplate(intersoccerCourseDateLabel(courseData.end_date, courseData.end_date_display)) : null);
             this.updateRow('intersoccer-course-total-sessions', courseData.total_weeks ? this.valueTemplate(courseData.total_weeks) : null);
 
             if (courseData.remaining_sessions && courseData.remaining_sessions !== courseData.total_weeks) {
@@ -243,8 +253,11 @@
             }
 
             if (courseData.holidays && courseData.holidays.length) {
+                const labels = courseData.holidays_display && courseData.holidays_display.length === courseData.holidays.length
+                    ? courseData.holidays_display
+                    : courseData.holidays;
                 const holidayHtml = [`<div style="color: white; padding: 8px;"><ul style="margin: 0; padding-left: 20px;">`]
-                    .concat(courseData.holidays.map((holiday) => `<li>${holiday}</li>`))
+                    .concat(labels.map((holiday) => `<li>${holiday}</li>`))
                     .concat(['</ul></div>'])
                     .join('');
                 this.updateRow('intersoccer-course-holidays', holidayHtml);

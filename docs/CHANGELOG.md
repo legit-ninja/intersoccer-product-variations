@@ -5,6 +5,25 @@ All notable changes to the InterSoccer Product Variations plugin will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.4] - 2026-11-03
+
+### Fixed
+- Camp Times: new terms typed as `08:30-15:30`, `8:30 - 15:30` or `10h00-15h30` were rejected by the strict HHMM-HHMM check. They are now converted to `0830-1530` before validation, in both the WooCommerce attribute screen and the Program Manager (#173).
+
+## [2.11.2] - 2026-11-01
+
+### Fixed
+- Orders that store EN term names now show the FR/DE term names (#143, issue #138).
+- FR/DE order dates display correctly, and My Account no longer shows a None medical row (#144, issue #139).
+
+## [2.11.1] - 2026-11-01
+
+### Fixed
+- Customer UI now inherits the Cloe Brooks theme and WooCommerce styles (#126).
+- FR checkout shows course-time labels in French format (#158).
+- Variation prices pass through correctly after the price-callback signature fix (#169, issue #166).
+- DE course days resolve through the WPML English term, so proration works for German orders (#168, issue #167).
+
 ## [2.10.31] - 2026-10-31
 
 Note: v2.10.30.1 failed to publish because the publish workflow rejects four-part versions, so nothing shipped under it. This release ships the same changes.

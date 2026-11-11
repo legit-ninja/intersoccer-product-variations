@@ -4,6 +4,14 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', dirname(__DIR__) . '/');
 }
 
+// Isolated checkout integration tests set this via putenv before the child process starts.
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT')) {
+    $load_real_checkout = getenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+    if ($load_real_checkout !== false && $load_real_checkout !== '' && $load_real_checkout !== '0') {
+        define('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT', true);
+    }
+}
+
 // WordPress constants used by some functions
 if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
@@ -11,6 +19,7 @@ if (!defined('OBJECT')) {
 
 // Load Composer autoloader.
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/IntersoccerPvTestDateI18n.php';
 
 // Shared meta store for tests (must include reset(); define before test files).
 if (!class_exists('MockMetaData')) {
@@ -423,6 +432,10 @@ if (!function_exists('date_i18n')) {
         if ($timestamp === false) {
             $timestamp = time();
         }
+        if (!empty($GLOBALS['intersoccer_test_date_i18n_override'])
+            && is_callable($GLOBALS['intersoccer_test_date_i18n_override'])) {
+            return $GLOBALS['intersoccer_test_date_i18n_override']($format, $timestamp, $gmt);
+        }
         return date($format, (int) $timestamp);
     }
 }
@@ -529,7 +542,7 @@ if (!function_exists('get_current_user_id')) {
 }
 
 // Test doubles for player enrichment (OrderMeta*). Prefer globals so suite load order cannot shadow mocks.
-if (!function_exists('intersoccer_get_player_details')) {
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT') && !function_exists('intersoccer_get_player_details')) {
     function intersoccer_get_player_details($user_id, $player_index) {
         if (isset($GLOBALS['intersoccer_test_player_details']) && is_array($GLOBALS['intersoccer_test_player_details'])) {
             return $GLOBALS['intersoccer_test_player_details'];
@@ -876,11 +889,18 @@ if (!function_exists('get_term_by')) {
                 if ($taxonomy !== '' && isset($row['taxonomy']) && $row['taxonomy'] !== $taxonomy) {
                     continue;
                 }
-                if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+                if ($current_lang !== '' && $current_lang !== 'all' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
                     continue;
                 }
-                if ($field === 'name' && isset($row['name']) && (string) $row['name'] === (string) $value) {
-                    return get_term((int) $term_id, $taxonomy);
+                if ($field === 'name' && isset($row['name'])) {
+                    $stored_name = (string) $row['name'];
+                    $needle = (string) $value;
+                    $name_matches = !empty($GLOBALS['intersoccer_test_get_term_by_name_case_insensitive'])
+                        ? strcasecmp($stored_name, $needle) === 0
+                        : $stored_name === $needle;
+                    if ($name_matches) {
+                        return get_term((int) $term_id, $taxonomy);
+                    }
                 }
                 if ($field === 'slug') {
                     $slug = $row['slug'] ?? sanitize_title($row['name'] ?? '');
@@ -909,7 +929,7 @@ if (!function_exists('get_terms')) {
             if (!is_array($row) || ($row['taxonomy'] ?? '') !== $taxonomy) {
                 continue;
             }
-            if ($current_lang !== '' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
+            if ($current_lang !== '' && $current_lang !== 'all' && isset($row['wpml_lang']) && (string) $row['wpml_lang'] !== $current_lang) {
                 continue;
             }
             $out[] = (object) [

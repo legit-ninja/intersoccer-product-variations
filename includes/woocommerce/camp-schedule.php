@@ -278,23 +278,37 @@ function intersoccer_camp_schedule_from_terms_deprecated($camp_terms, $season = 
 		return $result;
 	}
 
+	// Year still comes from the season argument. A legacy season word in the term
+	// is only a stand-in when that argument is empty (new-style terms have none).
+	if (trim($season) === '' && function_exists('intersoccer_legacy_season_token_from_camp_terms')) {
+		$season = intersoccer_legacy_season_token_from_camp_terms($camp_terms);
+	}
+
 	if (function_exists('intersoccer_parse_camp_dates_fixed')) {
 		list($start, $end) = intersoccer_parse_camp_dates_fixed($camp_terms, $season);
 		$result['start'] = intersoccer_camp_schedule_normalize_ymd((string) $start);
 		$result['end']   = intersoccer_camp_schedule_normalize_ymd((string) $end);
-	} elseif (function_exists('intersoccer_parse_camp_start_date_from_terms')) {
+	}
+
+	if (($result['start'] === '' || $result['end'] === '') && function_exists('intersoccer_parse_camp_term_schedule')) {
+		$parts = intersoccer_parse_camp_term_schedule($camp_terms, $season);
+		if ($result['start'] === '') {
+			$result['start'] = intersoccer_camp_schedule_normalize_ymd((string) $parts['start']);
+		}
+		if ($result['end'] === '') {
+			$result['end'] = intersoccer_camp_schedule_normalize_ymd((string) $parts['end']);
+		}
+	} elseif ($result['start'] === '' && function_exists('intersoccer_parse_camp_start_date_from_terms')) {
 		$start = intersoccer_parse_camp_start_date_from_terms($camp_terms, $season);
 		$result['start'] = intersoccer_camp_schedule_normalize_ymd((string) $start);
-		// Best-effort end from same-month / cross-month slug patterns when RR helper absent.
-		if ($result['start'] !== '' && preg_match('/(\w+)[\s\-]+(\d{1,2})[\s\-]+(?:(\w+)[\s\-]+)?(\d{1,2})/i', $camp_terms, $m)) {
-			// Prefer dedicated PV end parse via start+duration from "(N days)" when present.
-			if (preg_match('/\((\d+)\s*days?\)/i', $camp_terms, $dm)) {
-				$days = max(1, (int) $dm[1]);
-				$ts   = strtotime($result['start'] . ' 00:00:00');
-				if ($ts) {
-					$result['end'] = date('Y-m-d', strtotime('+' . ($days - 1) . ' days', $ts));
-				}
-			}
+	}
+
+	// Day count: "4 days", "(4 days camps)". Slug ranges already set end above.
+	if ($result['start'] !== '' && $result['end'] === '' && preg_match('/(\d+)\s*days?\b/i', $camp_terms, $dm)) {
+		$days = max(1, (int) $dm[1]);
+		$ts   = strtotime($result['start'] . ' 00:00:00');
+		if ($ts) {
+			$result['end'] = date('Y-m-d', strtotime('+' . ($days - 1) . ' days', $ts));
 		}
 	}
 
@@ -450,4 +464,57 @@ function intersoccer_camp_schedule_propose_from_week1($week1_start, $week_index,
 	$end    = date('Y-m-d', strtotime('+' . ($duration_days - 1) . ' days', strtotime($start . ' 00:00:00')));
 
 	return ['start' => $start, 'end' => $end];
+}
+
+/**
+ * English admin flag when a camp variation has no date meta and no parseable term.
+ *
+ * Date meta (`_camp_start_date` or `_camp_end_date`) or a term that yields a start
+ * date suppresses the flag. Does not write order or product data.
+ *
+ * @param int $variation_id Variation ID.
+ * @return string "Missing dates" or empty.
+ */
+function intersoccer_camp_variation_missing_dates_flag($variation_id) {
+	$variation_id = (int) $variation_id;
+	if ($variation_id <= 0) {
+		return '';
+	}
+
+	$meta = intersoccer_get_camp_schedule_meta($variation_id);
+	if ($meta['start'] !== '' || $meta['end'] !== '') {
+		return '';
+	}
+
+	$parent_id = 0;
+	$product = function_exists('wc_get_product') ? wc_get_product($variation_id) : null;
+	if ($product && method_exists($product, 'get_parent_id')) {
+		$parent_id = (int) $product->get_parent_id();
+	}
+
+	$terms = '';
+	if (function_exists('intersoccer_get_camp_terms_slug')) {
+		$terms = (string) intersoccer_get_camp_terms_slug($parent_id, $variation_id);
+	}
+	if ($terms === '') {
+		$terms = (string) get_post_meta($variation_id, 'attribute_pa_camp-terms', true);
+	}
+	if ($terms === '' && $product && method_exists($product, 'get_attribute')) {
+		$terms = (string) $product->get_attribute('pa_camp-terms');
+	}
+
+	$season = '';
+	if (function_exists('intersoccer_get_variation_program_season_string')) {
+		$season = (string) intersoccer_get_variation_program_season_string($parent_id, $variation_id);
+	}
+	if ($season === '') {
+		$season = (string) get_post_meta($variation_id, 'attribute_pa_program-season', true);
+	}
+
+	$parsed = intersoccer_camp_schedule_from_terms_deprecated($terms, $season);
+	if ($parsed['start'] !== '') {
+		return '';
+	}
+
+	return __('Missing dates', 'intersoccer-product-variations');
 }

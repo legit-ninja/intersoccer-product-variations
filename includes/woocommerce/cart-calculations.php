@@ -828,22 +828,11 @@ function intersoccer_modify_price_html($price_html, $product) {
 }
 
 /**
- * Modify variation price at source level for courses
- * Calculates prorated price directly without session dependency
+ * Fix woocommerce_get_variation_price callback signature (course ranges use woocommerce_variation_prices).
  */
 add_filter('woocommerce_get_variation_price', 'intersoccer_modify_variation_price', 10, 4);
-function intersoccer_modify_variation_price($price, $variation, $product, $min_or_max) {
-    $product_type = InterSoccer_Product_Types::get_product_type($product->get_id());
-
-    // Only modify for course products
-    if ($product_type !== 'course') {
-        return $price;
-    }
-
-    // Calculate prorated price directly
-    $prorated_price = InterSoccer_Course::calculate_price($product->get_id(), $variation->get_id());
-    
-    return $prorated_price;
+function intersoccer_modify_variation_price($price, $product, $min_or_max, $for_display) {
+    return $price;
 }
 
 /**
@@ -914,19 +903,13 @@ function intersoccer_inject_course_prorated_price($variation_data, $product, $va
     }
     
     // Inject course info into variation data
-    $variation_data['course_info'] = [
+    $course_info = [
         'is_course' => true,
-        'start_date' => $start_date ? date_i18n('F j, Y', strtotime($start_date)) : '',
-        'end_date' => $end_date ? date_i18n('F j, Y', strtotime($end_date)) : '',
         'total_weeks' => $total_weeks,
         'remaining_sessions' => $remaining_sessions,
-        'holidays' => array_map(function($holiday) {
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
-                return date_i18n('F j, Y', strtotime($holiday));
-            }
-            return $holiday;
-        }, $holidays)
     ];
+    intersoccer_pv_merge_course_date_response_fields($course_info, $start_date, $end_date, $holidays);
+    $variation_data['course_info'] = $course_info;
     
     return $variation_data;
 }

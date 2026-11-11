@@ -42,7 +42,7 @@ if (!function_exists('wc_get_product_terms')) {
     }
 }
 
-if (!function_exists('intersoccer_get_player_details')) {
+if (!defined('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT') && !function_exists('intersoccer_get_player_details')) {
     function intersoccer_get_player_details($user_id, $player_index) {
         return OrderMetadataTest::$mock_player_details;
     }

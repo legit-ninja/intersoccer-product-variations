@@ -416,7 +416,7 @@
             this.config.preloadedDays.forEach(day => {
                 const isChecked = this.state.selectedDays.includes(day);
                 const $label = $(`
-                    <label style="margin-right: 10px; display: inline-block;">
+                    <label class="intersoccer-day-label">
                         <input type="checkbox" name="camp_days_temp[]" value="${day}" 
                                class="intersoccer-day-checkbox" ${isChecked ? 'checked' : ''}> ${day}
                     </label>
@@ -472,16 +472,18 @@
             }
 
             let html = '<div class="intersoccer-course-details">';
+            const courseDateLabel = (iso, display) => (display || iso || '');
             if (courseData.start_date) {
-                const startDate = new Date(courseData.start_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${startDate}</p>`;
+                html += `<p><strong>${getCourseLabel('start_date', 'Start Date')}${getLabelValueSeparator()}</strong> ${courseDateLabel(courseData.start_date, courseData.start_date_display)}</p>`;
             }
             if (courseData.end_date) {
-                const endDate = new Date(courseData.end_date).toLocaleDateString('de-CH');
-                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${endDate}</p>`;
+                html += `<p><strong>${getCourseLabel('end_date', 'End Date')}${getLabelValueSeparator()}</strong> ${courseDateLabel(courseData.end_date, courseData.end_date_display)}</p>`;
             }
             if (courseData.holidays && courseData.holidays.length > 0) {
-                const holidays = courseData.holidays.map(date => new Date(date).toLocaleDateString('de-CH')).join(', ');
+                const holidayLabels = courseData.holidays_display && courseData.holidays_display.length === courseData.holidays.length
+                    ? courseData.holidays_display
+                    : courseData.holidays;
+                const holidays = holidayLabels.join(', ');
                 html += `<p><strong>${getCourseLabel('holidays_no_session', 'Holidays (No Session)')}${getLabelValueSeparator()}</strong> ${holidays}</p>`;
             }
             if (courseData.remaining_sessions) {
@@ -537,8 +539,8 @@
             }
 
             if ($notification.length) {
-                $notification.text(message).show();
-                setTimeout(() => $notification.hide(), 5000);
+                $notification.removeClass('woocommerce-info').addClass('woocommerce-error').text(message).show();
+                setTimeout(() => $notification.removeClass('woocommerce-error').hide(), 5000);
             }
         },
 
@@ -628,18 +630,18 @@
             const $notification = $form.find('.intersoccer-attendee-notification');
 
             if (!isLoggedIn) {
-                $notification.text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
+                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
             } else if (!playerSelected) {
-                $notification.text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
+                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
             } else {
-                $notification.hide();
+                $notification.removeClass('woocommerce-error').hide();
             }
 
             const $dayNotification = $form.find('.intersoccer-day-notification');
             if (playerSelected && !daysSelected) {
-                $dayNotification.text(getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.')).show();
+                $dayNotification.removeClass('woocommerce-info').addClass('woocommerce-error').text(getPlayerMessage('selectAtLeastOneDay', 'Please select at least one day.')).show();
             } else {
-                $dayNotification.hide();
+                $dayNotification.removeClass('woocommerce-error').hide();
             }
         },
 
