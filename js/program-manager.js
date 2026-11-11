@@ -1362,39 +1362,6 @@
 	});
 
 	// =========================================================================
-	// Course Holiday Fix (detail view — reuses existing AJAX handler)
-	// =========================================================================
-
-	$(document).on('click', '#intersoccer-pm-course-holiday-fix-btn', function() {
-		var $btn = $(this);
-		if ($btn.prop('disabled')) return;
-
-		if (!confirm('Are you sure you want to run the course holiday fix? This should only be run once.')) {
-			return;
-		}
-
-		var $results = $('#intersoccer-pm-holiday-fix-result');
-		$btn.prop('disabled', true).text('Running…');
-		$results.show().html('<p>Running course holiday fix…</p>');
-
-		$.post(PM.ajax_url, {
-			action: 'intersoccer_run_course_holiday_fix',
-			nonce: PM.course_holiday_fix_nonce
-		}).done(function(response) {
-			if (response.success) {
-				$results.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
-				setTimeout(function() { window.location.reload(); }, 2000);
-			} else {
-				$results.html('<div class="notice notice-error inline"><p>' + escHtml(response.data.message || 'Unknown error') + '</p></div>');
-				$btn.prop('disabled', false).text('Run Course Holiday Fix');
-			}
-		}).fail(function() {
-			$results.html('<div class="notice notice-error inline"><p>Request failed.</p></div>');
-			$btn.prop('disabled', false).text('Run Course Holiday Fix');
-		});
-	});
-
-	// =========================================================================
 	// Save parent attributes (detail view)
 	// =========================================================================
 
