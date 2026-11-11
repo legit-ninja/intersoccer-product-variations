@@ -2570,8 +2570,8 @@ function intersoccer_render_variation_health_page() {
         </form>
 
         <?php
-        // Include course holiday fix functionality
-        // require_once plugin_dir_path(dirname(dirname(dirname(__FILE__)))) . 'fix-course-holidays.php';
+        // The one-time fixer is not part of the release. Show this only when that file is loaded.
+        if (function_exists('intersoccer_course_holiday_fix_has_run')) :
         $fix_completed = intersoccer_course_holiday_fix_has_run();
         ?>
         <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
@@ -2588,6 +2588,7 @@ function intersoccer_render_variation_health_page() {
                 <div id="course-holiday-fix-results" style="margin-top: 10px; display: none;"></div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
         <h1><?php _e('Variation Health Checker', 'intersoccer-product-variations'); ?></h1>
         <p class="description"><?php _e('Catalog tool only: checks and fixes product variation attributes. Does not update existing order metadata. After catalog fixes, use Find Order Issues and Reconcile Rosters for order and roster data.', 'intersoccer-product-variations'); ?></p>
         <p><?php _e('Scan and check health of product variations. Use the filter to show only unhealthy ones.', 'intersoccer-product-variations'); ?></p>
