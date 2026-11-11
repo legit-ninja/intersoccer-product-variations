@@ -406,6 +406,152 @@ function intersoccer_get_variation_program_season_string($product_id, $variation
 }
 
 /**
+ * Calendar month number (1-12) for a camp-terms month token, or 0.
+ *
+ * @param string $month_token Slug or label token.
+ * @return int
+ */
+function intersoccer_pv_camp_month_number($month_token) {
+    $name = intersoccer_pv_normalize_camp_month_token($month_token);
+    if ($name === '') {
+        return 0;
+    }
+    $t = strtotime('1 ' . $name . ' 2000');
+    if ($t === false) {
+        return 0;
+    }
+    return (int) date('n', $t);
+}
+
+/**
+ * Build Y-m-d from a month token, day, and year. Empty when the date is not real.
+ *
+ * @param string $month_token Month slug or name.
+ * @param int    $day         Day of month.
+ * @param int    $year        Four-digit year.
+ * @return string
+ */
+function intersoccer_pv_camp_ymd_from_month_day($month_token, $day, $year) {
+    $month = intersoccer_pv_normalize_camp_month_token($month_token);
+    $day = (int) $day;
+    $year = (int) $year;
+    if ($month === '' || $day < 1 || $year < 1) {
+        return '';
+    }
+    $t = strtotime($month . ' ' . $day . ' ' . $year);
+    if ($t === false || (int) date('j', $t) !== $day || (int) date('Y', $t) !== $year) {
+        return '';
+    }
+    return date('Y-m-d', $t);
+}
+
+/**
+ * Parse week, start, end, and day count from a camp-terms slug or label.
+ *
+ * Season may be omitted (`week-1-march-22-25-4-days`, `Week 1: March 22-25 (4 days)`).
+ * A trailing word after days is ignored (`4-days-camps`, `(4 days camps)`).
+ * Legacy `season-week-N-...` slugs, including FR/DE `semaine` / `woche` forms, keep the same start date.
+ * The year comes from $season (`pa_program-season`), not from the camp term.
+ *
+ * @deprecated since 2.7.18 Remove in 2.9.0 or next major — prefer `_camp_start_date` / `_camp_end_date`.
+ *
+ * @param string $camp_terms Slug or display label.
+ * @param string $season     Season string used only for the year.
+ * @return array{week:int|null,start:string,end:string,days:int|null}
+ */
+function intersoccer_parse_camp_term_schedule($camp_terms, $season = '') {
+    $result = array(
+        'week' => null,
+        'start' => '',
+        'end' => '',
+        'days' => null,
+    );
+    $raw = trim((string) $camp_terms);
+    if ($raw === '' || $raw === 'N/A') {
+        return $result;
+    }
+
+    $year = intersoccer_pv_year_from_program_season($season);
+    $week = null;
+    $smonth = '';
+    $sday = 0;
+    $emonth = '';
+    $eday = 0;
+    $days = null;
+    $matched = false;
+
+    // Slug: optional season, then week|woche|semaine-N-month-D-[month-]D-N-days|jours|tage.
+    // Case-insensitive. A hyphen-word after the day unit (`-camps`) is not part of the match.
+    if (preg_match('/(?:week|woche|semaine)-(\d+)-([\p{L}]+)-(\d{1,2})-(?:([\p{L}]+)-)?(\d{1,2})-(\d+)-(days?|jours?|tage)\b/iu', $raw, $matches)) {
+        $matched = true;
+        $week = (int) $matches[1];
+        $smonth = $matches[2];
+        $sday = (int) $matches[3];
+        $emonth = isset($matches[4]) ? (string) $matches[4] : '';
+        $eday = (int) $matches[5];
+        $days = (int) $matches[6];
+    } elseif (preg_match('/(?:week|woche|semaine)\s+(\d+)\s*:\s*([\p{L}]+)\s+(\d{1,2})\s*-\s*(?:([\p{L}]+)\s+)?(\d{1,2})/iu', $raw, $matches)) {
+        // Label: optional season words, then "Week 1: March 22-25" or "Week 2: June 29-July 3".
+        $matched = true;
+        $week = (int) $matches[1];
+        $smonth = $matches[2];
+        $sday = (int) $matches[3];
+        $emonth = isset($matches[4]) ? (string) $matches[4] : '';
+        $eday = (int) $matches[5];
+    }
+
+    if ($matched) {
+        if ($days === null && preg_match('/(\d+)\s*days?\b/i', $raw, $day_match)) {
+            $days = (int) $day_match[1];
+        }
+        $result['week'] = $week > 0 ? $week : null;
+        $result['days'] = ($days !== null && $days > 0) ? $days : null;
+        $result['start'] = intersoccer_pv_camp_ymd_from_month_day($smonth, $sday, $year);
+        if ($result['start'] !== '' && $eday > 0) {
+            $end_token = $emonth !== '' ? $emonth : $smonth;
+            $end_year = $year;
+            $start_month_num = intersoccer_pv_camp_month_number($smonth);
+            $end_month_num = intersoccer_pv_camp_month_number($end_token);
+            if ($start_month_num > 0 && $end_month_num > 0 && $end_month_num < $start_month_num) {
+                $end_year = $year + 1;
+            }
+            $result['end'] = intersoccer_pv_camp_ymd_from_month_day($end_token, $eday, $end_year);
+        }
+        if ($result['end'] === '' && $result['start'] !== '' && $result['days'] !== null) {
+            $ts = strtotime($result['start'] . ' 00:00:00');
+            if ($ts) {
+                $result['end'] = date('Y-m-d', strtotime('+' . ($result['days'] - 1) . ' days', $ts));
+            }
+        }
+        if ($result['start'] !== '') {
+            return $result;
+        }
+    }
+
+    $make_ymd = static function ($month_token, $day, $y) {
+        $ymd = intersoccer_pv_camp_ymd_from_month_day($month_token, $day, $y);
+        return $ymd === '' ? null : $ymd;
+    };
+
+    if (preg_match('/^\s*\w+\s*:\s*(\w+)\s+(\d{1,2})\s*$/i', $raw, $matches)) {
+        $simple = $make_ymd($matches[1], $matches[2], $year);
+        if ($simple) {
+            $result['start'] = $simple;
+        }
+        return $result;
+    }
+
+    if (preg_match('/^\s*(\w+)\s+(\d{1,2})\s*$/i', $raw, $matches)) {
+        $simple = $make_ymd($matches[1], $matches[2], $year);
+        if ($simple) {
+            $result['start'] = $simple;
+        }
+    }
+
+    return $result;
+}
+
+/**
  * Parse camp start date (Y-m-d) from pa_camp-terms slug and season (ported from roster logic).
  *
  * @deprecated since 2.7.18 Remove in 2.9.0 or next major — prefer `_camp_start_date` variation meta via intersoccer_get_camp_schedule().
@@ -415,58 +561,11 @@ function intersoccer_get_variation_program_season_string($product_id, $variation
  * @return string|null
  */
 function intersoccer_parse_camp_start_date_from_terms($camp_terms_slug, $season) {
-    $camp_terms = trim((string) $camp_terms_slug);
-    if ($camp_terms === '' || $camp_terms === 'N/A') {
+    $parsed = intersoccer_parse_camp_term_schedule($camp_terms_slug, $season);
+    if ($parsed['start'] === '') {
         return null;
     }
-
-    $year = intersoccer_pv_year_from_program_season($season);
-
-    $make_ymd = static function ($month_token, $day, $y) {
-        $month = intersoccer_pv_normalize_camp_month_token($month_token);
-        $day = (int) $day;
-        $t = strtotime($month . ' ' . $day . ' ' . (int) $y);
-        if ($t === false) {
-            return null;
-        }
-        return date('Y-m-d', $t);
-    };
-
-    if (preg_match('/(\w+)-week-\d+-(\w+)-(\d{1,2})-(\w+)-(\d{1,2})-\d+-days/', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    if (preg_match('/(\w+)-week-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-days/', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    // German storefront slugs (WPML): e.g. sommer-woche-2-juni-29-juli-3-5-tage
-    if (preg_match('/(\w+)-woche-\d+-(\w+)-(\d{1,2})-(\w+)-(\d{1,2})-\d+-tage/u', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    if (preg_match('/(\w+)-woche-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-tage/u', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    // French storefront slugs: e.g. été-semaine-2-juin-29-juillet-3-5-jours
-    if (preg_match('/(\w+)-semaine-\d+-(\w+)-(\d{1,2})-(\w+)-(\d{1,2})-\d+-jours/ui', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    if (preg_match('/(\w+)-semaine-\d+-(\w+)-(\d{1,2})-(\d{1,2})-\d+-jours/ui', $camp_terms, $matches)) {
-        return $make_ymd($matches[2], $matches[3], $year);
-    }
-
-    if (preg_match('/^\s*\w+\s*:\s*(\w+)\s+(\d{1,2})\s*$/i', $camp_terms, $matches)) {
-        return $make_ymd($matches[1], $matches[2], $year);
-    }
-
-    if (preg_match('/^\s*(\w+)\s+(\d{1,2})\s*$/i', $camp_terms, $matches)) {
-        return $make_ymd($matches[1], $matches[2], $year);
-    }
-
-    return null;
+    return $parsed['start'];
 }
 
 /**
