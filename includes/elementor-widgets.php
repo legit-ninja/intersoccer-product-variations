@@ -2259,8 +2259,44 @@ $intersoccer_elementor_product_page_cb = function () {
                     daysSelected = selectedDaysCount > 0;
                 }
                 
-                // Enable button only if player is selected AND (for variable products: variation is selected) AND (for single-day bookings: days are selected)
-                var shouldEnable = hasPlayer && variationSelected && daysSelected;
+                // WooCommerce leaves wc-variation-selection-needed on the button until the
+                // variation slide finishes (about 300ms after variation_id is set). The
+                // submit guard treats that class as "not ready", so the button must stay
+                // disabled until the class is gone. Otherwise a click looks enabled and is ignored.
+                var wooSelectionPending = false;
+                if (variationSelected) {
+                    var $choiceButtons = $button;
+                    $('form').not('.search_form').each(function () {
+                        var $tf = $(this);
+                        if (!intersoccerPvFormIsForThisProduct($tf)) {
+                            return;
+                        }
+                        $choiceButtons = $choiceButtons.add($tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]'));
+                    });
+                    wooSelectionPending = $choiceButtons.filter('.wc-variation-selection-needed').length > 0;
+                }
+                var readyForCart = hasPlayer && variationSelected && daysSelected;
+                var shouldEnable = readyForCart && !wooSelectionPending;
+                if (readyForCart && wooSelectionPending && !$layoutForm.data('intersoccerPvWooSelectionTimer')) {
+                    var watchedVariationId = variationIdResolved;
+                    $layoutForm.data('intersoccerPvWooSelectionTimer', setTimeout(function () {
+                        $layoutForm.removeData('intersoccerPvWooSelectionTimer');
+                        var currentVariationId = $layoutForm.find('input[name="variation_id"]').val() || '';
+                        if (String(currentVariationId) !== String(watchedVariationId) || !currentVariationId || currentVariationId === '0') {
+                            intersoccerPvDispatchUpdateButtonState();
+                            return;
+                        }
+                        $button.removeClass('wc-variation-selection-needed');
+                        $('form').not('.search_form').each(function () {
+                            var $tf = $(this);
+                            if (!intersoccerPvFormIsForThisProduct($tf)) {
+                                return;
+                            }
+                            $tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').removeClass('wc-variation-selection-needed');
+                        });
+                        intersoccerPvDispatchUpdateButtonState();
+                    }, 350));
+                }
                 
                 // Manage notifications based on what's missing (scope to this product's player row)
                 var $attendeeNotification = $playerSel.closest('.intersoccer-player-selection').find('.intersoccer-attendee-notification');
@@ -2331,7 +2367,12 @@ $intersoccer_elementor_product_page_cb = function () {
 
             function intersoccerPvValidateCampCourseProductForm($productForm) {
                 var $submitButton = $productForm.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
-                if ($submitButton.length && ($submitButton.prop('disabled') || $submitButton.hasClass('disabled') || $submitButton.hasClass('wc-variation-selection-needed'))) {
+                var buttonHeld = $submitButton.prop('disabled') || $submitButton.hasClass('disabled');
+                var wooSelectionClass = $submitButton.hasClass('wc-variation-selection-needed');
+                if ($submitButton.length && (buttonHeld || wooSelectionClass)) {
+                    if (!buttonHeld && wooSelectionClass) {
+                        alert('<?php echo esc_js(__('Please select a variation.', 'intersoccer-product-variations')); ?>');
+                    }
                     debug('InterSoccer: ❌ Validation failed - submit button is disabled');
                     return false;
                 }
@@ -2999,6 +3040,13 @@ $intersoccer_elementor_product_page_cb = function () {
             $form.find('input[name="variation_id"]').on('change', function() {
                 var variationId = $(this).val();
                 debug('InterSoccer: Variation ID changed to:', variationId);
+                intersoccerPvDispatchUpdateButtonState();
+            });
+
+            // Woo removes wc-variation-selection-needed on show_variation, which can be
+            // later than the variation_id change. Refresh then so Buy now enables only
+            // once the submit guard will accept the click.
+            $form.on('show_variation.intersoccerPvBuyNow', function () {
                 intersoccerPvDispatchUpdateButtonState();
             });
 
