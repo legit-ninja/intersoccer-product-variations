@@ -73,11 +73,37 @@ if (!function_exists('intersoccer_order_line_time_range_language')) {
      */
     function intersoccer_order_line_time_range_language($order = null) {
         if (is_object($order) && method_exists($order, 'get_meta')) {
-            $wpml = (string) $order->get_meta('wpml_language', true);
-            if ($wpml !== '') {
-                $code = strtolower(substr(trim($wpml), 0, 2));
+            foreach (['wpml_language', 'language', 'icl_language_code'] as $meta_key) {
+                $stored = (string) $order->get_meta($meta_key, true);
+                if ($stored === '') {
+                    continue;
+                }
+                $code = strtolower(substr(trim($stored), 0, 2));
+                if ($code === '') {
+                    continue;
+                }
+                if ($meta_key === 'language' && !in_array($code, ['en', 'fr', 'de'], true)) {
+                    continue;
+                }
+                return $code;
+            }
 
-                return $code !== '' ? $code : intersoccer_time_range_language();
+            if (method_exists($order, 'get_id') && (int) $order->get_id() > 0 && function_exists('apply_filters')) {
+                // Not verified under HPOS custom order tables; may return null and fall through below.
+                $element_lang = apply_filters(
+                    'wpml_element_language_code',
+                    null,
+                    [
+                        'element_id' => (int) $order->get_id(),
+                        'element_type' => 'post_shop_order',
+                    ]
+                );
+                if (is_string($element_lang) && trim($element_lang) !== '') {
+                    $code = strtolower(substr(trim($element_lang), 0, 2));
+                    if ($code !== '') {
+                        return $code;
+                    }
+                }
             }
         }
 
