@@ -24,4 +24,13 @@ class PluginBoundariesTest extends TestCase
             'Player Management owns organizer role registration; PV must not call add_role for organizer'
         );
     }
+
+    public function test_release_does_not_include_the_one_time_course_holiday_fixer()
+    {
+        $main_plugin = file_get_contents(dirname(__DIR__) . '/intersoccer-product-variations.php');
+        $this->assertStringNotContainsString('utils/fix-course-holidays.php', $main_plugin);
+
+        $admin_ui = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php');
+        $this->assertStringContainsString("function_exists('intersoccer_course_holiday_fix_has_run')", $admin_ui);
+    }
 }
