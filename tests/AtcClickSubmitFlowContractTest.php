@@ -107,6 +107,16 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('intersoccerPvShowStashWaitTimeoutNotice', $php);
     }
 
+    public function testBuyNowStaysDisabledWhileWooSelectionClassRemains(): void
+    {
+        $php = $this->elementorWidgetsSource();
+        $this->assertStringContainsString('wooSelectionPending', $php);
+        $this->assertStringContainsString("var shouldEnable = readyForCart && !wooSelectionPending;", $php);
+        $this->assertStringContainsString('show_variation.intersoccerPvBuyNow', $php);
+        $this->assertStringContainsString('intersoccerPvWooSelectionTimer', $php);
+        $this->assertStringContainsString("if (!buttonHeld && wooSelectionClass)", $php);
+    }
+
     public function testProductEnhancerJsIsNotRegisteredOrEnqueued(): void
     {
         $main = file_get_contents(dirname(__DIR__) . '/intersoccer-product-variations.php');
