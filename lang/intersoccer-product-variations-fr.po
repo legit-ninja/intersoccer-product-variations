@@ -766,6 +766,9 @@ msgstr "Montant de la remise"
 msgid "Sites InterSoccer"
 msgstr "Sites InterSoccer"
 
+msgid "InterSoccer Venues"
+msgstr "Sites InterSoccer"
+
 msgid "Medical Conditions"
 msgstr "Conditions médicales"
 
@@ -958,6 +961,10 @@ msgstr "Informations médicales : fournies (consulter ou mettre à jour dans Mo
 #, php-format
 msgid "Age at camp start: %d"
 msgstr "Âge au début du camp : %d"
+
+#, php-format
+msgid "Age at course start: %d"
+msgstr "Âge au début du cours : %d"
 
 #, php-format
 msgid "Birth year: %s"

@@ -838,6 +838,9 @@ msgstr ""
 msgid "Sites InterSoccer"
 msgstr ""
 
+msgid "InterSoccer Venues"
+msgstr ""
+
 # wpml-name: Medical Conditions
 msgid "Medical Conditions"
 msgstr ""
@@ -1119,4 +1122,8 @@ msgid "Winter"
 msgstr ""
 
 msgid "j F Y"
+msgstr ""
+
+#, php-format
+msgid "Age at course start: %d"
 msgstr ""

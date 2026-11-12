@@ -100,11 +100,11 @@ class OrderMetaPrivacyWpmlSeedTest extends TestCase {
         return intersoccer_pv_privacy_redaction_strings_seed_fingerprint();
     }
 
-    public function test_first_run_seeds_six_translations_with_correct_argument_order(): void {
+    public function test_first_run_seeds_translations_with_correct_argument_order(): void {
         intersoccer_register_privacy_redaction_wpml_strings();
 
         $calls = $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation'];
-        $this->assertCount(6, $calls);
+        $this->assertCount(8, $calls);
 
         $map = $this->expected_map();
         $expected = [];
@@ -192,7 +192,7 @@ class OrderMetaPrivacyWpmlSeedTest extends TestCase {
 
         intersoccer_register_privacy_redaction_wpml_strings();
 
-        $this->assertCount(6, $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation']);
+        $this->assertCount(8, $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation']);
         $this->assertSame($this->seed_fingerprint(), get_option('intersoccer_pv_privacy_strings_seed'));
     }
 
@@ -208,7 +208,7 @@ class OrderMetaPrivacyWpmlSeedTest extends TestCase {
 
         $this->assertFalse(array_key_exists('intersoccer_pv_privacy_strings_seed', $GLOBALS['intersoccer_test_options'] ?? []));
         $calls = $GLOBALS['intersoccer_test_wpml_privacy_seed']['add_string_translation'];
-        $this->assertCount(4, $calls);
+        $this->assertCount(6, $calls);
         foreach ($calls as $row) {
             $this->assertNotSame(0, (int) $row['string_id']);
         }

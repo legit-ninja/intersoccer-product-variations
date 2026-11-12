@@ -452,6 +452,34 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         $this->assertSame($readable, $out->value);
     }
 
+    public function test_en_customer_venue_label_is_intersoccer_venues(): void {
+        $this->setWpmlLanguage('en');
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        $this->assertSame(
+            'InterSoccer Venues',
+            intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
+        );
+
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        $this->assertSame(
+            'Sites InterSoccer',
+            intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
+        );
+    }
+
+    public function test_fr_de_customer_venue_label_keeps_existing_translation(): void {
+        $this->bindLocale('fr_FR');
+        $this->assertSame(
+            'Sites InterSoccer',
+            intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
+        );
+        $this->bindLocale('de_DE');
+        $this->assertSame(
+            'InterSoccer-Standorte',
+            intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
+        );
+    }
+
     public function test_cart_attribute_label_interSoccer_venues_fr(): void {
         $this->bindLocale('fr_FR');
         $this->setWpmlLanguage('fr');

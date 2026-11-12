@@ -1668,6 +1668,7 @@ function intersoccer_privacy_redaction_string_msgids() {
         'Medical information: provided (view or update in My Account).',
         'Age at camp start: %d',
         'Birth year: %s',
+        'Age at course start: %d',
     ];
 }
 
@@ -1685,6 +1686,10 @@ function intersoccer_privacy_redaction_string_i18n_map() {
         'Age at camp start: %d' => [
             'fr' => 'Âge au début du camp : %d',
             'de' => 'Alter bei Campbeginn: %d',
+        ],
+        'Age at course start: %d' => [
+            'fr' => "Âge au début du cours\u{00A0}: %d",
+            'de' => 'Alter bei Kursbeginn: %d',
         ],
         'Birth year: %s' => [
             'fr' => 'Année de naissance : %s',
@@ -2158,6 +2163,36 @@ function intersoccer_normalize_attendee_dob_order_meta_value($value) {
 }
 
 /**
+ * Course order lines use the course age label. Camps and other types keep the camp label.
+ *
+ * @param object $item Order line.
+ * @return bool
+ */
+function intersoccer_order_item_is_course($item) {
+    if (!is_object($item) || !method_exists($item, 'get_meta')) {
+        return false;
+    }
+
+    $activity = strtolower(trim((string) $item->get_meta('Activity Type', true)));
+    if ($activity === 'course') {
+        return true;
+    }
+
+    $product_id = 0;
+    if (method_exists($item, 'get_product_id')) {
+        $product_id = (int) $item->get_product_id();
+    }
+    if ($product_id <= 0 && method_exists($item, 'get_variation_id')) {
+        $product_id = (int) $item->get_variation_id();
+    }
+    if ($product_id > 0 && function_exists('intersoccer_get_product_type')) {
+        return intersoccer_get_product_type($product_id) === 'course';
+    }
+
+    return false;
+}
+
+/**
  * Redacted attendee DOB string for emails and thank-you page.
  *
  * @param mixed           $value Raw DOB meta value.
@@ -2192,7 +2227,10 @@ function intersoccer_format_attendee_dob_for_redacted_surface($value, $item) {
     if ($ref !== null && function_exists('intersoccer_age_on_date')) {
         $age = intersoccer_age_on_date($dob_ymd, $ref);
         if ($age !== null) {
-            return intersoccer_pv_privacy_string('Age at camp start: %d', [(int) $age]);
+            $msgid = intersoccer_order_item_is_course($item)
+                ? 'Age at course start: %d'
+                : 'Age at camp start: %d';
+            return intersoccer_pv_privacy_string($msgid, [(int) $age]);
         }
     }
 
@@ -2901,7 +2939,11 @@ function intersoccer_translate_stored_order_meta_display_key($display_key, $meta
     $lookup = $meta_key !== '' ? $meta_key : $display_key;
     $map = intersoccer_stored_order_meta_display_key_map();
     if (isset($map[$lookup])) {
-        return intersoccer_pv_translate_textdomain_msgid_for_customer((string) $map[$lookup]);
+        $msgid = (string) $map[$lookup];
+        if ($msgid === 'Sites InterSoccer') {
+            $msgid = 'InterSoccer Venues';
+        }
+        return intersoccer_pv_translate_textdomain_msgid_for_customer($msgid);
     }
 
     return $display_key;
