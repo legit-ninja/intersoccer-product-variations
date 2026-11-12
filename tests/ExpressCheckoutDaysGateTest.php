@@ -720,8 +720,8 @@ class ExpressCheckoutDaysGateTest extends TestCase
     {
         $thrown = null;
         try {
-            intersoccer_store_api_require_billing_phone($this->phoneOrder('+41 00 000 00 00'), $this->expressPhoneRequest([]));
-            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest(['phone' => '+41 00 000 00 00']));
+            intersoccer_store_api_require_billing_phone($this->phoneOrder('+41 79 123 45 67'), $this->expressPhoneRequest([]));
+            intersoccer_store_api_require_billing_phone($this->phoneOrder(''), $this->expressPhoneRequest(['phone' => '+41 79 123 45 67']));
         } catch (Exception $e) {
             $thrown = $e;
         }
