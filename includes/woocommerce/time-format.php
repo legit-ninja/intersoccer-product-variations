@@ -258,3 +258,100 @@ if (!function_exists('intersoccer_format_order_line_time_attribute_label')) {
         return intersoccer_format_time_range($compact, 'fr', '-');
     }
 }
+
+if (!function_exists('intersoccer_time_range_term_label')) {
+    /**
+     * Name used to order a time-range term (term name, then slug, then the value itself).
+     *
+     * @param mixed $term
+     * @return string
+     */
+    function intersoccer_time_range_term_label($term) {
+        if (is_object($term)) {
+            if (isset($term->name) && (string) $term->name !== '') {
+                return (string) $term->name;
+            }
+            if (isset($term->slug) && (string) $term->slug !== '') {
+                return (string) $term->slug;
+            }
+        }
+
+        return (string) $term;
+    }
+}
+
+if (!function_exists('intersoccer_time_range_start_minutes')) {
+    /**
+     * Minutes from midnight of the first time in a range such as 9h30-11h00 or 0930-1100.
+     *
+     * @param string $label
+     * @return int|null
+     */
+    function intersoccer_time_range_start_minutes($label) {
+        $label = trim((string) $label);
+        if (!preg_match('/(\d{1,2})\s*[h:.]?\s*(\d{2})/u', $label, $matches)) {
+            return null;
+        }
+
+        $hour = (int) $matches[1];
+        $minute = (int) $matches[2];
+        if ($hour > 23 || $minute > 59) {
+            return null;
+        }
+
+        return ($hour * 60) + $minute;
+    }
+}
+
+if (!function_exists('intersoccer_compare_time_range_terms')) {
+    /**
+     * @param mixed $left
+     * @param mixed $right
+     * @return int
+     */
+    function intersoccer_compare_time_range_terms($left, $right) {
+        $left_minutes = intersoccer_time_range_start_minutes(intersoccer_time_range_term_label($left));
+        $right_minutes = intersoccer_time_range_start_minutes(intersoccer_time_range_term_label($right));
+
+        if ($left_minutes === null && $right_minutes === null) {
+            return 0;
+        }
+        if ($left_minutes === null) {
+            return 1;
+        }
+        if ($right_minutes === null) {
+            return -1;
+        }
+        if ($left_minutes !== $right_minutes) {
+            return $left_minutes <=> $right_minutes;
+        }
+
+        return strcmp(intersoccer_time_range_term_label($left), intersoccer_time_range_term_label($right));
+    }
+}
+
+if (!function_exists('intersoccer_sort_time_range_product_terms')) {
+    /**
+     * Keep camp and course time options in start-time order (FR names are not zero-padded).
+     *
+     * @param mixed        $terms
+     * @param int          $product_id
+     * @param string       $taxonomy
+     * @param array|string $args
+     * @return mixed
+     */
+    function intersoccer_sort_time_range_product_terms($terms, $product_id, $taxonomy, $args) {
+        unset($product_id, $args);
+        if (!is_array($terms) || !in_array((string) $taxonomy, intersoccer_time_range_taxonomies(), true)) {
+            return $terms;
+        }
+
+        usort($terms, 'intersoccer_compare_time_range_terms');
+
+        return $terms;
+    }
+}
+
+if (function_exists('add_filter')) {
+    add_filter('woocommerce_get_product_terms', 'intersoccer_sort_time_range_product_terms', 20, 4);
+}
