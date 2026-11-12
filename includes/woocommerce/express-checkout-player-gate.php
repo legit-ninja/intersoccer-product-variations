@@ -1336,6 +1336,9 @@ function intersoccer_assigned_attendee_fallback_on_item_save($item) {
     if (!is_object($item) || !method_exists($item, 'get_product_id') || !method_exists($item, 'get_order')) {
         return;
     }
+    if (method_exists($item, 'get_id') && (int) $item->get_id() !== 0) {
+        return;
+    }
     if (!intersoccer_express_gate_applies_to_product((int) $item->get_product_id())) {
         return;
     }
