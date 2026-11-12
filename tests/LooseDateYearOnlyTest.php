@@ -163,6 +163,26 @@ class LooseDateYearOnlyTest extends TestCase {
         $this->assertSame('', intersoccer_format_attendee_dob_for_redacted_surface('2031-05-03', $item));
     }
 
+    public function test_course_order_line_uses_course_age_label_and_camp_keeps_camp_label(): void {
+        $camp = $this->makeOrderItem([
+            'Activity Type' => 'Camp',
+            'Camp Start Date' => '2026-07-06',
+        ]);
+        $course = $this->makeOrderItem([
+            'Activity Type' => 'Course',
+            'Start Date' => '2026-07-06',
+        ]);
+
+        $this->assertSame(
+            'Age at camp start: 10',
+            intersoccer_format_attendee_dob_for_redacted_surface('2016-05-03', $camp)
+        );
+        $this->assertSame(
+            'Age at course start: 10',
+            intersoccer_format_attendee_dob_for_redacted_surface('2016-05-03', $course)
+        );
+    }
+
     public function test_age_gate_dob_parse_null_for_year_only(): void {
         $this->assertNull(intersoccer_parse_loose_date_to_ymd('2016'));
         $this->assertNull(intersoccer_normalize_attendee_dob_order_meta_value('2016'));

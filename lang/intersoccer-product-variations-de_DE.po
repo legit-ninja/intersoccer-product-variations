@@ -757,6 +757,9 @@ msgstr "Rabattbetrag"
 msgid "Sites InterSoccer"
 msgstr "InterSoccer-Standorte"
 
+msgid "InterSoccer Venues"
+msgstr "InterSoccer-Standorte"
+
 msgid "Medical Conditions"
 msgstr "Medizinische Angaben"
 
@@ -882,6 +885,10 @@ msgstr "Medizinische Informationen: angegeben (im Mein Konto ansehen oder aktual
 #, php-format
 msgid "Age at camp start: %d"
 msgstr "Alter bei Campbeginn: %d"
+
+#, php-format
+msgid "Age at course start: %d"
+msgstr "Alter bei Kursbeginn: %d"
 
 #, php-format
 msgid "Birth year: %s"
