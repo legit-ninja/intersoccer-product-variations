@@ -285,6 +285,14 @@ function intersoccer_render_discounts_page() {
         $lookback_months = isset($_POST['intersoccer_retroactive_discount_lookback_months']) ? intval($_POST['intersoccer_retroactive_discount_lookback_months']) : 6;
         $lookback_months = max(1, min(24, $lookback_months)); // Clamp between 1 and 24 months
         update_option('intersoccer_retroactive_discount_lookback_months', $lookback_months);
+
+        if (isset($_POST['intersoccer_url_coupon_allowlist']) && function_exists('intersoccer_url_coupon_sanitize_allowlist')) {
+            $raw_allowlist = $_POST['intersoccer_url_coupon_allowlist'];
+            if (function_exists('wp_unslash')) {
+                $raw_allowlist = wp_unslash($raw_allowlist);
+            }
+            update_option('intersoccer_url_coupon_allowlist', intersoccer_url_coupon_sanitize_allowlist($raw_allowlist));
+        }
         
         echo '<div class="notice notice-success"><p>' . __('Settings saved.', 'intersoccer-product-variations') . '</p></div>';
     }
@@ -294,6 +302,15 @@ function intersoccer_render_discounts_page() {
     $enable_retroactive_camps = get_option('intersoccer_enable_retroactive_camp_discounts', true);
     $enable_retroactive_siblings = get_option('intersoccer_enable_retroactive_sibling_discounts', true);
     $lookback_months = intval(get_option('intersoccer_retroactive_discount_lookback_months', 6));
+    $url_coupon_allowlist = get_option('intersoccer_url_coupon_allowlist', []);
+    if (function_exists('intersoccer_url_coupon_sanitize_allowlist')) {
+        $url_coupon_allowlist = intersoccer_url_coupon_sanitize_allowlist($url_coupon_allowlist);
+    }
+    if (!is_array($url_coupon_allowlist)) {
+        $url_coupon_allowlist = [];
+    }
+    $url_coupon_allowlist_text = implode("\n", $url_coupon_allowlist);
+    $url_coupon_max_length = defined('INTERSOCCER_URL_COUPON_MAX_LENGTH') ? (int) INTERSOCCER_URL_COUPON_MAX_LENGTH : 32;
     ?>
     <div class="wrap">
         <h1><?php _e('Manage Discounts', 'intersoccer-product-variations'); ?></h1>
@@ -403,6 +420,30 @@ function intersoccer_render_discounts_page() {
                         </p>
                     </td>
                 </tr>
+                <?php if (function_exists('intersoccer_url_coupon_sanitize_allowlist')) : ?>
+                <tr>
+                    <th scope="row">
+                        <label for="intersoccer_url_coupon_allowlist">
+                            <?php _e('URL coupon allowlist', 'intersoccer-product-variations'); ?>
+                        </label>
+                    </th>
+                    <td>
+                        <textarea
+                            name="intersoccer_url_coupon_allowlist"
+                            id="intersoccer_url_coupon_allowlist"
+                            rows="5"
+                            class="large-text code"><?php echo esc_textarea($url_coupon_allowlist_text); ?></textarea>
+                        <p class="description">
+                            <?php
+                            echo esc_html(sprintf(
+                                __('One code per line. Only these codes may be applied from a front-end URL parameter named coupon. Leave empty to disable. Codes are normalised on save (maximum %d characters; letters, numbers, hyphen, and underscore). This list is separate from campaign offers. Ignored codes are not shown to shoppers.', 'intersoccer-product-variations'),
+                                $url_coupon_max_length
+                            ));
+                            ?>
+                        </p>
+                    </td>
+                </tr>
+                <?php endif; ?>
             </table>
             <p class="submit">
                 <input type="submit" 
@@ -554,6 +595,16 @@ function intersoccer_register_enhanced_discount_settings() {
             'type' => 'boolean',
             'default' => false,
             'sanitize_callback' => 'rest_sanitize_boolean'
+        ]
+    );
+
+    register_setting(
+        'intersoccer_discounts_group',
+        'intersoccer_url_coupon_allowlist',
+        [
+            'type' => 'array',
+            'default' => [],
+            'sanitize_callback' => 'intersoccer_url_coupon_sanitize_allowlist'
         ]
     );
     

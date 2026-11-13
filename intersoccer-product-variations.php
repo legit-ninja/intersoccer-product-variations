@@ -426,6 +426,7 @@ $includes = [
     'includes/woocommerce/campaign-offers-admin.php',
     'includes/woocommerce/campaign-checkout-field.php',
     'includes/woocommerce/campaign-leads.php',
+    'includes/woocommerce/url-coupon.php',
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/express-checkout-player-gate.php',
