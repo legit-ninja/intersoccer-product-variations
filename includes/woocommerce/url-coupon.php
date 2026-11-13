@@ -254,19 +254,44 @@ if (!function_exists('intersoccer_url_coupon_capture_query_arg')) {
     }
 }
 
+if (!function_exists('intersoccer_url_coupon_redirect_target_is_safe')) {
+    /**
+     * Same-origin path only. Empty, scheme-relative, and backslash targets are rejected.
+     *
+     * @param string $target
+     * @return bool
+     */
+    function intersoccer_url_coupon_redirect_target_is_safe($target) {
+        if (!is_string($target) || $target === '' || $target[0] !== '/') {
+            return false;
+        }
+        if (isset($target[1]) && $target[1] === '/') {
+            return false;
+        }
+        if (strpos($target, '\\') !== false) {
+            return false;
+        }
+        return true;
+    }
+}
+
 if (!function_exists('intersoccer_url_coupon_strip_target')) {
     /**
      * Current request path with the coupon parameter removed.
      *
      * Other query arguments, including tracking parameters, are preserved.
-     * Returns an empty string when there is nothing to strip.
+     * Returns an empty string when there is nothing to strip, or when the
+     * request URI or the stripped target is not a same-origin path.
      *
      * @return string
      */
     function intersoccer_url_coupon_strip_target() {
         $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        if (!intersoccer_url_coupon_redirect_target_is_safe($uri)) {
+            return '';
+        }
         $qpos = strpos($uri, '?');
-        if ($uri === '' || $qpos === false) {
+        if ($qpos === false) {
             return '';
         }
 
@@ -293,7 +318,7 @@ if (!function_exists('intersoccer_url_coupon_strip_target')) {
         if ($hash !== '') {
             $target .= $hash;
         }
-        if ($target === $uri) {
+        if ($target === $uri || !intersoccer_url_coupon_redirect_target_is_safe($target)) {
             return '';
         }
 
@@ -332,7 +357,7 @@ if (!function_exists('intersoccer_url_coupon_maybe_redirect')) {
      */
     function intersoccer_url_coupon_maybe_redirect() {
         $target = intersoccer_url_coupon_redirect_target_for_request();
-        if ($target === '' || !function_exists('wp_safe_redirect')) {
+        if (!intersoccer_url_coupon_redirect_target_is_safe($target) || !function_exists('wp_safe_redirect')) {
             return;
         }
 

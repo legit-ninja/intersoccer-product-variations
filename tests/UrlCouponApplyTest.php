@@ -373,6 +373,25 @@ class UrlCouponApplyTest extends TestCase {
         $this->assertStringNotContainsString('coupon=', $target);
     }
 
+    public function test_unsafe_request_uris_are_not_redirected(): void {
+        $this->allow(['TESTCODE10']);
+        $cases = [
+            '//evil.example/?coupon=x',
+            '',
+            'programs/?coupon=x',
+            '/programs\\next?coupon=x',
+        ];
+        foreach ($cases as $uri) {
+            unset($GLOBALS['intersoccer_test_redirect']);
+            $_GET = ['coupon' => 'x'];
+            $_SERVER['REQUEST_METHOD'] = 'GET';
+            $_SERVER['REQUEST_URI'] = $uri;
+            $this->assertSame('', intersoccer_url_coupon_redirect_target_for_request(), $uri);
+            intersoccer_url_coupon_maybe_redirect();
+            $this->assertArrayNotHasKey('intersoccer_test_redirect', $GLOBALS, $uri);
+        }
+    }
+
     public function test_post_admin_and_ajax_do_not_read_or_strip(): void {
         $this->allow(['TESTCODE10']);
         $_GET = ['coupon' => 'TESTCODE10'];
