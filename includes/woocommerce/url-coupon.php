@@ -20,6 +20,8 @@
  * A coupon applied from the URL does not stack with sibling or progressive-week
  * discounts while that code is still on the cart. The pending session value is
  * cleared after a successful apply; the applied session value keeps the code.
+ * Removing that coupon clears both session values, so typing the same code
+ * afterwards follows the typed-coupon rules.
  *
  * @package InterSoccer_Product_Variations
  */
@@ -655,6 +657,47 @@ if (!function_exists('intersoccer_url_coupon_maybe_apply')) {
     }
 }
 
+if (!function_exists('intersoccer_url_coupon_on_removed_coupon')) {
+    /**
+     * Clear both URL-coupon session codes when the shopper removes that coupon.
+     *
+     * Typing the same code afterwards follows the typed-coupon rules. Removing
+     * a different coupon leaves the session, including the failed-apply
+     * fingerprint, unchanged. This does not call
+     * intersoccer_url_coupon_clear_stored_code(), which must leave the applied
+     * key set while the URL coupon is still on the cart.
+     *
+     * @param mixed $removed_code Coupon code WooCommerce just removed.
+     * @return void
+     */
+    function intersoccer_url_coupon_on_removed_coupon($removed_code) {
+        $session = intersoccer_url_coupon_session();
+        if (!$session) {
+            return;
+        }
+
+        $removed = intersoccer_url_coupon_normalize($removed_code);
+        if ($removed === '') {
+            return;
+        }
+
+        $pending = intersoccer_url_coupon_normalize(
+            intersoccer_url_coupon_session_string($session, INTERSOCCER_URL_COUPON_SESSION_KEY)
+        );
+        $applied = intersoccer_url_coupon_normalize(
+            intersoccer_url_coupon_session_string($session, INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY)
+        );
+        $matches_pending = ($pending !== '' && $pending === $removed);
+        $matches_applied = ($applied !== '' && $applied === $removed);
+        if (!$matches_pending && !$matches_applied) {
+            return;
+        }
+
+        $session->set(INTERSOCCER_URL_COUPON_SESSION_KEY, '');
+        $session->set(INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY, '');
+    }
+}
+
 if (!defined('INTERSOCCER_URL_COUPON_LOADED')) {
     define('INTERSOCCER_URL_COUPON_LOADED', true);
     add_action('init', 'intersoccer_url_coupon_capture_query_arg', 20);
@@ -662,5 +705,6 @@ if (!defined('INTERSOCCER_URL_COUPON_LOADED')) {
     add_action('woocommerce_add_to_cart', 'intersoccer_url_coupon_maybe_apply', 15);
     add_action('woocommerce_before_cart', 'intersoccer_url_coupon_maybe_apply', 1);
     add_action('woocommerce_before_checkout_form', 'intersoccer_url_coupon_maybe_apply', 1);
+    add_action('woocommerce_removed_coupon', 'intersoccer_url_coupon_on_removed_coupon', 10);
     add_action('template_redirect', 'intersoccer_url_coupon_maybe_redirect', 1);
 }

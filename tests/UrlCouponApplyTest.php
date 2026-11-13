@@ -471,6 +471,7 @@ class UrlCouponApplyTest extends TestCase {
         $this->assertStringContainsString("add_action('woocommerce_before_cart', 'intersoccer_url_coupon_maybe_apply', 1);", $src);
         $this->assertStringContainsString("add_action('woocommerce_before_checkout_form', 'intersoccer_url_coupon_maybe_apply', 1);", $src);
         $this->assertStringContainsString("add_action('woocommerce_cart_loaded_from_session', 'intersoccer_url_coupon_maybe_apply', 20);", $src);
+        $this->assertStringContainsString("add_action('woocommerce_removed_coupon', 'intersoccer_url_coupon_on_removed_coupon', 10);", $src);
         $this->assertStringContainsString("add_action('template_redirect', 'intersoccer_url_coupon_maybe_redirect', 1);", $src);
         $this->assertStringContainsString('REST_REQUEST', $src);
         $this->assertStringContainsString('wp_doing_ajax', $src);
@@ -588,6 +589,64 @@ class UrlCouponApplyTest extends TestCase {
         $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
         $this->assertFalse(intersoccer_cart_has_applied_url_coupon($this->cart));
         $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_removing_the_url_coupon_clears_session_so_a_retyped_code_follows_typed_rules(): void {
+        $this->requireDiscountSkipDecision();
+        $this->allow(['TESTCODE10']);
+        delete_option('intersoccer_disable_sibling_discount_with_coupons');
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->giveCartItem();
+
+        intersoccer_url_coupon_maybe_apply();
+
+        $this->assertSame(['testcode10'], $this->cart->applied);
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+        $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->cart->applied = [];
+        $apply_calls = $this->cart->apply_calls;
+        $this->runRegistered('woocommerce_removed_coupon', 'intersoccer_url_coupon_on_removed_coupon', ['TESTCODE10']);
+
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+
+        intersoccer_url_coupon_maybe_apply();
+        $this->assertSame($apply_calls, $this->cart->apply_calls);
+        $this->assertSame([], $this->cart->applied);
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+
+        $this->cart->applied = ['testcode10'];
+        $this->assertFalse(get_option('intersoccer_disable_sibling_discount_with_coupons', false));
+        $this->assertFalse(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_removing_a_different_coupon_keeps_the_url_coupon_session(): void {
+        $this->requireDiscountSkipDecision();
+        $this->allow(['TESTCODE10']);
+        delete_option('intersoccer_disable_sibling_discount_with_coupons');
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->giveCartItem();
+
+        intersoccer_url_coupon_maybe_apply();
+
+        $this->assertSame(['testcode10'], $this->cart->applied);
+        $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+        $this->session->set('intersoccer_url_coupon_failed', 'testcode10|same-cart');
+
+        $this->runRegistered('woocommerce_removed_coupon', 'intersoccer_url_coupon_on_removed_coupon', ['TESTOTHER']);
+
+        $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+        $this->assertSame('testcode10|same-cart', $this->session->get('intersoccer_url_coupon_failed'));
+        $this->assertSame(['testcode10'], $this->cart->applied);
+        $this->assertTrue(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
     }
 
     public function test_typed_coupon_still_skips_combo_discounts_when_option_is_on(): void {
