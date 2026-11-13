@@ -135,6 +135,19 @@ class IntersoccerUrlCouponTestCart {
     }
 }
 
+if (!class_exists('WC_Cart', false)) {
+    class WC_Cart {
+    }
+}
+
+class IntersoccerUrlCouponTypedCart extends WC_Cart {
+    public $applied = [];
+
+    public function get_applied_coupons() {
+        return $this->applied;
+    }
+}
+
 class UrlCouponApplyTest extends TestCase {
     /** @var IntersoccerUrlCouponTestSession */
     private $session;
@@ -180,7 +193,8 @@ class UrlCouponApplyTest extends TestCase {
         if (isset($GLOBALS['intersoccer_test_options']) && is_array($GLOBALS['intersoccer_test_options'])) {
             unset(
                 $GLOBALS['intersoccer_test_options']['intersoccer_url_coupon_allowlist'],
-                $GLOBALS['intersoccer_test_options']['intersoccer_campaign_offers']
+                $GLOBALS['intersoccer_test_options']['intersoccer_campaign_offers'],
+                $GLOBALS['intersoccer_test_options']['intersoccer_disable_sibling_discount_with_coupons']
             );
         }
         if (isset($GLOBALS['intersoccer_days_gate_wc']) && is_object($GLOBALS['intersoccer_days_gate_wc'])) {
@@ -500,7 +514,7 @@ class UrlCouponApplyTest extends TestCase {
         $this->assertFalse(intersoccer_cart_has_non_campaign_coupons($campaign_only));
 
         $discounts = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/discounts.php');
-        $start = strpos($discounts, 'if (!$has_coupons || !$disable_with_coupons)');
+        $start = strpos($discounts, 'if (!$skip_combo_discounts)');
         $end = strpos($discounts, 'End camp multi-child discount check');
         $this->assertNotFalse($start);
         $this->assertNotFalse($end);
@@ -509,6 +523,81 @@ class UrlCouponApplyTest extends TestCase {
         $this->assertStringContainsString('progressive_week_2', $camp_block);
         $this->assertStringContainsString('progressive_week_3_plus', $camp_block);
         $this->assertStringContainsString("get_option('intersoccer_disable_sibling_discount_with_coupons', false)", $discounts);
+        $this->assertStringContainsString('intersoccer_cart_has_applied_url_coupon', $discounts);
+        $this->assertGreaterThanOrEqual(2, substr_count($discounts, 'intersoccer_combo_discounts_skipped_for_coupons('));
+    }
+
+    public function test_applied_url_coupon_skips_combo_discounts_when_option_is_off(): void {
+        $this->requireDiscountSkipDecision();
+        $this->allow(['TESTCODE10']);
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->giveCartItem();
+        delete_option('intersoccer_disable_sibling_discount_with_coupons');
+
+        intersoccer_url_coupon_maybe_apply();
+
+        $this->assertSame(['testcode10'], $this->cart->applied);
+        $this->assertSame('', $this->session->get('intersoccer_url_coupon_code'));
+        $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertFalse(get_option('intersoccer_disable_sibling_discount_with_coupons', false));
+        $this->assertTrue(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_applied_url_coupon_skips_combo_discounts_when_option_is_on(): void {
+        $this->requireDiscountSkipDecision();
+        $this->allow(['TESTCODE10']);
+        update_option('intersoccer_disable_sibling_discount_with_coupons', 1);
+        $this->session->set('intersoccer_url_coupon_code', 'TESTCODE10');
+        $this->cart->applied = ['testcode10'];
+        $this->giveCartItem();
+
+        $this->assertTrue(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_typed_coupon_still_follows_the_option_when_it_is_off(): void {
+        $this->requireDiscountSkipDecision();
+        update_option('intersoccer_disable_sibling_discount_with_coupons', false);
+        $this->cart->applied = ['testcode10'];
+        $this->giveCartItem();
+
+        $this->assertFalse(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+
+        $this->session->set('intersoccer_url_coupon_code', '');
+        $this->session->set('intersoccer_url_coupon_applied', '');
+        $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+
+        $this->session->set('intersoccer_url_coupon_code', 'testother');
+        $this->assertFalse(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_removed_url_coupon_restores_combo_discounts_even_if_session_remains(): void {
+        $this->requireDiscountSkipDecision();
+        $this->allow(['TESTCODE10']);
+        update_option('intersoccer_disable_sibling_discount_with_coupons', false);
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->giveCartItem();
+        intersoccer_url_coupon_maybe_apply();
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+
+        $this->cart->applied = [];
+        $this->session->set('intersoccer_url_coupon_code', 'testcode10');
+        $this->assertSame('testcode10', $this->session->get('intersoccer_url_coupon_applied'));
+        $this->assertFalse(intersoccer_cart_has_applied_url_coupon($this->cart));
+        $this->assertFalse(intersoccer_combo_discounts_skipped_for_coupons($this->cart));
+    }
+
+    public function test_typed_coupon_still_skips_combo_discounts_when_option_is_on(): void {
+        $this->requireDiscountSkipDecision();
+        update_option('intersoccer_disable_sibling_discount_with_coupons', 1);
+        $typed = new IntersoccerUrlCouponTypedCart();
+        $typed->applied = ['testcode10'];
+
+        $this->assertFalse(intersoccer_cart_has_applied_url_coupon($typed));
+        $this->assertTrue(intersoccer_combo_discounts_skipped_for_coupons($typed));
     }
 
     /**
@@ -527,6 +616,11 @@ class UrlCouponApplyTest extends TestCase {
      */
     private function allow(array $codes) {
         update_option('intersoccer_url_coupon_allowlist', intersoccer_url_coupon_sanitize_allowlist($codes));
+    }
+
+    private function requireDiscountSkipDecision() {
+        require_once dirname(__DIR__) . '/includes/woocommerce/campaign-offers.php';
+        require_once dirname(__DIR__) . '/includes/woocommerce/discounts.php';
     }
 
     private function giveCartItem() {

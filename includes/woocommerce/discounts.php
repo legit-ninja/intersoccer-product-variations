@@ -1795,6 +1795,36 @@ add_action('woocommerce_before_calculate_totals', function($cart) {
     }
 }, 5);
 
+if (!function_exists('intersoccer_combo_discounts_skipped_for_coupons')) {
+    /**
+     * Sibling, same-season, and progressive-week rates must not run.
+     *
+     * An applied URL coupon always skips those rates. A coupon typed into the
+     * cart follows intersoccer_disable_sibling_discount_with_coupons (default off).
+     * Campaign-offer codes stay on that option and are not treated as URL coupons
+     * unless they were applied from a URL.
+     *
+     * @param object|null $cart
+     * @return bool
+     */
+    function intersoccer_combo_discounts_skipped_for_coupons($cart) {
+        if (function_exists('intersoccer_cart_has_applied_url_coupon') && intersoccer_cart_has_applied_url_coupon($cart)) {
+            return true;
+        }
+
+        $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
+        if (!$disable_with_coupons || !is_object($cart) || !($cart instanceof WC_Cart)) {
+            return false;
+        }
+
+        $has_coupons = function_exists('intersoccer_cart_has_non_campaign_coupons')
+            ? intersoccer_cart_has_non_campaign_coupons($cart)
+            : !empty($cart->get_applied_coupons());
+
+        return (bool) $has_coupons;
+    }
+}
+
 /**
  * Apply InterSoccer discounts to cart
  */
@@ -1822,17 +1852,10 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
 
     // Check if sibling discounts should be disabled when coupons are applied.
     // Campaign offer codes are PV sources (max+cap), not a reason to skip InterSoccer discounts.
-    $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
-    $has_coupons = false;
-    
-    if ($disable_with_coupons && $cart instanceof WC_Cart) {
-        $has_coupons = function_exists('intersoccer_cart_has_non_campaign_coupons')
-            ? intersoccer_cart_has_non_campaign_coupons($cart)
-            : !empty($cart->get_applied_coupons());
-        
-        if ($has_coupons && defined('WP_DEBUG') && WP_DEBUG) {
-            intersoccer_debug('InterSoccer: Sibling discounts disabled - non-campaign coupons detected');
-        }
+    // An applied URL coupon skips these rates whatever intersoccer_disable_sibling_discount_with_coupons says.
+    $skip_combo_discounts = intersoccer_combo_discounts_skipped_for_coupons($cart);
+    if ($skip_combo_discounts && defined('WP_DEBUG') && WP_DEBUG) {
+        intersoccer_debug('InterSoccer: Sibling discounts disabled - non-campaign coupons detected');
     }
 
     $context = intersoccer_build_cart_context($cart->get_cart());
@@ -1840,8 +1863,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
     // Get active discount rates (only includes active rules)
     $discount_rates = intersoccer_get_discount_rates();
 
-    // Apply Camp Multi-Child Discounts (skip if coupons are applied and option is enabled)
-    if (!$has_coupons || !$disable_with_coupons) {
+    // Apply Camp Multi-Child and progressive-week discounts (skipped for an applied URL coupon, or when the coupon option is on)
+    if (!$skip_combo_discounts) {
         // Check if camp sibling discounts are enabled
         $camp_2nd_rate = $discount_rates['camp']['2nd_child'] ?? null;
         $camp_3rd_rate = $discount_rates['camp']['3rd_plus_child'] ?? null;
@@ -2012,8 +2035,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
     } // End camp multi-child discount check
 
     // Similar logic for Course Multi-Child
-    // Skip if coupons are applied and option is enabled
-    if (!$has_coupons || !$disable_with_coupons) {
+    // Skipped for an applied URL coupon, or when the coupon option is on
+    if (!$skip_combo_discounts) {
         // Check if course sibling discounts are enabled
         $course_2nd_rate = $discount_rates['course']['2nd_child'] ?? null;
         $course_3rd_rate = $discount_rates['course']['3rd_plus_child'] ?? null;
@@ -2073,8 +2096,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
         }
     } // End course multi-child discount check
 
-    // Course Same-Season Same-Child (skip if coupons are applied and option is enabled)
-    if (!$has_coupons || !$disable_with_coupons) {
+    // Course Same-Season Same-Child (skipped for an applied URL coupon, or when the coupon option is on)
+    if (!$skip_combo_discounts) {
         // Check if same-season discount is enabled
         $same_season_rate = $discount_rates['course']['same_season_course'] ?? null;
         
@@ -2190,8 +2213,8 @@ function intersoccer_apply_combo_discounts_to_items($cart) {
     } // End same-season discount check
 
     // Apply Tournament Multi-Child Discounts
-    // Skip if coupons are applied and option is enabled
-    if (!$has_coupons || !$disable_with_coupons) {
+    // Skipped for an applied URL coupon, or when the coupon option is on
+    if (!$skip_combo_discounts) {
         // Check if tournament sibling discounts are enabled
         $tournament_2nd_rate = $discount_rates['tournament']['2nd_child'] ?? null;
         $tournament_3rd_rate = $discount_rates['tournament']['3rd_plus_child'] ?? null;
@@ -2337,18 +2360,12 @@ function intersoccer_attach_same_season_discount_note($cart) {
         return;
     }
 
-    // Check if same-season discount should be disabled when coupons are applied
-    $disable_with_coupons = get_option('intersoccer_disable_sibling_discount_with_coupons', false);
-    if ($disable_with_coupons) {
-        $has_foreign = function_exists('intersoccer_cart_has_non_campaign_coupons')
-            ? intersoccer_cart_has_non_campaign_coupons($cart)
-            : !empty($cart->get_applied_coupons());
-        if ($has_foreign) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                intersoccer_debug('InterSoccer: Same-season discount note disabled - non-campaign coupons detected');
-            }
-            return;
+    // Same gate as combo rates: an applied URL coupon always skips; typed coupons follow the option.
+    if (intersoccer_combo_discounts_skipped_for_coupons($cart)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            intersoccer_debug('InterSoccer: Same-season discount note disabled - non-campaign coupons detected');
         }
+        return;
     }
 
     // Group by season AND assigned attendee (must be same attendee for same season)

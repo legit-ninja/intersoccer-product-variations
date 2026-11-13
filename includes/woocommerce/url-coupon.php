@@ -17,6 +17,10 @@
  *
  * This does not write order meta, item meta, or order notes.
  *
+ * A coupon applied from the URL does not stack with sibling or progressive-week
+ * discounts while that code is still on the cart. The pending session value is
+ * cleared after a successful apply; the applied session value keeps the code.
+ *
  * @package InterSoccer_Product_Variations
  */
 
@@ -34,6 +38,10 @@ if (!defined('INTERSOCCER_URL_COUPON_ALLOWLIST_OPTION')) {
 
 if (!defined('INTERSOCCER_URL_COUPON_SESSION_KEY')) {
     define('INTERSOCCER_URL_COUPON_SESSION_KEY', 'intersoccer_url_coupon_code');
+}
+
+if (!defined('INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY')) {
+    define('INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY', 'intersoccer_url_coupon_applied');
 }
 
 if (!defined('INTERSOCCER_URL_COUPON_FAILED_SESSION_KEY')) {
@@ -421,6 +429,51 @@ if (!function_exists('intersoccer_url_coupon_already_applied')) {
     }
 }
 
+if (!function_exists('intersoccer_cart_has_applied_url_coupon')) {
+    /**
+     * True only when a stored URL code is currently applied on the cart.
+     *
+     * Checks the pending code and the code remembered after a successful apply.
+     * A leftover session value does not count once that coupon is removed.
+     *
+     * @param object|null $cart
+     * @return bool
+     */
+    function intersoccer_cart_has_applied_url_coupon($cart) {
+        if (!$cart || !is_object($cart)) {
+            return false;
+        }
+        $session = intersoccer_url_coupon_session();
+        if (!$session) {
+            return false;
+        }
+
+        $codes = [];
+        $pending = intersoccer_url_coupon_normalize(
+            intersoccer_url_coupon_session_string($session, INTERSOCCER_URL_COUPON_SESSION_KEY)
+        );
+        if ($pending !== '') {
+            $codes[] = $pending;
+        }
+        $remembered = intersoccer_url_coupon_normalize(
+            intersoccer_url_coupon_session_string($session, INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY)
+        );
+        if ($remembered !== '' && !in_array($remembered, $codes, true)) {
+            $codes[] = $remembered;
+        }
+        if ($codes === []) {
+            return false;
+        }
+
+        foreach ($codes as $code) {
+            if (intersoccer_url_coupon_already_applied($cart, $code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('intersoccer_url_coupon_cart_fingerprint')) {
     /**
      * Stable token for the current cart contents and subtotal.
@@ -554,6 +607,7 @@ if (!function_exists('intersoccer_url_coupon_apply_stored_code')) {
             return;
         }
         if (intersoccer_url_coupon_already_applied($cart, $code)) {
+            $session->set(INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY, $code);
             intersoccer_url_coupon_clear_stored_code($session);
             return;
         }
@@ -569,6 +623,7 @@ if (!function_exists('intersoccer_url_coupon_apply_stored_code')) {
         });
 
         if ($applied) {
+            $session->set(INTERSOCCER_URL_COUPON_APPLIED_SESSION_KEY, $code);
             intersoccer_url_coupon_clear_stored_code($session);
             if (method_exists($cart, 'calculate_totals')) {
                 $cart->calculate_totals();
