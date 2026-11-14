@@ -532,7 +532,7 @@ msgstr "30% Mehrkind-Rabatt Turnier"
 
 # wpml-name: e2aa92e4bbe819bd54e993da28101a9f
 msgid "Please select at least one day for this single-day camp."
-msgstr ""
+msgstr "Bitte wählen Sie mindestens einen Tag für dieses Tagescamp aus."
 
 # wpml-name: 6cf2c02baa81eadd3611ca6d743a7c13
 msgid "Use this file"
@@ -1043,3 +1043,16 @@ msgstr "Winter"
 
 msgid "j F Y"
 msgstr "j. F Y"
+
+msgid "Please select a variation."
+msgstr "Bitte wählen Sie eine Variante."
+
+msgid "The number of selected days must match the quantity."
+msgstr "Die Anzahl der ausgewählten Tage muss der Menge entsprechen."
+
+#, php-format
+msgid "Please <a href=\"%s\">log in or register</a> to book this product."
+msgstr "Bitte <a href=\"%s\">melden Sie sich an oder registrieren Sie sich</a>, um dieses Produkt zu buchen."
+
+msgid "Course Information"
+msgstr "Kursinformationen"

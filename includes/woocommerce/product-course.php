@@ -673,6 +673,19 @@ function intersoccer_course_info_shortcode($atts) {
 }
 
 /**
+ * Course-info label plus the shared label/value separator.
+ *
+ * Uses the existing unpunctuated msgid so FR/DE stay on one catalog entry.
+ *
+ * @param string $msgid English label without a trailing colon.
+ * @return string
+ */
+function intersoccer_pv_course_info_labeled($msgid) {
+    return __($msgid, 'intersoccer-product-variations')
+        . _x(':', 'label/value separator', 'intersoccer-product-variations');
+}
+
+/**
  * Render course information HTML
  *
  * @param int $product_id Product ID
@@ -708,7 +721,7 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
     if (!$inner_only) {
         if ($plain) {
             echo '<div class="intersoccer-course-info">';
-            echo '<strong>' . __('Course Information:', 'intersoccer-product-variations') . '</strong><br>';
+            echo '<strong>' . intersoccer_pv_course_info_labeled('Course Information') . '</strong><br>';
         } else {
             echo '<div class="intersoccer-course-info">';
             echo '<h4>' . __('Course Information', 'intersoccer-product-variations') . '</h4>';
@@ -719,26 +732,26 @@ function intersoccer_render_course_info($product_id, $variation_id, $inner_only 
     // Start Date
     if ($start_date) {
         $formatted_start = intersoccer_pv_format_ymd_for_customer_display($start_date);
-        echo '<p><strong>' . __('Start Date:', 'intersoccer-product-variations') . '</strong> ' . esc_html($formatted_start) . '</p>';
+        echo '<p><strong>' . intersoccer_pv_course_info_labeled('Start Date') . '</strong> ' . esc_html($formatted_start) . '</p>';
     }
 
     // End Date
     if ($end_date) {
         $formatted_end = intersoccer_pv_format_ymd_for_customer_display($end_date);
-        echo '<p><strong>' . __('End Date:', 'intersoccer-product-variations') . '</strong> ' . esc_html($formatted_end) . '</p>';
+        echo '<p><strong>' . intersoccer_pv_course_info_labeled('End Date') . '</strong> ' . esc_html($formatted_end) . '</p>';
     }
 
     // Total Weeks
-    echo '<p><strong>' . __('Total Sessions:', 'intersoccer-product-variations') . '</strong> ' . esc_html($total_weeks) . '</p>';
+    echo '<p><strong>' . intersoccer_pv_course_info_labeled('Total Sessions') . '</strong> ' . esc_html($total_weeks) . '</p>';
 
     // Remaining Sessions
     if ($remaining_sessions !== $total_weeks) {
-        echo '<p><strong>' . __('Remaining Sessions:', 'intersoccer-product-variations') . '</strong> ' . esc_html($remaining_sessions) . '</p>';
+        echo '<p><strong>' . intersoccer_pv_course_info_labeled('Remaining Sessions') . '</strong> ' . esc_html($remaining_sessions) . '</p>';
     }
 
     // Holidays
     if (!empty($holidays) && is_array($holidays)) {
-        echo '<p><strong>' . __('Holidays:', 'intersoccer-product-variations') . '</strong></p>';
+        echo '<p><strong>' . intersoccer_pv_course_info_labeled('Holidays') . '</strong></p>';
         echo '<ul style="margin-left: 20px;">';
         foreach ($holidays as $holiday) {
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $holiday)) {
