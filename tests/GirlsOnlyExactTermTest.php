@@ -9,6 +9,7 @@
  */
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -46,6 +47,23 @@ class GirlsOnlyExactTermTest extends TestCase {
 
     /** @var int[] */
     private $metaIds = [];
+
+    /**
+     * Checkout display tests run in a child process. Set the flag here, after
+     * other classes have cleared it, so the child bootstrap loads the real
+     * checkout helpers instead of the player-details double.
+     */
+    public static function setUpBeforeClass(): void {
+        parent::setUpBeforeClass();
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT=1');
+        $_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT'] = '1';
+    }
+
+    public static function tearDownAfterClass(): void {
+        putenv('INTERSOCCER_TEST_LOAD_REAL_CHECKOUT');
+        unset($_ENV['INTERSOCCER_TEST_LOAD_REAL_CHECKOUT']);
+        parent::tearDownAfterClass();
+    }
 
     protected function setUp(): void {
         parent::setUp();
@@ -353,6 +371,93 @@ class GirlsOnlyExactTermTest extends TestCase {
 
         $this->assertBoyRejected($parentId, $variationId);
         $this->assertGirlAllowed($parentId, $variationId);
+    }
+
+    /**
+     * Parent Yes and No, variation has no own value: not a girls-only line, so
+     * checkout display meta omits Girls Only and a boy can book.
+     */
+    #[RunInSeparateProcess]
+    public function test_parent_yes_and_no_omits_girls_only_display_meta_and_allows_a_boy(): void {
+        $this->loadCheckoutAttributeBuilder();
+        [$parentId, $variationId] = $this->switchLine(
+            [
+                ['yes', 'Yes'],
+                ['no', 'No'],
+            ],
+            null,
+            null
+        );
+        $this->installCheckoutAttributeProducts($parentId, $variationId, 'pa_girls-only');
+
+        $attributes = intersoccer_get_parent_product_attributes($parentId, $variationId);
+        $label = intersoccer_attr_order_meta_label('girls-only');
+        $this->assertNotSame('', $label);
+        $this->assertArrayNotHasKey($label, $attributes);
+        $this->assertBoyAllowed($parentId, $variationId);
+    }
+
+    /**
+     * Variation's own Yes is girls-only, so the Girls Only display entry is written.
+     */
+    #[RunInSeparateProcess]
+    public function test_variation_own_yes_writes_girls_only_display_meta(): void {
+        $this->loadCheckoutAttributeBuilder();
+        [$parentId, $variationId] = $this->switchLine(
+            [
+                ['no', 'No'],
+            ],
+            'yes',
+            'Yes'
+        );
+        $this->installCheckoutAttributeProducts($parentId, $variationId, 'pa_girls-only');
+
+        $attributes = intersoccer_get_parent_product_attributes($parentId, $variationId);
+        $label = intersoccer_attr_order_meta_label('girls-only');
+        $this->assertSame('Yes', $attributes[$label] ?? null);
+    }
+
+    private function loadCheckoutAttributeBuilder(): void {
+        if (!function_exists('intersoccer_attr_order_meta_label')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/attribute-registry.php';
+        }
+        if (!function_exists('intersoccer_format_girls_only_meta_value')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-contract.php';
+        }
+        if (!function_exists('intersoccer_get_parent_product_attributes')) {
+            require_once dirname(__DIR__) . '/includes/woocommerce/checkout-calculations.php';
+        }
+    }
+
+    private function installCheckoutAttributeProducts(int $parentId, int $variationId, string $taxonomy): void {
+        $attribute = new class {
+            public function is_taxonomy() {
+                return true;
+            }
+        };
+        $GLOBALS['intersoccer_test_products'][$parentId] = new class($taxonomy, $attribute) {
+            private $taxonomy;
+            private $attribute;
+
+            public function __construct($taxonomy, $attribute) {
+                $this->taxonomy = $taxonomy;
+                $this->attribute = $attribute;
+            }
+
+            public function get_attributes() {
+                return [$this->taxonomy => $this->attribute];
+            }
+        };
+        $GLOBALS['intersoccer_test_products'][$variationId] = new class {
+            public function get_variation_attributes() {
+                return [];
+            }
+
+            public function get_attribute($name) {
+                unset($name);
+                return '';
+            }
+        };
     }
 
     /**
