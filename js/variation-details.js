@@ -352,6 +352,10 @@
 
         setAddToCartEnabled(enabled) {
             const $button = this.$form.find('button.single_add_to_cart_button');
+            if (typeof window.intersoccerPvKeepAddToCartDisabledDuringWait === 'function'
+                && window.intersoccerPvKeepAddToCartDisabledDuringWait($button, !!enabled, this.getProductId())) {
+                return;
+            }
             $button.prop('disabled', !enabled);
             if (enabled) {
                 $button.removeClass('disabled');
