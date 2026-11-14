@@ -10,9 +10,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Activity-type markers that mean "girls only" (not generic camp/event terms).
+ * Whole girls-only terms (slug or name). Matching is exact after normalisation,
+ * never a substring of a longer label.
  *
- * @return string[] Lowercase markers matched against term slug and name.
+ * Spellings already used in this plugin: activity slugs, the Girls Only attribute
+ * term "Girl's Only", and the EN/FR/DE order-meta labels Girls Only / Filles
+ * uniquement / Nur Mädchen (plus the ASCII and "nur für" / "réservé aux filles"
+ * forms the previous whole-phrase check accepted).
+ *
+ * @return string[]
  */
 function intersoccer_get_girls_only_activity_markers() {
     return [
@@ -22,9 +28,19 @@ function intersoccer_get_girls_only_activity_markers() {
         'girls only',
         "girl's only",
         'girl’s only',
+        "girls' only",
+        'only-girls',
         'filles',
         'madchen',
+        'maedchen',
         'mädchen',
+        'filles uniquement',
+        'nur mädchen',
+        'nur madchen',
+        'nur maedchen',
+        'nur für mädchen',
+        'réservé aux filles',
+        'réservée aux filles',
     ];
 }
 
@@ -117,45 +133,163 @@ function intersoccer_switch_term_indicates_girls_only_session($slug, $name) {
         if (isset($yes_tokens[$token])) {
             return true;
         }
-        if (strpos($token, 'girls-only') !== false || strpos($token, 'girlsonly') !== false) {
-            return true;
-        }
     }
 
     return false;
 }
 
 /**
- * Collect term slug/name pairs for a Woo attribute taxonomy (parent terms + variation selection).
+ * Normalise a term slug or label for an exact girls-only comparison.
+ *
+ * Lowercase, strip accents, drop straight and curly apostrophes, then remove
+ * spaces, hyphens, and underscores so "Girls Only", "girls-only", and
+ * "girlsonly" share one key. The whole term is compared; callers must not
+ * search for this key inside a longer label.
+ *
+ * @param string $value Raw slug or display name.
+ * @return string
+ */
+function intersoccer_normalize_girls_only_exact_term($value) {
+    $token = strtolower(trim((string) $value));
+    if ($token === '') {
+        return '';
+    }
+    if (function_exists('remove_accents')) {
+        $token = strtolower(remove_accents($token));
+    }
+    $token = str_replace(["'", '’', '‘', '`', '´'], '', $token);
+    $collapsed = preg_replace('/[\s_\-]+/', '', $token);
+    return is_string($collapsed) ? $collapsed : '';
+}
+
+/**
+ * Append one slug/name pair, skipping empties and duplicates.
+ *
+ * @param array<int, array{slug: string, name: string}> $out
+ * @param array<string, bool>                           $seen
+ * @param mixed                                         $slug
+ * @param mixed                                         $name
+ */
+function intersoccer_append_taxonomy_term_pair(&$out, &$seen, $slug, $name) {
+    $slug = is_string($slug) ? trim($slug) : '';
+    $name = is_string($name) ? trim($name) : '';
+    if ($slug === '' && $name === '') {
+        return;
+    }
+    $key = strtolower($slug . '|' . $name);
+    if (isset($seen[$key])) {
+        return;
+    }
+    $seen[$key] = true;
+    $out[] = ['slug' => $slug, 'name' => $name];
+}
+
+/**
+ * Resolve a slug to its term, or keep the raw slug when the term is missing.
+ *
+ * @param array<int, array{slug: string, name: string}> $out
+ * @param array<string, bool>                           $seen
+ * @param string                                        $taxonomy
+ * @param string                                        $slug
+ * @param string                                        $fallback_name Used when the slug is not a known term.
+ */
+function intersoccer_append_taxonomy_term_slug(&$out, &$seen, $taxonomy, $slug, $fallback_name) {
+    $slug = trim((string) $slug);
+    if ($slug === '') {
+        return;
+    }
+    $term = get_term_by('slug', $slug, $taxonomy);
+    if ($term && !is_wp_error($term)) {
+        intersoccer_append_taxonomy_term_pair(
+            $out,
+            $seen,
+            isset($term->slug) ? (string) $term->slug : $slug,
+            isset($term->name) ? (string) $term->name : $fallback_name
+        );
+        return;
+    }
+    $name = trim((string) $fallback_name);
+    if ($name === '') {
+        $name = $slug;
+    }
+    intersoccer_append_taxonomy_term_pair($out, $seen, $slug, $name);
+}
+
+/**
+ * Term pairs from the variation's own attribute value.
+ *
+ * Null when the variation has no value for this taxonomy (empty
+ * attribute_<taxonomy> meta and empty get_attribute). An array, possibly
+ * empty, means the variation selected a value and parent terms must not be
+ * merged in.
+ *
+ * @param int    $variation_id Variation ID.
+ * @param string $taxonomy     e.g. pa_activity-type, pa_girls-only.
+ * @return array<int, array{slug: string, name: string}>|null
+ */
+function intersoccer_collect_variation_taxonomy_term_pairs($variation_id, $taxonomy) {
+    $variation_id = (int) $variation_id;
+    if ($variation_id <= 0 || !is_string($taxonomy) || $taxonomy === '') {
+        return null;
+    }
+
+    $out = [];
+    $seen = [];
+    $has_own = false;
+
+    $meta_key = 'attribute_' . $taxonomy;
+    $vslug = get_post_meta($variation_id, $meta_key, true);
+    if (is_string($vslug) && $vslug !== '') {
+        $has_own = true;
+        intersoccer_append_taxonomy_term_slug($out, $seen, $taxonomy, $vslug, $vslug);
+    }
+
+    $variation = function_exists('wc_get_product') ? wc_get_product($variation_id) : null;
+    if ($variation && method_exists($variation, 'get_attribute')) {
+        $attr = $variation->get_attribute($taxonomy);
+        if (is_string($attr) && $attr !== '') {
+            $has_own = true;
+            $maybe_slug = function_exists('sanitize_title') ? sanitize_title($attr) : $attr;
+            intersoccer_append_taxonomy_term_slug($out, $seen, $taxonomy, $maybe_slug, $attr);
+        }
+    }
+
+    if (!$has_own) {
+        return null;
+    }
+
+    return $out;
+}
+
+/**
+ * Collect term slug/name pairs for one taxonomy on a product line.
+ *
+ * A variation that has its own value (attribute_<taxonomy> meta or
+ * get_attribute) contributes only that value. Parent terms are used when
+ * there is no variation, or when the variation has no value for this
+ * taxonomy (a product-level attribute).
  *
  * @param int    $product_id   Parent product ID.
  * @param int    $variation_id Variation ID (0 if none).
- * @param string $taxonomy    e.g. pa_activity-type, pa_girls-only
+ * @param string $taxonomy     e.g. pa_activity-type, pa_girls-only
  * @return array<int, array{slug: string, name: string}>
  */
 function intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variation_id, $taxonomy) {
-    $out = [];
-    $seen = [];
-
-    $push = static function ($slug, $name) use (&$out, &$seen) {
-        $slug = is_string($slug) ? trim($slug) : '';
-        $name = is_string($name) ? trim($name) : '';
-        if ($slug === '' && $name === '') {
-            return;
-        }
-        $key = strtolower($slug . '|' . $name);
-        if (isset($seen[$key])) {
-            return;
-        }
-        $seen[$key] = true;
-        $out[] = ['slug' => $slug, 'name' => $name];
-    };
-
     $product_id = (int) $product_id;
     if ($product_id <= 0 || !is_string($taxonomy) || $taxonomy === '' || !taxonomy_exists($taxonomy)) {
-        return $out;
+        return [];
     }
 
+    $variation_id = (int) $variation_id;
+    if ($variation_id > 0) {
+        $own = intersoccer_collect_variation_taxonomy_term_pairs($variation_id, $taxonomy);
+        if (is_array($own)) {
+            return $own;
+        }
+    }
+
+    $out = [];
+    $seen = [];
     $terms = wc_get_product_terms($product_id, $taxonomy, ['fields' => 'all']);
     if (is_array($terms)) {
         foreach ($terms as $term) {
@@ -164,34 +298,7 @@ function intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variatio
             }
             $slug = isset($term->slug) ? (string) $term->slug : '';
             $name = isset($term->name) ? (string) $term->name : '';
-            $push($slug, $name);
-        }
-    }
-
-    $variation_id = (int) $variation_id;
-    if ($variation_id > 0) {
-        $meta_key = 'attribute_' . $taxonomy;
-        $vslug = get_post_meta($variation_id, $meta_key, true);
-        if (is_string($vslug) && $vslug !== '') {
-            $t = get_term_by('slug', $vslug, $taxonomy);
-            if ($t && !is_wp_error($t)) {
-                $push((string) $t->slug, (string) $t->name);
-            } else {
-                $push($vslug, $vslug);
-            }
-        }
-        $variation = wc_get_product($variation_id);
-        if ($variation) {
-            $attr = $variation->get_attribute($taxonomy);
-            if (is_string($attr) && $attr !== '') {
-                $maybe_slug = sanitize_title($attr);
-                $t = get_term_by('slug', $maybe_slug, $taxonomy);
-                if ($t && !is_wp_error($t)) {
-                    $push((string) $t->slug, (string) $t->name);
-                } else {
-                    $push($maybe_slug, $attr);
-                }
-            }
+            intersoccer_append_taxonomy_term_pair($out, $seen, $slug, $name);
         }
     }
 
@@ -199,42 +306,27 @@ function intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variatio
 }
 
 /**
- * Whether a single activity-type slug or label indicates girls-only.
+ * Whether a single activity-type slug or label is a whole girls-only term.
  *
  * @param string $slug Term slug (may be empty).
  * @param string $name Term name (may be empty).
  * @return bool
  */
 function intersoccer_activity_type_term_is_girls_only($slug, $name) {
-    $slug_cmp = strtolower(trim((string) $slug));
-    $name_cmp = strtolower(trim((string) $name));
-    if (function_exists('remove_accents')) {
-        $slug_cmp = strtolower(remove_accents($slug_cmp));
-        $name_cmp = strtolower(remove_accents($name_cmp));
-    }
-
-    foreach (intersoccer_get_girls_only_activity_markers() as $marker) {
-        $m = strtolower(trim($marker));
-        if ($m === '') {
-            continue;
-        }
-        if (function_exists('remove_accents')) {
-            $m = strtolower(remove_accents($m));
-        }
-        if ($slug_cmp === $m || $name_cmp === $m) {
-            return true;
-        }
-        if ($slug_cmp !== '' && strpos($slug_cmp, $m) !== false) {
-            return true;
-        }
-        if ($name_cmp !== '' && strpos($name_cmp, $m) !== false) {
-            return true;
+    static $keys = null;
+    if ($keys === null) {
+        $keys = [];
+        foreach (intersoccer_get_girls_only_activity_markers() as $marker) {
+            $normalized = intersoccer_normalize_girls_only_exact_term($marker);
+            if ($normalized !== '') {
+                $keys[$normalized] = true;
+            }
         }
     }
 
-    $hay = trim($slug_cmp . ' ' . $name_cmp);
-    if ($hay !== '') {
-        if (preg_match('/(?:girls?[\s_-]+only|girl[\x27\x{2019}]?s[\s_-]+only|only[\s_-]+girls?|girlsonly|nur[\s_-]*madchen|filles[\s_-]*uniquement|reserve[\s_-]?aux[\s_-]?filles|r\w{1,3}serv\w*\s+aux\s+filles|nur[\s_-]*f[uü]r[\s_-]*madchen)/iu', $hay)) {
+    foreach ([$slug, $name] as $part) {
+        $token = intersoccer_normalize_girls_only_exact_term($part);
+        if ($token !== '' && isset($keys[$token])) {
             return true;
         }
     }
@@ -243,7 +335,84 @@ function intersoccer_activity_type_term_is_girls_only($slug, $name) {
 }
 
 /**
- * Collect pa_activity-type term slug/name pairs for parent and optional variation.
+ * Whether every pair is girls-only, or whether any pair is.
+ *
+ * Parent fallback for a variation uses the exclusive check so a parent that
+ * carries both a girls-only term and another term does not mark the variation
+ * girls-only. The line's own values use any-match.
+ *
+ * @param array<int, array{slug: string, name: string}> $pairs
+ * @param bool                                          $is_switch Dedicated yes/no girls-only attribute.
+ * @param bool                                          $require_exclusive
+ * @return bool
+ */
+function intersoccer_girls_only_term_pairs_match($pairs, $is_switch, $require_exclusive) {
+    if (!is_array($pairs) || $pairs === []) {
+        return false;
+    }
+
+    $matched = false;
+    foreach ($pairs as $pair) {
+        if (!is_array($pair)) {
+            if ($require_exclusive) {
+                return false;
+            }
+            continue;
+        }
+        $slug = isset($pair['slug']) ? $pair['slug'] : '';
+        $name = isset($pair['name']) ? $pair['name'] : '';
+        $is_girls_only = intersoccer_activity_type_term_is_girls_only($slug, $name);
+        if ($is_switch && !$is_girls_only) {
+            $is_girls_only = intersoccer_switch_term_indicates_girls_only_session($slug, $name);
+        }
+        if ($is_girls_only) {
+            if (!$require_exclusive) {
+                return true;
+            }
+            $matched = true;
+            continue;
+        }
+        if ($require_exclusive) {
+            return false;
+        }
+    }
+
+    return $matched;
+}
+
+/**
+ * Girls-only decision for one taxonomy on a product line.
+ *
+ * Own variation value wins. A variation with no value for this taxonomy falls
+ * back to the parent product's terms, and only when those terms are exclusively
+ * girls-only. A simple product uses its own terms (any exact girls-only term).
+ *
+ * @param int    $product_id
+ * @param int    $variation_id
+ * @param string $taxonomy
+ * @param bool   $is_switch
+ * @return bool
+ */
+function intersoccer_line_taxonomy_terms_are_girls_only($product_id, $variation_id, $taxonomy, $is_switch) {
+    if (!is_string($taxonomy) || $taxonomy === '' || !taxonomy_exists($taxonomy)) {
+        return false;
+    }
+
+    $variation_id = (int) $variation_id;
+    if ($variation_id > 0) {
+        $own = intersoccer_collect_variation_taxonomy_term_pairs($variation_id, $taxonomy);
+        if (is_array($own)) {
+            return intersoccer_girls_only_term_pairs_match($own, $is_switch, false);
+        }
+    }
+
+    $pairs = intersoccer_collect_taxonomy_term_pairs_for_line($product_id, 0, $taxonomy);
+    $parent_fallback = $variation_id > 0;
+    return intersoccer_girls_only_term_pairs_match($pairs, $is_switch, $parent_fallback);
+}
+
+/**
+ * Collect pa_activity-type pairs for a line (variation value, else parent terms).
  *
  * @param int $product_id   Parent product ID.
  * @param int $variation_id Variation ID (0 if none).
@@ -266,32 +435,26 @@ function intersoccer_line_is_girls_only_program($product_id, $variation_id) {
         return (bool) apply_filters('intersoccer_line_is_girls_only_program', false, $product_id, $variation_id);
     }
 
-    $pairs = intersoccer_collect_activity_type_terms_for_line($product_id, $variation_id);
-    $is_girls_only = false;
-    foreach ($pairs as $pair) {
-        if (intersoccer_activity_type_term_is_girls_only($pair['slug'], $pair['name'])) {
-            $is_girls_only = true;
-            break;
-        }
-    }
+    $is_girls_only = intersoccer_line_taxonomy_terms_are_girls_only(
+        $product_id,
+        $variation_id,
+        'pa_activity-type',
+        false
+    );
 
     if (!$is_girls_only) {
         foreach (intersoccer_get_girls_only_attribute_taxonomies() as $tax) {
             if (!is_string($tax) || $tax === '' || $tax === 'pa_activity-type' || !taxonomy_exists($tax)) {
                 continue;
             }
-            $extra = intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variation_id, $tax);
-            foreach ($extra as $pair) {
-                if (intersoccer_taxonomy_is_girls_only_switch_attribute($tax)) {
-                    if (intersoccer_activity_type_term_is_girls_only($pair['slug'], $pair['name'])
-                        || intersoccer_switch_term_indicates_girls_only_session($pair['slug'], $pair['name'])) {
-                        $is_girls_only = true;
-                        break 2;
-                    }
-                } elseif (intersoccer_activity_type_term_is_girls_only($pair['slug'], $pair['name'])) {
-                    $is_girls_only = true;
-                    break 2;
-                }
+            if (intersoccer_line_taxonomy_terms_are_girls_only(
+                $product_id,
+                $variation_id,
+                $tax,
+                intersoccer_taxonomy_is_girls_only_switch_attribute($tax)
+            )) {
+                $is_girls_only = true;
+                break;
             }
         }
     }
@@ -324,6 +487,7 @@ function intersoccer_line_is_girls_only_program($product_id, $variation_id) {
         if ($tb !== '' && function_exists('remove_accents')) {
             $tb = strtolower(remove_accents($tb));
         }
+        // Whole phrases only. A mixed title such as "Garçons et filles" does not match.
         if ($tb !== '' && preg_match('/\bgirls?\s+only\b|\bgirl[\x27\x{2019}]?s\s+only\b|\bfilles\s+uniquement\b|\bnur\s+(madchen|mädchen|maedchen)\b|\bgirls?\s*-\s*only\b/iu', $tb)) {
             $is_girls_only = true;
         }
