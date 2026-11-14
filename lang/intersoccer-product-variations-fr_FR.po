@@ -738,7 +738,7 @@ msgid "Year"
 msgstr "Année"
 
 msgid "Course Day"
-msgstr "Jour de cours"
+msgstr "Jour du cours"
 
 msgid "Course Times"
 msgstr "Horaires du cours"
@@ -900,8 +900,8 @@ msgstr "ID de produit invalide."
 #~ "lorsque vous choisissez Jour(s) unique(s)."
 
 # wpml-name: 585f617ecc56b8abba20acfb2e53ce81
-#~ msgid "The number of selected days must match the quantity."
-#~ msgstr "Le nombre de jours sélectionnés doit correspondre à la quantité."
+msgid "The number of selected days must match the quantity."
+msgstr "Le nombre de jours sélectionnés doit correspondre à la quantité."
 
 # wpml-name: 9a7e58ee13cb727cb7c4acc68f4cafe5
 #~ msgid "Settings saved."
@@ -1139,3 +1139,13 @@ msgstr "Hiver"
 
 msgid "j F Y"
 msgstr "j F Y"
+
+msgid "Please select a variation."
+msgstr "Veuillez sélectionner une variation."
+
+#, php-format
+msgid "Please <a href=\"%s\">log in or register</a> to book this product."
+msgstr "Veuillez <a href=\"%s\">vous connecter ou vous inscrire</a> pour réserver ce produit."
+
+msgid "Course Information"
+msgstr "Informations sur le cours"
