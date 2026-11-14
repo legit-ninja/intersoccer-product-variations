@@ -738,7 +738,7 @@ msgid "Year"
 msgstr "Année"
 
 msgid "Course Day"
-msgstr "Jour de cours"
+msgstr "Jour du cours"
 
 msgid "Course Times"
 msgstr "Horaires du cours"

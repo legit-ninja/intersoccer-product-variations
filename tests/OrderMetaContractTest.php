@@ -454,6 +454,7 @@ class OrderMetaContractTest extends TestCase {
             'Sites InterSoccer' => 'Geneva',
             'Lieux InterSoccer' => 'Geneve',
             'InterSoccer-Standorte' => 'Genf',
+            'InterSoccer-Veranstaltungsorte' => 'Genf',
         ]);
 
         $changed = intersoccer_prune_legacy_order_meta_twins($item);
@@ -462,6 +463,7 @@ class OrderMetaContractTest extends TestCase {
         $this->assertSame('Geneva', $item->get_meta('Sites InterSoccer', true));
         $this->assertSame('', $item->get_meta('Lieux InterSoccer', true));
         $this->assertSame('', $item->get_meta('InterSoccer-Standorte', true));
+        $this->assertSame('', $item->get_meta('InterSoccer-Veranstaltungsorte', true));
     }
 
     public function test_prune_removes_pa_and_attribute_twins_when_canonical_present() {

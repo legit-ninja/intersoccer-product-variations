@@ -755,10 +755,10 @@ msgid "Discount Amount"
 msgstr "Rabattbetrag"
 
 msgid "Sites InterSoccer"
-msgstr "InterSoccer-Standorte"
+msgstr "InterSoccer-Veranstaltungsorte"
 
 msgid "InterSoccer Venues"
-msgstr "InterSoccer-Standorte"
+msgstr "InterSoccer-Veranstaltungsorte"
 
 msgid "Medical Conditions"
 msgstr "Medizinische Angaben"

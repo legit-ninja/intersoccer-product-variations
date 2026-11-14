@@ -485,7 +485,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         );
         $this->bindLocale('de_DE');
         $this->assertSame(
-            'InterSoccer-Standorte',
+            'InterSoccer-Veranstaltungsorte',
             intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
         );
     }
@@ -571,7 +571,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         $this->bindLocale('fr_FR');
         $this->setWpmlLanguage('fr');
         $this->assertSame('Sites InterSoccer', intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues'));
-        $this->assertSame('Jour de cours', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Day', 'pa_course-day'));
+        $this->assertSame('Jour du cours', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Day', 'pa_course-day'));
         $this->assertSame('Groupe d\'âge', intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group'));
         $this->assertSame('Horaires du cours', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Times', 'pa_course-times'));
         $this->assertSame('Horaires du camp', intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Times', 'pa_camp-times'));
@@ -579,7 +579,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
 
         $this->bindLocale('de_DE');
         $this->setWpmlLanguage('de');
-        $this->assertSame('InterSoccer-Standorte', intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues'));
+        $this->assertSame('InterSoccer-Veranstaltungsorte', intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues'));
         $this->assertSame('Kurstag', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Day', 'pa_course-day'));
         $this->assertSame('Altersgruppe', intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group'));
         $this->assertSame('Kurszeiten', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Times', 'pa_course-times'));
@@ -682,7 +682,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
                 'Course Information' => 'Informations sur le cours',
                 'Please select at least one day for this single-day camp.' => 'Veuillez sélectionner au moins un jour pour ce camp d\'un jour.',
                 'InterSoccer Venues' => 'Sites InterSoccer',
-                'Course Day' => 'Jour de cours',
+                'Course Day' => 'Jour du cours',
                 'Age Group' => 'Groupe d\'âge',
                 'Course Times' => 'Horaires du cours',
                 'Camp Terms' => 'Semaine de camp',
@@ -696,7 +696,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
                 'Please <a href="%s">log in or register</a> to book this product.' => 'Bitte <a href="%s">melden Sie sich an oder registrieren Sie sich</a>, um dieses Produkt zu buchen.',
                 'Course Information' => 'Kursinformationen',
                 'Please select at least one day for this single-day camp.' => 'Bitte wählen Sie mindestens einen Tag für dieses Tagescamp aus.',
-                'InterSoccer Venues' => 'InterSoccer-Standorte',
+                'InterSoccer Venues' => 'InterSoccer-Veranstaltungsorte',
                 'Course Day' => 'Kurstag',
                 'Age Group' => 'Altersgruppe',
                 'Course Times' => 'Kurszeiten',

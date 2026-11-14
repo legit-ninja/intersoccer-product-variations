@@ -62,6 +62,7 @@ function intersoccer_attr_registry() {
                 'Lieux InterSoccer',
                 'Lieu InterSoccer',
                 'InterSoccer-Standorte',
+                'InterSoccer-Veranstaltungsorte',
             ],
             'legacy_taxonomy_aliases' => ['pa_intersoccer_venues'],
             'legacy_meta_keys' => ['attribute_pa_intersoccer_venues'],
@@ -189,6 +190,7 @@ function intersoccer_attr_registry() {
             'order_meta_label' => 'Course Day',
             'legacy_order_meta_labels' => [
                 'Jour de cours',
+                'Jour du cours',
                 'Kurstag',
             ],
             'legacy_taxonomy_aliases' => ['pa_course_day'],
