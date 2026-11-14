@@ -107,6 +107,21 @@ class AtcClickSubmitFlowContractTest extends TestCase
         $this->assertStringContainsString('intersoccerPvShowStashWaitTimeoutNotice', $php);
     }
 
+    public function testButtonStateUpdateDefersEnableWhileStashWaitHolds(): void
+    {
+        $php = $this->elementorWidgetsSource();
+        $this->assertStringContainsString('function intersoccerPvKeepAddToCartDisabledDuringWait(', $php);
+        $this->assertStringContainsString('intersoccerPvIsStashSubmitWaitInProgress()', $php);
+        $this->assertStringContainsString('intersoccerPvKeepAddToCartDisabledDuringWait($button, true)', $php);
+        $this->assertStringContainsString('intersoccerPvKeepAddToCartDisabledDuringWait($button, false)', $php);
+        $this->assertStringContainsString('intersoccerPvKeepAddToCartDisabledDuringWait($targets, shouldEnable)', $php);
+        $this->assertStringContainsString("window.intersoccerPvKeepAddToCartDisabledDuringWait = intersoccerPvKeepAddToCartDisabledDuringWait", $php);
+        $details = file_get_contents(dirname(__DIR__) . '/js/variation-details.js');
+        $enhancer = file_get_contents(dirname(__DIR__) . '/js/product-enhancer.js');
+        $this->assertStringContainsString('intersoccerPvKeepAddToCartDisabledDuringWait', $details);
+        $this->assertStringContainsString('intersoccerPvKeepAddToCartDisabledDuringWait', $enhancer);
+    }
+
     public function testBuyNowStaysDisabledWhileWooSelectionClassRemains(): void
     {
         $php = $this->elementorWidgetsSource();

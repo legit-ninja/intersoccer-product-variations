@@ -1090,6 +1090,65 @@ $intersoccer_elementor_product_page_cb = function () {
                 return !!(map && map[intersoccerPvStashSubmitWaitGuardKey()]);
             }
 
+            function intersoccerPvWaitMapHolds(productId) {
+                var map = window.intersoccerPvStashSubmitWaitInProgress;
+                if (!map) {
+                    return false;
+                }
+                var specific = productId !== undefined && productId !== null && productId !== '' && String(productId) !== 'unknown';
+                if (specific) {
+                    return !!map[String(productId)];
+                }
+                for (var key in map) {
+                    if (Object.prototype.hasOwnProperty.call(map, key) && map[key]) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function intersoccerPvAddToCartButtonStampedForWait($buttons) {
+                var stamped = false;
+                $buttons.each(function () {
+                    if ($(this).data('intersoccerPvPreStashWaitDisabled') !== undefined) {
+                        stamped = true;
+                        return false;
+                    }
+                });
+                return stamped;
+            }
+
+            // While the pending-save wait is holding the button, remember the requested
+            // enabled state and keep the disabled attribute plus the disabled class.
+            // Returns true when the caller must not apply that state yet.
+            function intersoccerPvKeepAddToCartDisabledDuringWait($buttons, enabled, productId) {
+                if (!$buttons || !$buttons.length || !intersoccerPvAddToCartButtonStampedForWait($buttons)) {
+                    return false;
+                }
+                var waiting = (arguments.length < 3)
+                    ? intersoccerPvIsStashSubmitWaitInProgress()
+                    : intersoccerPvWaitMapHolds(productId);
+                if (!waiting && arguments.length >= 3 && intersoccerPvWaitMapHolds(undefined)) {
+                    waiting = true;
+                }
+                if (!waiting) {
+                    return false;
+                }
+                $buttons.each(function () {
+                    var $btn = $(this);
+                    if ($btn.data('intersoccerPvPreStashWaitDisabled') === undefined) {
+                        return;
+                    }
+                    $btn.data('intersoccerPvPreStashWaitDisabled', !enabled);
+                    $btn.data('intersoccerPvPreStashWaitHadDisabledClass', !enabled);
+                    $btn.prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
+                });
+                return true;
+            }
+            if (!window.intersoccerPvKeepAddToCartDisabledDuringWait) {
+                window.intersoccerPvKeepAddToCartDisabledDuringWait = intersoccerPvKeepAddToCartDisabledDuringWait;
+            }
+
             function intersoccerPvRestoreStashSubmitWaitButtons($form) {
                 if (!$form || !$form.length) {
                     return;
@@ -1101,7 +1160,12 @@ $intersoccer_elementor_product_page_cb = function () {
                     }
                     var wasDisabled = $btn.data('intersoccerPvPreStashWaitDisabled');
                     var hadDisabledClass = $btn.data('intersoccerPvPreStashWaitHadDisabledClass');
-                    $btn.prop('disabled', wasDisabled);
+                    $btn.prop('disabled', !!wasDisabled);
+                    if (wasDisabled) {
+                        $btn.attr('disabled', 'disabled');
+                    } else {
+                        $btn.removeAttr('disabled');
+                    }
                     if (hadDisabledClass) {
                         $btn.addClass('disabled');
                     } else {
@@ -1126,7 +1190,7 @@ $intersoccer_elementor_product_page_cb = function () {
                                 $btn.data('intersoccerPvPreStashWaitDisabled', $btn.prop('disabled'));
                                 $btn.data('intersoccerPvPreStashWaitHadDisabledClass', $btn.hasClass('disabled'));
                             }
-                            $btn.prop('disabled', true).addClass('disabled');
+                            $btn.prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
                         });
                     }
                 } else {
@@ -1196,7 +1260,7 @@ $intersoccer_elementor_product_page_cb = function () {
                     } else {
                         $('body').prepend($notice);
                     }
-                    $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+                    $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeAttr('disabled').removeClass('disabled');
                 };
             }
             if (!window.intersoccerPvWaitForProductPageStashAjax) {
@@ -2309,13 +2373,17 @@ $intersoccer_elementor_product_page_cb = function () {
                 var isSingleDayBooking = typeof window.intersoccerIsSingleDayBookingType === 'function' && window.intersoccerIsSingleDayBookingType(bookingType);
                 
                 if (shouldEnable) {
-                    $button.prop('disabled', false).removeClass('disabled');
+                    if (!intersoccerPvKeepAddToCartDisabledDuringWait($button, true)) {
+                        $button.prop('disabled', false).removeClass('disabled');
+                    }
                     intersoccerPvHideNotice($attendeeNotification);
                     if (!isSubmitting) {
                         intersoccerPvHideNotice($dayNotification);
                     }
                 } else {
-                    $button.prop('disabled', true).addClass('disabled');
+                    if (!intersoccerPvKeepAddToCartDisabledDuringWait($button, false)) {
+                        $button.prop('disabled', true).addClass('disabled');
+                    }
                     
                     // Don't show notifications if form is being submitted
                     if (isSubmitting) {
@@ -2343,11 +2411,15 @@ $intersoccer_elementor_product_page_cb = function () {
                     if (!intersoccerPvFormIsForThisProduct($tf)) {
                         return;
                     }
-                    $tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', !shouldEnable);
+                    var $targets = $tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]');
+                    if (intersoccerPvKeepAddToCartDisabledDuringWait($targets, shouldEnable)) {
+                        return;
+                    }
+                    $targets.prop('disabled', !shouldEnable);
                     if (!shouldEnable) {
-                        $tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').addClass('disabled');
+                        $targets.addClass('disabled');
                     } else {
-                        $tf.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').removeClass('disabled');
+                        $targets.removeClass('disabled');
                     }
                 });
             });
