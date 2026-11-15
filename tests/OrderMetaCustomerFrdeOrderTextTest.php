@@ -47,6 +47,12 @@ if (!function_exists('is_wc_endpoint_url')) {
     }
 }
 
+if (!function_exists('is_product')) {
+    function is_product() {
+        return !empty($GLOBALS['intersoccer_test_is_product']);
+    }
+}
+
 if (!function_exists('doing_action')) {
     function doing_action($hook = '') {
         $stack = $GLOBALS['intersoccer_test_doing_action_stack'] ?? [];
@@ -215,7 +221,9 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             $GLOBALS['intersoccer_test_terms'],
             $GLOBALS['intersoccer_test_products'],
             $GLOBALS['intersoccer_test_product_type'],
-            $GLOBALS['intersoccer_pv_test_parent_attribute_taxonomies']
+            $GLOBALS['intersoccer_pv_test_parent_attribute_taxonomies'],
+            $GLOBALS['intersoccer_test_is_product'],
+            $GLOBALS['intersoccer_pv_mini_cart_depth']
         );
         unset($_REQUEST['wc-ajax']);
         parent::tearDown();
@@ -244,7 +252,9 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             $GLOBALS['intersoccer_test_is_order_received_page'],
             $GLOBALS['intersoccer_test_wc_endpoint'],
             $GLOBALS['intersoccer_sensitive_order_meta_email'],
-            $GLOBALS['intersoccer_test_doing_ajax']
+            $GLOBALS['intersoccer_test_doing_ajax'],
+            $GLOBALS['intersoccer_test_is_product'],
+            $GLOBALS['intersoccer_pv_mini_cart_depth']
         );
         unset($_REQUEST['wc-ajax']);
     }
@@ -475,7 +485,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         );
         $this->bindLocale('de_DE');
         $this->assertSame(
-            'InterSoccer-Standorte',
+            'InterSoccer-Veranstaltungsorte',
             intersoccer_translate_stored_order_meta_display_key('Sites InterSoccer', 'Sites InterSoccer')
         );
     }
@@ -514,6 +524,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
     public function test_en_product_page_wc_attribute_labels_unchanged(): void {
         $this->setWpmlLanguage('en');
         $this->clearCustomerSurface();
+        $GLOBALS['intersoccer_test_is_product'] = true;
         $this->assertSame(
             'InterSoccer Venues',
             intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues')
@@ -532,14 +543,239 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
         $this->bindLocale('fr_FR');
         $this->setWpmlLanguage('fr');
         $this->clearCustomerSurface();
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        // A label that is already not the English registry string still passes through.
         $this->assertSame(
             'Duree du camp',
             intersoccer_pv_filter_wc_attribute_label_for_customer('Duree du camp', 'pa_camp-terms')
+        );
+        // English registry labels on the FR product page use the checkout wording.
+        $this->assertSame(
+            'Semaine de camp',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+        // Shopper pages that are not product, cart, checkout, order, email, or mini-cart stay English.
+        $GLOBALS['intersoccer_test_is_product'] = false;
+        $this->assertSame(
+            'Camp Terms',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+    }
+
+    public function test_fr_and_de_product_page_attribute_labels_use_checkout_wording(): void {
+        $this->clearCustomerSurface();
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->assertSame('Sites InterSoccer', intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues'));
+        $this->assertSame('Jour du cours', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Day', 'pa_course-day'));
+        $this->assertSame('Groupe d\'âge', intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group'));
+        $this->assertSame('Horaires du cours', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Times', 'pa_course-times'));
+        $this->assertSame('Horaires du camp', intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Times', 'pa_camp-times'));
+        $this->assertSame('Type de réservation', intersoccer_pv_filter_wc_attribute_label_for_customer('Booking Type', 'pa_booking-type'));
+
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $this->assertSame('InterSoccer-Veranstaltungsorte', intersoccer_pv_filter_wc_attribute_label_for_customer('InterSoccer Venues', 'pa_intersoccer-venues'));
+        $this->assertSame('Kurstag', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Day', 'pa_course-day'));
+        $this->assertSame('Altersgruppe', intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group'));
+        $this->assertSame('Kurszeiten', intersoccer_pv_filter_wc_attribute_label_for_customer('Course Times', 'pa_course-times'));
+    }
+
+    public function test_admin_product_screen_keeps_english_attribute_labels(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->clearCustomerSurface();
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        $GLOBALS['intersoccer_test_is_admin'] = true;
+        intersoccer_pv_begin_mini_cart_display();
+        $this->assertSame(
+            'Age Group',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
         );
         $this->assertSame(
             'Camp Terms',
             intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
         );
+        intersoccer_pv_end_mini_cart_display();
+    }
+
+    public function test_mini_cart_translates_english_attribute_labels_for_shoppers(): void {
+        $this->bindLocale('fr_FR');
+        $this->setWpmlLanguage('fr');
+        $this->clearCustomerSurface();
+        $GLOBALS['intersoccer_test_is_admin'] = false;
+        intersoccer_pv_begin_mini_cart_display();
+        $this->assertSame(
+            'Semaine de camp',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+        $rows = intersoccer_pv_translate_cart_item_data_keys(
+            [
+                ['key' => 'Camp Terms', 'value' => 'Week 1'],
+                ['key' => 'Booking Type', 'value' => 'Full Week'],
+            ],
+            []
+        );
+        $this->assertSame('Semaine de camp', $rows[0]['key']);
+        $this->assertSame('Type de réservation', $rows[1]['key']);
+        intersoccer_pv_end_mini_cart_display();
+        $this->assertSame(
+            'Camp Terms',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+
+        $this->bindLocale('de_DE');
+        $this->setWpmlLanguage('de');
+        $GLOBALS['intersoccer_test_doing_ajax'] = true;
+        $_REQUEST['wc-ajax'] = 'get_refreshed_fragments';
+        $this->assertSame(
+            'Altersgruppe',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
+        );
+    }
+
+    public function test_order_line_creation_stays_english_even_if_product_or_mini_cart_flags_are_set(): void {
+        $this->setCheckoutOrderCreationContext();
+        $this->setWpmlLanguage('de');
+        $this->bindLocale('de_DE');
+        $GLOBALS['intersoccer_test_is_product'] = true;
+        intersoccer_pv_begin_mini_cart_display();
+        $this->assertSame(
+            'Age Group',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Age Group', 'pa_age-group')
+        );
+        $this->assertSame(
+            'Camp Terms',
+            intersoccer_pv_filter_wc_attribute_label_for_customer('Camp Terms', 'pa_camp-terms')
+        );
+        intersoccer_pv_end_mini_cart_display();
+    }
+
+    public function test_product_page_shopper_strings_are_wrapped_and_catalogued(): void {
+        $root = dirname(__DIR__);
+        $elementor = (string) file_get_contents($root . '/includes/elementor-widgets.php');
+        $cart = (string) file_get_contents($root . '/includes/woocommerce/cart-calculations.php');
+        $camp = (string) file_get_contents($root . '/includes/woocommerce/product-camp.php');
+        $course = (string) file_get_contents($root . '/includes/woocommerce/product-course.php');
+        $domain = 'intersoccer-product-variations';
+
+        $this->assertStringContainsString("__('Please select a variation.', '" . $domain . "')", $elementor);
+        $this->assertStringContainsString("__('Please select at least one day for this single-day camp.', '" . $domain . "')", $elementor);
+        $this->assertStringContainsString("__('Please select at least one day for this single-day camp.', '" . $domain . "')", $cart);
+        $this->assertStringContainsString("__('Please select at least one day for this single-day camp.', '" . $domain . "')", $camp);
+        $this->assertStringContainsString("__('The number of selected days must match the quantity.', '" . $domain . "')", $camp);
+        $this->assertStringContainsString("__('Please <a href=\"%s\">log in or register</a> to book this product.', '" . $domain . "')", $cart);
+        $this->assertStringContainsString("__('Course Information', '" . $domain . "')", $course);
+        $this->assertStringContainsString("intersoccer_pv_course_info_labeled('Start Date')", $course);
+        $this->assertStringContainsString("intersoccer_pv_course_info_labeled('Course Information')", $course);
+        $this->assertStringNotContainsString("__('Start Date:', '" . $domain . "')", $course);
+
+        $expected = [
+            'fr_FR' => [
+                'Please select a variation.' => 'Veuillez sélectionner une variation.',
+                'The number of selected days must match the quantity.' => 'Le nombre de jours sélectionnés doit correspondre à la quantité.',
+                'Please <a href="%s">log in or register</a> to book this product.' => 'Veuillez <a href="%s">vous connecter ou vous inscrire</a> pour réserver ce produit.',
+                'Course Information' => 'Informations sur le cours',
+                'Please select at least one day for this single-day camp.' => 'Veuillez sélectionner au moins un jour pour ce camp d\'un jour.',
+                'InterSoccer Venues' => 'Sites InterSoccer',
+                'Course Day' => 'Jour du cours',
+                'Age Group' => 'Groupe d\'âge',
+                'Course Times' => 'Horaires du cours',
+                'Camp Terms' => 'Semaine de camp',
+                'Camp Times' => 'Horaires du camp',
+                'Booking Type' => 'Type de réservation',
+                'Start Date' => 'Date de début',
+            ],
+            'de_DE' => [
+                'Please select a variation.' => 'Bitte wählen Sie eine Variante.',
+                'The number of selected days must match the quantity.' => 'Die Anzahl der ausgewählten Tage muss der Menge entsprechen.',
+                'Please <a href="%s">log in or register</a> to book this product.' => 'Bitte <a href="%s">melden Sie sich an oder registrieren Sie sich</a>, um dieses Produkt zu buchen.',
+                'Course Information' => 'Kursinformationen',
+                'Please select at least one day for this single-day camp.' => 'Bitte wählen Sie mindestens einen Tag für dieses Tagescamp aus.',
+                'InterSoccer Venues' => 'InterSoccer-Veranstaltungsorte',
+                'Course Day' => 'Kurstag',
+                'Age Group' => 'Altersgruppe',
+                'Course Times' => 'Kurszeiten',
+                'Camp Terms' => 'Camp-Woche',
+                'Start Date' => 'Startdatum',
+            ],
+        ];
+
+        foreach ($expected as $locale => $pairs) {
+            $catalog = $this->parsePoCatalog($root . '/lang/intersoccer-product-variations-' . $locale . '.po');
+            foreach ($pairs as $msgid => $msgstr) {
+                $this->assertArrayHasKey($msgid, $catalog, $locale . ' missing ' . $msgid);
+                $this->assertSame($msgstr, $catalog[$msgid], $locale . ' msgstr for ' . $msgid);
+                $this->assertNotSame('', $catalog[$msgid]);
+            }
+        }
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function parsePoCatalog(string $path): array {
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $this->assertIsArray($lines);
+        $entries = [];
+        $msgid = '';
+        $msgstr = '';
+        $state = null;
+        $flush = static function () use (&$entries, &$msgid, &$msgstr): void {
+            if ($msgid !== '' && $msgstr !== '') {
+                $entries[$msgid] = $msgstr;
+            }
+            $msgid = '';
+            $msgstr = '';
+        };
+        foreach ($lines as $line) {
+            if ($line === '' || str_starts_with($line, '#')) {
+                if ($state === 'msgstr' && $msgid !== '') {
+                    $flush();
+                    $state = null;
+                }
+                continue;
+            }
+            if (str_starts_with($line, 'msgid ')) {
+                if ($state === 'msgstr' && $msgid !== '') {
+                    $flush();
+                }
+                $state = 'msgid';
+                $msgid = $this->poUnquote(substr($line, 6));
+                $msgstr = '';
+                continue;
+            }
+            if (str_starts_with($line, 'msgstr ')) {
+                $state = 'msgstr';
+                $msgstr = $this->poUnquote(substr($line, 7));
+                continue;
+            }
+            if ($state === 'msgid' && str_starts_with($line, '"')) {
+                $msgid .= $this->poUnquote($line);
+                continue;
+            }
+            if ($state === 'msgstr' && str_starts_with($line, '"')) {
+                $msgstr .= $this->poUnquote($line);
+            }
+        }
+        if ($state === 'msgstr' && $msgid !== '') {
+            $flush();
+        }
+
+        return $entries;
+    }
+
+    private function poUnquote(string $token): string {
+        $token = trim($token);
+        if (strlen($token) >= 2 && $token[0] === '"') {
+            $token = substr($token, 1, -1);
+        }
+
+        return stripcslashes($token);
     }
 
     public function test_fr_cart_translates_english_registry_labels(): void {

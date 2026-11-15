@@ -3357,7 +3357,8 @@ function intersoccer_pv_resolve_fr_de_language_code() {
 }
 
 /**
- * Cart, checkout, order customer surfaces where registry attribute labels may be translated.
+ * Cart, checkout, order, product-page, and mini-cart surfaces where registry
+ * attribute labels may be translated for shoppers.
  *
  * @return bool
  */
@@ -3377,6 +3378,10 @@ function intersoccer_pv_is_cart_checkout_order_customer_surface() {
         if ($action === 'update_order_review') {
             return true;
         }
+        // Header mini-cart fragment refresh is not is_cart() and is not wp-admin.
+        if ($action === 'get_refreshed_fragments' && !intersoccer_pv_is_admin_attribute_label_screen()) {
+            return true;
+        }
     }
 
     if (function_exists('is_cart') && is_cart()) {
@@ -3392,8 +3397,70 @@ function intersoccer_pv_is_cart_checkout_order_customer_surface() {
         return true;
     }
 
+    if (intersoccer_pv_is_storefront_product_page()) {
+        return true;
+    }
+
+    if (intersoccer_pv_is_mini_cart_display()) {
+        return true;
+    }
+
     return false;
 }
+
+/**
+ * wp-admin screens, including admin-ajax. Storefront wc-ajax is not admin.
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_admin_attribute_label_screen() {
+    return function_exists('is_admin') && is_admin();
+}
+
+/**
+ * Singular product page rendered for a shopper (not the product editor).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_storefront_product_page() {
+    if (intersoccer_pv_is_admin_attribute_label_screen()) {
+        return false;
+    }
+
+    return function_exists('is_product') && is_product();
+}
+
+/**
+ * Classic mini-cart template is rendering (header widget or fragment refresh).
+ *
+ * @return bool
+ */
+function intersoccer_pv_is_mini_cart_display() {
+    if (intersoccer_pv_is_admin_attribute_label_screen()) {
+        return false;
+    }
+
+    return isset($GLOBALS['intersoccer_pv_mini_cart_depth']) && (int) $GLOBALS['intersoccer_pv_mini_cart_depth'] > 0;
+}
+
+/**
+ * Mark the start of a classic mini-cart render.
+ */
+function intersoccer_pv_begin_mini_cart_display() {
+    $depth = isset($GLOBALS['intersoccer_pv_mini_cart_depth']) ? (int) $GLOBALS['intersoccer_pv_mini_cart_depth'] : 0;
+    $GLOBALS['intersoccer_pv_mini_cart_depth'] = $depth + 1;
+}
+
+/**
+ * Mark the end of a classic mini-cart render.
+ */
+function intersoccer_pv_end_mini_cart_display() {
+    $depth = isset($GLOBALS['intersoccer_pv_mini_cart_depth']) ? (int) $GLOBALS['intersoccer_pv_mini_cart_depth'] : 0;
+    $GLOBALS['intersoccer_pv_mini_cart_depth'] = $depth > 0 ? $depth - 1 : 0;
+}
+
+add_action('woocommerce_before_mini_cart', 'intersoccer_pv_begin_mini_cart_display', 0);
+add_action('woocommerce_after_mini_cart', 'intersoccer_pv_end_mini_cart_display', 999);
 
 /**
  * True while WooCommerce is persisting checkout order line meta (not display).
@@ -3410,7 +3477,7 @@ function intersoccer_pv_is_writing_checkout_order_line_meta() {
 }
 
 /**
- * Whether FR/DE cart/checkout/order/email surfaces should rewrite English attribute labels.
+ * Whether FR/DE shopper surfaces should rewrite English attribute labels.
  *
  * @return bool
  */

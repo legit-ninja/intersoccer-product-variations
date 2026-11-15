@@ -1127,3 +1127,16 @@ msgstr ""
 #, php-format
 msgid "Age at course start: %d"
 msgstr ""
+
+msgid "Please select a variation."
+msgstr ""
+
+msgid "The number of selected days must match the quantity."
+msgstr ""
+
+#, php-format
+msgid "Please <a href=\"%s\">log in or register</a> to book this product."
+msgstr ""
+
+msgid "Course Information"
+msgstr ""
