@@ -68,7 +68,7 @@
         } else {
             $('body').prepend($notice);
         }
-        $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeClass('disabled');
+        $target.find('button.single_add_to_cart_button, input[type="submit"][name="add-to-cart"]').prop('disabled', false).removeAttr('disabled').removeClass('disabled');
     }
 
     function intersoccerPvWaitForProductPageStashAjax(options) {
@@ -602,7 +602,10 @@
 
             const canAddToCart = playerSelected && daysSelected && isLoggedIn;
 
-            $button.prop('disabled', !canAddToCart);
+            if (!(typeof window.intersoccerPvKeepAddToCartDisabledDuringWait === 'function'
+                && window.intersoccerPvKeepAddToCartDisabledDuringWait($button, canAddToCart, this.config.productId))) {
+                $button.prop('disabled', !canAddToCart);
+            }
             
             // Express checkout (Apple Pay / Google Pay): toggle the server-set body class instead of
             // display:none, so Stripe can still mount its iframe while hidden.

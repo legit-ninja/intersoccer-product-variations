@@ -81,7 +81,34 @@ function buildHtml(inlineScript) {
 </body></html>`;
 }
 
-async function openHarnessPage(browser, inlineScript, jqueryPath) {
+function buildCourseHtml(inlineScript) {
+  return `<!DOCTYPE html>
+<html><head><base href="http://pv-test.local/"></head><body>
+<div id="intersoccer-enhancement-data" data-product-id="${PRODUCT_ID}" data-product-type="course" data-user-id="7" data-is-variable="1" data-preloaded-days="[]" data-initial-players="[]"></div>
+<form id="pv-form" class="variations_form cart" data-product_id="${PRODUCT_ID}" method="post" action="http://pv-test.local/product/course-test/">
+  <input type="hidden" name="product_id" value="${PRODUCT_ID}">
+  <input type="hidden" name="variation_id" value="501">
+  <input type="hidden" name="add-to-cart" value="${PRODUCT_ID}">
+  <input type="hidden" name="attribute_pa_booking-type" value="full-week">
+  <div class="intersoccer-player-selection" data-intersoccer-product-id="${PRODUCT_ID}">
+    <select name="player_assignment" class="intersoccer-player-select player-select">
+      <option value="">Select</option>
+      <option value="0" data-player-id="uuid-test-player">Test Kid</option>
+      <option value="1" data-player-id="uuid-second">Second</option>
+    </select>
+  </div>
+  <button type="submit" class="single_add_to_cart_button">Add to cart</button>
+</form>
+<script src="http://pv-test.local/tmp/jquery.min.js"></script>
+<script>${inlineScript}</script>
+<script src="http://pv-test.local/js/variation-details.js"></script>
+<script src="http://pv-test.local/js/product-enhancer.js"></script>
+</body></html>`;
+}
+
+async function openHarnessPage(browser, inlineScript, jqueryPath, options = {}) {
+  const html = options.html || buildHtml(inlineScript);
+  const extraRoutes = options.extraRoutes || null;
   const context = await browser.newContext();
   // Count add submissions at the source: native submit() calls plus submit events whose default
   // action was not prevented (a navigation can cancel an earlier POST before page.route sees it).
@@ -110,7 +137,24 @@ async function openHarnessPage(browser, inlineScript, jqueryPath) {
     if (url.includes('/tmp/jquery.min.js')) {
       return route.fulfill({ status: 200, contentType: 'application/javascript', path: jqueryPath });
     }
+    if (url.includes('/js/variation-details.js')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        path: path.join(ROOT, 'js/variation-details.js'),
+      });
+    }
+    if (url.includes('/js/product-enhancer.js')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        path: path.join(ROOT, 'js/product-enhancer.js'),
+      });
+    }
     const post = req.postData() || '';
+    if (extraRoutes && (await extraRoutes(route, req, post))) {
+      return;
+    }
     if (post.includes('action=intersoccer_store_selected_player')) {
       stashPosts.push(post);
       if (stashHold) {
@@ -122,7 +166,7 @@ async function openHarnessPage(browser, inlineScript, jqueryPath) {
     if (url.includes('admin-ajax.php')) {
       return route.fulfill({ status: 200, contentType: 'text/plain', body: '0' });
     }
-    if (req.method() === 'POST' && url.includes('/product/camp-test')) {
+    if (req.method() === 'POST' && (url.includes('/product/camp-test') || url.includes('/product/course-test'))) {
       addPosts.push(post);
       // 204 keeps the current document, so the submit counters below survive the POST.
       return route.fulfill({ status: 204, body: '' });
@@ -130,7 +174,7 @@ async function openHarnessPage(browser, inlineScript, jqueryPath) {
     return route.fulfill({ status: 404, body: 'not found' });
   });
 
-  await page.setContent(buildHtml(inlineScript), { waitUntil: 'load' });
+  await page.setContent(html, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.jQuery !== 'undefined' && window.jQuery('form.cart').length > 0);
 
   return {
@@ -164,6 +208,144 @@ async function addAttempts(page) {
   } catch (e) {
     return -1; // page navigated away; counters lost
   }
+}
+
+async function buttonFace(page) {
+  return page.evaluate(() => {
+    const btn = document.querySelector('button.single_add_to_cart_button');
+    if (!btn) {
+      return null;
+    }
+    return {
+      disabled: btn.disabled === true,
+      hasDisabledAttr: btn.hasAttribute('disabled'),
+      hasDisabledClass: btn.classList.contains('disabled'),
+    };
+  });
+}
+
+function faceIsHeld(face) {
+  return !!(face && face.disabled && face.hasDisabledAttr && face.hasDisabledClass);
+}
+
+function faceIsReady(face) {
+  return !!(face && face.disabled === false && !face.hasDisabledAttr && !face.hasDisabledClass);
+}
+
+async function waitUntil(fn, label, timeout = 4000) {
+  const start = Date.now();
+  while (!fn()) {
+    if (Date.now() - start > timeout) {
+      throw new Error(`timed out waiting for ${label}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+function courseMetadataBody() {
+  return JSON.stringify({
+    success: true,
+    data: {
+      is_course: true,
+      remaining_sessions: 8,
+      total_weeks: 10,
+      start_date: '2026-09-01',
+      end_date: '2026-12-15',
+    },
+  });
+}
+
+async function openCourseHarnessPage(browser, inlineScript, jqueryPath) {
+  const counts = { productType: 0, metadata: 0 };
+  const stashReleases = [];
+  let releaseMetadata = null;
+  const h = await openHarnessPage(browser, inlineScript, jqueryPath, {
+    html: buildCourseHtml(inlineScript),
+    extraRoutes: async (route, req, post) => {
+      if (post.includes('action=intersoccer_get_product_type')) {
+        counts.productType += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { product_type: 'course' } }),
+        });
+        return true;
+      }
+      if (post.includes('action=intersoccer_get_course_metadata')) {
+        counts.metadata += 1;
+        await new Promise((resolve) => {
+          releaseMetadata = () => {
+            route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: courseMetadataBody(),
+            }).then(resolve, resolve);
+          };
+        });
+        return true;
+      }
+      if (post.includes('action=intersoccer_get_course_info') || post.includes('action=intersoccer_calculate_dynamic_price') || post.includes('action=intersoccer_update_session_data')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, data: { price: '<span class="price">CHF 10</span>' } }),
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+  const origSet = h.setStashHold.bind(h);
+  origSet((route) => new Promise((resolve) => {
+    stashReleases.push(() => {
+      route.fulfill({ status: 200, contentType: 'text/plain', body: '0' }).then(resolve, resolve);
+    });
+  }));
+  return {
+    ...h,
+    counts,
+    releaseMetadata() {
+      const release = releaseMetadata;
+      releaseMetadata = null;
+      if (release) {
+        release();
+      }
+    },
+    releaseStash() {
+      const pending = stashReleases.splice(0);
+      pending.forEach((fn) => fn());
+    },
+  };
+}
+
+async function armCourseMetadataWait(h) {
+  await waitUntil(() => h.counts.productType >= 1, 'course product type');
+  await h.page.waitForTimeout(80);
+  await h.page.selectOption('select[name="player_assignment"]', '0');
+  await h.page.evaluate(() => {
+    document.querySelector('select[name="player_assignment"]').dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await h.page.evaluate(() => {
+    window.jQuery('#pv-form').trigger('found_variation', [{
+      variation_id: 501,
+      attributes: { attribute_pa_booking_type: 'full-week' },
+    }]);
+  });
+  await waitUntil(() => h.counts.metadata >= 1, 'course metadata request');
+  // Let the player-change enable timer finish before the pending-save wait starts.
+  await h.page.waitForTimeout(700);
+}
+
+async function fireLateEnablePaths(page) {
+  await page.evaluate(() => {
+    if (window.InterSoccerProductEnhancer) {
+      window.InterSoccerProductEnhancer.config.productId = 9001;
+      window.InterSoccerProductEnhancer.config.productType = 'course';
+      window.InterSoccerProductEnhancer.config.userId = 7;
+      window.InterSoccerProductEnhancer.updateButtonState();
+    }
+    window.jQuery(document.body).trigger('intersoccer_update_button_state.intersoccerPvDispatch_9001');
+  });
 }
 
 function parseAddBody(post) {
@@ -469,6 +651,77 @@ async function main() {
       }
       await h.context.close();
     }
+
+    // (j) Course: late metadata plus the other enable paths stay disabled; one add; button returns
+    {
+      const h = await openCourseHarnessPage(browser, inlineScript, jqueryPath);
+      await armCourseMetadataWait(h);
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(80);
+      h.releaseMetadata();
+      await h.page.waitForTimeout(80);
+      const weeks = await h.page.locator('input[name="remaining_weeks"]').inputValue().catch(() => '');
+      if (weeks !== '8') {
+        failures.push(`(j) course metadata enable path did not apply remaining weeks, got ${weeks}`);
+      }
+      await fireLateEnablePaths(h.page);
+      await h.page.waitForTimeout(40);
+      const during = await buttonFace(h.page);
+      if (!faceIsHeld(during)) {
+        failures.push(`(j) expected disabled attribute and class during wait, got ${JSON.stringify(during)}`);
+      }
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(40);
+      if (h.addPosts.length !== 0) {
+        failures.push(`(j) expected 0 adds while stash held, got ${h.addPosts.length}`);
+      }
+      h.releaseStash();
+      await h.page.waitForTimeout(400);
+      if (h.addPosts.length !== 1) {
+        failures.push(`(j) expected 1 add after stash, got ${h.addPosts.length}`);
+      }
+      {
+        const n = await addAttempts(h.page);
+        if (n !== 1) failures.push(`(j) expected 1 add submission attempt, got ${n}`);
+      }
+      const after = await buttonFace(h.page);
+      if (!faceIsReady(after)) {
+        failures.push(`(j) expected button re-enabled after successful wait, got ${JSON.stringify(after)}`);
+      }
+      await h.context.close();
+    }
+
+    // (k) Course: failed save (timeout) re-enables after the late enable paths
+    {
+      const h = await openCourseHarnessPage(browser, inlineScript, jqueryPath);
+      await armCourseMetadataWait(h);
+      await h.page.clock.install({ time: new Date('2020-01-01T00:00:00Z') });
+      await enableAddButton(h.page);
+      await h.page.click('button.single_add_to_cart_button', { force: true });
+      await h.page.waitForTimeout(80);
+      h.releaseMetadata();
+      await h.page.waitForTimeout(80);
+      await fireLateEnablePaths(h.page);
+      const during = await buttonFace(h.page);
+      if (!faceIsHeld(during)) {
+        failures.push(`(k) expected button held disabled during wait, got ${JSON.stringify(during)}`);
+      }
+      await h.page.clock.fastForward(60000);
+      await h.page.waitForTimeout(100);
+      const notice = await h.page.locator('.intersoccer-pv-stash-wait-notice').textContent().catch(() => '');
+      if (!notice || !notice.includes(TIMEOUT_NOTICE)) {
+        failures.push(`(k) timeout notice missing: ${notice}`);
+      }
+      if (h.addPosts.length !== 0) {
+        failures.push(`(k) expected 0 adds on timeout, got ${h.addPosts.length}`);
+      }
+      const after = await buttonFace(h.page);
+      if (!faceIsReady(after)) {
+        failures.push(`(k) expected button re-enabled after failed wait, got ${JSON.stringify(after)}`);
+      }
+      await h.context.close();
+    }
   } finally {
     await browser.close();
   }
@@ -477,7 +730,7 @@ async function main() {
     console.error('FAILURES:\n' + failures.join('\n'));
     process.exit(1);
   }
-  console.log('OK: all browser ATC stash flow assertions passed (9 scenarios).');
+  console.log('OK: all browser ATC stash flow assertions passed (11 scenarios).');
   process.exit(0);
 }
 
