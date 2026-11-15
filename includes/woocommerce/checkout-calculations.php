@@ -161,23 +161,36 @@ function intersoccer_get_parent_product_attributes($product_id, $variation_id = 
     foreach ($parent_attributes as $attribute_name => $attribute) {
         $value = '';
 
-        // Girls-only switch attributes are handled separately (not as Activity Type duplicate).
+        // Girls-only switch attributes are display meta only on a girls-only line,
+        // and only for terms that indicate girls-only.
         if (function_exists('intersoccer_is_girls_only_taxonomy') && intersoccer_is_girls_only_taxonomy($attribute_name)) {
-            $pairs = function_exists('intersoccer_collect_taxonomy_term_pairs_for_line')
-                ? intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variation_id ?: 0, $attribute_name)
-                : [];
-            $girls_values = [];
-            foreach ($pairs as $pair) {
-                $formatted = function_exists('intersoccer_format_girls_only_meta_value')
-                    ? intersoccer_format_girls_only_meta_value($pair['slug'] ?? '', $pair['name'] ?? '')
-                    : '';
-                if ($formatted !== '') {
-                    $girls_values[] = $formatted;
+            $line_is_girls_only = function_exists('intersoccer_line_is_girls_only_program')
+                && intersoccer_line_is_girls_only_program($product_id, $variation_id);
+            if ($line_is_girls_only) {
+                $pairs = function_exists('intersoccer_collect_taxonomy_term_pairs_for_line')
+                    ? intersoccer_collect_taxonomy_term_pairs_for_line($product_id, $variation_id ?: 0, $attribute_name)
+                    : [];
+                $girls_values = [];
+                foreach ($pairs as $pair) {
+                    if (!is_array($pair)) {
+                        continue;
+                    }
+                    $indicates = function_exists('intersoccer_girls_only_term_pairs_match')
+                        && intersoccer_girls_only_term_pairs_match([$pair], true, false);
+                    if (!$indicates) {
+                        continue;
+                    }
+                    $formatted = function_exists('intersoccer_format_girls_only_meta_value')
+                        ? intersoccer_format_girls_only_meta_value($pair['slug'] ?? '', $pair['name'] ?? '')
+                        : '';
+                    if ($formatted !== '') {
+                        $girls_values[] = $formatted;
+                    }
                 }
-            }
-            if (!empty($girls_values)) {
-                $label = intersoccer_attr_order_meta_label('girls-only');
-                $attributes[$label] = implode(', ', array_unique($girls_values));
+                if (!empty($girls_values)) {
+                    $label = intersoccer_attr_order_meta_label('girls-only');
+                    $attributes[$label] = implode(', ', array_unique($girls_values));
+                }
             }
             continue;
         }
