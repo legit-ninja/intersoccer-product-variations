@@ -41,6 +41,25 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     max-width: 100%;
 }
 
+.intersoccer-player-selection .intersoccer-player-content .intersoccer-attendee-notification {
+    text-align: left;
+    margin-top: 0.65rem;
+}
+
+/* Theme centres the error icon above the line (top 0, left 50%,
+   translateX -50%, 35px top padding). These notices are left-aligned,
+   so put the icon on the left and indent the text past it. Info notices
+   keep the theme rule that hides their icon. */
+.intersoccer-player-selection .intersoccer-player-content .intersoccer-attendee-notification.woocommerce-error {
+    padding: 0 0 0 1.75em;
+}
+
+.intersoccer-player-selection .intersoccer-player-content .intersoccer-attendee-notification.woocommerce-error::before {
+    top: 0;
+    left: 0;
+    transform: none;
+}
+
 .intersoccer-day-checkboxes {
     display: flex;
     flex-wrap: wrap;
