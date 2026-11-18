@@ -341,6 +341,9 @@
                         $select.val('0').trigger('change');
                     }
                 }
+                if (playerMessages.addAnotherChildHtml) {
+                    $form.find('.intersoccer-player-content').append(playerMessages.addAnotherChildHtml);
+                }
             } else {
                 const $content = $form.find('.intersoccer-player-content');
                 if (playerMessages.noPlayersRegisteredHtml) {

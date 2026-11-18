@@ -209,3 +209,13 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
 .intersoccer-booking-return-note {
     margin-bottom: 1rem;
 }
+
+.intersoccer-add-another-child {
+    margin: 0.5rem 0 0;
+}
+
+.intersoccer-add-another-child .intersoccer-booking-return-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+}

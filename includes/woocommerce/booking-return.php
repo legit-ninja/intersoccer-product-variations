@@ -484,6 +484,60 @@ if (!function_exists('intersoccer_pv_account_url_with_return')) {
     }
 }
 
+if (!function_exists('intersoccer_pv_user_has_players')) {
+    /**
+     * @param mixed $players
+     * @return bool
+     */
+    function intersoccer_pv_user_has_players($players) {
+        if (!is_array($players)) {
+            return false;
+        }
+        foreach ($players as $player) {
+            if (is_array($player)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('intersoccer_pv_add_another_child_html')) {
+    /**
+     * Link for a logged-in parent who already has a child. Empty otherwise.
+     *
+     * @return string
+     */
+    function intersoccer_pv_add_another_child_html() {
+        $user_id = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+        if ($user_id <= 0 || !function_exists('intersoccer_get_user_players') || !function_exists('intersoccer_pv_manage_players_url')) {
+            return '';
+        }
+        $players = intersoccer_get_user_players($user_id);
+        if (!intersoccer_pv_user_has_players($players)) {
+            return '';
+        }
+        $url = intersoccer_pv_manage_players_url();
+        if (!is_string($url) || $url === '') {
+            return '';
+        }
+        $html = '<p class="intersoccer-add-another-child"><a class="intersoccer-booking-return-link" href="'
+            . esc_url($url) . '">'
+            . esc_html(__('Add another child', 'intersoccer-product-variations'))
+            . '</a></p>';
+        if (!function_exists('wp_kses')) {
+            return $html;
+        }
+        return wp_kses($html, [
+            'p' => ['class' => []],
+            'a' => [
+                'href' => [],
+                'class' => [],
+            ],
+        ]);
+    }
+}
+
 if (!function_exists('intersoccer_pv_add_to_cart_return_selections')) {
     /**
      * Selections from the add-to-cart request, for PV's own failed-validation redirects.

@@ -852,6 +852,9 @@ msgstr "Ihre Auswahl ist gespeichert. Prüfen Sie sie und legen Sie sie in den W
 msgid "We couldn't keep your choices. Please pick them again."
 msgstr "Ihre Auswahl konnte nicht gespeichert werden. Bitte wählen Sie erneut."
 
+msgid "Add another child"
+msgstr "Weiteres Kind hinzufügen"
+
 #, php-format
 # wpml-name: No players registered. <a href="%s">Add a player</a>.
 msgid "No players registered. <a href=\"%s\">Add a player</a>."

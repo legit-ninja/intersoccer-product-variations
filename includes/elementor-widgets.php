@@ -109,6 +109,9 @@ $intersoccer_elementor_product_page_cb = function () {
                     <p class="intersoccer-login-prompt"><?php echo $player_assignment_i18n['loginPromptHtml']; ?></p>
                 <?php else : ?>
                     <p class="intersoccer-loading-players"><?php echo esc_html($player_assignment_i18n['loadingPlayers']); ?></p>
+                    <?php if (!empty($player_assignment_i18n['addAnotherChildHtml'])) : ?>
+                        <?php echo $player_assignment_i18n['addAnotherChildHtml']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built with wp_kses in intersoccer_pv_add_another_child_html(). ?>
+                    <?php endif; ?>
                 <?php endif; ?>
                 <div class="woocommerce-info intersoccer-attendee-notification" style="display: none;"><?php echo esc_html($player_assignment_i18n['selectAttendeeToAdd']); ?></div>
             </div>
@@ -1641,6 +1644,9 @@ $intersoccer_elementor_product_page_cb = function () {
                                             style: 'display: none;'
                                         }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
                                     );
+                                    if (intersoccerPlayerI18n.addAnotherChildHtml) {
+                                        $playerContent.append(intersoccerPlayerI18n.addAnotherChildHtml);
+                                    }
 
                                     var returnPreselect = (window.intersoccerCheckout && window.intersoccerCheckout.returnPreselect) ? String(window.intersoccerCheckout.returnPreselect) : '';
                                     var onBookingReturn = false;

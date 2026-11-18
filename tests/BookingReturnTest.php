@@ -273,6 +273,38 @@ class BookingReturnTest extends TestCase {
         $this->assertStringContainsString("'class' => []", $helpers);
     }
 
+    public function test_add_another_child_link_is_only_for_parents_with_players(): void {
+        $return = intersoccer_pv_booking_return_url(42, []);
+        $encoded = rawurlencode($return);
+        $GLOBALS['intersoccer_test_user_id'] = 5;
+        $GLOBALS['intersoccer_test_user_players'] = [
+            0 => ['first_name' => 'Ada', 'last_name' => 'Example', 'player_id' => 'player-uuid-1'],
+        ];
+
+        $html = intersoccer_pv_add_another_child_html();
+        $this->assertStringContainsString('Add another child', $html);
+        $this->assertStringContainsString('redirect=' . $encoded, $html);
+        $this->assertStringContainsString('manage-players/', $html);
+
+        $strings = intersoccer_get_player_assignment_strings();
+        $this->assertStringContainsString('redirect=' . $encoded, $strings['addAnotherChildHtml']);
+
+        $src = (string) file_get_contents(dirname(__DIR__) . '/includes/woocommerce/booking-return.php');
+        $this->assertStringContainsString('intersoccer-booking-return-link', $src);
+        $elementor = (string) file_get_contents(dirname(__DIR__) . '/includes/elementor-widgets.php');
+        $this->assertStringContainsString('addAnotherChildHtml', $elementor);
+
+        $GLOBALS['intersoccer_test_user_id'] = 0;
+        $this->assertSame('', intersoccer_pv_add_another_child_html());
+
+        $GLOBALS['intersoccer_test_user_id'] = 5;
+        $GLOBALS['intersoccer_test_user_players'] = [];
+        $this->assertSame('', intersoccer_pv_add_another_child_html());
+        $empty = intersoccer_get_player_assignment_strings();
+        $this->assertSame('', $empty['addAnotherChildHtml']);
+        $this->assertStringContainsString('Add a player', $empty['noPlayersRegisteredHtml']);
+    }
+
     public function test_return_notice_and_single_eligible_player_preselect(): void {
         $_GET['bf_return'] = '1';
         $saved = intersoccer_pv_booking_return_notice_html(42);

@@ -935,6 +935,9 @@ msgstr ""
 msgid "We couldn't keep your choices. Please pick them again."
 msgstr ""
 
+msgid "Add another child"
+msgstr ""
+
 #, php-format
 # wpml-name: No players registered. <a href="%s">Add a player</a>.
 msgid "No players registered. <a href=\"%s\">Add a player</a>."
