@@ -678,7 +678,7 @@ class OrderMetaCustomerFrdeOrderTextTest extends TestCase {
             'fr_FR' => [
                 'Please select a variation.' => 'Veuillez sélectionner une variation.',
                 'The number of selected days must match the quantity.' => 'Le nombre de jours sélectionnés doit correspondre à la quantité.',
-                'Please <a href="%s">log in or register</a> to book this product.' => 'Veuillez <a href="%s">vous connecter ou vous inscrire</a> pour réserver ce produit.',
+                'Please <a href="%s">log in or register</a> to book this product.' => 'Veuillez <a href="%s">vous connecter ou créer un compte</a> pour réserver ce produit.',
                 'Course Information' => 'Informations sur le cours',
                 'Please select at least one day for this single-day camp.' => 'Veuillez sélectionner au moins un jour pour ce camp d\'un jour.',
                 'InterSoccer Venues' => 'Sites InterSoccer',
