@@ -215,33 +215,58 @@ function intersoccer_get_player_assignment_strings($args = []) {
     ];
 
     $args = wp_parse_args($args, $defaults);
+    if (function_exists('intersoccer_pv_account_url_with_return')) {
+        if (!function_exists('intersoccer_pv_url_has_redirect_arg') || !intersoccer_pv_url_has_redirect_arg($args['dashboard_url'])) {
+            $args['dashboard_url'] = intersoccer_pv_account_url_with_return($args['dashboard_url']);
+        }
+        if (!function_exists('intersoccer_pv_url_has_redirect_arg') || !intersoccer_pv_url_has_redirect_arg($args['manage_players_url'])) {
+            $args['manage_players_url'] = intersoccer_pv_account_url_with_return($args['manage_players_url']);
+        }
+    }
 
     $allowed_link_tags = [
         'a' => [
             'href' => [],
+            'class' => [],
         ],
     ];
+
+    $logged_out_prompt = __('Log in or create an account to choose your child.', 'intersoccer-product-variations');
+    $create_account = __('Create account', 'intersoccer-product-variations');
+    $log_in = __('Log in', 'intersoccer-product-variations');
+    $login_prompt_html = wp_kses(
+        esc_html($logged_out_prompt)
+        . ' <a class="button intersoccer-booking-return-link" href="' . esc_url($args['dashboard_url']) . '">' . esc_html($create_account) . '</a>'
+        . ' <a class="intersoccer-booking-return-link" href="' . esc_url($args['dashboard_url']) . '">' . esc_html($log_in) . '</a>',
+        $allowed_link_tags
+    );
+    $legacy_login_html = wp_kses(
+        sprintf(
+            __('Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.', 'intersoccer-product-variations'),
+            esc_url($args['dashboard_url']),
+            esc_url($args['dashboard_url'])
+        ),
+        $allowed_link_tags
+    );
+    $no_players_html = sprintf(
+        __('No players registered. <a href="%s">Add a player</a>.', 'intersoccer-product-variations'),
+        esc_url($args['manage_players_url'])
+    );
+    $no_players_html = str_replace('<a href="', '<a class="intersoccer-booking-return-link" href="', $no_players_html);
 
     return [
         'loadingPlayers' => __('Loading players...', 'intersoccer-product-variations'),
         'errorLoadingPlayers' => __('Error: Unable to load players. Please try refreshing the page.', 'intersoccer-product-variations'),
         'errorLoadingPlayersWithMessage' => __('Error loading players: %s. Please try again.', 'intersoccer-product-variations'),
-        'loginPromptHtml' => wp_kses(
-            sprintf(
-                __('Please <a href="%1$s">log in</a> or <a href="%2$s">register</a> to select an attendee.', 'intersoccer-product-variations'),
-                esc_url($args['dashboard_url']),
-                esc_url($args['dashboard_url'])
-            ),
-            $allowed_link_tags
-        ),
+        'loginPromptHtml' => $login_prompt_html,
+        'loginPromptHtmlLegacy' => $legacy_login_html,
         'loginPromptText' => __('Please log in or register to select an attendee.', 'intersoccer-product-variations'),
-        'noPlayersRegisteredHtml' => wp_kses(
-            sprintf(
-                __('No players registered. <a href="%s">Add a player</a>.', 'intersoccer-product-variations'),
-                esc_url($args['manage_players_url'])
-            ),
-            $allowed_link_tags
-        ),
+        'loggedOutPrompt' => $logged_out_prompt,
+        'createAccount' => $create_account,
+        'logIn' => $log_in,
+        'choicesSaved' => __('Your choices are saved. Check them and add to cart.', 'intersoccer-product-variations'),
+        'choicesLost' => __('We couldn\'t keep your choices. Please pick them again.', 'intersoccer-product-variations'),
+        'noPlayersRegisteredHtml' => wp_kses($no_players_html, $allowed_link_tags),
         'pleaseAddPlayer' => __('Please add a player to continue.', 'intersoccer-product-variations'),
         'selectAttendee' => __('Select an Attendee', 'intersoccer-product-variations'),
         'selectAttendeeToAdd' => __('Please select an attendee to add to cart.', 'intersoccer-product-variations'),

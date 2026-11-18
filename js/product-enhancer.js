@@ -327,10 +327,28 @@
                     const $option = $('<option>').val(index).text(player.first_name + ' ' + player.last_name);
                     $select.append($option);
                 });
+                const returnPreselect = (window.intersoccerCheckout && window.intersoccerCheckout.returnPreselect) ? String(window.intersoccerCheckout.returnPreselect) : '';
+                let onBookingReturn = false;
+                try {
+                    onBookingReturn = new URLSearchParams(window.location.search).get('bf_return') === '1';
+                } catch (error) {
+                    onBookingReturn = false;
+                }
+                if (onBookingReturn && returnPreselect && this.config.initialPlayers.length === 1 && !$select.val()) {
+                    const only = this.config.initialPlayers[0] || {};
+                    const onlyId = String(only.player_id || '');
+                    if (returnPreselect === '0' || (onlyId !== '' && onlyId === returnPreselect)) {
+                        $select.val('0').trigger('change');
+                    }
+                }
             } else {
-                // Show link to add players
                 const $content = $form.find('.intersoccer-player-content');
-                $content.append('<p>No players registered. <a href="' + intersoccerCheckout.manage_players_url + '">Add a player</a>.</p>');
+                if (playerMessages.noPlayersRegisteredHtml) {
+                    $content.append($('<p class="intersoccer-no-players"></p>').html(playerMessages.noPlayersRegisteredHtml));
+                } else {
+                    const manageUrl = (window.intersoccerCheckout && intersoccerCheckout.manage_players_url) || '';
+                    $content.append('<p>No players registered. <a class="intersoccer-booking-return-link" href="' + manageUrl + '">Add a player</a>.</p>');
+                }
             }
         },
 
@@ -413,8 +431,9 @@
             const self = this;
             $container.empty();
 
+            const returnDays = (!window.intersoccerPvReturnDaysTouched && window.intersoccerPvReturnCampDays) ? window.intersoccerPvReturnCampDays : [];
             this.config.preloadedDays.forEach(day => {
-                const isChecked = this.state.selectedDays.includes(day);
+                const isChecked = this.state.selectedDays.includes(day) || returnDays.indexOf(day) !== -1;
                 const $label = $(`
                     <label class="intersoccer-day-label">
                         <input type="checkbox" name="camp_days_temp[]" value="${day}" 
@@ -633,7 +652,7 @@
             const $notification = $form.find('.intersoccer-attendee-notification');
 
             if (!isLoggedIn) {
-                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.')).show();
+                $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('loggedOutPrompt', getPlayerMessage('loginPromptText', 'Please log in or register to select an attendee.'))).show();
             } else if (!playerSelected) {
                 $notification.removeClass('woocommerce-error').addClass('woocommerce-info').text(getPlayerMessage('selectAttendeeShort', 'Please select an attendee.')).show();
             } else {

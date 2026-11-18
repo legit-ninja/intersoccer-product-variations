@@ -1134,19 +1134,24 @@ function intersoccer_pv_manage_players_url() {
         return '';
     }
 
+    $url = '';
     if (function_exists('wc_get_endpoint_url') && function_exists('wc_get_page_permalink')) {
         $account = wc_get_page_permalink('myaccount');
         if (is_string($account) && $account !== '') {
-            return wc_get_endpoint_url($slug, '', $account);
+            $url = wc_get_endpoint_url($slug, '', $account);
         }
     }
 
-    if (function_exists('wc_get_account_endpoint_url')) {
-        $url = wc_get_account_endpoint_url($slug);
-        return is_string($url) ? $url : '';
+    if ($url === '' && function_exists('wc_get_account_endpoint_url')) {
+        $endpoint_url = wc_get_account_endpoint_url($slug);
+        $url = is_string($endpoint_url) ? $endpoint_url : '';
     }
 
-    return '';
+    if ($url !== '' && function_exists('intersoccer_pv_account_url_with_return')) {
+        return intersoccer_pv_account_url_with_return($url);
+    }
+
+    return $url;
 }
 
 /**

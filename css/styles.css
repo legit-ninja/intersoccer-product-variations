@@ -197,3 +197,15 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     margin-top: 10px;
     font-size: 1.1em;
 }
+
+.intersoccer-login-prompt .intersoccer-booking-return-link {
+    display: inline-block;
+    margin: 0.35rem 0.5rem 0 0;
+    min-height: 44px;
+    line-height: 2.75rem;
+    vertical-align: middle;
+}
+
+.intersoccer-booking-return-note {
+    margin-bottom: 1rem;
+}

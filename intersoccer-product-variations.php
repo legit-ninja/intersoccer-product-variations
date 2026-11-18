@@ -427,6 +427,7 @@ $includes = [
     'includes/woocommerce/campaign-checkout-field.php',
     'includes/woocommerce/campaign-leads.php',
     'includes/woocommerce/url-coupon.php',
+    'includes/woocommerce/booking-return.php',
     'includes/woocommerce/discounts.php',
     'includes/woocommerce/cart-calculations.php',
     'includes/woocommerce/express-checkout-player-gate.php',
@@ -479,6 +480,9 @@ add_action('wp_enqueue_scripts', function () {
                 'server_time' => current_time('c'),
                 'nonce_refresh_url' => admin_url('admin-ajax.php?action=intersoccer_refresh_nonce'),
                 'manage_players_url' => function_exists('intersoccer_pv_manage_players_url') ? intersoccer_pv_manage_players_url() : '',
+                'productPermalink' => (function_exists('intersoccer_pv_product_permalink') && function_exists('get_queried_object_id')) ? intersoccer_pv_product_permalink((int) get_queried_object_id()) : '',
+                'returnCoupon' => function_exists('intersoccer_pv_session_coupon_code') ? intersoccer_pv_session_coupon_code() : '',
+                'returnPreselect' => (function_exists('intersoccer_pv_return_preselect_value') && function_exists('get_queried_object_id')) ? intersoccer_pv_return_preselect_value((int) get_queried_object_id()) : '',
                 'i18n' => [
                     'start_date' => __('Start Date', 'intersoccer-product-variations'),
                     'end_date' => __('End Date', 'intersoccer-product-variations'),
@@ -535,6 +539,17 @@ add_action('wp_enqueue_scripts', function () {
             INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'css/styles.css',
             [],
             $styles_ver
+        );
+    }
+    if ($on_product || $on_embedded_product) {
+        $return_script = INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'js/booking-return.js';
+        $return_ver = file_exists($return_script) ? (string) filemtime($return_script) : '1';
+        wp_enqueue_script(
+            'intersoccer-booking-return',
+            INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/booking-return.js',
+            ['jquery'],
+            $return_ver,
+            true
         );
     }
     if ($on_checkout || $on_cart) {

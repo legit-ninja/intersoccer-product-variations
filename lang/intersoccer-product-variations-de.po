@@ -837,6 +837,21 @@ msgstr "Bitte <a href=\"%1$s\">melden Sie sich an</a> oder <a href=\"%2$s\">regi
 msgid "Please log in or register to select an attendee."
 msgstr "Bitte melden Sie sich an oder registrieren Sie sich, um einen Teilnehmer auszuwählen."
 
+msgid "Log in or create an account to choose your child."
+msgstr "Melden Sie sich an oder erstellen Sie ein Konto, um Ihr Kind auszuwählen."
+
+msgid "Create account"
+msgstr "Konto erstellen"
+
+msgid "Log in"
+msgstr "Anmelden"
+
+msgid "Your choices are saved. Check them and add to cart."
+msgstr "Ihre Auswahl ist gespeichert. Prüfen Sie sie und legen Sie sie in den Warenkorb."
+
+msgid "We couldn't keep your choices. Please pick them again."
+msgstr "Ihre Auswahl konnte nicht gespeichert werden. Bitte wählen Sie erneut."
+
 #, php-format
 # wpml-name: No players registered. <a href="%s">Add a player</a>.
 msgid "No players registered. <a href=\"%s\">Add a player</a>."

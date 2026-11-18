@@ -30,6 +30,9 @@ $intersoccer_elementor_product_page_cb = function () {
     }
 
     $product_id = $product->get_id();
+    if (function_exists('intersoccer_pv_echo_booking_return_notice')) {
+        intersoccer_pv_echo_booking_return_notice($product_id);
+    }
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = function_exists('intersoccer_get_product_type') ? intersoccer_get_product_type($product_id) : null;
@@ -293,6 +296,9 @@ $intersoccer_elementor_product_page_cb = function () {
                 ajax_url: <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>,
                 nonce: <?php echo wp_json_encode(wp_create_nonce('intersoccer_nonce')); ?>,
                 user_id: <?php echo (int) $user_id; ?>,
+                productPermalink: <?php echo wp_json_encode(function_exists('intersoccer_pv_product_permalink') ? intersoccer_pv_product_permalink((int) $product_id) : ''); ?>,
+                returnCoupon: <?php echo wp_json_encode(function_exists('intersoccer_pv_session_coupon_code') ? intersoccer_pv_session_coupon_code() : ''); ?>,
+                returnPreselect: <?php echo wp_json_encode(function_exists('intersoccer_pv_return_preselect_value') ? intersoccer_pv_return_preselect_value((int) $product_id) : ''); ?>,
                 latePickupI18n: <?php echo wp_json_encode(function_exists('intersoccer_get_late_pickup_elementor_strings') ? intersoccer_get_late_pickup_elementor_strings() : []); ?>,
                 i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
                     stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>,
@@ -1636,6 +1642,25 @@ $intersoccer_elementor_product_page_cb = function () {
                                         }).text(intersoccerPlayerI18n.selectAttendeeToAdd)
                                     );
 
+                                    var returnPreselect = (window.intersoccerCheckout && window.intersoccerCheckout.returnPreselect) ? String(window.intersoccerCheckout.returnPreselect) : '';
+                                    var onBookingReturn = false;
+                                    try {
+                                        onBookingReturn = new URLSearchParams(window.location.search).get('bf_return') === '1';
+                                    } catch (returnFlagError) {
+                                        onBookingReturn = false;
+                                    }
+                                    if (onBookingReturn && returnPreselect && !intersoccerPlayerIndexChosen(preservedPlayer) && response.data.players.length === 1) {
+                                        var returnOptionMatches = false;
+                                        $select.find('option').each(function () {
+                                            if (String(this.value) === returnPreselect) {
+                                                returnOptionMatches = true;
+                                            }
+                                        });
+                                        if (returnOptionMatches) {
+                                            preservedPlayer = returnPreselect;
+                                        }
+                                    }
+
                                     if (intersoccerPlayerIndexChosen(preservedPlayer)) {
                                         $select.val(String(preservedPlayer));
                                     }
@@ -1841,6 +1866,9 @@ $intersoccer_elementor_product_page_cb = function () {
 
                     var lastCampDayChangeTime = 0;
                     $dayCheckboxes.find('input.intersoccer-day-checkbox').off('change click').on('change click', function(e) {
+                        if (!window.intersoccerPvApplyingReturnDays) {
+                            window.intersoccerPvReturnDaysTouched = true;
+                        }
                         var now = Date.now();
                         if (now - lastCampDayChangeTime < 100) {
                             return;
@@ -3100,10 +3128,23 @@ $intersoccer_elementor_product_page_cb = function () {
                 lastVariation = null;
                 lastVariationId = 0;
 
-                // Hide day selection when variation is reset
+                // Hide day selection when variation is reset.
+                // A booking-return visit keeps its camp days until the parent changes them.
                 $daySelection.hide();
                 $form.find('input[name="camp_days[]"]').remove();
-                selectedDays = [];
+                if (!window.intersoccerPvReturnDaysTouched && window.intersoccerPvReturnCampDays && window.intersoccerPvReturnCampDays.length) {
+                    selectedDays = window.intersoccerPvReturnCampDays.slice();
+                    selectedDays.forEach(function (day) {
+                        $form.append($('<input>', {
+                            type: 'hidden',
+                            name: 'camp_days[]',
+                            value: day,
+                            'class': 'intersoccer-camp-day-input'
+                        }));
+                    });
+                } else {
+                    selectedDays = [];
+                }
 
                 // Course info container removed from top of page (no longer needed)
 
@@ -3371,6 +3412,9 @@ $intersoccer_elementor_product_page_cb = function () {
             
             // Handle day checkbox changes
             $form.on('change', '.intersoccer-day-checkbox', function() {
+                if (!window.intersoccerPvApplyingReturnDays) {
+                    window.intersoccerPvReturnDaysTouched = true;
+                }
                 debug('InterSoccer: Day checkbox changed');
                 
                 // Set flag to prevent found_variation handler from also calling updateCampPrice
