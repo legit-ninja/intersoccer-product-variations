@@ -743,9 +743,10 @@ if (!function_exists('intersoccer_pv_return_preselect_value')) {
 
 if (!function_exists('intersoccer_pv_booking_return_has_saved_state')) {
     /**
-     * True when the return visit still carries a choice to restore.
+     * True when the return visit still carries a product option or day to restore.
      *
-     * The bf_return flag on its own is not a saved choice.
+     * The bf_return flag, a quantity (including the default of 1), and a
+     * session coupon on their own are not saved choices.
      *
      * @return bool
      */
@@ -753,16 +754,7 @@ if (!function_exists('intersoccer_pv_booking_return_has_saved_state')) {
         if (intersoccer_pv_request_attribute_selections() !== []) {
             return true;
         }
-        if (intersoccer_pv_request_camp_days() !== []) {
-            return true;
-        }
-        if (isset($_GET['quantity']) && is_scalar($_GET['quantity'])) {
-            $quantity = (string) $_GET['quantity'];
-            if ($quantity !== '' && ctype_digit($quantity) && (int) $quantity > 0) {
-                return true;
-            }
-        }
-        return intersoccer_pv_session_coupon_code() !== '';
+        return intersoccer_pv_request_camp_days() !== [];
     }
 }
 

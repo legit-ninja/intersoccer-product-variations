@@ -44,6 +44,15 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
 .intersoccer-player-selection .intersoccer-player-content .intersoccer-attendee-notification {
     text-align: left;
     margin-top: 0.65rem;
+    /* Stay in normal flow under the login prompt. WooCommerce notices
+       are position:relative, which would paint over a wrapped, floated
+       Create account button. */
+    position: static;
+    float: none;
+    clear: both;
+    display: block;
+    inset: auto;
+    transform: none;
 }
 
 /* Theme centres the error icon above the line (top 0, left 50%,
@@ -198,7 +207,20 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     font-size: 1.1em;
 }
 
+/* Contain floated children so a wrapped button cannot hang out of the
+   paragraph and sit under the attendee notice. */
+.intersoccer-login-prompt {
+    display: flow-root;
+}
+
+/* WooCommerce core uses `.woocommerce div.product form.cart .button
+   { float: left }`, which pulls the Create account control out of the
+   prompt when the links wrap. Undo that for these prompt links only. */
+.woocommerce div.product form.cart .intersoccer-login-prompt .button,
+.woocommerce div.product form.cart .intersoccer-login-prompt .intersoccer-booking-return-link,
+.intersoccer-login-prompt .button,
 .intersoccer-login-prompt .intersoccer-booking-return-link {
+    float: none;
     display: inline-block;
     margin: 0.35rem 0.5rem 0 0;
     min-height: 44px;

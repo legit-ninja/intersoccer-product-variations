@@ -309,11 +309,11 @@ class BookingReturnTest extends TestCase {
         $_GET['bf_return'] = '1';
         $this->assertSame('', intersoccer_pv_booking_return_notice_html(42));
 
-        $_GET['quantity'] = '1';
+        $_GET['camp_days'] = 'monday';
         $saved = intersoccer_pv_booking_return_notice_html(42);
         $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', $saved);
 
-        unset($_GET['quantity']);
+        unset($_GET['camp_days']);
         $_GET['attribute_pa_venue'] = 'hall';
         $lost = intersoccer_pv_booking_return_notice_html(42);
         $this->assertStringContainsString('Please pick them again.', $lost);
@@ -342,6 +342,59 @@ class BookingReturnTest extends TestCase {
 
         $_GET = [];
         $this->assertSame('', intersoccer_pv_return_preselect_value(42));
+    }
+
+    public function test_return_notice_requires_a_product_option_or_day(): void {
+        $_GET = ['bf_return' => '1', 'quantity' => '1'];
+        $this->assertSame('', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET = ['bf_return' => '1'];
+        $this->session->set('intersoccer_url_coupon_code', 'SAMPLE10');
+        $this->assertSame('', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET['quantity'] = '1';
+        $this->assertSame('', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET = ['bf_return' => '1', 'camp_days' => 'monday'];
+        $saved_days = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', $saved_days);
+
+        $_GET = ['bf_return' => '1', 'attribute_pa_venue' => 'hall', 'quantity' => '1'];
+        $this->session->set('intersoccer_url_coupon_code', 'SAMPLE10');
+        $this->assertTrue(intersoccer_pv_booking_return_has_saved_state());
+        $this->assertStringContainsString('Please pick them again.', intersoccer_pv_booking_return_notice_html(42));
+    }
+
+    public function test_login_prompt_buttons_stay_in_flow_above_the_attendee_notice(): void {
+        $css = (string) file_get_contents(dirname(__DIR__) . '/css/styles.css');
+        $this->assertMatchesRegularExpression(
+            '/\.intersoccer-login-prompt\s*\{[^}]*display:\s*flow-root/',
+            $css
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.woocommerce\s+div\.product\s+form\.cart\s+\.intersoccer-login-prompt\s+\.button[^{]*\{[^}]*float:\s*none/',
+            $css
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.intersoccer-attendee-notification[^{]*\{[^}]*position:\s*static/',
+            $css
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.intersoccer-attendee-notification[^{]*\{[^}]*float:\s*none/',
+            $css
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.intersoccer-login-prompt[^{]*\{[^}]*margin-top:\s*-/',
+            $css
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.intersoccer-attendee-notification[^{]*\{[^}]*margin(?:-top|-bottom)?:\s*-/',
+            $css
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.intersoccer-attendee-notification[^{]*\{[^}]*position:\s*absolute/',
+            $css
+        );
     }
 
     public function test_return_notice_sits_in_normal_flow_above_the_form(): void {
