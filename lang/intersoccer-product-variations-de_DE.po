@@ -1050,6 +1050,9 @@ msgstr "Frühlings-/Sommerkurse"
 msgid "Easter Camps"
 msgstr "Osterferienlager"
 
+msgid "Winter Camps"
+msgstr "Winterlager"
+
 msgid "j F Y"
 msgstr "j. F Y"
 

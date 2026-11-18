@@ -89,6 +89,7 @@ function intersoccer_attr_registry() {
                 ['name' => 'Winter Courses', 'slug' => 'winter-courses'],
                 ['name' => 'Spring/Summer Courses', 'slug' => 'spring-summer-courses'],
                 ['name' => 'Easter Camps', 'slug' => 'easter-camps'],
+                ['name' => 'Winter Camps', 'slug' => 'winter-camps'],
             ],
             'day_attribute' => false,
         ],
@@ -706,8 +707,8 @@ function intersoccer_pm_duplicate_variation_meta_keys($product_type) {
  *
  * sort is a calendar slot, not WooCommerce menu_order. The original four stay
  * in registry order for seeding. Specialized seasons sit beside that calendar:
- * Winter Courses shares Winter, Easter Camps sits with Spring, and
- * Spring/Summer Courses sits between Spring and Summer (also after Winter
+ * Winter Courses and Winter Camps share Winter, Easter Camps sits with Spring,
+ * and Spring/Summer Courses sits between Spring and Summer (also after Winter
  * and before Summer).
  *
  * activity is empty for the original four (used by camps and courses).
@@ -745,6 +746,15 @@ function intersoccer_attr_program_season_extras() {
             'translations' => [
                 'fr' => "Cours d'hiver",
                 'de' => 'Winterkurse',
+            ],
+        ],
+        'winter-camps' => [
+            'sort' => 12,
+            'activity' => 'camp',
+            'anchor' => 'winter',
+            'translations' => [
+                'fr' => "Camps d'hiver",
+                'de' => 'Winterlager',
             ],
         ],
         'spring-summer-courses' => [

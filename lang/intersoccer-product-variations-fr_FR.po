@@ -1146,6 +1146,9 @@ msgstr "Cours printemps-été"
 msgid "Easter Camps"
 msgstr "Camps de Pâques"
 
+msgid "Winter Camps"
+msgstr "Camps d'hiver"
+
 msgid "j F Y"
 msgstr "j F Y"
 

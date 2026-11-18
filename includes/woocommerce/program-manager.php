@@ -1421,7 +1421,7 @@ class InterSoccer_Program_Manager {
 		<div class="wrap intersoccer-pm-duplicate">
 			<h1><?php esc_html_e('Duplicate Program', 'intersoccer-product-variations'); ?></h1>
 			<p><a href="<?php echo esc_url($list_url); ?>">&larr; <?php esc_html_e('Back to Program List', 'intersoccer-product-variations'); ?></a></p>
-			<p class="description"><?php esc_html_e('Creates a Draft clone. Set program year for catalogue roll-over; seasons stay evergreen (Autumn, Winter, Spring, Summer, Winter Courses, Spring/Summer Courses, or Easter Camps). Update dates, terms, and prices after duplicating, then Sync WPML.', 'intersoccer-product-variations'); ?></p>
+			<p class="description"><?php esc_html_e('Creates a Draft clone. Set program year for catalogue roll-over; seasons stay evergreen (Autumn, Winter, Spring, Summer, Winter Courses, Spring/Summer Courses, Easter Camps, or Winter Camps). Update dates, terms, and prices after duplicating, then Sync WPML.', 'intersoccer-product-variations'); ?></p>
 
 			<table class="form-table">
 				<tr>
@@ -2836,7 +2836,7 @@ class InterSoccer_Program_Manager {
 			if (!$season_term || is_wp_error($season_term)) {
 				return new WP_Error(
 					'invalid_season',
-					__('Season term not found. Use an evergreen season (Autumn, Winter, Spring, Summer, Winter Courses, Spring/Summer Courses, or Easter Camps).', 'intersoccer-product-variations')
+					__('Season term not found. Use an evergreen season (Autumn, Winter, Spring, Summer, Winter Courses, Spring/Summer Courses, Easter Camps, or Winter Camps).', 'intersoccer-product-variations')
 				);
 			}
 		}

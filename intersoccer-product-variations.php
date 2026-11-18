@@ -327,6 +327,7 @@ add_action('init', function () {
             'Winter Courses',
             'Spring/Summer Courses',
             'Easter Camps',
+            'Winter Camps',
             'Male',
             'Female',
             'Other',
