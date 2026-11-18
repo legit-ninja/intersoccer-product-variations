@@ -754,7 +754,7 @@ function intersoccer_attr_program_season_extras() {
             'anchor' => 'winter',
             'translations' => [
                 'fr' => "Camps d'hiver",
-                'de' => 'Winterlager',
+                'de' => 'Winter Camps',
             ],
         ],
         'spring-summer-courses' => [

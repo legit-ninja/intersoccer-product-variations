@@ -1051,7 +1051,7 @@ msgid "Easter Camps"
 msgstr "Osterferienlager"
 
 msgid "Winter Camps"
-msgstr "Winterlager"
+msgstr "Winter Camps"
 
 msgid "j F Y"
 msgstr "j. F Y"

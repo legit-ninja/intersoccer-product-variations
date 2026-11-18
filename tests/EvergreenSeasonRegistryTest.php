@@ -111,7 +111,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
             'fr winter camps typographic apostrophe' => ["Camps d\u{2019}hiver", 'winter-camps'],
             'fr winter camps entity apostrophe' => ['Camps d&#039;hiver', 'winter-camps'],
             'fr winter camps nfd' => ["Camps d'hive\u{0301}r", 'winter-camps'],
-            'de winter camps' => ['Winterlager', 'winter-camps'],
+            'de winter camps' => ['Winter Camps', 'winter-camps'],
             'fr spring summer' => ['Cours printemps-été', 'spring-summer-courses'],
             'fr spring summer nfd' => ["Cours printemps-e\u{0301}te\u{0301}", 'spring-summer-courses'],
             'de spring summer' => ['Frühlings-/Sommerkurse', 'spring-summer-courses'],
@@ -141,7 +141,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
             ["Camps d\u{2019}hiver 2027"],
             ['Camps d&#039;hiver 2027'],
             ['Winterkurse 2026/27'],
-            ['Winterlager 2026/27'],
+            ['Winter Camps 2026/27'],
             ['Spring/Summer Courses 2027'],
             ['Frühlings-/Sommerkurse 2026'],
             ['Camps de Pâques 2026'],
@@ -196,7 +196,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertSame('course', intersoccer_attr_program_season_activity_type('Winterkurse'));
         $this->assertSame('course', intersoccer_attr_program_season_activity_type("Cours d'hiver"));
         $this->assertSame('camp', intersoccer_attr_program_season_activity_type('Winter Camps'));
-        $this->assertSame('camp', intersoccer_attr_program_season_activity_type('Winterlager'));
+        $this->assertSame('camp', intersoccer_attr_program_season_activity_type('Winter Camps'));
         $this->assertSame('camp', intersoccer_attr_program_season_activity_type("Camps d'hiver"));
         $this->assertSame('course', intersoccer_attr_program_season_activity_type('Spring/Summer Courses'));
         $this->assertSame('course', intersoccer_attr_program_season_activity_type('Frühlings-/Sommerkurse'));
@@ -212,7 +212,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor('Winter Courses'));
         $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor('Winterkurse'));
         $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor('Winter Camps'));
-        $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor('Winterlager'));
+        $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor('Winter Camps'));
         $this->assertSame('winter', intersoccer_attr_program_season_calendar_anchor("Camps d'hiver"));
         $this->assertSame('spring', intersoccer_attr_program_season_calendar_anchor('Spring'));
         $this->assertSame('spring', intersoccer_attr_program_season_calendar_anchor('Easter Camps'));
@@ -293,7 +293,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertSame('Winter Camps', intersoccer_discount_canonicalize_season_label("Camps d'hiver"));
         $this->assertSame('Winter Camps', intersoccer_discount_canonicalize_season_label("Camps d\u{2019}hiver"));
         $this->assertSame('Winter Camps', intersoccer_discount_canonicalize_season_label('Camps d&#039;hiver'));
-        $this->assertSame('Winter Camps', intersoccer_discount_canonicalize_season_label('Winterlager'));
+        $this->assertSame('Winter Camps', intersoccer_discount_canonicalize_season_label('Winter Camps'));
         $this->assertSame('Easter Camps', intersoccer_discount_canonicalize_season_label('Osterferienlager'));
         $this->assertSame(
             'Spring/Summer Courses',
@@ -317,7 +317,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertSame(
             intersoccer_discount_compose_season_key('Winter Camps', '2027'),
             intersoccer_discount_compose_season_key(
-                intersoccer_discount_canonicalize_season_label('Winterlager'),
+                intersoccer_discount_canonicalize_season_label('Winter Camps'),
                 '2027'
             )
         );
@@ -360,6 +360,6 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertStringContainsString('msgstr "Frühlings-/Sommerkurse"', $de);
         $this->assertStringContainsString('msgstr "Osterferienlager"', $de);
         $this->assertStringContainsString("msgstr \"Camps d'hiver\"", $fr);
-        $this->assertStringContainsString('msgstr "Winterlager"', $de);
+        $this->assertStringContainsString('msgstr "Winter Camps"', $de);
     }
 }
