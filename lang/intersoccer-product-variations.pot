@@ -935,6 +935,9 @@ msgstr ""
 msgid "We couldn't keep your choices. Please pick them again."
 msgstr ""
 
+msgid "Please finish choosing your options to continue."
+msgstr ""
+
 msgid "Add another child"
 msgstr ""
 

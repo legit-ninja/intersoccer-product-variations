@@ -132,6 +132,7 @@ class BookingReturnTest extends TestCase {
         $_GET = $this->previousGet;
         $_POST = $this->previousPost;
         unset($GLOBALS['product']);
+        unset($GLOBALS['intersoccer_test_products'], $GLOBALS['intersoccer_pv_test_matching_variation']);
         MockFilters::reset();
         parent::tearDown();
     }
@@ -407,6 +408,53 @@ class BookingReturnTest extends TestCase {
         $this->assertStringContainsString('.intersoccer-booking-return-note', $css);
     }
 
+    public function test_return_notice_distinguishes_partial_matched_and_invalid_options(): void {
+        $GLOBALS['intersoccer_test_products'][42] = new class {
+            public function get_id() {
+                return 42;
+            }
+            public function is_type($type) {
+                return $type === 'variable';
+            }
+            public function get_variation_attributes() {
+                return [
+                    'pa_venue' => ['hall', 'park'],
+                    'pa_age' => ['3-5', '6-8'],
+                ];
+            }
+        };
+        $GLOBALS['intersoccer_pv_test_matching_variation'] = static function ($product, $attributes) {
+            $venue = isset($attributes['attribute_pa_venue']) ? (string) $attributes['attribute_pa_venue'] : '';
+            $age = isset($attributes['attribute_pa_age']) ? (string) $attributes['attribute_pa_age'] : '';
+            if ($venue === 'hall' && $age === '3-5') {
+                return 99;
+            }
+            return 0;
+        };
+
+        $_GET = ['bf_return' => '1', 'attribute_pa_venue' => 'hall'];
+        $partial = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertSame('partial', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringContainsString('Please finish choosing your options to continue.', $partial);
+        $this->assertStringNotContainsString('Please pick them again.', $partial);
+        $this->assertStringNotContainsString('Your choices are saved.', $partial);
+
+        $_GET = ['bf_return' => '1', 'attribute_pa_venue' => 'hall', 'attribute_pa_age' => '3-5'];
+        $matched = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', $matched);
+
+        $_GET = ['bf_return' => '1', 'attribute_pa_venue' => 'unknown'];
+        $invalid_value = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertSame('invalid', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringContainsString('Please pick them again.', $invalid_value);
+
+        $_GET = ['bf_return' => '1', 'attribute_pa_venue' => 'hall', 'attribute_pa_age' => '6-8'];
+        $unmatched = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertSame('invalid', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringContainsString('Please pick them again.', $unmatched);
+    }
+
     public function test_return_script_takes_the_coupon_from_the_server_value_only(): void {
         $js = (string) file_get_contents(dirname(__DIR__) . '/js/booking-return.js');
         $this->assertStringContainsString('returnCoupon', $js);
@@ -414,5 +462,16 @@ class BookingReturnTest extends TestCase {
         $this->assertStringNotContainsString("get('coupon')", $js);
         $this->assertStringNotContainsString('get("coupon")', $js);
         $this->assertStringContainsString('bf_return', $js);
+    }
+}
+
+if (!class_exists('WC_Product_Data_Store_CPT')) {
+    class WC_Product_Data_Store_CPT {
+        public function find_matching_product_variation($product, $attributes) {
+            if (isset($GLOBALS['intersoccer_pv_test_matching_variation']) && is_callable($GLOBALS['intersoccer_pv_test_matching_variation'])) {
+                return (int) call_user_func($GLOBALS['intersoccer_pv_test_matching_variation'], $product, $attributes);
+            }
+            return 0;
+        }
     }
 }

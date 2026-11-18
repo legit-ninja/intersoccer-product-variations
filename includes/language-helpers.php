@@ -266,6 +266,7 @@ function intersoccer_get_player_assignment_strings($args = []) {
         'logIn' => $log_in,
         'choicesSaved' => __('Your choices are saved. Check them and add to cart.', 'intersoccer-product-variations'),
         'choicesLost' => __('We couldn\'t keep your choices. Please pick them again.', 'intersoccer-product-variations'),
+        'choicesFinish' => __('Please finish choosing your options to continue.', 'intersoccer-product-variations'),
         'addAnotherChildHtml' => function_exists('intersoccer_pv_add_another_child_html') ? intersoccer_pv_add_another_child_html() : '',
         'noPlayersRegisteredHtml' => wp_kses($no_players_html, $allowed_link_tags),
         'pleaseAddPlayer' => __('Please add a player to continue.', 'intersoccer-product-variations'),

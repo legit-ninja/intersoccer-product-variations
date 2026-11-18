@@ -617,35 +617,142 @@ if (!function_exists('intersoccer_pv_matching_variation_id')) {
     }
 }
 
+if (!function_exists('intersoccer_pv_attribute_request_key')) {
+    /**
+     * @param string $name
+     * @return string
+     */
+    function intersoccer_pv_attribute_request_key($name) {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return '';
+        }
+        if (strpos($name, 'attribute_') === 0) {
+            return $name;
+        }
+        return 'attribute_' . $name;
+    }
+}
+
+if (!function_exists('intersoccer_pv_variation_attribute_options')) {
+    /**
+     * Allowed values for each variation attribute, keyed as attribute_*.
+     *
+     * @param object $product
+     * @return array<string,array<int,string>>
+     */
+    function intersoccer_pv_variation_attribute_options($product) {
+        $options = [];
+        if (!is_object($product)) {
+            return $options;
+        }
+        if (method_exists($product, 'get_variation_attributes')) {
+            $raw = $product->get_variation_attributes();
+            if (is_array($raw)) {
+                foreach ($raw as $name => $values) {
+                    $key = intersoccer_pv_attribute_request_key($name);
+                    if ($key === '' || !is_array($values)) {
+                        continue;
+                    }
+                    $clean = [];
+                    foreach ($values as $value) {
+                        if (!is_scalar($value)) {
+                            continue;
+                        }
+                        $token = intersoccer_pv_return_query_token($value);
+                        if ($token !== '') {
+                            $clean[] = $token;
+                        }
+                    }
+                    if ($clean !== []) {
+                        $options[$key] = $clean;
+                    }
+                }
+            }
+        }
+        return $options;
+    }
+}
+
+if (!function_exists('intersoccer_pv_attribute_value_is_allowed')) {
+    /**
+     * @param string $value
+     * @param array<int,string> $allowed
+     * @return bool
+     */
+    function intersoccer_pv_attribute_value_is_allowed($value, array $allowed) {
+        $value = strtolower((string) $value);
+        foreach ($allowed as $option) {
+            if (strtolower((string) $option) === $value) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_attribute_state')) {
+    /**
+     * How the carried attributes sit on this product.
+     *
+     * - none: no attributes were carried
+     * - matched: they identify a variation
+     * - partial: every carried value is a valid option, but not enough to match yet
+     * - invalid: a value is unknown, or a complete set matches no variation
+     *
+     * @param int $product_id
+     * @return string
+     */
+    function intersoccer_pv_return_attribute_state($product_id) {
+        if (!intersoccer_pv_is_booking_return_request()) {
+            return 'none';
+        }
+        $attributes = intersoccer_pv_request_attribute_selections();
+        if ($attributes === []) {
+            return 'none';
+        }
+        if (!function_exists('wc_get_product')) {
+            return 'matched';
+        }
+        $product = wc_get_product((int) $product_id);
+        if (!is_object($product) || !method_exists($product, 'is_type')) {
+            return 'matched';
+        }
+        if (!$product->is_type('variable')) {
+            return 'invalid';
+        }
+        $options = intersoccer_pv_variation_attribute_options($product);
+        if ($options !== []) {
+            foreach ($attributes as $key => $value) {
+                if (!isset($options[$key]) || !intersoccer_pv_attribute_value_is_allowed($value, $options[$key])) {
+                    return 'invalid';
+                }
+            }
+        }
+        if (intersoccer_pv_matching_variation_id((int) $product_id) > 0) {
+            return 'matched';
+        }
+        if ($options !== [] && count($attributes) < count($options)) {
+            return 'partial';
+        }
+        if (!class_exists('WC_Product_Data_Store_CPT')) {
+            return 'matched';
+        }
+        return 'invalid';
+    }
+}
+
 if (!function_exists('intersoccer_pv_return_attributes_mismatch')) {
     /**
-     * True when a return visit carried attributes that no longer match a variation.
+     * True when a return visit carried attributes that are invalid or unmatched.
+     *
+     * A valid partial subset (for example venue only) is not a mismatch.
      *
      * @param int $product_id
      * @return bool
      */
     function intersoccer_pv_return_attributes_mismatch($product_id) {
-        if (!intersoccer_pv_is_booking_return_request()) {
-            return false;
-        }
-        $attributes = intersoccer_pv_request_attribute_selections();
-        if ($attributes === []) {
-            return false;
-        }
-        if (!function_exists('wc_get_product')) {
-            return false;
-        }
-        $product = wc_get_product((int) $product_id);
-        if (!is_object($product) || !method_exists($product, 'is_type')) {
-            return false;
-        }
-        if (!$product->is_type('variable')) {
-            return true;
-        }
-        if (!class_exists('WC_Product_Data_Store_CPT')) {
-            return false;
-        }
-        return intersoccer_pv_matching_variation_id((int) $product_id) <= 0;
+        return intersoccer_pv_return_attribute_state($product_id) === 'invalid';
     }
 }
 
@@ -770,8 +877,12 @@ if (!function_exists('intersoccer_pv_booking_return_notice_html')) {
         if (!intersoccer_pv_booking_return_has_saved_state()) {
             return '';
         }
-        if (intersoccer_pv_return_attributes_mismatch($product_id)) {
+        $state = intersoccer_pv_return_attribute_state($product_id);
+        if ($state === 'invalid') {
             $text = __('We couldn\'t keep your choices. Please pick them again.', 'intersoccer-product-variations');
+            $class = 'woocommerce-info intersoccer-booking-return-note';
+        } elseif ($state === 'partial') {
+            $text = __('Please finish choosing your options to continue.', 'intersoccer-product-variations');
             $class = 'woocommerce-info intersoccer-booking-return-note';
         } else {
             $text = __('Your choices are saved. Check them and add to cart.', 'intersoccer-product-variations');
