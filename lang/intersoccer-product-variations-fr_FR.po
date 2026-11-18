@@ -935,7 +935,7 @@ msgstr "Veuillez vous <a href=\"%1$s\">connecter</a> ou vous <a href=\"%2$s\">in
 
 # wpml-name: Please log in or register to select an attendee.
 msgid "Please log in or register to select an attendee."
-msgstr "Veuillez vous connecter ou vous inscrire pour sélectionner un participant."
+msgstr "Connectez-vous ou créez un compte pour sélectionner un participant."
 
 msgid "Log in or create an account to choose your child."
 msgstr "Connectez-vous ou créez un compte pour choisir votre enfant."
@@ -1163,7 +1163,7 @@ msgstr "Veuillez sélectionner une variation."
 
 #, php-format
 msgid "Please <a href=\"%s\">log in or register</a> to book this product."
-msgstr "Veuillez <a href=\"%s\">vous connecter ou vous inscrire</a> pour réserver ce produit."
+msgstr "Veuillez <a href=\"%s\">vous connecter ou créer un compte</a> pour réserver ce produit."
 
 msgid "Course Information"
 msgstr "Informations sur le cours"
