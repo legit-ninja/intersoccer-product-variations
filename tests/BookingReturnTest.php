@@ -307,9 +307,13 @@ class BookingReturnTest extends TestCase {
 
     public function test_return_notice_and_single_eligible_player_preselect(): void {
         $_GET['bf_return'] = '1';
+        $this->assertSame('', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET['quantity'] = '1';
         $saved = intersoccer_pv_booking_return_notice_html(42);
         $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', $saved);
 
+        unset($_GET['quantity']);
         $_GET['attribute_pa_venue'] = 'hall';
         $lost = intersoccer_pv_booking_return_notice_html(42);
         $this->assertStringContainsString('Please pick them again.', $lost);
@@ -338,6 +342,16 @@ class BookingReturnTest extends TestCase {
 
         $_GET = [];
         $this->assertSame('', intersoccer_pv_return_preselect_value(42));
+    }
+
+    public function test_return_notice_sits_in_normal_flow_above_the_form(): void {
+        $php = (string) file_get_contents(dirname(__DIR__) . '/includes/woocommerce/booking-return.php');
+        $this->assertStringContainsString("add_action('woocommerce_before_add_to_cart_form', 'intersoccer_pv_echo_booking_return_notice'", $php);
+        $widgets = (string) file_get_contents(dirname(__DIR__) . '/includes/elementor-widgets.php');
+        $this->assertStringNotContainsString('intersoccer_pv_echo_booking_return_notice', $widgets);
+        $css = (string) file_get_contents(dirname(__DIR__) . '/css/styles.css');
+        $this->assertStringContainsString('position: static;', $css);
+        $this->assertStringContainsString('.intersoccer-booking-return-note', $css);
     }
 
     public function test_return_script_takes_the_coupon_from_the_server_value_only(): void {

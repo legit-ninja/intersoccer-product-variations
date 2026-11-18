@@ -206,8 +206,20 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     vertical-align: middle;
 }
 
+/* In normal flow above the booking form. WooCommerce marks these notices
+   position:relative, which paints them over later content that is pulled up. */
+.woocommerce .intersoccer-booking-return-note.woocommerce-message,
+.woocommerce .intersoccer-booking-return-note.woocommerce-info,
 .intersoccer-booking-return-note {
-    margin-bottom: 1rem;
+    position: static;
+    float: none;
+    clear: both;
+    display: block;
+    width: auto;
+    margin: 0 0 1rem;
+    text-align: start;
+    inset: auto;
+    transform: none;
 }
 
 .intersoccer-add-another-child {

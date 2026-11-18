@@ -30,9 +30,6 @@ $intersoccer_elementor_product_page_cb = function () {
     }
 
     $product_id = $product->get_id();
-    if (function_exists('intersoccer_pv_echo_booking_return_notice')) {
-        intersoccer_pv_echo_booking_return_notice($product_id);
-    }
     $user_id = get_current_user_id();
     $is_variable = $product->is_type('variable');
     $product_type = function_exists('intersoccer_get_product_type') ? intersoccer_get_product_type($product_id) : null;

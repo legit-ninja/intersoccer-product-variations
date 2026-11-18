@@ -741,6 +741,31 @@ if (!function_exists('intersoccer_pv_return_preselect_value')) {
     }
 }
 
+if (!function_exists('intersoccer_pv_booking_return_has_saved_state')) {
+    /**
+     * True when the return visit still carries a choice to restore.
+     *
+     * The bf_return flag on its own is not a saved choice.
+     *
+     * @return bool
+     */
+    function intersoccer_pv_booking_return_has_saved_state() {
+        if (intersoccer_pv_request_attribute_selections() !== []) {
+            return true;
+        }
+        if (intersoccer_pv_request_camp_days() !== []) {
+            return true;
+        }
+        if (isset($_GET['quantity']) && is_scalar($_GET['quantity'])) {
+            $quantity = (string) $_GET['quantity'];
+            if ($quantity !== '' && ctype_digit($quantity) && (int) $quantity > 0) {
+                return true;
+            }
+        }
+        return intersoccer_pv_session_coupon_code() !== '';
+    }
+}
+
 if (!function_exists('intersoccer_pv_booking_return_notice_html')) {
     /**
      * @param int $product_id
@@ -748,6 +773,9 @@ if (!function_exists('intersoccer_pv_booking_return_notice_html')) {
      */
     function intersoccer_pv_booking_return_notice_html($product_id) {
         if (!intersoccer_pv_is_booking_return_request()) {
+            return '';
+        }
+        if (!intersoccer_pv_booking_return_has_saved_state()) {
             return '';
         }
         if (intersoccer_pv_return_attributes_mismatch($product_id)) {
@@ -766,11 +794,21 @@ if (!function_exists('intersoccer_pv_echo_booking_return_notice')) {
      * @param int $product_id
      * @return void
      */
-    function intersoccer_pv_echo_booking_return_notice($product_id) {
-        $html = intersoccer_pv_booking_return_notice_html($product_id);
-        if ($html !== '') {
-            echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    function intersoccer_pv_echo_booking_return_notice($product_id = 0) {
+        static $shown = false;
+        if ($shown) {
+            return;
         }
+        $product_id = (int) $product_id;
+        if ($product_id <= 0) {
+            $product_id = intersoccer_pv_current_product_id();
+        }
+        $html = intersoccer_pv_booking_return_notice_html($product_id);
+        if ($html === '') {
+            return;
+        }
+        $shown = true;
+        echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
     }
 }
 
@@ -813,6 +851,7 @@ if (!function_exists('intersoccer_pv_register_booking_return_hooks')) {
         add_filter('woocommerce_login_redirect', 'intersoccer_pv_filter_account_redirect', 10, 2);
         add_filter('woocommerce_registration_redirect', 'intersoccer_pv_filter_account_redirect', 10, 1);
         add_filter('login_redirect', 'intersoccer_pv_filter_account_redirect', 10, 3);
+        add_action('woocommerce_before_add_to_cart_form', 'intersoccer_pv_echo_booking_return_notice', 5);
         add_action('woocommerce_login_form_end', 'intersoccer_pv_print_return_redirect_field');
         add_action('woocommerce_register_form_end', 'intersoccer_pv_print_return_redirect_field');
         add_action('login_form', 'intersoccer_pv_print_return_redirect_field');
