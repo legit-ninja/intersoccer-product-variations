@@ -3,6 +3,7 @@
  * Evergreen course/camp seasons on the locked pa_program-season registry.
  */
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class EvergreenSeasonRegistryTest extends TestCase {
@@ -81,9 +82,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         $this->assertSame('term_not_in_registry', $legacy_fr->get_error_code());
     }
 
-    /**
-     * @dataProvider translatedNameProvider
-     */
+    #[DataProvider('translatedNameProvider')]
     public function test_translated_names_are_accepted_and_map_to_the_english_slug(string $name, string $slug): void {
         $this->assertTrue(intersoccer_attr_validate_new_term('pa_program-season', $name));
         $this->assertSame($slug, intersoccer_attr_program_season_slug_for_label($name));
@@ -113,9 +112,7 @@ class EvergreenSeasonRegistryTest extends TestCase {
         ];
     }
 
-    /**
-     * @dataProvider yearQualifiedProvider
-     */
+    #[DataProvider('yearQualifiedProvider')]
     public function test_year_qualified_forms_stay_blocked(string $name): void {
         $result = intersoccer_attr_validate_new_term('pa_program-season', $name);
         $this->assertInstanceOf(WP_Error::class, $result, $name);
