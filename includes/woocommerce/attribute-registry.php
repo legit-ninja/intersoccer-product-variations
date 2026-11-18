@@ -84,6 +84,11 @@ function intersoccer_attr_registry() {
                 ['name' => 'Autumn', 'slug' => 'autumn'],
                 ['name' => 'Spring', 'slug' => 'spring'],
                 ['name' => 'Winter', 'slug' => 'winter'],
+                // Evergreen course/camp seasons. EN slug is authoritative; FR/DE names
+                // resolve to that slug via intersoccer_attr_program_season_extras().
+                ['name' => 'Winter Courses', 'slug' => 'winter-courses'],
+                ['name' => 'Spring/Summer Courses', 'slug' => 'spring-summer-courses'],
+                ['name' => 'Easter Camps', 'slug' => 'easter-camps'],
             ],
             'day_attribute' => false,
         ],
@@ -694,4 +699,278 @@ function intersoccer_pm_duplicate_variation_meta_keys($product_type) {
     }
 
     return $shared;
+}
+
+/**
+ * Calendar metadata for pa_program-season.
+ *
+ * sort is a calendar slot, not WooCommerce menu_order. The original four stay
+ * in registry order for seeding. Specialized seasons sit beside that calendar:
+ * Winter Courses shares Winter, Easter Camps sits with Spring, and
+ * Spring/Summer Courses sits between Spring and Summer (also after Winter
+ * and before Summer).
+ *
+ * activity is empty for the original four (used by camps and courses).
+ * Specialized seasons classify as camp or course. Discount keys stay the
+ * full season, not the calendar anchor.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function intersoccer_attr_program_season_extras() {
+    return [
+        'summer' => [
+            'sort' => 30,
+            'activity' => '',
+            'anchor' => 'summer',
+        ],
+        'autumn' => [
+            'sort' => 40,
+            'activity' => '',
+            'anchor' => 'autumn',
+        ],
+        'spring' => [
+            'sort' => 20,
+            'activity' => '',
+            'anchor' => 'spring',
+        ],
+        'winter' => [
+            'sort' => 10,
+            'activity' => '',
+            'anchor' => 'winter',
+        ],
+        'winter-courses' => [
+            'sort' => 11,
+            'activity' => 'course',
+            'anchor' => 'winter',
+            'translations' => [
+                'fr' => "Cours d'hiver",
+                'de' => 'Winterkurse',
+            ],
+        ],
+        'spring-summer-courses' => [
+            'sort' => 25,
+            'activity' => 'course',
+            'anchor' => 'spring-summer',
+            'translations' => [
+                'fr' => 'Cours printemps-été',
+                'de' => 'Frühlings-/Sommerkurse',
+            ],
+        ],
+        'easter-camps' => [
+            'sort' => 21,
+            'activity' => 'camp',
+            'anchor' => 'spring',
+            'translations' => [
+                'fr' => 'Camps de Pâques',
+                'de' => 'Osterferienlager',
+            ],
+        ],
+    ];
+}
+
+/**
+ * English season names shown to customers (original four, then any registry additions).
+ *
+ * @return array<int,string>
+ */
+function intersoccer_attr_program_season_customer_labels() {
+    $labels = ['Summer', 'Autumn', 'Spring', 'Winter'];
+    $def = intersoccer_attr_definition('program-season');
+    if ($def && !empty($def['default_terms']) && is_array($def['default_terms'])) {
+        foreach ($def['default_terms'] as $term) {
+            $name = isset($term['name']) ? (string) $term['name'] : '';
+            if ($name !== '') {
+                $labels[] = $name;
+            }
+        }
+    }
+    return array_values(array_unique($labels));
+}
+
+/**
+ * NFC-compose a season label. Falls back to stripping combining marks.
+ *
+ * Same idea as booking-type NFC, kept local so the registry does not load order meta.
+ *
+ * @param string $text
+ * @return string
+ */
+function intersoccer_attr_program_season_compose($text) {
+    $text = (string) $text;
+    if (class_exists('Normalizer')) {
+        $normalized = Normalizer::normalize($text, Normalizer::FORM_C);
+        if (is_string($normalized) && $normalized !== '') {
+            return $normalized;
+        }
+    }
+    $stripped = preg_replace('/\p{Mn}/u', '', $text);
+    return is_string($stripped) ? $stripped : $text;
+}
+
+/**
+ * Case-folded season label: entities decoded, apostrophes straightened, NFC.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_fold_label($label) {
+    $label = html_entity_decode(trim((string) $label), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $label = str_replace(["\u{2019}", "\u{2018}", "\u{02BC}", '`'], "'", $label);
+    $label = intersoccer_attr_program_season_compose($label);
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($label, 'UTF-8');
+    }
+    return strtolower($label);
+}
+
+/**
+ * Accent-folded season label so NFD-stripped input still matches.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_fold_label_ascii($label) {
+    $label = intersoccer_attr_program_season_fold_label($label);
+    if (function_exists('remove_accents')) {
+        $label = remove_accents($label);
+    }
+    return $label;
+}
+
+/**
+ * @return array{exact:array<string,array<string,mixed>>,ascii:array<string,array<string,mixed>>}
+ */
+function &intersoccer_attr_program_season_lookup_index() {
+    static $index = null;
+    if ($index !== null) {
+        return $index;
+    }
+    $index = [
+        'exact' => [],
+        'ascii' => [],
+    ];
+    $def = intersoccer_attr_definition('program-season');
+    $terms = ($def && !empty($def['default_terms']) && is_array($def['default_terms']))
+        ? $def['default_terms']
+        : [];
+    $extras = intersoccer_attr_program_season_extras();
+    foreach ($terms as $term) {
+        $slug = strtolower(trim((string) ($term['slug'] ?? '')));
+        $name = (string) ($term['name'] ?? '');
+        if ($slug === '' || $name === '') {
+            continue;
+        }
+        $extra = isset($extras[$slug]) && is_array($extras[$slug]) ? $extras[$slug] : [];
+        $record = [
+            'slug' => $slug,
+            'name' => $name,
+            'sort' => isset($extra['sort']) ? (int) $extra['sort'] : 0,
+            'activity' => isset($extra['activity']) ? (string) $extra['activity'] : '',
+            'anchor' => isset($extra['anchor']) ? (string) $extra['anchor'] : $slug,
+        ];
+        $labels = [$name, $slug];
+        if (!empty($extra['translations']) && is_array($extra['translations'])) {
+            foreach ($extra['translations'] as $translated) {
+                $translated = (string) $translated;
+                if ($translated !== '') {
+                    $labels[] = $translated;
+                }
+            }
+        }
+        foreach ($labels as $label) {
+            $exact = intersoccer_attr_program_season_fold_label($label);
+            $ascii = intersoccer_attr_program_season_fold_label_ascii($label);
+            if ($exact !== '') {
+                $index['exact'][$exact] = $record;
+            }
+            if ($ascii !== '' && !isset($index['ascii'][$ascii])) {
+                $index['ascii'][$ascii] = $record;
+            }
+        }
+    }
+    return $index;
+}
+
+/**
+ * Registry record for an EN/FR/DE season name or EN slug.
+ *
+ * @param string $label
+ * @return array<string,mixed>|null
+ */
+function intersoccer_attr_program_season_record_for_label($label) {
+    $exact = intersoccer_attr_program_season_fold_label($label);
+    if ($exact === '') {
+        return null;
+    }
+    $index = &intersoccer_attr_program_season_lookup_index();
+    if (isset($index['exact'][$exact])) {
+        return $index['exact'][$exact];
+    }
+    $ascii = intersoccer_attr_program_season_fold_label_ascii($label);
+    if ($ascii !== '' && isset($index['ascii'][$ascii])) {
+        return $index['ascii'][$ascii];
+    }
+    return null;
+}
+
+/**
+ * EN slug for a known season label, or empty when the label is not in the registry.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_slug_for_label($label) {
+    $record = intersoccer_attr_program_season_record_for_label($label);
+    return $record ? (string) $record['slug'] : '';
+}
+
+/**
+ * English term name for a known season label, or empty when unknown.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_canonical_name($label) {
+    $record = intersoccer_attr_program_season_record_for_label($label);
+    return $record ? (string) $record['name'] : '';
+}
+
+/**
+ * Calendar sort rank. Null when the label is not a registered season.
+ *
+ * @param string $label
+ * @return int|null
+ */
+function intersoccer_attr_program_season_sort_rank($label) {
+    $record = intersoccer_attr_program_season_record_for_label($label);
+    if (!$record) {
+        return null;
+    }
+    return (int) $record['sort'];
+}
+
+/**
+ * camp, course, or empty when the season is not tied to one activity type.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_activity_type($label) {
+    $record = intersoccer_attr_program_season_record_for_label($label);
+    if (!$record) {
+        return '';
+    }
+    $activity = (string) $record['activity'];
+    return in_array($activity, ['camp', 'course'], true) ? $activity : '';
+}
+
+/**
+ * Calendar anchor shared with a base season, or a span such as spring-summer.
+ *
+ * @param string $label
+ * @return string
+ */
+function intersoccer_attr_program_season_calendar_anchor($label) {
+    $record = intersoccer_attr_program_season_record_for_label($label);
+    return $record ? (string) $record['anchor'] : '';
 }

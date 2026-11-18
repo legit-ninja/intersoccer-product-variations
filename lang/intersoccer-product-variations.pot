@@ -1121,6 +1121,15 @@ msgstr ""
 msgid "Winter"
 msgstr ""
 
+msgid "Winter Courses"
+msgstr ""
+
+msgid "Spring/Summer Courses"
+msgstr ""
+
+msgid "Easter Camps"
+msgstr ""
+
 msgid "j F Y"
 msgstr ""
 

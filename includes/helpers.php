@@ -1060,6 +1060,17 @@ function intersoccer_discount_canonicalize_season_label($label) {
             return $canonical;
         }
     }
+    // Specialized evergreen seasons (not the bare four) share one EN name across FR/DE
+    // even before a term row exists. Bare Winter/Spring stay untouched.
+    if (function_exists('intersoccer_attr_program_season_record_for_label')) {
+        $record = intersoccer_attr_program_season_record_for_label($label);
+        if (is_array($record) && in_array((string) ($record['activity'] ?? ''), ['camp', 'course'], true)) {
+            $canonical_name = (string) ($record['name'] ?? '');
+            if ($canonical_name !== '') {
+                return $canonical_name;
+            }
+        }
+    }
     return $label;
 }
 
