@@ -1062,6 +1062,18 @@ msgstr "Unbekannt"
 msgid "Winter"
 msgstr "Winter"
 
+msgid "Winter Courses"
+msgstr "Winterkurse"
+
+msgid "Spring/Summer Courses"
+msgstr "Frühlings-/Sommerkurse"
+
+msgid "Easter Camps"
+msgstr "Osterferienlager"
+
+msgid "Winter Camps"
+msgstr "Winter Camps"
+
 msgid "j F Y"
 msgstr "j. F Y"
 

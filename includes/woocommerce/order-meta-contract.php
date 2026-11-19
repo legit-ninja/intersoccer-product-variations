@@ -2823,7 +2823,9 @@ function intersoccer_pv_translate_order_meta_token_for_display($label) {
         return __($label, 'intersoccer-product-variations');
     }
 
-    $seasons = ['Summer', 'Autumn', 'Spring', 'Winter'];
+    $seasons = function_exists('intersoccer_attr_program_season_customer_labels')
+        ? intersoccer_attr_program_season_customer_labels()
+        : ['Summer', 'Autumn', 'Spring', 'Winter'];
     if (in_array($label, $seasons, true)) {
         return __($label, 'intersoccer-product-variations');
     }

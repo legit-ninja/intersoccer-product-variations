@@ -1158,6 +1158,18 @@ msgstr "Inconnu"
 msgid "Winter"
 msgstr "Hiver"
 
+msgid "Winter Courses"
+msgstr "Cours d'hiver"
+
+msgid "Spring/Summer Courses"
+msgstr "Cours printemps-été"
+
+msgid "Easter Camps"
+msgstr "Camps de Pâques"
+
+msgid "Winter Camps"
+msgstr "Camps d'hiver"
+
 msgid "j F Y"
 msgstr "j F Y"
 

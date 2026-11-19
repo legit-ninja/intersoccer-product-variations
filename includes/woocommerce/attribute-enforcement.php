@@ -1175,6 +1175,12 @@ function intersoccer_attr_validate_new_term($taxonomy, $name, $slug = '') {
         $slug_l = strtolower($slug);
         $name_l = strtolower($name);
         $name_as_slug = intersoccer_attr_english_term_slug($name);
+        if ($attr_slug === 'program-season' && function_exists('intersoccer_attr_program_season_slug_for_label')) {
+            $mapped = intersoccer_attr_program_season_slug_for_label($name);
+            if ($mapped !== '' && in_array($mapped, $allowed_slugs, true)) {
+                return true;
+            }
+        }
         if (!in_array($slug_l, $allowed_slugs, true)
             && !in_array($name_l, $allowed_names, true)
             && !in_array($name_as_slug, $allowed_slugs, true)) {
@@ -1299,6 +1305,14 @@ function intersoccer_attr_insert_term_english_slug($data, $taxonomy, $args = [])
         if ($year !== '' && (bool) preg_match('/^20\d{2}$/', $name)) {
             $data['name'] = $year;
             $data['slug'] = $year;
+            return $data;
+        }
+    }
+
+    if ($attr_slug === 'program-season' && function_exists('intersoccer_attr_program_season_slug_for_label')) {
+        $mapped = intersoccer_attr_program_season_slug_for_label($name);
+        if ($mapped !== '') {
+            $data['slug'] = $mapped;
             return $data;
         }
     }
