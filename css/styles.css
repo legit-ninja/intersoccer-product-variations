@@ -228,7 +228,9 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
    in pixels (no custom properties) at the same breakpoints copied below.
    Type size uses the theme variable until the 479px rule, where the
    theme hardcodes 14px. Radius, weight, and colours stay on `.button`.
-   A block box keeps the control under the sentence. */
+   A block box keeps the control under the sentence. The label stays on
+   one line: the theme's 55% variations column is narrower than the
+   French label around 480px, and a capped button wraps inside the pill. */
 .woocommerce div.product form.cart .intersoccer-login-prompt .button,
 .intersoccer-login-prompt .button {
     clear: both;
@@ -237,8 +239,9 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     justify-content: center;
     box-sizing: border-box;
     width: fit-content;
-    max-width: 100%;
+    max-width: none;
     margin: 0.65rem 0 0;
+    white-space: nowrap;
     text-transform: capitalize;
     font-size: var(--theme-font-button_font-size);
     height: 52px;

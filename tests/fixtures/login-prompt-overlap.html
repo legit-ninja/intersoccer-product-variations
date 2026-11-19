@@ -33,6 +33,9 @@
     padding: 17px 37px;
     text-decoration: none;
     border: 0;
+    white-space: pre-wrap;
+    max-width: 100%;
+    height: auto;
 }
 .woocommerce div.product form.cart .single_add_to_cart_button {
     height: 52px;
@@ -82,6 +85,31 @@
 
 body { font: 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; margin: 0; }
 form.cart { margin: 0; }
+/* Theme variations table is 55% of the form until 479px, which is what
+   squeezes the prompt to about 190px around a 480px viewport once the
+   content inset is included. At 479px and below the table is full width. */
+.content {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0 70px;
+}
+.woocommerce div.product form.cart .variations {
+    width: 55%;
+    border-collapse: collapse;
+}
+.woocommerce div.product form.cart .variations td,
+.woocommerce div.product form.cart .variations th {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    text-align: left;
+}
+@media (max-width: 479px) {
+    .woocommerce div.product form.cart .variations {
+        width: 100%;
+    }
+}
 /* Theme forms often collapse paragraph margins. With a floated button
    that has wrapped, a zero-margin paragraph no longer covers it. */
 .intersoccer-login-prompt { margin: 0; }
@@ -97,11 +125,12 @@ form.cart { margin: 0; }
 <link rel="stylesheet" href="../../css/styles.css">
 </head>
 <body>
+<div id="band"></div>
 <div id="cases"></div>
 <pre id="results">running</pre>
 <script>
 (function () {
-    var widths = [360, 390, 414, 768, 1440];
+    var widths = [320, 360, 390, 414, 440, 460, 480, 490, 495, 520, 768, 1440];
     var locales = [
         {
             id: 'en',
@@ -125,6 +154,50 @@ form.cart { margin: 0; }
             buy: 'Jetzt kaufen'
         }
     ];
+
+    var band = document.getElementById('band');
+    locales.forEach(function (locale) {
+        var wrap = document.createElement('div');
+        wrap.className = 'content band';
+        wrap.dataset.locale = locale.id;
+        wrap.innerHTML =
+            '<div class="woocommerce"><div class="product">' +
+            '<form class="cart intersoccer-product-form variations_form" action="#" method="post">' +
+            '<table class="variations"><tbody><tr class="intersoccer-player-selection intersoccer-injected">' +
+            '<th class="label"><label>Select an Attendee</label></th>' +
+            '<td class="value"><div class="intersoccer-player-content">' +
+            '<p class="intersoccer-login-prompt">' + locale.prompt + ' ' +
+            '<a class="button intersoccer-booking-return-link" href="#">' + locale.create + '</a> ' +
+            '<a class="intersoccer-booking-return-link" href="#">' + locale.login + '</a></p>' +
+            '<div class="woocommerce-info intersoccer-attendee-notification">' + locale.prompt + '</div>' +
+            '</div></td></tr></tbody></table>' +
+            '<button type="submit" class="button alt single_add_to_cart_button">' + locale.buy + '</button>' +
+            '</form></div></div>';
+        band.appendChild(wrap);
+    });
+
+    function textLines(el) {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var rects = range.getClientRects();
+        var tops = {};
+        var n = 0;
+        for (var i = 0; i < rects.length; i++) {
+            if (rects[i].width <= 0 || rects[i].height <= 0) {
+                continue;
+            }
+            var key = Math.round(rects[i].top);
+            if (!tops[key]) {
+                tops[key] = true;
+                n += 1;
+            }
+        }
+        return n;
+    }
+
+    function boxesOverlap(a, b) {
+        return a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    }
 
     var root = document.getElementById('cases');
     locales.forEach(function (locale) {
@@ -172,10 +245,50 @@ form.cart { margin: 0; }
 
     var lines = [];
     var failed = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.band'), function (bandEl) {
+        var button = bandEl.querySelector('a.button.intersoccer-booking-return-link');
+        var login = bandEl.querySelector('a.intersoccer-booking-return-link:not(.button)');
+        var notice = bandEl.querySelector('.intersoccer-attendee-notification');
+        var buy = bandEl.querySelector('.single_add_to_cart_button');
+        var createStyle = window.getComputedStyle(button);
+        var buyStyle = window.getComputedStyle(buy);
+        var createBox = button.getBoundingClientRect();
+        var loginBox = login.getBoundingClientRect();
+        var noticeBox = notice.getBoundingClientRect();
+        var oneLine = textLines(button) === 1;
+        var same = createStyle.height === buyStyle.height
+            && createStyle.lineHeight === buyStyle.lineHeight
+            && createStyle.padding === buyStyle.padding
+            && createStyle.fontSize === buyStyle.fontSize
+            && createStyle.textTransform === buyStyle.textTransform;
+        var clearLogin = !boxesOverlap(createBox, loginBox);
+        var clearNotice = !boxesOverlap(createBox, noticeBox);
+        var onPage = createBox.left >= -1 && createBox.right <= window.innerWidth + 1;
+        var ok = oneLine && same && clearLogin && clearNotice && onPage;
+        if (!ok) {
+            failed += 1;
+        }
+        lines.push(
+            (ok ? 'PASS' : 'FAIL') + ' band ' + bandEl.dataset.locale +
+            ' lines=' + textLines(button) +
+            ' h=' + createStyle.height + '/' + buyStyle.height +
+            ' pad=' + createStyle.padding + '/' + buyStyle.padding +
+            ' font=' + createStyle.fontSize + '/' + buyStyle.fontSize +
+            ' lh=' + createStyle.lineHeight + '/' + buyStyle.lineHeight +
+            ' tx=' + createStyle.textTransform + '/' + buyStyle.textTransform +
+            ' login=' + (clearLogin ? 'clear' : 'overlap') +
+            ' notice=' + (clearNotice ? 'clear' : 'overlap') +
+            ' page=' + (onPage ? 'inside' : 'overflow') +
+            ' w=' + Math.round(createBox.width)
+        );
+    });
     Array.prototype.forEach.call(document.querySelectorAll('.case'), function (caseEl) {
         var result = hitAtButtonCentre(caseEl);
+        var centreX = result.x;
+        var centreY = result.y;
+        var inView = centreX >= 0 && centreX < window.innerWidth && centreY >= 0 && centreY < window.innerHeight;
         var hit = result.hit;
-        var ok = !!(hit && (hit === result.button || (hit.closest && hit.closest('a.button.intersoccer-booking-return-link') === result.button)));
+        var ok = !inView || !!(hit && (hit === result.button || (hit.closest && hit.closest('a.button.intersoccer-booking-return-link') === result.button)));
         var hitDesc = hit ? (hit.id ? hit.id : hit.className || hit.tagName) : 'null';
         if (!ok) {
             failed += 1;
