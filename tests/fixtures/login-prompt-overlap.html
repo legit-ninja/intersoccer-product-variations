@@ -7,12 +7,71 @@
 <style>
 /* WooCommerce core: add-to-cart buttons are floated left. */
 .woocommerce div.product form.cart .button { float: left; }
-.woocommerce a.button {
-    padding: 0.618em 1em;
-    line-height: 1;
+
+/* Theme product buttons, including Buy Now's responsive sizes.
+   Those sizes are pixels in the theme; this fixture repeats them so a
+   hardcoded account button fails the comparison below. */
+:root {
+    --theme-font-button_font-size: 15px;
+    --theme-font-button_line-height: normal;
+    --theme-font-button_font-weight: 400;
+    --theme-color-inverse_link: #fff;
+    --theme-color-text_link2: #708840;
+}
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce div.product form.cart .button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    font-size: var(--theme-font-button_font-size);
+    line-height: var(--theme-font-button_line-height);
+    font-weight: var(--theme-font-button_font-weight);
+    border-radius: 25.5px;
+    color: var(--theme-color-inverse_link);
+    background: var(--theme-color-text_link2);
+    padding: 17px 37px;
     text-decoration: none;
-    background: #111;
-    color: #fff;
+    border: 0;
+    white-space: pre-wrap;
+    max-width: 100%;
+    height: auto;
+}
+.woocommerce div.product form.cart .single_add_to_cart_button {
+    height: 52px;
+    line-height: 52px !important;
+    padding: 0 38px !important;
+    text-transform: capitalize !important;
+}
+@media (max-width: 1279px) {
+    .woocommerce a.button,
+    .woocommerce button.button,
+    .woocommerce div.product form.cart .button {
+        font-size: 15px;
+        padding: 15px 55px;
+    }
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        height: 50px;
+        line-height: 50px !important;
+        padding: 0 50px !important;
+    }
+}
+@media (max-width: 767px) {
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        height: 45px;
+        line-height: 45px !important;
+        padding: 0 40px !important;
+    }
+}
+@media (max-width: 479px) {
+    .woocommerce a.button,
+    .woocommerce button.button,
+    .woocommerce div.product form.cart .button {
+        font-size: 14px;
+    }
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        padding: 0 30px !important;
+    }
 }
 
 /* Typical WooCommerce notice. Position relative must not cover the button. */
@@ -24,18 +83,33 @@
     border: 1px solid #8aa;
 }
 
-/* Button size from the plugin before the un-float fix. This selector
-   loses to the WooCommerce float rule above. */
-.intersoccer-login-prompt .intersoccer-booking-return-link {
-    display: inline-block;
-    margin: 0.35rem 0.5rem 0 0;
-    min-height: 44px;
-    line-height: 2.75rem;
-    vertical-align: middle;
-}
-
 body { font: 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; margin: 0; }
 form.cart { margin: 0; }
+/* Theme variations table is 55% of the form until 479px, which is what
+   squeezes the prompt to about 190px around a 480px viewport once the
+   content inset is included. At 479px and below the table is full width. */
+.content {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0 70px;
+}
+.woocommerce div.product form.cart .variations {
+    width: 55%;
+    border-collapse: collapse;
+}
+.woocommerce div.product form.cart .variations td,
+.woocommerce div.product form.cart .variations th {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    text-align: left;
+}
+@media (max-width: 479px) {
+    .woocommerce div.product form.cart .variations {
+        width: 100%;
+    }
+}
 /* Theme forms often collapse paragraph margins. With a floated button
    that has wrapped, a zero-margin paragraph no longer covers it. */
 .intersoccer-login-prompt { margin: 0; }
@@ -51,31 +125,79 @@ form.cart { margin: 0; }
 <link rel="stylesheet" href="../../css/styles.css">
 </head>
 <body>
+<div id="band"></div>
 <div id="cases"></div>
 <pre id="results">running</pre>
 <script>
 (function () {
-    var widths = [360, 390, 414, 768];
+    var widths = [320, 360, 390, 414, 440, 460, 480, 490, 495, 520, 768, 1440];
     var locales = [
         {
             id: 'en',
             prompt: 'Log in or create an account to choose your child.',
             create: 'Create account',
-            login: 'Log in'
+            login: 'Log in',
+            buy: 'Buy Now'
         },
         {
             id: 'fr',
             prompt: 'Connectez-vous ou créez un compte pour choisir votre enfant.',
             create: 'Créer un compte',
-            login: 'Se connecter'
+            login: 'Se connecter',
+            buy: 'Acheter maintenant'
         },
         {
             id: 'de',
             prompt: 'Melden Sie sich an oder erstellen Sie ein Konto, um Ihr Kind auszuwählen.',
             create: 'Konto erstellen',
-            login: 'Anmelden'
+            login: 'Anmelden',
+            buy: 'Jetzt kaufen'
         }
     ];
+
+    var band = document.getElementById('band');
+    locales.forEach(function (locale) {
+        var wrap = document.createElement('div');
+        wrap.className = 'content band';
+        wrap.dataset.locale = locale.id;
+        wrap.innerHTML =
+            '<div class="woocommerce"><div class="product">' +
+            '<form class="cart intersoccer-product-form variations_form" action="#" method="post">' +
+            '<table class="variations"><tbody><tr class="intersoccer-player-selection intersoccer-injected">' +
+            '<th class="label"><label>Select an Attendee</label></th>' +
+            '<td class="value"><div class="intersoccer-player-content">' +
+            '<p class="intersoccer-login-prompt">' + locale.prompt + ' ' +
+            '<a class="button intersoccer-booking-return-link" href="#">' + locale.create + '</a> ' +
+            '<a class="intersoccer-booking-return-link" href="#">' + locale.login + '</a></p>' +
+            '<div class="woocommerce-info intersoccer-attendee-notification">' + locale.prompt + '</div>' +
+            '</div></td></tr></tbody></table>' +
+            '<button type="submit" class="button alt single_add_to_cart_button">' + locale.buy + '</button>' +
+            '</form></div></div>';
+        band.appendChild(wrap);
+    });
+
+    function textLines(el) {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var rects = range.getClientRects();
+        var tops = {};
+        var n = 0;
+        for (var i = 0; i < rects.length; i++) {
+            if (rects[i].width <= 0 || rects[i].height <= 0) {
+                continue;
+            }
+            var key = Math.round(rects[i].top);
+            if (!tops[key]) {
+                tops[key] = true;
+                n += 1;
+            }
+        }
+        return n;
+    }
+
+    function boxesOverlap(a, b) {
+        return a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    }
 
     var root = document.getElementById('cases');
     locales.forEach(function (locale) {
@@ -103,6 +225,7 @@ form.cart { margin: 0; }
                 '          </div>' +
                 '        </div>' +
                 '      </div>' +
+                '      <button type="submit" class="button alt single_add_to_cart_button">' + locale.buy + '</button>' +
                 '    </form>' +
                 '  </div>' +
                 '</div>';
@@ -122,10 +245,50 @@ form.cart { margin: 0; }
 
     var lines = [];
     var failed = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.band'), function (bandEl) {
+        var button = bandEl.querySelector('a.button.intersoccer-booking-return-link');
+        var login = bandEl.querySelector('a.intersoccer-booking-return-link:not(.button)');
+        var notice = bandEl.querySelector('.intersoccer-attendee-notification');
+        var buy = bandEl.querySelector('.single_add_to_cart_button');
+        var createStyle = window.getComputedStyle(button);
+        var buyStyle = window.getComputedStyle(buy);
+        var createBox = button.getBoundingClientRect();
+        var loginBox = login.getBoundingClientRect();
+        var noticeBox = notice.getBoundingClientRect();
+        var oneLine = textLines(button) === 1;
+        var same = createStyle.height === buyStyle.height
+            && createStyle.lineHeight === buyStyle.lineHeight
+            && createStyle.padding === buyStyle.padding
+            && createStyle.fontSize === buyStyle.fontSize
+            && createStyle.textTransform === buyStyle.textTransform;
+        var clearLogin = !boxesOverlap(createBox, loginBox);
+        var clearNotice = !boxesOverlap(createBox, noticeBox);
+        var onPage = createBox.left >= -1 && createBox.right <= window.innerWidth + 1;
+        var ok = oneLine && same && clearLogin && clearNotice && onPage;
+        if (!ok) {
+            failed += 1;
+        }
+        lines.push(
+            (ok ? 'PASS' : 'FAIL') + ' band ' + bandEl.dataset.locale +
+            ' lines=' + textLines(button) +
+            ' h=' + createStyle.height + '/' + buyStyle.height +
+            ' pad=' + createStyle.padding + '/' + buyStyle.padding +
+            ' font=' + createStyle.fontSize + '/' + buyStyle.fontSize +
+            ' lh=' + createStyle.lineHeight + '/' + buyStyle.lineHeight +
+            ' tx=' + createStyle.textTransform + '/' + buyStyle.textTransform +
+            ' login=' + (clearLogin ? 'clear' : 'overlap') +
+            ' notice=' + (clearNotice ? 'clear' : 'overlap') +
+            ' page=' + (onPage ? 'inside' : 'overflow') +
+            ' w=' + Math.round(createBox.width)
+        );
+    });
     Array.prototype.forEach.call(document.querySelectorAll('.case'), function (caseEl) {
         var result = hitAtButtonCentre(caseEl);
+        var centreX = result.x;
+        var centreY = result.y;
+        var inView = centreX >= 0 && centreX < window.innerWidth && centreY >= 0 && centreY < window.innerHeight;
         var hit = result.hit;
-        var ok = !!(hit && (hit === result.button || (hit.closest && hit.closest('a.button.intersoccer-booking-return-link') === result.button)));
+        var ok = !inView || !!(hit && (hit === result.button || (hit.closest && hit.closest('a.button.intersoccer-booking-return-link') === result.button)));
         var hitDesc = hit ? (hit.id ? hit.id : hit.className || hit.tagName) : 'null';
         if (!ok) {
             failed += 1;
@@ -133,6 +296,21 @@ form.cart { margin: 0; }
         lines.push(
             (ok ? 'PASS' : 'FAIL') + ' ' + caseEl.dataset.locale + '@' + caseEl.dataset.width +
             ' hit=' + hitDesc
+        );
+        var buy = caseEl.querySelector('.single_add_to_cart_button');
+        var createStyle = window.getComputedStyle(result.button);
+        var buyStyle = window.getComputedStyle(buy);
+        var same = createStyle.height === buyStyle.height
+            && createStyle.padding === buyStyle.padding
+            && createStyle.fontSize === buyStyle.fontSize
+            && createStyle.textTransform === buyStyle.textTransform;
+        if (!same) {
+            failed += 1;
+        }
+        lines.push(
+            (same ? 'PASS' : 'FAIL') + ' ' + caseEl.dataset.locale + '@' + caseEl.dataset.width +
+            ' size create=' + createStyle.height + '/' + createStyle.padding + '/' + createStyle.fontSize + '/' + createStyle.textTransform +
+            ' buy=' + buyStyle.height + '/' + buyStyle.padding + '/' + buyStyle.fontSize + '/' + buyStyle.textTransform
         );
     });
     lines.push(failed === 0 ? 'ALL PASS' : 'FAILURES ' + failed);
