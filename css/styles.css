@@ -223,11 +223,12 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     float: none;
 }
 
-/* The theme's 52px product-button size is on `.single_add_to_cart_button`
-   only, so this account link cannot inherit it. Repeat that height,
-   line-height, and padding here. Font, radius, weight, and colours stay
-   on the theme's `.button` rules. A block box puts the control under the
-   sentence at every width, at the same content width as Buy Now. */
+/* Buy Now's size lives on `.single_add_to_cart_button`, which this link
+   is not, so it cannot inherit those declarations. The theme sets them
+   in pixels (no custom properties) at the same breakpoints copied below.
+   Type size uses the theme variable until the 479px rule, where the
+   theme hardcodes 14px. Radius, weight, and colours stay on `.button`.
+   A block box keeps the control under the sentence. */
 .woocommerce div.product form.cart .intersoccer-login-prompt .button,
 .intersoccer-login-prompt .button {
     clear: both;
@@ -237,10 +238,38 @@ form.variations_form:has(.intersoccer-injected) .woocommerce-variation-add-to-ca
     box-sizing: border-box;
     width: fit-content;
     max-width: 100%;
+    margin: 0.65rem 0 0;
+    text-transform: capitalize;
+    font-size: var(--theme-font-button_font-size);
     height: 52px;
     line-height: 52px;
     padding: 0 38px;
-    margin: 0.65rem 0 0;
+}
+
+@media (max-width: 1279px) {
+    .woocommerce div.product form.cart .intersoccer-login-prompt .button,
+    .intersoccer-login-prompt .button {
+        height: 50px;
+        line-height: 50px;
+        padding: 0 50px;
+    }
+}
+
+@media (max-width: 767px) {
+    .woocommerce div.product form.cart .intersoccer-login-prompt .button,
+    .intersoccer-login-prompt .button {
+        height: 45px;
+        line-height: 45px;
+        padding: 0 40px;
+    }
+}
+
+@media (max-width: 479px) {
+    .woocommerce div.product form.cart .intersoccer-login-prompt .button,
+    .intersoccer-login-prompt .button {
+        padding: 0 30px;
+        font-size: 14px;
+    }
 }
 
 /* In normal flow above the booking form. WooCommerce marks these notices

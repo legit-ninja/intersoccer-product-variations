@@ -8,7 +8,9 @@
 /* WooCommerce core: add-to-cart buttons are floated left. */
 .woocommerce div.product form.cart .button { float: left; }
 
-/* Theme product buttons. Buy Now is then pinned to 52px. */
+/* Theme product buttons, including Buy Now's responsive sizes.
+   Those sizes are pixels in the theme; this fixture repeats them so a
+   hardcoded account button fails the comparison below. */
 :root {
     --theme-font-button_font-size: 15px;
     --theme-font-button_line-height: normal;
@@ -34,8 +36,39 @@
 }
 .woocommerce div.product form.cart .single_add_to_cart_button {
     height: 52px;
-    line-height: 52px;
-    padding: 0 38px;
+    line-height: 52px !important;
+    padding: 0 38px !important;
+    text-transform: capitalize !important;
+}
+@media (max-width: 1279px) {
+    .woocommerce a.button,
+    .woocommerce button.button,
+    .woocommerce div.product form.cart .button {
+        font-size: 15px;
+        padding: 15px 55px;
+    }
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        height: 50px;
+        line-height: 50px !important;
+        padding: 0 50px !important;
+    }
+}
+@media (max-width: 767px) {
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        height: 45px;
+        line-height: 45px !important;
+        padding: 0 40px !important;
+    }
+}
+@media (max-width: 479px) {
+    .woocommerce a.button,
+    .woocommerce button.button,
+    .woocommerce div.product form.cart .button {
+        font-size: 14px;
+    }
+    .woocommerce div.product form.cart .single_add_to_cart_button {
+        padding: 0 30px !important;
+    }
 }
 
 /* Typical WooCommerce notice. Position relative must not cover the button. */
@@ -150,6 +183,21 @@ form.cart { margin: 0; }
         lines.push(
             (ok ? 'PASS' : 'FAIL') + ' ' + caseEl.dataset.locale + '@' + caseEl.dataset.width +
             ' hit=' + hitDesc
+        );
+        var buy = caseEl.querySelector('.single_add_to_cart_button');
+        var createStyle = window.getComputedStyle(result.button);
+        var buyStyle = window.getComputedStyle(buy);
+        var same = createStyle.height === buyStyle.height
+            && createStyle.padding === buyStyle.padding
+            && createStyle.fontSize === buyStyle.fontSize
+            && createStyle.textTransform === buyStyle.textTransform;
+        if (!same) {
+            failed += 1;
+        }
+        lines.push(
+            (same ? 'PASS' : 'FAIL') + ' ' + caseEl.dataset.locale + '@' + caseEl.dataset.width +
+            ' size create=' + createStyle.height + '/' + createStyle.padding + '/' + createStyle.fontSize + '/' + createStyle.textTransform +
+            ' buy=' + buyStyle.height + '/' + buyStyle.padding + '/' + buyStyle.fontSize + '/' + buyStyle.textTransform
         );
     });
     lines.push(failed === 0 ? 'ALL PASS' : 'FAILURES ' + failed);
