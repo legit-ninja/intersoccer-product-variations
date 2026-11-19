@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login prompt overlap fixture</title>
+<style>
+/* WooCommerce core: add-to-cart buttons are floated left. */
+.woocommerce div.product form.cart .button { float: left; }
+.woocommerce a.button {
+    padding: 0.618em 1em;
+    line-height: 1;
+    text-decoration: none;
+    background: #111;
+    color: #fff;
+}
+
+/* Typical WooCommerce notice. Position relative must not cover the button. */
+.woocommerce-info {
+    position: relative;
+    margin: 0;
+    padding: 1em 1.5em;
+    background: #d7e8f0;
+    border: 1px solid #8aa;
+}
+
+/* Button size from the plugin before the un-float fix. This selector
+   loses to the WooCommerce float rule above. */
+.intersoccer-login-prompt .intersoccer-booking-return-link {
+    display: inline-block;
+    margin: 0.35rem 0.5rem 0 0;
+    min-height: 44px;
+    line-height: 2.75rem;
+    vertical-align: middle;
+}
+
+body { font: 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; margin: 0; }
+form.cart { margin: 0; }
+/* Theme forms often collapse paragraph margins. With a floated button
+   that has wrapped, a zero-margin paragraph no longer covers it. */
+.intersoccer-login-prompt { margin: 0; }
+.case {
+    border: 1px solid #ccc;
+    margin: 0 0 1rem;
+    padding: 0.75rem;
+    box-sizing: border-box;
+}
+.case h2 { font-size: 0.9rem; margin: 0 0 0.4rem; }
+.case .label { display: block; margin: 0 0 0.35rem; font-weight: bold; }
+</style>
+<link rel="stylesheet" href="../../css/styles.css">
+</head>
+<body>
+<div id="cases"></div>
+<pre id="results">running</pre>
+<script>
+(function () {
+    var widths = [360, 390, 414, 768];
+    var locales = [
+        {
+            id: 'en',
+            prompt: 'Log in or create an account to choose your child.',
+            create: 'Create account',
+            login: 'Log in'
+        },
+        {
+            id: 'fr',
+            prompt: 'Connectez-vous ou créez un compte pour choisir votre enfant.',
+            create: 'Créer un compte',
+            login: 'Se connecter'
+        },
+        {
+            id: 'de',
+            prompt: 'Melden Sie sich an oder erstellen Sie ein Konto, um Ihr Kind auszuwählen.',
+            create: 'Konto erstellen',
+            login: 'Anmelden'
+        }
+    ];
+
+    var root = document.getElementById('cases');
+    locales.forEach(function (locale) {
+        widths.forEach(function (width) {
+            var wrap = document.createElement('div');
+            wrap.className = 'case';
+            wrap.dataset.locale = locale.id;
+            wrap.dataset.width = String(width);
+            wrap.style.width = width + 'px';
+            wrap.innerHTML =
+                '<h2>' + locale.id + ' @ ' + width + '</h2>' +
+                '<div class="woocommerce">' +
+                '  <div class="product">' +
+                '    <form class="cart intersoccer-product-form variations_form" action="#" method="post">' +
+                '      <div class="intersoccer-player-selection intersoccer-injected">' +
+                '        <span class="label">Select an Attendee</span>' +
+                '        <div class="intersoccer-player-content">' +
+                '          <p class="intersoccer-login-prompt">' +
+                locale.prompt + ' ' +
+                '<a class="button intersoccer-booking-return-link" href="#">'+ locale.create +'</a> ' +
+                '<a class="intersoccer-booking-return-link" href="#">'+ locale.login +'</a>' +
+                '          </p>' +
+                '          <div class="woocommerce-info intersoccer-attendee-notification">' +
+                locale.prompt +
+                '          </div>' +
+                '        </div>' +
+                '      </div>' +
+                '    </form>' +
+                '  </div>' +
+                '</div>';
+            root.appendChild(wrap);
+        });
+    });
+
+    function hitAtButtonCentre(caseEl) {
+        var button = caseEl.querySelector('a.button.intersoccer-booking-return-link');
+        caseEl.scrollIntoView({ block: 'center', inline: 'nearest' });
+        var rect = button.getBoundingClientRect();
+        var x = rect.left + (rect.width / 2);
+        var y = rect.top + (rect.height / 2);
+        var hit = document.elementFromPoint(x, y);
+        return { button: button, hit: hit, x: x, y: y, rect: rect };
+    }
+
+    var lines = [];
+    var failed = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.case'), function (caseEl) {
+        var result = hitAtButtonCentre(caseEl);
+        var hit = result.hit;
+        var ok = !!(hit && (hit === result.button || (hit.closest && hit.closest('a.button.intersoccer-booking-return-link') === result.button)));
+        var hitDesc = hit ? (hit.id ? hit.id : hit.className || hit.tagName) : 'null';
+        if (!ok) {
+            failed += 1;
+        }
+        lines.push(
+            (ok ? 'PASS' : 'FAIL') + ' ' + caseEl.dataset.locale + '@' + caseEl.dataset.width +
+            ' hit=' + hitDesc
+        );
+    });
+    lines.push(failed === 0 ? 'ALL PASS' : 'FAILURES ' + failed);
+    var out = document.getElementById('results');
+    out.textContent = lines.join('\n');
+    document.title = failed === 0 ? 'ALL PASS' : 'FAILURES ' + failed;
+})();
+</script>
+</body>
+</html>

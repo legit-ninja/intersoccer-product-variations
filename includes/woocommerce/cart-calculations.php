@@ -466,14 +466,22 @@ function intersoccer_validate_cart_item($passed, $product_id, $quantity, $variat
             $login_url = function_exists('wc_get_account_endpoint_url')
                 ? wc_get_account_endpoint_url('dashboard')
                 : wp_login_url();
-            wc_add_notice(
-                sprintf(
-                    /* translators: %s: login/register URL */
-                    __('Please <a href="%s">log in or register</a> to book this product.', 'intersoccer-product-variations'),
-                    esc_url($login_url)
-                ),
-                'error'
+            if (function_exists('intersoccer_pv_account_url_with_return')) {
+                $login_url = intersoccer_pv_account_url_with_return(
+                    $login_url,
+                    (int) $product_id,
+                    function_exists('intersoccer_pv_add_to_cart_return_selections')
+                        ? intersoccer_pv_add_to_cart_return_selections($variations, (int) $quantity, (int) $variation_id)
+                        : []
+                );
+            }
+            $guest_notice = sprintf(
+                /* translators: %s: login/register URL */
+                __('Please <a href="%s">log in or register</a> to book this product.', 'intersoccer-product-variations'),
+                esc_url($login_url)
             );
+            $guest_notice = str_replace('<a href="', '<a class="intersoccer-booking-return-link" href="', $guest_notice);
+            wc_add_notice($guest_notice, 'error');
             $passed = false;
             intersoccer_warning('Cart validation failed: guest attempted ATC on attendee-required product ' . $product_id);
         } else {
@@ -549,6 +557,18 @@ function intersoccer_fix_add_to_cart_redirect($url) {
             WC()->session->__unset('intersoccer_redirect_url');
             return $stored_url;
         }
+        $product_id = isset($_REQUEST['add-to-cart']) ? absint($_REQUEST['add-to-cart']) : 0;
+        if ($product_id > 0 && function_exists('intersoccer_pv_booking_return_url')) {
+            $return_url = intersoccer_pv_booking_return_url(
+                $product_id,
+                function_exists('intersoccer_pv_add_to_cart_return_selections')
+                    ? intersoccer_pv_add_to_cart_return_selections()
+                    : []
+            );
+            if ($return_url !== '') {
+                return $return_url;
+            }
+        }
     }
 
     return $url;
@@ -570,7 +590,19 @@ function intersoccer_fix_validation_fail_redirect($referer) {
         return $referer;
     }
     
-    $product_url = get_permalink($product_id);
+    $product_url = '';
+    if (function_exists('intersoccer_pv_booking_return_url')) {
+        $product_url = intersoccer_pv_booking_return_url(
+            $product_id,
+            function_exists('intersoccer_pv_add_to_cart_return_selections')
+                ? intersoccer_pv_add_to_cart_return_selections()
+                : []
+        );
+    }
+    if ($product_url === '' && function_exists('get_permalink')) {
+        $permalink = get_permalink($product_id);
+        $product_url = is_string($permalink) ? $permalink : '';
+    }
     if (!$product_url) {
         return $referer;
     }

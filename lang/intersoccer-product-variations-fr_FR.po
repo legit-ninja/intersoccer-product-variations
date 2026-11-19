@@ -935,7 +935,28 @@ msgstr "Veuillez vous <a href=\"%1$s\">connecter</a> ou vous <a href=\"%2$s\">in
 
 # wpml-name: Please log in or register to select an attendee.
 msgid "Please log in or register to select an attendee."
-msgstr "Veuillez vous connecter ou vous inscrire pour sélectionner un participant."
+msgstr "Connectez-vous ou créez un compte pour sélectionner un participant."
+
+msgid "Log in or create an account to choose your child."
+msgstr "Connectez-vous ou créez un compte pour choisir votre enfant."
+
+msgid "Create account"
+msgstr "Créer un compte"
+
+msgid "Log in"
+msgstr "Se connecter"
+
+msgid "Your choices are saved. Check them and add to cart."
+msgstr "Vos choix sont enregistrés. Vérifiez-les et ajoutez au panier."
+
+msgid "We couldn't keep your choices. Please pick them again."
+msgstr "Nous n'avons pas pu conserver vos choix. Merci de les sélectionner à nouveau."
+
+msgid "Please finish choosing your options to continue."
+msgstr "Veuillez terminer de sélectionner vos options pour continuer."
+
+msgid "Add another child"
+msgstr "Ajouter un autre enfant"
 
 #, php-format
 # wpml-name: No players registered. <a href="%s">Add a player</a>.
@@ -1157,7 +1178,7 @@ msgstr "Veuillez sélectionner une variation."
 
 #, php-format
 msgid "Please <a href=\"%s\">log in or register</a> to book this product."
-msgstr "Veuillez <a href=\"%s\">vous connecter ou vous inscrire</a> pour réserver ce produit."
+msgstr "Veuillez <a href=\"%s\">vous connecter ou créer un compte</a> pour réserver ce produit."
 
 msgid "Course Information"
 msgstr "Informations sur le cours"
