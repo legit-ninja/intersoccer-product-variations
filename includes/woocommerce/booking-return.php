@@ -613,7 +613,11 @@ if (!function_exists('intersoccer_pv_matching_variation_id')) {
         if (!method_exists($store, 'find_matching_product_variation')) {
             return 0;
         }
-        return (int) $store->find_matching_product_variation($product, $attributes);
+        $direct = (int) $store->find_matching_product_variation($product, $attributes);
+        if ($direct > 0 || !intersoccer_pv_return_wpml_active()) {
+            return $direct;
+        }
+        return intersoccer_pv_matching_variation_id_by_term($product, $attributes);
     }
 }
 
@@ -674,16 +678,319 @@ if (!function_exists('intersoccer_pv_variation_attribute_options')) {
     }
 }
 
-if (!function_exists('intersoccer_pv_attribute_value_is_allowed')) {
+if (!function_exists('intersoccer_pv_return_wpml_active')) {
     /**
-     * @param string $value
-     * @param array<int,string> $allowed
+     * Term translation is available only when WPML reports a default language.
+     *
      * @return bool
      */
-    function intersoccer_pv_attribute_value_is_allowed($value, array $allowed) {
-        $value = strtolower((string) $value);
+    function intersoccer_pv_return_wpml_active() {
+        if (!function_exists('apply_filters')) {
+            return false;
+        }
+        $default = apply_filters('wpml_default_language', null);
+        return is_string($default) && $default !== '';
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_with_all_languages')) {
+    /**
+     * Resolve a term by its real slug. WPML otherwise limits lookups to the current language.
+     *
+     * @param callable $callback
+     * @return mixed
+     */
+    function intersoccer_pv_return_with_all_languages(callable $callback) {
+        $previous = null;
+        $switched = false;
+        if (intersoccer_pv_return_wpml_active() && function_exists('do_action')) {
+            $previous = apply_filters('wpml_current_language', null);
+            if (is_string($previous) && $previous !== '' && $previous !== 'all') {
+                do_action('wpml_switch_language', 'all');
+                $switched = true;
+            }
+        }
+        try {
+            return $callback();
+        } finally {
+            if ($switched && is_string($previous) && $previous !== '') {
+                do_action('wpml_switch_language', $previous);
+            }
+        }
+    }
+}
+
+if (!function_exists('intersoccer_pv_attribute_taxonomy')) {
+    /**
+     * Taxonomy for an attribute_* request key. Empty for non-taxonomy attributes.
+     *
+     * @param string $name
+     * @return string
+     */
+    function intersoccer_pv_attribute_taxonomy($name) {
+        $key = intersoccer_pv_attribute_request_key($name);
+        $prefix = 'attribute_pa_';
+        if ($key === '' || strpos($key, $prefix) !== 0) {
+            return '';
+        }
+        return substr($key, strlen('attribute_'));
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_term_by_slug')) {
+    /**
+     * @param string $slug
+     * @param string $taxonomy
+     * @return object|null
+     */
+    function intersoccer_pv_return_term_by_slug($slug, $taxonomy) {
+        $slug = strtolower(trim((string) $slug));
+        $taxonomy = (string) $taxonomy;
+        if ($slug === '' || $taxonomy === '' || !function_exists('get_term_by')) {
+            return null;
+        }
+        $term = intersoccer_pv_return_with_all_languages(static function () use ($slug, $taxonomy) {
+            return get_term_by('slug', $slug, $taxonomy);
+        });
+        if (!is_object($term) || empty($term->term_id)) {
+            return null;
+        }
+        return $term;
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_term_by_id')) {
+    /**
+     * @param int    $term_id
+     * @param string $taxonomy
+     * @return object|null
+     */
+    function intersoccer_pv_return_term_by_id($term_id, $taxonomy) {
+        $term_id = (int) $term_id;
+        $taxonomy = (string) $taxonomy;
+        if ($term_id <= 0 || $taxonomy === '' || !function_exists('get_term')) {
+            return null;
+        }
+        $term = intersoccer_pv_return_with_all_languages(static function () use ($term_id, $taxonomy) {
+            return get_term($term_id, $taxonomy);
+        });
+        if (!is_object($term) || (function_exists('is_wp_error') && is_wp_error($term))) {
+            return null;
+        }
+        return $term;
+    }
+}
+
+if (!function_exists('intersoccer_pv_attribute_term_canonical_id')) {
+    /**
+     * Default-language term id for a slug, or 0 when WPML cannot resolve it.
+     *
+     * @param string $slug
+     * @param string $taxonomy
+     * @return int
+     */
+    function intersoccer_pv_attribute_term_canonical_id($slug, $taxonomy) {
+        if (!intersoccer_pv_return_wpml_active()) {
+            return 0;
+        }
+        $term = intersoccer_pv_return_term_by_slug($slug, $taxonomy);
+        if (!$term) {
+            return 0;
+        }
+        $default = apply_filters('wpml_default_language', null);
+        $canonical = (int) apply_filters('wpml_object_id', (int) $term->term_id, $taxonomy, true, $default);
+        return $canonical > 0 ? $canonical : (int) $term->term_id;
+    }
+}
+
+if (!function_exists('intersoccer_pv_attribute_slugs_equivalent')) {
+    /**
+     * Direct slug match, or the same WPML term when the slugs differ.
+     *
+     * Without WPML only the direct comparison runs.
+     *
+     * @param string $left
+     * @param string $right
+     * @param string $taxonomy
+     * @return bool
+     */
+    function intersoccer_pv_attribute_slugs_equivalent($left, $right, $taxonomy = '') {
+        $left_norm = strtolower(trim((string) $left));
+        $right_norm = strtolower(trim((string) $right));
+        if ($left_norm === '' || $right_norm === '') {
+            return false;
+        }
+        if ($left_norm === $right_norm) {
+            return true;
+        }
+        if ($taxonomy === '' || !intersoccer_pv_return_wpml_active()) {
+            return false;
+        }
+        $left_id = intersoccer_pv_attribute_term_canonical_id($left, $taxonomy);
+        $right_id = intersoccer_pv_attribute_term_canonical_id($right, $taxonomy);
+        return $left_id > 0 && $left_id === $right_id;
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_attribute_slug_for_form')) {
+    /**
+     * Slug to select in the current-language form. The request slug is kept when WPML is absent.
+     *
+     * @param string $slug
+     * @param string $taxonomy
+     * @return string
+     */
+    function intersoccer_pv_return_attribute_slug_for_form($slug, $taxonomy) {
+        $slug = (string) $slug;
+        if ($slug === '' || $taxonomy === '' || !intersoccer_pv_return_wpml_active()) {
+            return $slug;
+        }
+        $current = apply_filters('wpml_current_language', null);
+        if (!is_string($current) || $current === '' || $current === 'all') {
+            return $slug;
+        }
+        $term = intersoccer_pv_return_term_by_slug($slug, $taxonomy);
+        if (!$term) {
+            return $slug;
+        }
+        $translated_id = (int) apply_filters('wpml_object_id', (int) $term->term_id, $taxonomy, true, $current);
+        if ($translated_id <= 0) {
+            return $slug;
+        }
+        if ($translated_id === (int) $term->term_id && isset($term->slug) && (string) $term->slug !== '') {
+            return (string) $term->slug;
+        }
+        $translated = intersoccer_pv_return_term_by_id($translated_id, $taxonomy);
+        if ($translated && isset($translated->slug) && (string) $translated->slug !== '') {
+            return (string) $translated->slug;
+        }
+        return $slug;
+    }
+}
+
+if (!function_exists('intersoccer_pv_return_form_attribute_values')) {
+    /**
+     * Attribute values to restore on the form, in the current language when WPML can translate them.
+     *
+     * @return array<string,string>
+     */
+    function intersoccer_pv_return_form_attribute_values() {
+        if (!intersoccer_pv_is_booking_return_request()) {
+            return [];
+        }
+        $out = [];
+        foreach (intersoccer_pv_request_attribute_selections() as $key => $value) {
+            $out[$key] = intersoccer_pv_return_attribute_slug_for_form($value, intersoccer_pv_attribute_taxonomy($key));
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('intersoccer_pv_normalize_variation_attribute_map')) {
+    /**
+     * @param mixed $attributes
+     * @return array<string,string>
+     */
+    function intersoccer_pv_normalize_variation_attribute_map($attributes) {
+        $out = [];
+        if (!is_array($attributes)) {
+            return $out;
+        }
+        foreach ($attributes as $name => $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $key = intersoccer_pv_attribute_request_key($name);
+            if ($key === '') {
+                continue;
+            }
+            $out[$key] = (string) $value;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('intersoccer_pv_variation_matches_request')) {
+    /**
+     * WooCommerce "any" (empty) values match. A stored value matches a translation of the request slug.
+     *
+     * @param array<string,string> $stored
+     * @param array<string,string> $requested
+     * @return bool
+     */
+    function intersoccer_pv_variation_matches_request(array $stored, array $requested) {
+        if ($requested === []) {
+            return false;
+        }
+        foreach ($stored as $key => $stored_value) {
+            $stored_value = (string) $stored_value;
+            if ($stored_value === '') {
+                continue;
+            }
+            if (!array_key_exists($key, $requested)) {
+                return false;
+            }
+            if (!intersoccer_pv_attribute_slugs_equivalent($requested[$key], $stored_value, intersoccer_pv_attribute_taxonomy($key))) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+if (!function_exists('intersoccer_pv_matching_variation_id_by_term')) {
+    /**
+     * Published variation whose stored slugs are the same terms as the request.
+     *
+     * Used only after an exact slug match misses and WPML is active, so mixed
+     * slug languages on one product still resolve. Reads variation data only.
+     *
+     * @param object $product
+     * @param array<string,string> $attributes
+     * @return int
+     */
+    function intersoccer_pv_matching_variation_id_by_term($product, array $attributes) {
+        if (!is_object($product) || !method_exists($product, 'get_children') || !function_exists('wc_get_product')) {
+            return 0;
+        }
+        $children = $product->get_children();
+        if (!is_array($children)) {
+            return 0;
+        }
+        foreach ($children as $child_id) {
+            $child_id = (int) $child_id;
+            if ($child_id <= 0) {
+                continue;
+            }
+            $variation = wc_get_product($child_id);
+            if (!is_object($variation) || !method_exists($variation, 'get_variation_attributes')) {
+                continue;
+            }
+            if (method_exists($variation, 'get_status')) {
+                $status = (string) $variation->get_status();
+                if ($status !== '' && $status !== 'publish') {
+                    continue;
+                }
+            }
+            $stored = intersoccer_pv_normalize_variation_attribute_map($variation->get_variation_attributes());
+            if (intersoccer_pv_variation_matches_request($stored, $attributes)) {
+                return $child_id;
+            }
+        }
+        return 0;
+    }
+}
+
+if (!function_exists('intersoccer_pv_attribute_value_is_allowed')) {
+    /**
+     * @param string              $value
+     * @param array<int,string>   $allowed
+     * @param string              $taxonomy
+     * @return bool
+     */
+    function intersoccer_pv_attribute_value_is_allowed($value, array $allowed, $taxonomy = '') {
         foreach ($allowed as $option) {
-            if (strtolower((string) $option) === $value) {
+            if (intersoccer_pv_attribute_slugs_equivalent($value, $option, $taxonomy)) {
                 return true;
             }
         }
@@ -724,7 +1031,7 @@ if (!function_exists('intersoccer_pv_return_attribute_state')) {
         $options = intersoccer_pv_variation_attribute_options($product);
         if ($options !== []) {
             foreach ($attributes as $key => $value) {
-                if (!isset($options[$key]) || !intersoccer_pv_attribute_value_is_allowed($value, $options[$key])) {
+                if (!isset($options[$key]) || !intersoccer_pv_attribute_value_is_allowed($value, $options[$key], intersoccer_pv_attribute_taxonomy($key))) {
                     return 'invalid';
                 }
             }

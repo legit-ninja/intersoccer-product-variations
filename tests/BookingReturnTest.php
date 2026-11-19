@@ -133,6 +133,12 @@ class BookingReturnTest extends TestCase {
         $_POST = $this->previousPost;
         unset($GLOBALS['product']);
         unset($GLOBALS['intersoccer_test_products'], $GLOBALS['intersoccer_pv_test_matching_variation']);
+        unset(
+            $GLOBALS['intersoccer_test_terms'],
+            $GLOBALS['intersoccer_test_wpml_current_language'],
+            $GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'],
+            $GLOBALS['intersoccer_test_wpml_switch_language_count']
+        );
         MockFilters::reset();
         parent::tearDown();
     }
@@ -453,6 +459,386 @@ class BookingReturnTest extends TestCase {
         $unmatched = intersoccer_pv_booking_return_notice_html(42);
         $this->assertSame('invalid', intersoccer_pv_return_attribute_state(42));
         $this->assertStringContainsString('Please pick them again.', $unmatched);
+    }
+
+    public function test_french_form_slugs_match_english_variation_slugs_and_restore_the_form(): void {
+        $this->installReturnTermMap();
+        $stored = $this->englishVariationAttributes();
+        $this->bindReturnProduct($this->optionsFromAttributes($stored), [77 => $stored]);
+        $this->useExactVariationMatch(77, $stored);
+        $this->setReturnLanguage('fr');
+        $GLOBALS['intersoccer_test_user_players'] = [
+            3 => ['first_name' => 'Ada', 'last_name' => 'Example', 'player_id' => 'player-uuid-1'],
+        ];
+
+        $_GET = $this->frenchReturnQuery();
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(77, intersoccer_pv_matching_variation_id(42));
+        $saved = intersoccer_pv_booking_return_notice_html(42);
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', $saved);
+        $this->assertStringNotContainsString('Please pick them again.', $saved);
+        $this->assertSame('player-uuid-1', intersoccer_pv_return_preselect_value(42));
+        $this->assertSame($this->frenchFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+
+        $_GET = $this->englishReturnQuery();
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(77, intersoccer_pv_matching_variation_id(42));
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', intersoccer_pv_booking_return_notice_html(42));
+        $this->assertSame($this->frenchFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+
+        $_GET = $this->frenchReturnQuery();
+        unset($_GET['attribute_pa_age-group'], $_GET['attribute_pa_camp-times'], $_GET['attribute_pa_booking-type']);
+        $this->assertSame('partial', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringNotContainsString('Please pick them again.', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET = $this->frenchReturnQuery();
+        $_GET['attribute_pa_booking-type'] = 'not-a-real-slug';
+        $this->assertSame('invalid', intersoccer_pv_return_attribute_state(42));
+        $this->assertStringContainsString('Please pick them again.', intersoccer_pv_booking_return_notice_html(42));
+        $this->assertSame('', intersoccer_pv_return_preselect_value(42));
+
+        $js = (string) file_get_contents(dirname(__DIR__) . '/js/booking-return.js');
+        $this->assertStringContainsString('returnAttributes', $js);
+        $this->assertStringContainsString('returnCampDays', $js);
+        $this->assertMatchesRegularExpression(
+            '/restoreAttributes\(\$form\);\s*seedCampDays\(\$form\);/',
+            $js
+        );
+    }
+
+    public function test_mixed_english_and_french_variation_slugs_still_match(): void {
+        $this->installReturnTermMap();
+        $stored = [
+            'attribute_pa_intersoccer-venues' => '-pully',
+            'attribute_pa_age-group' => '5-13-ans-journee-complete',
+            'attribute_pa_camp-times' => '1000-1700',
+            'attribute_pa_booking-type' => 'a-la-journee',
+        ];
+        $this->bindReturnProduct($this->optionsFromAttributes($stored), [77 => $stored]);
+        $this->useExactVariationMatch(77, $stored);
+        $this->setReturnLanguage('fr');
+
+        $_GET = $this->frenchReturnQuery();
+        $this->assertSame(0, $this->exactVariationId($stored, intersoccer_pv_request_attribute_selections()));
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(77, intersoccer_pv_matching_variation_id(42));
+        $this->assertSame($this->frenchFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+
+        $this->setReturnLanguage('en');
+        $_GET = $this->englishReturnQuery();
+        $this->assertSame(0, $this->exactVariationId($stored, intersoccer_pv_request_attribute_selections()));
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(77, intersoccer_pv_matching_variation_id(42));
+        $this->assertSame($this->englishFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+    }
+
+    public function test_english_and_german_returns_stay_on_direct_slug_matches(): void {
+        $this->installReturnTermMap();
+        $english = $this->englishVariationAttributes();
+        $this->bindReturnProduct($this->optionsFromAttributes($english), [88 => $english]);
+        $seen = [];
+        $GLOBALS['intersoccer_pv_test_matching_variation'] = static function ($product, $attributes) use (&$seen) {
+            $seen = $attributes;
+            return 88;
+        };
+        $this->setReturnLanguage('en');
+        $_GET = $this->englishReturnQuery();
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame($english, $seen);
+        $this->assertSame($this->englishFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', intersoccer_pv_booking_return_notice_html(42));
+
+        $german = $this->germanVariationAttributes();
+        $this->bindReturnProduct($this->optionsFromAttributes($german), [89 => $german]);
+        $seen = [];
+        $GLOBALS['intersoccer_pv_test_matching_variation'] = static function ($product, $attributes) use (&$seen) {
+            $seen = $attributes;
+            return 89;
+        };
+        $this->setReturnLanguage('de');
+        $_GET = $this->germanReturnQuery();
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame($german, $seen);
+        $this->assertSame($this->germanFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+        $this->assertStringNotContainsString('Please pick them again.', intersoccer_pv_booking_return_notice_html(42));
+    }
+
+    public function test_without_wpml_translated_slugs_do_not_match_and_direct_slugs_still_do(): void {
+        $stored = $this->englishVariationAttributes();
+        $this->bindReturnProduct($this->optionsFromAttributes($stored), [77 => $stored]);
+        $this->useExactVariationMatch(77, $stored);
+        $GLOBALS['intersoccer_test_terms'] = [
+            31 => ['taxonomy' => 'pa_intersoccer-venues', 'slug' => '-pully', 'name' => 'Venue', 'wpml_lang' => 'en'],
+            32 => ['taxonomy' => 'pa_intersoccer-venues', 'slug' => '-pully-fr', 'name' => 'Venue FR', 'wpml_lang' => 'fr'],
+        ];
+
+        $_GET = $this->frenchReturnQuery();
+        $this->assertFalse(intersoccer_pv_return_wpml_active());
+        $this->assertFalse(intersoccer_pv_attribute_slugs_equivalent('-pully-fr', '-pully', 'pa_intersoccer-venues'));
+        $this->assertSame('invalid', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(0, intersoccer_pv_matching_variation_id(42));
+        $this->assertSame($this->frenchFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertStringContainsString('Please pick them again.', intersoccer_pv_booking_return_notice_html(42));
+
+        $_GET = $this->englishReturnQuery();
+        $this->assertSame('matched', intersoccer_pv_return_attribute_state(42));
+        $this->assertSame(77, intersoccer_pv_matching_variation_id(42));
+        $this->assertSame($this->englishFormAttributes(), intersoccer_pv_return_form_attribute_values());
+        $this->assertSame(['Monday', 'Wednesday'], intersoccer_pv_request_camp_days());
+        $this->assertStringContainsString('Your choices are saved. Check them and add to cart.', intersoccer_pv_booking_return_notice_html(42));
+    }
+
+    /**
+     * @param array<string,array<int,string>> $options
+     * @param array<int,array<string,string>> $variations
+     */
+    private function bindReturnProduct(array $options, array $variations): void {
+        $child_ids = array_map('intval', array_keys($variations));
+        $GLOBALS['intersoccer_test_products'][42] = new class($options, $child_ids) {
+            /** @var array<string,array<int,string>> */
+            private $options;
+            /** @var array<int,int> */
+            private $children;
+
+            public function __construct(array $options, array $children) {
+                $this->options = $options;
+                $this->children = $children;
+            }
+
+            public function get_id() {
+                return 42;
+            }
+
+            public function is_type($type) {
+                return $type === 'variable';
+            }
+
+            public function get_variation_attributes() {
+                return $this->options;
+            }
+
+            public function get_children() {
+                return $this->children;
+            }
+
+            public function get_attribute($name) {
+                return '';
+            }
+        };
+        foreach ($variations as $id => $attributes) {
+            $GLOBALS['intersoccer_test_products'][(int) $id] = new class($attributes) {
+                /** @var array<string,string> */
+                private $attributes;
+
+                public function __construct(array $attributes) {
+                    $this->attributes = $attributes;
+                }
+
+                public function get_status() {
+                    return 'publish';
+                }
+
+                public function get_variation_attributes() {
+                    return $this->attributes;
+                }
+
+                public function get_attribute($name) {
+                    return '';
+                }
+            };
+        }
+    }
+
+    /**
+     * @param array<string,string> $stored
+     */
+    private function useExactVariationMatch(int $variation_id, array $stored): void {
+        $GLOBALS['intersoccer_pv_test_matching_variation'] = static function ($product, $attributes) use ($variation_id, $stored) {
+            foreach ($stored as $key => $value) {
+                if (!isset($attributes[$key]) || (string) $attributes[$key] !== (string) $value) {
+                    return 0;
+                }
+            }
+            return $variation_id;
+        };
+    }
+
+    /**
+     * @param array<string,string> $stored
+     * @param array<string,string> $requested
+     */
+    private function exactVariationId(array $stored, array $requested): int {
+        foreach ($stored as $key => $value) {
+            if (!isset($requested[$key]) || (string) $requested[$key] !== (string) $value) {
+                return 0;
+            }
+        }
+        return 77;
+    }
+
+    /**
+     * @param array<string,string> $attributes
+     * @return array<string,array<int,string>>
+     */
+    private function optionsFromAttributes(array $attributes): array {
+        $options = [];
+        foreach ($attributes as $key => $value) {
+            $name = strpos($key, 'attribute_') === 0 ? substr($key, strlen('attribute_')) : $key;
+            $options[$name] = [(string) $value];
+        }
+        return $options;
+    }
+
+    private function setReturnLanguage(string $language): void {
+        $GLOBALS['intersoccer_test_wpml_current_language'] = $language;
+        $GLOBALS['intersoccer_test_wpml_filter_get_term_by_to_current_language'] = true;
+        MockFilters::$filters['wpml_current_language'] = static function () {
+            return $GLOBALS['intersoccer_test_wpml_current_language'] ?? null;
+        };
+    }
+
+    private function installReturnTermMap(): void {
+        $rows = [
+            'pa_booking-type' => [
+                'en' => ['id' => 11, 'slug' => 'single-days'],
+                'fr' => ['id' => 12, 'slug' => 'a-la-journee'],
+                'de' => ['id' => 13, 'slug' => 'einzelner-tage'],
+            ],
+            'pa_age-group' => [
+                'en' => ['id' => 21, 'slug' => '5-13y-full-day'],
+                'fr' => ['id' => 22, 'slug' => '5-13-ans-journee-complete'],
+                'de' => ['id' => 23, 'slug' => '5-13j-ganzer-tag'],
+            ],
+            'pa_intersoccer-venues' => [
+                'en' => ['id' => 31, 'slug' => '-pully'],
+                'fr' => ['id' => 32, 'slug' => '-pully-fr'],
+                'de' => ['id' => 33, 'slug' => '-ort-de'],
+            ],
+            'pa_camp-times' => [
+                'en' => ['id' => 41, 'slug' => '1000-1700'],
+                'fr' => ['id' => 42, 'slug' => '1000-1700-fr'],
+                'de' => ['id' => 43, 'slug' => '1000-1700-de'],
+            ],
+        ];
+        $terms = [];
+        $groups = [];
+        foreach ($rows as $taxonomy => $langs) {
+            $by_lang = [];
+            foreach ($langs as $lang => $term) {
+                $terms[$term['id']] = [
+                    'taxonomy' => $taxonomy,
+                    'slug' => $term['slug'],
+                    'name' => $term['slug'],
+                    'wpml_lang' => $lang,
+                ];
+                $by_lang[$lang] = $term['id'];
+            }
+            foreach ($langs as $term) {
+                $groups[$term['id']] = $by_lang;
+            }
+        }
+        $GLOBALS['intersoccer_test_terms'] = $terms;
+        MockFilters::$filters['wpml_default_language'] = static function () {
+            return 'en';
+        };
+        MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) use ($groups) {
+            $id = (int) $id;
+            if (!isset($groups[$id])) {
+                return $return_original ? $id : 0;
+            }
+            $lang = is_string($lang) && $lang !== '' ? $lang : 'en';
+            if (isset($groups[$id][$lang])) {
+                return $groups[$id][$lang];
+            }
+            return $return_original ? $id : 0;
+        };
+        $this->setReturnLanguage('en');
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function englishVariationAttributes(): array {
+        return [
+            'attribute_pa_intersoccer-venues' => '-pully',
+            'attribute_pa_age-group' => '5-13y-full-day',
+            'attribute_pa_camp-times' => '1000-1700',
+            'attribute_pa_booking-type' => 'single-days',
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function frenchFormAttributes(): array {
+        return [
+            'attribute_pa_intersoccer-venues' => '-pully-fr',
+            'attribute_pa_age-group' => '5-13-ans-journee-complete',
+            'attribute_pa_camp-times' => '1000-1700-fr',
+            'attribute_pa_booking-type' => 'a-la-journee',
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function englishFormAttributes(): array {
+        return $this->englishVariationAttributes();
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function germanVariationAttributes(): array {
+        return [
+            'attribute_pa_intersoccer-venues' => '-ort-de',
+            'attribute_pa_age-group' => '5-13j-ganzer-tag',
+            'attribute_pa_camp-times' => '1000-1700-de',
+            'attribute_pa_booking-type' => 'einzelner-tage',
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function germanFormAttributes(): array {
+        return $this->germanVariationAttributes();
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function frenchReturnQuery(): array {
+        return $this->frenchFormAttributes() + [
+            'bf_return' => '1',
+            'camp_days' => ['Monday', 'Wednesday'],
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function englishReturnQuery(): array {
+        return $this->englishFormAttributes() + [
+            'bf_return' => '1',
+            'camp_days' => ['Monday', 'Wednesday'],
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function germanReturnQuery(): array {
+        return $this->germanFormAttributes() + [
+            'bf_return' => '1',
+            'camp_days' => ['Monday', 'Wednesday'],
+        ];
     }
 
     public function test_return_script_takes_the_coupon_from_the_server_value_only(): void {

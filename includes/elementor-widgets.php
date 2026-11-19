@@ -299,6 +299,8 @@ $intersoccer_elementor_product_page_cb = function () {
                 productPermalink: <?php echo wp_json_encode(function_exists('intersoccer_pv_product_permalink') ? intersoccer_pv_product_permalink((int) $product_id) : ''); ?>,
                 returnCoupon: <?php echo wp_json_encode(function_exists('intersoccer_pv_session_coupon_code') ? intersoccer_pv_session_coupon_code() : ''); ?>,
                 returnPreselect: <?php echo wp_json_encode(function_exists('intersoccer_pv_return_preselect_value') ? intersoccer_pv_return_preselect_value((int) $product_id) : ''); ?>,
+                returnAttributes: <?php echo wp_json_encode(function_exists('intersoccer_pv_return_form_attribute_values') ? intersoccer_pv_return_form_attribute_values() : []); ?>,
+                returnCampDays: <?php echo wp_json_encode((function_exists('intersoccer_pv_is_booking_return_request') && intersoccer_pv_is_booking_return_request() && function_exists('intersoccer_pv_request_camp_days')) ? intersoccer_pv_request_camp_days() : []); ?>,
                 latePickupI18n: <?php echo wp_json_encode(function_exists('intersoccer_get_late_pickup_elementor_strings') ? intersoccer_get_late_pickup_elementor_strings() : []); ?>,
                 i18n: $.extend(true, {}, (window.intersoccerCheckout && window.intersoccerCheckout.i18n) || {}, {
                     stash_wait_timeout: <?php echo wp_json_encode(__('Booking data is still saving. Please wait a moment, then try Add to cart again.', 'intersoccer-product-variations')); ?>,

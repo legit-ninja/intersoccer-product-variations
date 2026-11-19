@@ -21,7 +21,27 @@
         }
     }
 
+    function serverCampDays() {
+        var checkout = window.intersoccerCheckout || {};
+        var raw = checkout.returnCampDays;
+        if (!Array.isArray(raw) || !raw.length) {
+            return [];
+        }
+        var days = [];
+        raw.forEach(function (value) {
+            var day = cleanToken(value);
+            if (day && days.indexOf(day) === -1) {
+                days.push(day);
+            }
+        });
+        return days;
+    }
+
     function collectCampDays() {
+        var fromServer = serverCampDays();
+        if (fromServer.length) {
+            return fromServer;
+        }
         var days = [];
         if (!isBookingReturn()) {
             return days;
@@ -187,6 +207,25 @@
         window.intersoccerPvApplyingReturnDays = false;
     }
 
+    function mappedAttribute(key) {
+        var checkout = window.intersoccerCheckout || {};
+        var mapped = checkout.returnAttributes;
+        if (!mapped || !Object.prototype.hasOwnProperty.call(mapped, key)) {
+            return '';
+        }
+        return cleanToken(mapped[key]);
+    }
+
+    function optionExists($field, token) {
+        var found = false;
+        $field.find('option').each(function () {
+            if (this.value === token) {
+                found = true;
+            }
+        });
+        return found;
+    }
+
     function restoreAttributes($form) {
         if (!isBookingReturn() || !$form || !$form.length) {
             return;
@@ -202,7 +241,8 @@
             if (key.indexOf('attribute_') !== 0 || window.intersoccerPvTouchedAttributes[key]) {
                 return;
             }
-            var token = cleanToken(value);
+            var raw = cleanToken(value);
+            var token = mappedAttribute(key) || raw;
             if (!token) {
                 return;
             }
@@ -213,15 +253,16 @@
                 return;
             }
             if ($field.is('select')) {
-                var hasOption = false;
-                $field.find('option').each(function () {
-                    if (this.value === token) {
-                        hasOption = true;
-                    }
-                });
-                if (!hasOption) {
+                var chosen = '';
+                if (optionExists($field, token)) {
+                    chosen = token;
+                } else if (raw && raw !== token && optionExists($field, raw)) {
+                    chosen = raw;
+                }
+                if (!chosen) {
                     return;
                 }
+                token = chosen;
             }
             $field.val(token).trigger('change');
         });
@@ -280,11 +321,13 @@
     });
 
     $(function () {
+        window.intersoccerPvReturnCampDays = collectCampDays();
         var $forms = $('form.variations_form, form.cart').not('.search_form');
         $forms.each(function () {
             var $form = $(this);
             seedCampDays($form);
             restoreAttributes($form);
+            seedCampDays($form);
             restoreQuantity($form);
             $form.find('a.intersoccer-booking-return-link').each(function () {
                 refreshLink(this);
@@ -294,7 +337,9 @@
 
     $(document.body).on('reset_data found_variation', 'form.variations_form', function () {
         var $form = $(this);
+        window.intersoccerPvReturnCampDays = collectCampDays();
         seedCampDays($form);
         restoreAttributes($form);
+        seedCampDays($form);
     });
 })(window.jQuery);

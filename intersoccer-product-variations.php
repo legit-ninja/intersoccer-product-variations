@@ -483,6 +483,8 @@ add_action('wp_enqueue_scripts', function () {
                 'productPermalink' => (function_exists('intersoccer_pv_product_permalink') && function_exists('get_queried_object_id')) ? intersoccer_pv_product_permalink((int) get_queried_object_id()) : '',
                 'returnCoupon' => function_exists('intersoccer_pv_session_coupon_code') ? intersoccer_pv_session_coupon_code() : '',
                 'returnPreselect' => (function_exists('intersoccer_pv_return_preselect_value') && function_exists('get_queried_object_id')) ? intersoccer_pv_return_preselect_value((int) get_queried_object_id()) : '',
+                'returnAttributes' => function_exists('intersoccer_pv_return_form_attribute_values') ? intersoccer_pv_return_form_attribute_values() : [],
+                'returnCampDays' => (function_exists('intersoccer_pv_is_booking_return_request') && intersoccer_pv_is_booking_return_request() && function_exists('intersoccer_pv_request_camp_days')) ? intersoccer_pv_request_camp_days() : [],
                 'i18n' => [
                     'start_date' => __('Start Date', 'intersoccer-product-variations'),
                     'end_date' => __('End Date', 'intersoccer-product-variations'),
