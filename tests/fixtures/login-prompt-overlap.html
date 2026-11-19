@@ -7,12 +7,35 @@
 <style>
 /* WooCommerce core: add-to-cart buttons are floated left. */
 .woocommerce div.product form.cart .button { float: left; }
-.woocommerce a.button {
-    padding: 0.618em 1em;
-    line-height: 1;
+
+/* Theme product buttons. Buy Now is then pinned to 52px. */
+:root {
+    --theme-font-button_font-size: 15px;
+    --theme-font-button_line-height: normal;
+    --theme-font-button_font-weight: 400;
+    --theme-color-inverse_link: #fff;
+    --theme-color-text_link2: #708840;
+}
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce div.product form.cart .button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    font-size: var(--theme-font-button_font-size);
+    line-height: var(--theme-font-button_line-height);
+    font-weight: var(--theme-font-button_font-weight);
+    border-radius: 25.5px;
+    color: var(--theme-color-inverse_link);
+    background: var(--theme-color-text_link2);
+    padding: 17px 37px;
     text-decoration: none;
-    background: #111;
-    color: #fff;
+    border: 0;
+}
+.woocommerce div.product form.cart .single_add_to_cart_button {
+    height: 52px;
+    line-height: 52px;
+    padding: 0 38px;
 }
 
 /* Typical WooCommerce notice. Position relative must not cover the button. */
@@ -22,16 +45,6 @@
     padding: 1em 1.5em;
     background: #d7e8f0;
     border: 1px solid #8aa;
-}
-
-/* Button size from the plugin before the un-float fix. This selector
-   loses to the WooCommerce float rule above. */
-.intersoccer-login-prompt .intersoccer-booking-return-link {
-    display: inline-block;
-    margin: 0.35rem 0.5rem 0 0;
-    min-height: 44px;
-    line-height: 2.75rem;
-    vertical-align: middle;
 }
 
 body { font: 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; margin: 0; }
@@ -55,25 +68,28 @@ form.cart { margin: 0; }
 <pre id="results">running</pre>
 <script>
 (function () {
-    var widths = [360, 390, 414, 768];
+    var widths = [360, 390, 414, 768, 1440];
     var locales = [
         {
             id: 'en',
             prompt: 'Log in or create an account to choose your child.',
             create: 'Create account',
-            login: 'Log in'
+            login: 'Log in',
+            buy: 'Buy Now'
         },
         {
             id: 'fr',
             prompt: 'Connectez-vous ou créez un compte pour choisir votre enfant.',
             create: 'Créer un compte',
-            login: 'Se connecter'
+            login: 'Se connecter',
+            buy: 'Acheter maintenant'
         },
         {
             id: 'de',
             prompt: 'Melden Sie sich an oder erstellen Sie ein Konto, um Ihr Kind auszuwählen.',
             create: 'Konto erstellen',
-            login: 'Anmelden'
+            login: 'Anmelden',
+            buy: 'Jetzt kaufen'
         }
     ];
 
@@ -103,6 +119,7 @@ form.cart { margin: 0; }
                 '          </div>' +
                 '        </div>' +
                 '      </div>' +
+                '      <button type="submit" class="button alt single_add_to_cart_button">' + locale.buy + '</button>' +
                 '    </form>' +
                 '  </div>' +
                 '</div>';
