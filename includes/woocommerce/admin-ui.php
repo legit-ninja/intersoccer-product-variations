@@ -69,7 +69,7 @@ function intersoccer_render_order_meta_repair_page() {
     }
 
     $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash((string) $_GET['tab'])) : 'scan';
-    if (!in_array($tab, ['scan', 'batch'], true)) {
+    if (!in_array($tab, ['scan', 'batch', 'season-labels'], true)) {
         $tab = 'scan';
     }
 
@@ -85,10 +85,15 @@ function intersoccer_render_order_meta_repair_page() {
             <a href="<?php echo esc_url(add_query_arg('tab', 'batch', $base_url)); ?>" class="nav-tab <?php echo $tab === 'batch' ? 'nav-tab-active' : ''; ?>">
                 <?php esc_html_e('Automated batch', 'intersoccer-product-variations'); ?>
             </a>
+            <a href="<?php echo esc_url(add_query_arg('tab', 'season-labels', $base_url)); ?>" class="nav-tab <?php echo $tab === 'season-labels' ? 'nav-tab-active' : ''; ?>">
+                <?php esc_html_e('Season labels', 'intersoccer-product-variations'); ?>
+            </a>
         </nav>
         <?php
         if ($tab === 'batch') {
             intersoccer_render_automated_update_orders_page(true);
+        } elseif ($tab === 'season-labels' && function_exists('intersoccer_render_season_label_repair_page')) {
+            intersoccer_render_season_label_repair_page(true);
         } else {
             intersoccer_render_update_orders_page(true);
         }

@@ -102,4 +102,11 @@ class OrderMetaRepairMenuTest extends TestCase {
         $this->assertStringContainsString('page=intersoccer-order-meta-repair', $GLOBALS['intersoccer_test_redirect']);
         $this->assertStringContainsString('tab=batch', $GLOBALS['intersoccer_test_redirect']);
     }
+
+    public function test_order_meta_repair_page_exposes_season_labels_tab() {
+        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php');
+        $this->assertNotFalse($src);
+        $this->assertStringContainsString("'season-labels'", $src);
+        $this->assertStringContainsString('intersoccer_render_season_label_repair_page', $src);
+    }
 }
