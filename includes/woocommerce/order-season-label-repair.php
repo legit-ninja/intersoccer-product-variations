@@ -18,7 +18,14 @@ if (!defined('ABSPATH')) {
 class InterSoccer_Order_Season_Label_Repair {
 
 	const TAXONOMY = 'pa_program-season';
-	const BATCH_SIZE = 200;
+	const BATCH_SIZE = 500;
+
+	/**
+	 * Per-run lookup cache (parent product / product-term checks). Null outside run().
+	 *
+	 * @var array|null
+	 */
+	private static $run_cache = null;
 	const PREVIEW_TRANSIENT = 'intersoccer_pv_season_label_repair_preview';
 	const BACKUP_SUBDIR = 'intersoccer-backups';
 	const ACTION_REPAIRED = 'intersoccer_pv_order_season_labels_repaired';
@@ -420,8 +427,30 @@ class InterSoccer_Order_Season_Label_Repair {
 			$variation_id = (int) $item->get_variation_id();
 		}
 
+		$cache_key = 'parent|' . $product_id . '|' . $variation_id;
+		if (is_array(self::$run_cache) && array_key_exists($cache_key, self::$run_cache)) {
+			return self::$run_cache[$cache_key];
+		}
+		$resolved = self::resolve_default_language_parent($product_id, $variation_id);
+		if (is_array(self::$run_cache)) {
+			self::$run_cache[$cache_key] = $resolved;
+		}
+		return $resolved;
+	}
+
+	/**
+	 * Uncached parent resolution. Uses the post parent (no product object) when a
+	 * row-based scan already knows the parent product id.
+	 *
+	 * @param int $product_id   Line _product_id (the parent for variable products).
+	 * @param int $variation_id Line _variation_id.
+	 * @return int
+	 */
+	private static function resolve_default_language_parent($product_id, $variation_id) {
 		$parent_id = $product_id;
-		if ($variation_id > 0 && function_exists('wc_get_product')) {
+		if ($product_id <= 0 && $variation_id > 0 && function_exists('wp_get_post_parent_id')) {
+			$parent_id = (int) wp_get_post_parent_id($variation_id);
+		} elseif ($variation_id > 0 && $product_id <= 0 && function_exists('wc_get_product')) {
 			$variation = wc_get_product($variation_id);
 			if ($variation && method_exists($variation, 'get_parent_id')) {
 				$pid = (int) $variation->get_parent_id();
@@ -429,7 +458,7 @@ class InterSoccer_Order_Season_Label_Repair {
 					$parent_id = $pid;
 				}
 			}
-		} elseif ($product_id > 0 && function_exists('wc_get_product')) {
+		} elseif ($variation_id <= 0 && $product_id > 0 && !is_array(self::$run_cache) && function_exists('wc_get_product')) {
 			$product = wc_get_product($product_id);
 			if ($product && method_exists($product, 'get_parent_id')) {
 				$pid = (int) $product->get_parent_id();
@@ -465,6 +494,23 @@ class InterSoccer_Order_Season_Label_Repair {
 		if ($parent_id <= 0) {
 			return false;
 		}
+		$cache_key = 'term|' . $parent_id . '|' . (int) ($target_info['term_id'] ?? 0) . '|' . (string) ($target_info['target_en'] ?? '');
+		if (is_array(self::$run_cache) && array_key_exists($cache_key, self::$run_cache)) {
+			return self::$run_cache[$cache_key];
+		}
+		$has = self::product_has_target_term_uncached($parent_id, $target_info);
+		if (is_array(self::$run_cache)) {
+			self::$run_cache[$cache_key] = $has;
+		}
+		return $has;
+	}
+
+	/**
+	 * @param int   $parent_id   Product ID.
+	 * @param array $target_info Target term info.
+	 * @return bool
+	 */
+	private static function product_has_target_term_uncached($parent_id, array $target_info) {
 		$term_id = isset($target_info['term_id']) ? (int) $target_info['term_id'] : 0;
 		$ids     = [];
 		if (function_exists('wc_get_product_terms')) {
@@ -706,6 +752,19 @@ class InterSoccer_Order_Season_Label_Repair {
 			'batch_size'   => self::BATCH_SIZE,
 		], $args);
 
+		self::$run_cache = [];
+		try {
+			return self::run_inner($args);
+		} finally {
+			self::$run_cache = null;
+		}
+	}
+
+	/**
+	 * @param array $args Merged args.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private static function run_inner(array $args) {
 		$runtime = self::build_runtime_mapping($args['mapping_spec'], $args['mapping_file']);
 		if (!empty($runtime['errors'])) {
 			return new WP_Error('mapping_error', implode('; ', $runtime['errors']));
@@ -741,45 +800,7 @@ class InterSoccer_Order_Season_Label_Repair {
 				self::accumulate_order($order, $runtime, $all_changes, $all_skipped, $unmatched, $order_ids_touched, $args);
 			}
 		} else {
-			$page      = 1;
-			$per_page  = max(1, (int) $args['batch_size']);
-			$order_id  = $args['order_id'] !== null ? (int) $args['order_id'] : 0;
-
-			do {
-				$query = [
-					'limit'    => $per_page,
-					'page'     => $page,
-					'paginate' => true,
-					'return'   => 'objects',
-					'status'   => self::order_statuses_except_trash(),
-					'type'     => 'shop_order',
-				];
-				if ($order_id > 0) {
-					$query['limit'] = 1;
-					$query['page']  = 1;
-					$query['include'] = [$order_id];
-				}
-
-				$result = function_exists('wc_get_orders') ? wc_get_orders($query) : [];
-				$orders = [];
-				$total_pages = 1;
-				if (is_object($result) && isset($result->orders)) {
-					$orders = $result->orders;
-					$total_pages = isset($result->max_num_pages) ? max(1, (int) $result->max_num_pages) : 1;
-				} elseif (is_array($result)) {
-					$orders = $result;
-					$total_pages = $order_id > 0 || count($orders) < $per_page ? $page : $page + 1;
-				}
-
-				foreach ($orders as $order) {
-					self::accumulate_order($order, $runtime, $all_changes, $all_skipped, $unmatched, $order_ids_touched, $args);
-				}
-
-				if ($order_id > 0) {
-					break;
-				}
-				$page++;
-			} while ($page <= $total_pages && !empty($orders));
+			self::scan_line_rows($args, $runtime, $all_changes, $all_skipped, $unmatched, $order_ids_touched);
 		}
 
 		$report['rows']    = $all_changes;
@@ -789,6 +810,7 @@ class InterSoccer_Order_Season_Label_Repair {
 		$report['orders']  = count(array_unique(array_column($all_changes, 'order_id')));
 		$report['counts']  = self::summarize_counts($all_changes);
 		$report['order_ids'] = array_values(array_unique($order_ids_touched));
+		$report['peak_memory_mb'] = self::peak_memory_mb();
 
 		if (empty($args['apply'])) {
 			return $report;
@@ -814,7 +836,9 @@ class InterSoccer_Order_Season_Label_Repair {
 					$updated_orders[(int) $change['order_id']] = true;
 				}
 			}
+			self::flush_runtime_caches();
 		}
+		$report['peak_memory_mb'] = self::peak_memory_mb();
 
 		$order_ids = array_keys($updated_orders);
 		$report['order_ids'] = $order_ids;
@@ -823,6 +847,198 @@ class InterSoccer_Order_Season_Label_Repair {
 		}
 
 		return $report;
+	}
+
+	/**
+	 * Peak PHP memory in MB (real allocation).
+	 *
+	 * @return float
+	 */
+	public static function peak_memory_mb() {
+		return round(memory_get_peak_usage(true) / 1048576, 1);
+	}
+
+	/**
+	 * Drop per-request object caches between batches without touching a
+	 * persistent object cache shared with the live site.
+	 */
+	public static function flush_runtime_caches() {
+		if (function_exists('wp_cache_flush_runtime')) {
+			wp_cache_flush_runtime();
+		} elseif (function_exists('wp_using_ext_object_cache') && !wp_using_ext_object_cache() && function_exists('wp_cache_flush')) {
+			wp_cache_flush();
+		}
+		if (is_array(self::$run_cache) && count(self::$run_cache) > 20000) {
+			self::$run_cache = [];
+		}
+	}
+
+	/**
+	 * Whether WooCommerce HPOS (wc_orders) is the authoritative order store.
+	 *
+	 * @return bool
+	 */
+	public static function hpos_enabled() {
+		if (isset($GLOBALS['intersoccer_test_season_label_hpos'])) {
+			return (bool) $GLOBALS['intersoccer_test_season_label_hpos'];
+		}
+		$cls = 'Automattic\\WooCommerce\\Utilities\\OrderUtil';
+		return class_exists($cls) && method_exists($cls, 'custom_orders_table_usage_is_enabled')
+			&& $cls::custom_orders_table_usage_is_enabled();
+	}
+
+	/**
+	 * Row-based scan: targeted SQL on order items + item meta, batches of
+	 * BATCH_SIZE line items keyed on order_item_id. Never loads WC_Order objects.
+	 *
+	 * @param array $args Run args (order_id, batch_size).
+	 * @param array $runtime Mapping.
+	 * @param array $all_changes By ref.
+	 * @param array $all_skipped By ref.
+	 * @param array $unmatched By ref.
+	 * @param array $order_ids_touched By ref.
+	 */
+	private static function scan_line_rows(array $args, array $runtime, array &$all_changes, array &$all_skipped, array &$unmatched, array &$order_ids_touched) {
+		global $wpdb;
+		if (!isset($wpdb) || !is_object($wpdb)) {
+			return;
+		}
+		$items_t = $wpdb->prefix . 'woocommerce_order_items';
+		$meta_t  = $wpdb->prefix . 'woocommerce_order_itemmeta';
+		$label_keys = array_values(array_unique(array_merge(self::primary_meta_keys(), self::conditional_meta_keys())));
+		$fetch_keys = array_merge(['_product_id', '_variation_id'], $label_keys);
+		$label_ph = implode(',', array_fill(0, count($label_keys), '%s'));
+		$fetch_ph = implode(',', array_fill(0, count($fetch_keys), '%s'));
+		$batch    = max(1, (int) ($args['batch_size'] ?? self::BATCH_SIZE));
+		$only_order = $args['order_id'] !== null ? (int) $args['order_id'] : 0;
+		$allowed_status = array_flip(self::order_statuses_except_trash());
+		$last_id = 0;
+
+		do {
+			$sql = "SELECT oi.order_item_id, oi.order_id FROM {$items_t} oi
+				WHERE oi.order_item_type = 'line_item' AND oi.order_item_id > %d"
+				. ($only_order > 0 ? ' AND oi.order_id = %d' : '')
+				. " AND EXISTS (SELECT 1 FROM {$meta_t} m WHERE m.order_item_id = oi.order_item_id
+					AND m.meta_key IN ({$label_ph}) AND m.meta_value <> '')
+				ORDER BY oi.order_item_id ASC LIMIT %d";
+			$params = [$last_id];
+			if ($only_order > 0) {
+				$params[] = $only_order;
+			}
+			$params = array_merge($params, $label_keys, [$batch]);
+			$lines = $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A);
+			if (!is_array($lines) || $lines === []) {
+				break;
+			}
+
+			$item_ids = [];
+			$order_ids = [];
+			foreach ($lines as $line) {
+				$item_ids[] = (int) $line['order_item_id'];
+				$order_ids[(int) $line['order_id']] = true;
+			}
+			$last_id = max($item_ids);
+
+			$meta = [];
+			$id_ph = implode(',', array_fill(0, count($item_ids), '%d'));
+			$meta_rows = $wpdb->get_results($wpdb->prepare(
+				"SELECT order_item_id, meta_key, meta_value FROM {$meta_t}
+				WHERE order_item_id IN ({$id_ph}) AND meta_key IN ({$fetch_ph})",
+				...array_merge($item_ids, $fetch_keys)
+			), ARRAY_A);
+			foreach ((array) $meta_rows as $mr) {
+				$iid = (int) $mr['order_item_id'];
+				$key = (string) $mr['meta_key'];
+				if (!isset($meta[$iid][$key])) {
+					$meta[$iid][$key] = intersoccer_pv_season_label_maybe_unserialize($mr['meta_value']);
+				}
+			}
+			unset($meta_rows);
+
+			$orders = self::order_rows(array_keys($order_ids));
+
+			foreach ($lines as $line) {
+				$iid = (int) $line['order_item_id'];
+				$oid = (int) $line['order_id'];
+				$o   = $orders[$oid] ?? null;
+				if (!$o || $o['type'] !== 'shop_order' || !isset($allowed_status[$o['status']])) {
+					continue;
+				}
+				$m = $meta[$iid] ?? [];
+				$item = new InterSoccer_Season_Label_Line_Row(
+					$iid,
+					(int) ($m['_product_id'] ?? 0),
+					(int) ($m['_variation_id'] ?? 0),
+					$m
+				);
+				$order = new InterSoccer_Season_Label_Order_Row($oid, $o['status'], $o['lang']);
+				$result = self::evaluate_item($item, $order, $runtime, $args);
+				foreach ($result['changes'] as $change) {
+					$all_changes[] = $change;
+					$order_ids_touched[(int) $change['order_id']] = true;
+				}
+				foreach ($result['skipped'] as $skip) {
+					$all_skipped[] = $skip;
+				}
+				foreach ($result['unmatched'] as $u) {
+					$unmatched[$u] = $u;
+				}
+			}
+
+			$fetched = count($lines);
+			unset($lines, $meta, $orders, $item_ids, $order_ids);
+			self::flush_runtime_caches();
+		} while ($fetched >= $batch);
+	}
+
+	/**
+	 * Status / type / WPML language for order ids (HPOS or posts storage).
+	 *
+	 * @param int[] $order_ids Order ids.
+	 * @return array<int,array{status:string,type:string,lang:string}>
+	 */
+	public static function order_rows(array $order_ids) {
+		global $wpdb;
+		$order_ids = array_values(array_filter(array_map('intval', $order_ids)));
+		if ($order_ids === []) {
+			return [];
+		}
+		$ph = implode(',', array_fill(0, count($order_ids), '%d'));
+		$out = [];
+		if (self::hpos_enabled()) {
+			$rows = $wpdb->get_results($wpdb->prepare(
+				"SELECT id AS oid, status, type FROM {$wpdb->prefix}wc_orders WHERE id IN ({$ph})",
+				...$order_ids
+			), ARRAY_A);
+			$langs = $wpdb->get_results($wpdb->prepare(
+				"SELECT order_id AS oid, meta_value FROM {$wpdb->prefix}wc_orders_meta WHERE meta_key = 'wpml_language' AND order_id IN ({$ph})",
+				...$order_ids
+			), ARRAY_A);
+		} else {
+			$rows = $wpdb->get_results($wpdb->prepare(
+				"SELECT ID AS oid, post_status AS status, post_type AS type FROM {$wpdb->posts} WHERE ID IN ({$ph})",
+				...$order_ids
+			), ARRAY_A);
+			$langs = $wpdb->get_results($wpdb->prepare(
+				"SELECT post_id AS oid, meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'wpml_language' AND post_id IN ({$ph})",
+				...$order_ids
+			), ARRAY_A);
+		}
+		foreach ((array) $rows as $r) {
+			$status = (string) $r['status'];
+			if (strpos($status, 'wc-') === 0) {
+				$status = substr($status, 3);
+			}
+			$out[(int) $r['oid']] = ['status' => $status, 'type' => (string) $r['type'], 'lang' => 'en'];
+		}
+		foreach ((array) $langs as $l) {
+			$oid = (int) $l['oid'];
+			$lang = strtolower(trim((string) $l['meta_value']));
+			if (isset($out[$oid]) && $lang !== '') {
+				$out[$oid]['lang'] = $lang;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -1004,28 +1220,34 @@ class InterSoccer_Order_Season_Label_Repair {
 
 		$stamp = gmdate('Ymd-His');
 		$path  = intersoccer_pv_season_label_trailingslashit($dir) . 'season-label-repair-' . $stamp . '.json';
-		$payload = [
-			'created_at' => gmdate('c'),
-			'tool'       => 'order-season-label-repair',
-			'entries'    => [],
-		];
+		$fh = @fopen($path, 'wb');
+		if ($fh === false) {
+			return new WP_Error('backup_write', __('Could not write backup file.', 'intersoccer-product-variations'));
+		}
+		// Streamed: header, one entry per line, footer (no whole-payload encode in memory).
+		$ok = fwrite($fh, '{"created_at":' . json_encode(gmdate('c')) . ',"tool":"order-season-label-repair","entries":[' . "\n") !== false;
+		$first = true;
 		foreach ($changes as $change) {
-			$payload['entries'][] = [
+			$entry = intersoccer_pv_season_label_json_encode([
 				'item_id'    => (int) ($change['item_id'] ?? 0),
 				'meta_key'   => (string) ($change['meta_key'] ?? ''),
 				'old'        => $change['old'] ?? '',
 				'new'        => $change['new'] ?? '',
 				'order_id'   => (int) ($change['order_id'] ?? 0),
 				'timestamp'  => gmdate('c'),
-			];
+			], JSON_UNESCAPED_UNICODE);
+			if ($entry === false) {
+				fclose($fh);
+				@unlink($path);
+				return new WP_Error('backup_encode', __('Could not encode backup JSON.', 'intersoccer-product-variations'));
+			}
+			$ok = $ok && fwrite($fh, ($first ? '' : ",\n") . $entry) !== false;
+			$first = false;
 		}
-
-		$json = intersoccer_pv_season_label_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-		if ($json === false) {
-			return new WP_Error('backup_encode', __('Could not encode backup JSON.', 'intersoccer-product-variations'));
-		}
-		$written = @file_put_contents($path, $json);
-		if ($written === false) {
+		$ok = $ok && fwrite($fh, "\n]}\n") !== false;
+		$ok = fclose($fh) && $ok;
+		if (!$ok) {
+			@unlink($path);
 			return new WP_Error('backup_write', __('Could not write backup file.', 'intersoccer-product-variations'));
 		}
 		return $path;
@@ -1346,11 +1568,12 @@ function intersoccer_render_season_label_repair_page($embedded = false) {
 			<p>
 				<?php
 				echo esc_html(sprintf(
-					/* translators: 1: mode, 2: orders, 3: lines */
-					__('Mode: %1$s — orders: %2$d — lines: %3$d', 'intersoccer-product-variations'),
+					/* translators: 1: mode, 2: orders, 3: lines, 4: peak memory MB */
+					__('Mode: %1$s — orders: %2$d — lines: %3$d — peak memory: %4$s MB', 'intersoccer-product-variations'),
 					(string) ($report['mode'] ?? ''),
 					(int) ($report['orders'] ?? 0),
-					(int) ($report['lines'] ?? 0)
+					(int) ($report['lines'] ?? 0),
+					(string) ($report['peak_memory_mb'] ?? '?')
 				));
 				?>
 			</p>
@@ -1566,12 +1789,13 @@ if (defined('WP_CLI') && WP_CLI) {
 		}
 
 		WP_CLI::log(sprintf(
-			'Mode=%s orders=%d lines=%d unmatched=%d skipped=%d%s',
+			'Mode=%s orders=%d lines=%d unmatched=%d skipped=%d peak_memory_mb=%s%s',
 			$result['mode'],
 			(int) $result['orders'],
 			(int) $result['lines'],
 			count($result['unmatched_values'] ?? []),
 			count($result['skipped'] ?? []),
+			(string) ($result['peak_memory_mb'] ?? '?'),
 			!empty($result['backup_file']) ? ' backup=' . basename((string) $result['backup_file']) : ''
 		));
 
@@ -1656,5 +1880,61 @@ if (!function_exists('intersoccer_pv_season_label_roster_followup')) {
 			: 'wp intersoccer-rr reconcile-orders --all-season-renames';
 		return 'ROSTERS NOT UPDATED: Reports & Rosters reconcile is not loaded in this context. Run next: '
 			. $cmd . ' --dry-run, then the same command without --dry-run.';
+	}
+}
+
+if (!function_exists('intersoccer_pv_season_label_maybe_unserialize')) {
+	/**
+	 * Item meta values as WooCommerce would read them (serialized arrays stay arrays).
+	 *
+	 * @param mixed $value Raw meta_value.
+	 * @return mixed
+	 */
+	function intersoccer_pv_season_label_maybe_unserialize($value) {
+		if (function_exists('maybe_unserialize')) {
+			return maybe_unserialize($value);
+		}
+		return $value;
+	}
+}
+
+if (!class_exists('InterSoccer_Season_Label_Line_Row')) {
+	/**
+	 * Minimal order-line view built from SQL rows (no WC_Order_Item object).
+	 */
+	class InterSoccer_Season_Label_Line_Row {
+		private $id;
+		private $product_id;
+		private $variation_id;
+		private $meta;
+		public function __construct($id, $product_id, $variation_id, array $meta) {
+			$this->id = (int) $id;
+			$this->product_id = (int) $product_id;
+			$this->variation_id = (int) $variation_id;
+			$this->meta = $meta;
+		}
+		public function get_id() { return $this->id; }
+		public function get_product_id() { return $this->product_id; }
+		public function get_variation_id() { return $this->variation_id; }
+		public function get_meta($key, $single = true) { return $this->meta[$key] ?? ''; }
+	}
+}
+
+if (!class_exists('InterSoccer_Season_Label_Order_Row')) {
+	/**
+	 * Minimal order view built from SQL rows (no WC_Order object).
+	 */
+	class InterSoccer_Season_Label_Order_Row {
+		private $id;
+		private $status;
+		private $lang;
+		public function __construct($id, $status, $lang) {
+			$this->id = (int) $id;
+			$this->status = (string) $status;
+			$this->lang = (string) $lang;
+		}
+		public function get_id() { return $this->id; }
+		public function get_status() { return $this->status; }
+		public function get_meta($key, $single = true) { return $key === 'wpml_language' ? $this->lang : ''; }
 	}
 }
