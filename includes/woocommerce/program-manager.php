@@ -16,6 +16,13 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+if (!function_exists('intersoccer_admin_parse_date')) {
+	$intersoccer_admin_date_format = __DIR__ . '/admin-date-format.php';
+	if (file_exists($intersoccer_admin_date_format)) {
+		require_once $intersoccer_admin_date_format;
+	}
+}
+
 class InterSoccer_Program_Manager {
 
 	const NONCE_ACTION = 'intersoccer_pm_nonce';
@@ -77,10 +84,18 @@ class InterSoccer_Program_Manager {
 			'2.8.4.0'
 		);
 
+		wp_enqueue_script('jquery-ui-datepicker');
+		wp_enqueue_script(
+			'intersoccer-admin-date-format',
+			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/admin-date-format.js',
+			['jquery', 'jquery-ui-datepicker'],
+			'1.0.0',
+			true
+		);
 		wp_enqueue_script(
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
-			['jquery'],
+			['jquery', 'intersoccer-admin-date-format'],
 			'2.8.4.0',
 			true
 		);
@@ -890,7 +905,7 @@ class InterSoccer_Program_Manager {
 				<p>
 					<label>
 						<?php esc_html_e('Week 1 start', 'intersoccer-product-variations'); ?>
-						<input type="date" id="intersoccer-pm-week1-start" />
+						<input type="text" class="intersoccer-admin-date" id="intersoccer-pm-week1-start" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 					</label>
 					&nbsp;
 					<label>
@@ -1064,10 +1079,10 @@ class InterSoccer_Program_Manager {
 								<input type="number" min="1" max="52" class="intersoccer-pm-camp-week" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['week'] !== null ? $sched['week'] : ''); ?>" style="width: 60px;" />
 							</td>
 							<td>
-								<input type="date" class="intersoccer-pm-camp-start" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['start']); ?>" />
+								<input type="text" class="intersoccer-admin-date intersoccer-pm-camp-start" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr(function_exists('intersoccer_admin_format_date') ? intersoccer_admin_format_date($sched['start']) : $sched['start']); ?>" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 							</td>
 							<td>
-								<input type="date" class="intersoccer-pm-camp-end" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['end']); ?>" />
+								<input type="text" class="intersoccer-admin-date intersoccer-pm-camp-end" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr(function_exists('intersoccer_admin_format_date') ? intersoccer_admin_format_date($sched['end']) : $sched['end']); ?>" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 								<span class="intersoccer-pm-schedule-status"></span>
 								<?php
 								$missing_dates_flag = function_exists('intersoccer_camp_variation_missing_dates_flag')
@@ -1234,8 +1249,8 @@ class InterSoccer_Program_Manager {
 						</tr>
 						<?php endforeach; endforeach; ?>
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
-							<th><label for="pm-course-start-date"><?php esc_html_e('Course start date', 'intersoccer-product-variations'); ?></label></th>
-							<td><input type="date" id="pm-course-start-date" /></td>
+							<th><label for="pm-course-start-date"><?php esc_html_e('Course start date (DD/MM/YYYY)', 'intersoccer-product-variations'); ?></label></th>
+							<td><input type="text" class="intersoccer-admin-date" id="pm-course-start-date" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" /></td>
 						</tr>
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
 							<th><label for="pm-course-total-weeks"><?php esc_html_e('Total weeks / sessions', 'intersoccer-product-variations'); ?></label></th>
@@ -1244,8 +1259,8 @@ class InterSoccer_Program_Manager {
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
 							<th><label for="pm-course-holiday-dates"><?php esc_html_e('Holiday dates', 'intersoccer-product-variations'); ?></label></th>
 							<td>
-								<textarea id="pm-course-holiday-dates" rows="3" class="large-text" placeholder="<?php esc_attr_e('One Y-m-d per line, e.g. 2026-12-25', 'intersoccer-product-variations'); ?>"></textarea>
-								<p class="description"><?php esc_html_e('Applied to each variation as _course_holiday_dates before generation.', 'intersoccer-product-variations'); ?></p>
+								<textarea id="pm-course-holiday-dates" rows="3" class="large-text" placeholder="<?php esc_attr_e('One date per line, e.g. 25/12/2026', 'intersoccer-product-variations'); ?>"></textarea>
+								<p class="description"><?php esc_html_e('Use DD/MM/YYYY (for example 06/03/2027 for 6 March). Applied to each variation as _course_holiday_dates before generation.', 'intersoccer-product-variations'); ?></p>
 							</td>
 						</tr>
 						<tr class="intersoccer-pm-attr-row" data-types="camp,course,birthday,tournament" style="display:none;">
@@ -2085,6 +2100,23 @@ class InterSoccer_Program_Manager {
 			wp_send_json_error(['message' => __('Invalid variation.', 'intersoccer-product-variations')]);
 		}
 
+		if (function_exists('intersoccer_admin_parse_date_result')) {
+			$start_parsed = intersoccer_admin_parse_date_result($start);
+			$end_parsed   = intersoccer_admin_parse_date_result($end);
+			if ($start_parsed['invalid'] || $end_parsed['invalid']) {
+				$bad = $start_parsed['invalid'] ? $start_parsed['input'] : $end_parsed['input'];
+				wp_send_json_error([
+					'message' => sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('"%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). The dates were not changed.', 'intersoccer-product-variations'),
+						$bad
+					),
+				]);
+			}
+			$start = $start_parsed['ymd'];
+			$end   = $end_parsed['ymd'];
+		}
+
 		intersoccer_update_camp_schedule($variation_id, $start, $end, $week > 0 ? $week : null, true);
 		wc_delete_product_transients($variation->get_parent_id());
 
@@ -2109,6 +2141,20 @@ class InterSoccer_Program_Manager {
 		$product = wc_get_product($product_id);
 		if (!$product || !$product->is_type('variable') || !function_exists('intersoccer_camp_schedule_propose_from_week1')) {
 			wp_send_json_error(['message' => __('Invalid product.', 'intersoccer-product-variations')]);
+		}
+
+		if (function_exists('intersoccer_admin_parse_date_result')) {
+			$week1_parsed = intersoccer_admin_parse_date_result($week1_start);
+			if ($week1_parsed['empty'] || $week1_parsed['invalid']) {
+				wp_send_json_error([
+					'message' => sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('Week 1 start "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March).', 'intersoccer-product-variations'),
+						$week1_parsed['input'] !== '' ? $week1_parsed['input'] : $week1_start
+					),
+				]);
+			}
+			$week1_start = $week1_parsed['ymd'];
 		}
 
 		$updated = 0;
@@ -3568,6 +3614,25 @@ class InterSoccer_Program_Manager {
 				if ($meta_key === '_course_holiday_dates') {
 					$value = self::normalize_course_holiday_dates($value);
 				}
+				if ($meta_key === '_course_start_date' || $meta_key === '_end_date') {
+					if (function_exists('intersoccer_admin_parse_date_result')) {
+						$parsed = intersoccer_admin_parse_date_result($value);
+						if ($parsed['ok']) {
+							$value = $parsed['ymd'];
+						} elseif ($parsed['invalid']) {
+							if (function_exists('intersoccer_admin_date_flag_error')) {
+								intersoccer_admin_date_flag_error(sprintf(
+									/* translators: %s is the date the admin typed. */
+									__('Date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
+									$parsed['input']
+								));
+							}
+							continue;
+						} else {
+							$value = '';
+						}
+					}
+				}
 				if ($meta_key === '_course_total_weeks') {
 					$value = (string) max(0, (int) $value);
 				}
@@ -3729,7 +3794,23 @@ class InterSoccer_Program_Manager {
 		$out = [];
 		foreach ($lines as $line) {
 			$line = trim((string) $line);
-			if ($line !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) {
+			if ($line === '') {
+				continue;
+			}
+			if (function_exists('intersoccer_admin_parse_date_result')) {
+				$parsed = intersoccer_admin_parse_date_result($line);
+				if ($parsed['ok']) {
+					$out[] = $parsed['ymd'];
+				} elseif ($parsed['invalid'] && function_exists('intersoccer_admin_date_flag_error')) {
+					intersoccer_admin_date_flag_error(sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('Holiday date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
+						$parsed['input']
+					));
+				}
+				continue;
+			}
+			if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) {
 				$out[] = $line;
 			}
 		}

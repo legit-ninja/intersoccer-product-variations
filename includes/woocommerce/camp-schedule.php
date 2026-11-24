@@ -13,6 +13,13 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+if (!function_exists('intersoccer_admin_parse_date')) {
+	$intersoccer_admin_date_format = __DIR__ . '/admin-date-format.php';
+	if (file_exists($intersoccer_admin_date_format)) {
+		require_once $intersoccer_admin_date_format;
+	}
+}
+
 /** @var bool Flag for removal tracking — set false only after parse helpers are deleted. */
 if (!defined('INTERSOCCER_CAMP_TERMS_DATE_PARSE_DEPRECATED')) {
 	define('INTERSOCCER_CAMP_TERMS_DATE_PARSE_DEPRECATED', true);
@@ -32,12 +39,17 @@ function intersoccer_camp_schedule_meta_keys() {
 }
 
 /**
- * Normalize a Y-m-d date string or return empty.
+ * Normalize a camp date to Y-m-d, or return empty.
+ *
+ * Accepts stored Y-m-d and Swiss admin inputs (DD/MM/YYYY or DD.MM.YYYY).
  *
  * @param mixed $value Raw value.
  * @return string
  */
 function intersoccer_camp_schedule_normalize_ymd($value) {
+	if (function_exists('intersoccer_admin_parse_date')) {
+		return intersoccer_admin_parse_date($value);
+	}
 	$value = is_string($value) ? trim($value) : '';
 	if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
 		return '';
