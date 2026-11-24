@@ -1504,8 +1504,8 @@ if (defined('WP_CLI') && WP_CLI) {
 	 * [--format=<format>]
 	 * : table or json. Default: table.
 	 *
-	 * [--rollback=<backup.json>]
-	 * : Restore from a backup basename or absolute path inside the backup dir.
+	 * [--rollback=<file>]
+	 * : Restore from a backup JSON (basename or absolute path inside the backup dir).
 	 *
 	 * ## EXAMPLES
 	 *
@@ -1617,8 +1617,44 @@ if (defined('WP_CLI') && WP_CLI) {
 
 		if ($result['mode'] === 'apply') {
 			WP_CLI::success(sprintf('Updated %d line meta value(s).', (int) ($result['updated'] ?? 0)));
+			$followup = intersoccer_pv_season_label_roster_followup($result);
+			if ($followup !== null) {
+				WP_CLI::warning($followup);
+			}
 		} else {
 			WP_CLI::success('Dry-run complete (no writes).');
 		}
 	});
+}
+
+if (!function_exists('intersoccer_pv_season_label_roster_followup')) {
+	/**
+	 * Warning text when Reports & Rosters cannot reconcile after an apply (e.g. RR
+	 * inactive or too old to load its reconcile code under WP-CLI). Null when fine.
+	 *
+	 * @param array $result Result of InterSoccer_Order_Season_Label_Repair::run().
+	 * @return string|null
+	 */
+	function intersoccer_pv_season_label_roster_followup(array $result) {
+		if ((int) ($result['updated'] ?? 0) <= 0) {
+			return null;
+		}
+		if (function_exists('intersoccer_rr_load_reconcile') && intersoccer_rr_load_reconcile()) {
+			return null;
+		}
+		$order_ids = [];
+		foreach ((array) ($result['rows'] ?? []) as $row) {
+			$oid = (int) ($row['order_id'] ?? 0);
+			if ($oid > 0) {
+				$order_ids[$oid] = $oid;
+			}
+		}
+		$order_ids = array_values($order_ids);
+		sort($order_ids);
+		$cmd = $order_ids !== []
+			? 'wp intersoccer-rr reconcile-orders --orders=' . implode(',', $order_ids)
+			: 'wp intersoccer-rr reconcile-orders --all-season-renames';
+		return 'ROSTERS NOT UPDATED: Reports & Rosters reconcile is not loaded in this context. Run next: '
+			. $cmd . ' --dry-run, then the same command without --dry-run.';
+	}
 }

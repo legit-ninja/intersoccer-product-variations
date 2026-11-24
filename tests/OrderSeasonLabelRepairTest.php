@@ -492,4 +492,27 @@ class OrderSeasonLabelRepairTest extends TestCase {
 		$src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-season-label-repair.php');
 		$this->assertStringContainsString("WP_CLI::add_command('intersoccer season-label-repair'", $src);
 	}
+
+	public function test_wp_cli_synopsis_value_tokens_are_valid(): void {
+		$src = (string) file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-season-label-repair.php');
+		preg_match_all('/\*\s+\[--[a-z-]+=(<[^>]*>)\]/', $src, $m);
+		$this->assertNotEmpty($m[1]);
+		foreach ($m[1] as $token) {
+			$this->assertMatchesRegularExpression('/^<[a-z_-]+>$/', $token);
+		}
+	}
+
+	public function test_roster_followup_warns_with_rr_command_when_rr_not_loaded(): void {
+		$this->assertNull(intersoccer_pv_season_label_roster_followup(['updated' => 0, 'rows' => []]));
+		if (function_exists('intersoccer_rr_load_reconcile')) {
+			$this->markTestSkipped('RR loader present in this environment.');
+		}
+		$msg = intersoccer_pv_season_label_roster_followup([
+			'updated' => 2,
+			'rows' => [['order_id' => 302], ['order_id' => 301], ['order_id' => 302]],
+		]);
+		$this->assertIsString($msg);
+		$this->assertStringContainsString('ROSTERS NOT UPDATED', $msg);
+		$this->assertStringContainsString('wp intersoccer-rr reconcile-orders --orders=301,302 --dry-run', $msg);
+	}
 }
