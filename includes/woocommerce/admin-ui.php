@@ -69,7 +69,7 @@ function intersoccer_render_order_meta_repair_page() {
     }
 
     $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash((string) $_GET['tab'])) : 'scan';
-    if (!in_array($tab, ['scan', 'batch', 'season-labels'], true)) {
+    if (!in_array($tab, ['scan', 'batch', 'season-labels', 'course-dates'], true)) {
         $tab = 'scan';
     }
 
@@ -77,7 +77,7 @@ function intersoccer_render_order_meta_repair_page() {
     ?>
     <div class="wrap">
         <h1><?php esc_html_e('Order Meta Repair', 'intersoccer-product-variations'); ?></h1>
-        <p><?php esc_html_e('Scan orders for missing or twin metadata, then repair selected rows or run an automated batch. Scan and Automated batch use the same need-repair criteria — re-run Scan after a batch to confirm leftovers. After repair, run Reports → Reconcile Rosters if needed.', 'intersoccer-product-variations'); ?></p>
+        <p><?php esc_html_e('Scan orders for missing or twin metadata, then repair selected rows or run an automated batch. Scan and Automated batch use the same need-repair criteria — re-run Scan after a batch to confirm leftovers. The Season labels and Course dates tabs re-sync the affected roster rows themselves; do not run the broad Reports → Reconcile Rosters button after them.', 'intersoccer-product-variations'); ?></p>
         <nav class="nav-tab-wrapper" style="margin-bottom: 16px;">
             <a href="<?php echo esc_url(add_query_arg('tab', 'scan', $base_url)); ?>" class="nav-tab <?php echo $tab === 'scan' ? 'nav-tab-active' : ''; ?>">
                 <?php esc_html_e('Scan &amp; preview', 'intersoccer-product-variations'); ?>
@@ -88,12 +88,17 @@ function intersoccer_render_order_meta_repair_page() {
             <a href="<?php echo esc_url(add_query_arg('tab', 'season-labels', $base_url)); ?>" class="nav-tab <?php echo $tab === 'season-labels' ? 'nav-tab-active' : ''; ?>">
                 <?php esc_html_e('Season labels', 'intersoccer-product-variations'); ?>
             </a>
+            <a href="<?php echo esc_url(add_query_arg('tab', 'course-dates', $base_url)); ?>" class="nav-tab <?php echo $tab === 'course-dates' ? 'nav-tab-active' : ''; ?>">
+                <?php esc_html_e('Course dates', 'intersoccer-product-variations'); ?>
+            </a>
         </nav>
         <?php
         if ($tab === 'batch') {
             intersoccer_render_automated_update_orders_page(true);
         } elseif ($tab === 'season-labels' && function_exists('intersoccer_render_season_label_repair_page')) {
             intersoccer_render_season_label_repair_page(true);
+        } elseif ($tab === 'course-dates' && function_exists('intersoccer_render_course_date_repair_page')) {
+            intersoccer_render_course_date_repair_page(true);
         } else {
             intersoccer_render_update_orders_page(true);
         }
