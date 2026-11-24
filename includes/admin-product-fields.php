@@ -327,29 +327,62 @@ function intersoccer_course_holiday_section_was_posted($loop) {
         && isset($_POST["intersoccer_holiday_dates_present"][$loop]);
 }
 
-function intersoccer_parse_posted_course_holiday_dates($loop) {
+function intersoccer_course_holiday_previous_for_index($stored_dates, $index) {
+    if (!is_array($stored_dates)) {
+        return '';
+    }
+    if (!array_key_exists($index, $stored_dates) && is_numeric($index)) {
+        $index = (int) $index;
+    }
+    if (!array_key_exists($index, $stored_dates)) {
+        return '';
+    }
+    $raw = $stored_dates[$index];
+    if (function_exists('intersoccer_admin_parse_date')) {
+        return intersoccer_admin_parse_date($raw);
+    }
+    $raw = is_string($raw) ? trim($raw) : '';
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) && strtotime($raw)) {
+        return $raw;
+    }
+    return '';
+}
+
+function intersoccer_parse_posted_course_holiday_dates($loop, $stored_dates = []) {
     $loop = (int) $loop;
     $holiday_dates = [];
+    $stored_dates = is_array($stored_dates) ? array_values($stored_dates) : [];
     if (!isset($_POST["intersoccer_holiday_dates"][$loop]) || !is_array($_POST["intersoccer_holiday_dates"][$loop])) {
         return $holiday_dates;
     }
-    foreach ($_POST["intersoccer_holiday_dates"][$loop] as $date) {
+    foreach ($_POST["intersoccer_holiday_dates"][$loop] as $index => $date) {
         $sanitized_date = sanitize_text_field($date);
         if (function_exists('intersoccer_admin_parse_date_result')) {
             $parsed = intersoccer_admin_parse_date_result($sanitized_date);
             if ($parsed['ok']) {
                 $holiday_dates[] = $parsed['ymd'];
-            } elseif ($parsed['invalid'] && function_exists('intersoccer_admin_date_flag_error')) {
-                intersoccer_admin_date_flag_error(sprintf(
-                    /* translators: %s is the date the admin typed. */
-                    __('Holiday date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
-                    $parsed['input']
-                ));
+            } elseif ($parsed['invalid']) {
+                if (function_exists('intersoccer_admin_date_flag_error')) {
+                    intersoccer_admin_date_flag_error(sprintf(
+                        /* translators: %s is the date the admin typed. */
+                        __('Holiday date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
+                        $parsed['input']
+                    ));
+                }
+                $previous = intersoccer_course_holiday_previous_for_index($stored_dates, $index);
+                if ($previous !== '') {
+                    $holiday_dates[] = $previous;
+                }
             }
             continue;
         }
         if (preg_match("/^\d{4}-\d{2}-\d{2}$/", $sanitized_date) && strtotime($sanitized_date)) {
             $holiday_dates[] = $sanitized_date;
+        } elseif ($sanitized_date !== '') {
+            $previous = intersoccer_course_holiday_previous_for_index($stored_dates, $index);
+            if ($previous !== '') {
+                $holiday_dates[] = $previous;
+            }
         }
     }
     return array_values(array_unique($holiday_dates));
@@ -357,11 +390,12 @@ function intersoccer_parse_posted_course_holiday_dates($loop) {
 
 function intersoccer_save_course_holiday_dates($variation_id, $loop) {
     $variation_id = (int) $variation_id;
+    $stored = get_post_meta($variation_id, "_course_holiday_dates", true);
+    $stored = is_array($stored) ? array_values($stored) : [];
     if (!intersoccer_course_holiday_section_was_posted($loop)) {
-        $stored = get_post_meta($variation_id, "_course_holiday_dates", true);
-        return is_array($stored) ? array_values($stored) : [];
+        return $stored;
     }
-    $holiday_dates = intersoccer_parse_posted_course_holiday_dates($loop);
+    $holiday_dates = intersoccer_parse_posted_course_holiday_dates($loop, $stored);
     update_post_meta($variation_id, "_course_holiday_dates", $holiday_dates);
     return $holiday_dates;
 }
