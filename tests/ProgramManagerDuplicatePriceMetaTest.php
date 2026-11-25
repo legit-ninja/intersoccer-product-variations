@@ -160,8 +160,10 @@ PHP
 				$object_id = (int) $object_id;
 				$names = [];
 				foreach ((array) $terms as $term) {
-					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term])) {
-						$names[] = $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term]['name'])) {
+						$names[] = (string) $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					} elseif (!is_numeric($term) && (string) $term !== '') {
+						$names[] = (string) $term;
 					}
 				}
 				$GLOBALS['intersoccer_test_product_terms'][$object_id][$taxonomy] = $names;

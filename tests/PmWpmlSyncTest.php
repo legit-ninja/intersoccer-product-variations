@@ -117,6 +117,16 @@ PHP
 		}
 		if (!function_exists('wp_set_object_terms')) {
 			function wp_set_object_terms($object_id, $terms, $taxonomy, $append = false) {
+				unset($append);
+				$stored = [];
+				foreach ((array) $terms as $term) {
+					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term]['name'])) {
+						$stored[] = (string) $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					} elseif (!is_numeric($term) && (string) $term !== '') {
+						$stored[] = (string) $term;
+					}
+				}
+				$GLOBALS['intersoccer_test_product_terms'][(int) $object_id][$taxonomy] = $stored;
 				return true;
 			}
 		}

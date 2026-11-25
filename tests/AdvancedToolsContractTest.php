@@ -80,6 +80,7 @@ class AdvancedToolsContractTest extends TestCase {
 
 	public static function setUpBeforeClass(): void {
 		require_once dirname(__DIR__) . '/includes/woocommerce/advanced-tools-admin.php';
+		require_once dirname(__DIR__) . '/includes/language-helpers.php';
 	}
 
 	protected function setUp(): void {
@@ -126,8 +127,13 @@ class AdvancedToolsContractTest extends TestCase {
 			$GLOBALS['intersoccer_pv_test_post_types'],
 			$GLOBALS['intersoccer_test_wp_get_post_parent_id_map'],
 			$GLOBALS['intersoccer_pv_test_rr_active'],
-			$GLOBALS['intersoccer_pv_test_scan_queries']
+			$GLOBALS['intersoccer_pv_test_scan_queries'],
+			$GLOBALS['intersoccer_pv_test_open_basedir'],
+			$GLOBALS['intersoccer_pv_test_upload_basedir']
 		);
+		if (class_exists('MockFilters')) {
+			MockFilters::reset();
+		}
 		$_POST = [];
 		$_GET = [];
 		$_SERVER['REQUEST_METHOD'] = 'GET';
@@ -410,6 +416,70 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertStringContainsString('Require all denied', $htaccess);
 		$this->assertStringContainsString('Deny from all', $htaccess);
 		$this->assertFileExists($this->backupDir . '/index.php');
+		$index = intersoccer_pv_repair_state_get('intersoccer_pv_repair_backup_index', []);
+		$this->assertIsArray($index);
+		$this->assertSame(realpath($this->backupDir), $index[count($index) - 1]['dir']);
+	}
+
+	public function test_backup_read_uses_the_recorded_directory_after_the_preferred_dir_changes(): void {
+		$dir_a = $this->backupDir;
+		$name = intersoccer_pv_repair_write_backup('late_pickup', 1, [[
+			'id' => 'meta:5:_end_date',
+			'before' => ['value' => 'old'],
+			'after' => ['value' => 'new'],
+		]]);
+		$dir_b = sys_get_temp_dir() . '/pv-repair-b-' . getmypid() . '-' . uniqid('', true);
+		mkdir($dir_b, 0777, true);
+		$GLOBALS['intersoccer_pv_test_backup_dir'] = $dir_b;
+		$read = intersoccer_pv_repair_read_backup($name);
+		$this->assertIsArray($read);
+		$this->assertSame('old', $read['rows'][0]['before']['value']);
+		$this->assertFileDoesNotExist($dir_b . '/' . $name);
+		$this->assertFileExists($dir_a . '/' . $name);
+		$GLOBALS['intersoccer_pv_test_value_store']['meta:5:_end_date'] = ['value' => 'new'];
+		$rolled = $this->postTool('rollback', [
+			'intersoccer_pv_repair_tool' => 'rollback',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+			'intersoccer_pv_repair_backup' => $name,
+		]);
+		$this->assertStringContainsString('restored 1', $rolled['message']);
+		$this->assertSame(['value' => 'old'], $GLOBALS['intersoccer_pv_test_value_store']['meta:5:_end_date']);
+		$this->backupDir = $dir_a;
+		$GLOBALS['intersoccer_pv_test_backup_dir'] = $dir_a;
+	}
+
+	public function test_backup_dir_probe_skips_paths_outside_open_basedir(): void {
+		$root = sys_get_temp_dir() . '/pv-open-' . getmypid() . '-' . uniqid('', true);
+		mkdir($root, 0777, true);
+		$GLOBALS['intersoccer_pv_test_open_basedir'] = $root;
+		$outside = dirname($root) . '/pv-outside-' . uniqid('', true) . '/intersoccer-pv-repair-backups';
+		$this->assertFalse(intersoccer_pv_repair_dir_creatable($outside));
+		$this->assertDirectoryDoesNotExist(dirname($outside));
+		$inside = $root . '/intersoccer-pv-repair-backups';
+		$this->assertTrue(intersoccer_pv_repair_dir_creatable($inside));
+		$this->assertDirectoryExists($inside);
+		$this->assertTrue(intersoccer_pv_repair_dir_creatable($inside));
+	}
+
+	public function test_uninstall_deletes_backup_files_and_directories(): void {
+		$name = intersoccer_pv_repair_write_backup('late_pickup', 1, [[
+			'id' => 'meta:5:_end_date',
+			'before' => ['value' => 'a'],
+			'after' => ['value' => 'b'],
+		]]);
+		$uploads = sys_get_temp_dir() . '/pv-uploads-' . getmypid() . '-' . uniqid('', true);
+		mkdir($uploads, 0777, true);
+		file_put_contents($uploads . '/keep.txt', 'keep');
+		$fallback = $uploads . '/intersoccer-pv-repair-backups';
+		mkdir($fallback, 0777, true);
+		file_put_contents($fallback . '/player.json', '{"player_first_name":"Ada"}');
+		$GLOBALS['intersoccer_pv_test_upload_basedir'] = $uploads;
+		intersoccer_pv_repair_uninstall();
+		$this->assertFileDoesNotExist($this->backupDir . '/' . $name);
+		$this->assertDirectoryDoesNotExist($this->backupDir);
+		$this->assertFileDoesNotExist($fallback . '/player.json');
+		$this->assertDirectoryDoesNotExist($fallback);
+		$this->assertFileExists($uploads . '/keep.txt');
 	}
 
 	public function test_uninstall_removes_cap_and_repair_options_only(): void {
@@ -664,9 +734,157 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame(count($preview['result']['rows']), count($applied['result']['rows']));
 		$this->assertSame('full-day', $open->attrs['pa_age-group']);
 		$this->assertSame('monday', $open->attrs['pa_course-day']);
-		$this->assertSame('16', (string) get_post_meta(77, '_course_total_weeks', true));
+		$this->assertSame('', (string) get_post_meta(77, '_course_total_weeks', true));
 		$this->assertSame('2099-09-01', (string) get_post_meta(77, '_course_start_date', true));
 		$this->assertSame('', $running->attrs['pa_course-day']);
+		$manual_ids = [];
+		foreach ($applied['result']['rows'] as $row) {
+			if (!empty($row['needs_manual'])) {
+				$manual_ids[] = (string) ($row['id'] ?? '');
+			}
+		}
+		$this->assertContains('manual:meta:77:_course_total_weeks', $manual_ids);
+		$this->assertNotContains('manual:meta:77:_course_start_date', $manual_ids);
+	}
+
+	public function test_refresh_attributes_lists_missing_course_meta_and_any_attributes_as_needs_manual(): void {
+		$this->loadProductTypes();
+		$course = new class {
+			public $attrs = [
+				'pa_course-day' => 'monday',
+				'pa_age-group' => 'full-day',
+			];
+			public function get_attributes() {
+				return $this->attrs;
+			}
+			public function set_attributes($attributes) {
+				$this->attrs = $attributes;
+			}
+			public function save() {
+			}
+			public function get_id() {
+				return 79;
+			}
+			public function is_type($type) {
+				return $type === 'variation';
+			}
+		};
+		$camp = new class {
+			public $attrs = [
+				'pa_age-group' => '5-13y-full-day',
+				'pa_camp-times' => '0900-1200',
+				'pa_booking-type' => '',
+				'pa_girls-only' => '',
+			];
+			public function get_attributes() {
+				return $this->attrs;
+			}
+			public function set_attributes($attributes) {
+				$this->attrs = $attributes;
+			}
+			public function save() {
+			}
+			public function get_id() {
+				return 81;
+			}
+			public function is_type($type) {
+				return $type === 'variation';
+			}
+		};
+		$GLOBALS['intersoccer_test_products'][16] = new class($course) {
+			private $course;
+			public function __construct($course) {
+				$this->course = $course;
+			}
+			public function get_children() {
+				return [79];
+			}
+			public function get_attributes() {
+				return [];
+			}
+			public function is_type($type) {
+				return $type === 'variable';
+			}
+			public function get_id() {
+				return 16;
+			}
+		};
+		$GLOBALS['intersoccer_test_products'][18] = new class($camp) {
+			private $camp;
+			public function __construct($camp) {
+				$this->camp = $camp;
+			}
+			public function get_children() {
+				return [81];
+			}
+			public function get_attributes() {
+				return [];
+			}
+			public function is_type($type) {
+				return $type === 'variable';
+			}
+			public function get_id() {
+				return 18;
+			}
+		};
+		$GLOBALS['intersoccer_test_products'][79] = $course;
+		$GLOBALS['intersoccer_test_products'][81] = $camp;
+		MockMetaData::$data[16]['_intersoccer_product_type'] = 'course';
+		MockMetaData::$data[18]['_intersoccer_product_type'] = 'camp';
+		unset(
+			$GLOBALS['intersoccer_test_transients']['intersoccer_type_16'],
+			$GLOBALS['intersoccer_test_transients']['intersoccer_type_18']
+		);
+
+		$preview = $this->postTool('preview', [
+			'intersoccer_pv_repair_tool' => 'refresh_attributes',
+			'product_id' => '16',
+		]);
+		$ids = array_map(static function ($row) {
+			return (string) ($row['id'] ?? '');
+		}, $preview['result']['rows']);
+		$this->assertContains('manual:meta:79:_course_start_date', $ids);
+		$this->assertContains('manual:meta:79:_course_total_weeks', $ids);
+		$this->assertContains('manual:meta:79:_course_holiday_dates', $ids);
+		$this->assertNotContains('attrs:79', $ids);
+		$applied = $this->postTool('apply', [
+			'intersoccer_pv_repair_tool' => 'refresh_attributes',
+			'product_id' => '16',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+		]);
+		$this->assertTrue(
+			$applied['type'] === 'success' || strpos($applied['message'], 'no changes') !== false,
+			$applied['message']
+		);
+		$this->assertSame('', (string) get_post_meta(79, '_course_start_date', true));
+		$this->assertSame('', (string) get_post_meta(79, '_course_total_weeks', true));
+		$this->assertSame('', (string) get_post_meta(79, '_course_holiday_dates', true));
+		$this->assertSame('monday', $course->attrs['pa_course-day']);
+		$this->assertSame('full-day', $course->attrs['pa_age-group']);
+
+		$camp_preview = $this->postTool('preview', [
+			'intersoccer_pv_repair_tool' => 'refresh_attributes',
+			'product_id' => '18',
+		]);
+		$camp_ids = array_map(static function ($row) {
+			return (string) ($row['id'] ?? '');
+		}, $camp_preview['result']['rows']);
+		$this->assertContains('manual:attr:81:pa_girls-only', $camp_ids);
+		$this->assertContains('attrs:81', $camp_ids);
+		$this->assertSame('', $camp->attrs['pa_booking-type']);
+		$this->assertSame('', $camp->attrs['pa_girls-only']);
+		$this->assertSame('5-13y-full-day', $camp->attrs['pa_age-group']);
+		$this->assertSame('0900-1200', $camp->attrs['pa_camp-times']);
+		$camp_applied = $this->postTool('apply', [
+			'intersoccer_pv_repair_tool' => 'refresh_attributes',
+			'product_id' => '18',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+		]);
+		$this->assertSame('success', $camp_applied['type'], $camp_applied['message']);
+		$this->assertSame('full-week', $camp->attrs['pa_booking-type']);
+		$this->assertSame('', $camp->attrs['pa_girls-only']);
+		$this->assertSame('5-13y-full-day', $camp->attrs['pa_age-group']);
+		$this->assertSame('0900-1200', $camp->attrs['pa_camp-times']);
 	}
 
 	public function test_real_course_end_date_preview_apply_and_rollback(): void {
@@ -708,14 +926,16 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame('1999-01-01', MockMetaData::$data[88]['_end_date']);
 	}
 
-	public function test_course_holiday_fix_card_has_no_preview_or_apply(): void {
+	public function test_product_tools_has_no_course_holiday_fix_card(): void {
 		$_GET['tab'] = 'product-tools';
 		ob_start();
 		intersoccer_pv_render_advanced_tools_page();
 		$html = ob_get_clean();
-		$this->assertStringContainsString('The course holiday fixer is not available in this release.', $html);
+		$this->assertStringNotContainsString('Course Holiday Fix', $html);
+		$this->assertStringNotContainsString('not available in this release', $html);
 		$this->assertStringNotContainsString('value="course_holiday_fix"', $html);
 		$this->assertStringNotContainsString('intersoccer-pm-course-holiday-fix-btn', $html);
+		$this->assertStringContainsString('value="refresh_attributes"', $html);
 		$result = $this->postTool('apply', [
 			'intersoccer_pv_repair_tool' => 'course_holiday_fix',
 			'intersoccer_pv_repair_phrase' => 'APPLY',
@@ -746,6 +966,9 @@ class AdvancedToolsContractTest extends TestCase {
 		}
 		if (!class_exists('WP_List_Table', false)) {
 			eval('class WP_List_Table { public function __construct($args = []) {} }');
+		}
+		if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+			define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', dirname(__DIR__) . '/');
 		}
 		if (!function_exists('intersoccer_render_update_orders_page')) {
 			require_once dirname(__DIR__) . '/includes/woocommerce/admin-ui.php';
@@ -860,6 +1083,50 @@ class AdvancedToolsContractTest extends TestCase {
 		MockMetaData::$data[880]['_intersoccer_product_type'] = 'camp';
 		MockMetaData::$data[881]['_camp_week_index'] = 1;
 		unset($GLOBALS['intersoccer_test_transients']['intersoccer_type_880']);
+		if (!class_exists('WC_Product_Variation', false)) {
+			eval('class WC_Product_Variation { public function get_attributes() { return []; } public function set_attributes($attributes) {} public function save() { return 0; } }');
+		}
+		if (!class_exists('PvAdvancedToolsTwinVariation', false)) {
+			eval(<<<'PHP'
+class PvAdvancedToolsTwinVariation extends WC_Product_Variation {
+	public $attrs = [];
+	private $id;
+	public function __construct($id) { $this->id = (int) $id; }
+	public function get_id() { return $this->id; }
+	public function get_attributes() { return $this->attrs; }
+	public function set_attributes($attributes) { $this->attrs = $attributes; }
+	public function save() { return $this->id; }
+	public function is_type($type) { return $type === 'variation'; }
+}
+PHP
+			);
+		}
+		if (!defined('ICL_SITEPRESS_VERSION')) {
+			define('ICL_SITEPRESS_VERSION', 'test');
+		}
+		$twin = new PvAdvancedToolsTwinVariation(882);
+		$twin->attrs = [
+			'pa_age-group' => '5-8y',
+			'pa_intersoccer-venues' => '',
+			'pa_camp-terms' => '',
+		];
+		$GLOBALS['intersoccer_test_products'][882] = $twin;
+		MockFilters::$filters['wpml_active_languages'] = static function () {
+			return ['en' => [], 'fr' => []];
+		};
+		MockFilters::$filters['wpml_element_language_code'] = static function () {
+			return 'en';
+		};
+		MockFilters::$filters['wpml_current_language'] = static function () {
+			return 'en';
+		};
+		MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) {
+			unset($type, $return_original);
+			if ((int) $id === 881 && $lang === 'fr') {
+				return 882;
+			}
+			return 0;
+		};
 
 		$preview = $this->postTool('preview', [
 			'intersoccer_pv_repair_tool' => 'repair_venue',
@@ -886,6 +1153,16 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame('autumn-week-1', $variation->attrs['pa_camp-terms']);
 		$this->assertSame('5-13y-full-day', $variation->attrs['pa_age-group']);
 		$this->assertSame('1000-1700', $variation->attrs['pa_camp-times']);
+		$this->assertSame('nyon', (string) get_post_meta(881, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('autumn-week-1', (string) get_post_meta(881, 'attribute_pa_camp-terms', true));
+		$this->assertContains('nyon', (array) ($GLOBALS['intersoccer_test_product_terms'][881]['pa_intersoccer-venues'] ?? []));
+		$this->assertContains('autumn-week-1', (array) ($GLOBALS['intersoccer_test_product_terms'][881]['pa_camp-terms'] ?? []));
+		$this->assertSame('nyon', $twin->attrs['pa_intersoccer-venues']);
+		$this->assertSame('autumn-week-1', $twin->attrs['pa_camp-terms']);
+		$this->assertSame('5-8y', $twin->attrs['pa_age-group']);
+		$this->assertSame('nyon', (string) get_post_meta(882, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('autumn-week-1', (string) get_post_meta(882, 'attribute_pa_camp-terms', true));
+		$this->assertContains('nyon', (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_intersoccer-venues'] ?? []));
 
 		$log = intersoccer_pv_repair_log_entries();
 		$filename = (string) $log[count($log) - 1]['backup'];
@@ -903,6 +1180,19 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame('5-13y-full-day', $variation->attrs['pa_age-group']);
 		$this->assertSame('1000-1700', $variation->attrs['pa_camp-times']);
 		$this->assertArrayHasKey('pa_age-group', $variation->attrs);
+		$this->assertSame('', $variation->attrs['pa_intersoccer-venues']);
+		$this->assertSame('', $variation->attrs['pa_camp-terms']);
+		$this->assertSame('', (string) get_post_meta(881, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('', (string) get_post_meta(881, 'attribute_pa_camp-terms', true));
+		$this->assertSame([], (array) ($GLOBALS['intersoccer_test_product_terms'][881]['pa_intersoccer-venues'] ?? []));
+		$this->assertSame([], (array) ($GLOBALS['intersoccer_test_product_terms'][881]['pa_camp-terms'] ?? []));
+		$this->assertSame('', $twin->attrs['pa_intersoccer-venues']);
+		$this->assertSame('', $twin->attrs['pa_camp-terms']);
+		$this->assertSame('5-8y', $twin->attrs['pa_age-group']);
+		$this->assertSame('', (string) get_post_meta(882, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('', (string) get_post_meta(882, 'attribute_pa_camp-terms', true));
+		$this->assertSame([], (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_intersoccer-venues'] ?? []));
+		$this->assertSame([], (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_camp-terms'] ?? []));
 	}
 
 	public function test_get_and_legacy_handlers_write_nothing(): void {

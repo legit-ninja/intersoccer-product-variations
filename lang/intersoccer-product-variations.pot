@@ -1180,16 +1180,10 @@ msgstr ""
 msgid "InterSoccer Advanced tools: Rosters & reports"
 msgstr ""
 
-msgid "Fills empty camp and course attributes from the registry defaults. Existing values are kept. Courses that have already started and not finished are skipped. Leave the product ID empty only for a shop-wide run (GLOBAL)."
+msgid "Fills empty required camp and course attributes when the registry has a safe default. Existing values are kept. Missing course start date, length, and holidays are listed as needs manual and are not written. An empty attribute that means Any is listed as needs manual unless that attribute is required. Courses that have already started and not finished are skipped. Leave the product ID empty only for a shop-wide run (GLOBAL)."
 msgstr ""
 
 msgid "Seeds camp start, end, and week from the camp-terms label when dates are empty. Overwrite existing dates, or leave the product ID empty, only with GLOBAL. The WP-CLI command dry-runs unless --apply is passed. This screen stays Preview-first."
-msgstr ""
-
-msgid "Course Holiday Fix"
-msgstr ""
-
-msgid "The course holiday fixer is not available in this release."
 msgstr ""
 
 msgid "Course end dates run from Advanced tools."
@@ -1204,4 +1198,238 @@ msgstr ""
 
 #, php-format
 msgid "Venue or camp-term changes: %d."
+msgstr ""
+
+msgid "Automated batch"
+msgstr ""
+
+msgid "Lists each order-line field that would change for the statuses and scan limit you choose. Strip deprecated metadata and prune legacy label twins stay off unless you check them. Removing metadata also requires DELETE. This path is shop-wide. Apply is refused above 200 changes."
+msgstr ""
+
+msgid "Order statuses"
+msgstr ""
+
+msgid "Orders to scan"
+msgstr ""
+
+msgid "Strip deprecated metadata"
+msgstr ""
+
+msgid "Prune legacy label twins"
+msgstr ""
+
+msgid "Shows the proposed end date next to the current end date for each course variation. Leave the product ID empty only for a shop-wide run (GLOBAL)."
+msgstr ""
+
+msgid "Repair Venue / Camp Term"
+msgstr ""
+
+msgid "Promotes venue and camp term onto variations and backfills empty values. Leave the product ID empty only for a shop-wide run (GLOBAL)."
+msgstr ""
+
+msgid "Apply parsed dates from camp-terms"
+msgstr ""
+
+msgid "Overwrite existing start dates"
+msgstr ""
+
+msgid "Re-enable late pick up"
+msgstr ""
+
+msgid "Turns late pick up on for full-day variations of one camp. Half-day variations are left off. Enter the camp product ID."
+msgstr ""
+
+msgid "Unknown repair."
+msgstr ""
+
+msgid "Course end dates are unavailable."
+msgstr ""
+
+#, php-format
+msgid "Proposed end date changes: %d."
+msgstr ""
+
+#, php-format
+msgid "Needs manual: %d."
+msgstr ""
+
+msgid "Camp date migration is unavailable."
+msgstr ""
+
+#, php-format
+msgid "Parsed camp date changes: %d."
+msgstr ""
+
+msgid "Enter a camp product ID."
+msgstr ""
+
+msgid "Camp product was not found."
+msgstr ""
+
+#, php-format
+msgid "Late pick up would be enabled on %d variation(s)."
+msgstr ""
+
+msgid "Order metadata repair is unavailable."
+msgstr ""
+
+#, php-format
+msgid "Order-line field changes: %d."
+msgstr ""
+
+#, php-format
+msgid "Apply is refused above %d changes. Narrow the scan. Nothing was written."
+msgstr ""
+
+msgid "Security check failed."
+msgstr ""
+
+msgid "Preview finished. Nothing was written."
+msgstr ""
+
+#, php-format
+msgid "Apply is refused above %d changes."
+msgstr ""
+
+msgid "Unknown action."
+msgstr ""
+
+msgid "Apply is not offered for this tool. No rollback."
+msgstr ""
+
+msgid "The change set no longer matches the Preview. Run Preview again."
+msgstr ""
+
+#, php-format
+msgid "Apply is refused above %d changes. Narrow the scope so the backup can cover every row."
+msgstr ""
+
+msgid "Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written."
+msgstr ""
+
+msgid "Apply finished."
+msgstr ""
+
+msgid "Type APPLY to confirm."
+msgstr ""
+
+msgid "Backup file was not found."
+msgstr ""
+
+#, php-format
+msgid "Rollback restored %1$d rows. Conflicts left untouched: %2$d."
+msgstr ""
+
+msgid "Type APPLY to confirm"
+msgstr ""
+
+msgid "Type GLOBAL for a shop-wide scope"
+msgstr ""
+
+msgid "Type DELETE when Preview removes metadata"
+msgstr ""
+
+msgid "Scan & preview"
+msgstr ""
+
+msgid "Season labels"
+msgstr ""
+
+msgid "Course dates"
+msgstr ""
+
+msgid "Product repairs"
+msgstr ""
+
+msgid "Late pick up"
+msgstr ""
+
+msgid "Preview (dry run)"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "GLOBAL is required when the product ID is empty, and when parsed dates overwrite existing values."
+msgstr ""
+
+msgid "This tool is shop-wide. Type GLOBAL as well as APPLY."
+msgstr ""
+
+msgid "Apply is not offered. No rollback."
+msgstr ""
+
+msgid "Repairs stay off everyday product screens. Preview lists the fields that would change and writes nothing. Apply asks you to type APPLY. A shop-wide run also asks you to type GLOBAL. Removals also ask you to type DELETE. Apply is refused above 200 changes. The backup is taken before Apply and can roll back rows that still match what Apply wrote, including a partial Apply. Tools marked no rollback are not in the backup list."
+msgstr ""
+
+msgid "Preview rows"
+msgstr ""
+
+msgid "ID"
+msgstr ""
+
+msgid "Before"
+msgstr ""
+
+msgid "After"
+msgstr ""
+
+msgid "Run log"
+msgstr ""
+
+msgid "No repair runs yet."
+msgstr ""
+
+msgid "When"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "Tool"
+msgstr ""
+
+msgid "Mode"
+msgstr ""
+
+msgid "Scope"
+msgstr ""
+
+msgid "Changed"
+msgstr ""
+
+msgid "Backup"
+msgstr ""
+
+msgid "Peak memory (MB)"
+msgstr ""
+
+msgid "Backups"
+msgstr ""
+
+msgid "File"
+msgstr ""
+
+msgid "APPLY"
+msgstr ""
+
+msgid "Rollback"
+msgstr ""
+
+msgid "You do not have permission to run repairs."
+msgstr ""
+
+msgid "Run Preview before Apply."
+msgstr ""
+
+msgid "This scope is shop-wide. Type GLOBAL as well as APPLY."
+msgstr ""
+
+msgid "Preview removes metadata. Type DELETE to confirm those removals."
+msgstr ""
+
+msgid "Preview has no changes. Apply was not run."
+msgstr ""
+
+msgid "This repair runs only from Advanced tools."
 msgstr ""

@@ -3533,20 +3533,30 @@ class InterSoccer_Program_Manager {
 			}
 
 			if ($changed) {
+				$before_row = [
+					'attributes' => [
+						'pa_intersoccer-venues' => $old_venue,
+						'pa_camp-terms' => $old_term,
+					],
+				];
+				$after_row = [
+					'attributes' => [
+						'pa_intersoccer-venues' => (string) ($attrs['pa_intersoccer-venues'] ?? ''),
+						'pa_camp-terms' => (string) ($attrs['pa_camp-terms'] ?? ''),
+					],
+				];
+				if (function_exists('intersoccer_pv_facet_side_effect_plan')) {
+					$side = intersoccer_pv_facet_side_effect_plan((int) $var_id, [
+						'pa_camp-terms' => (string) ($attrs['pa_camp-terms'] ?? ''),
+						'pa_intersoccer-venues' => (string) ($attrs['pa_intersoccer-venues'] ?? ''),
+					]);
+					$before_row = array_merge($before_row, $side['before']);
+					$after_row = array_merge($after_row, $side['after']);
+				}
 				$result['changes'][] = [
 					'id' => 'attrs:' . (int) $var_id,
-					'before' => [
-						'attributes' => [
-							'pa_intersoccer-venues' => $old_venue,
-							'pa_camp-terms' => $old_term,
-						],
-					],
-					'after' => [
-						'attributes' => [
-							'pa_intersoccer-venues' => (string) ($attrs['pa_intersoccer-venues'] ?? ''),
-							'pa_camp-terms' => (string) ($attrs['pa_camp-terms'] ?? ''),
-						],
-					],
+					'before' => $before_row,
+					'after' => $after_row,
 				];
 				if ($dry_run) {
 					$result['updated']++;
@@ -3623,8 +3633,14 @@ class InterSoccer_Program_Manager {
 		}
 
 		if ($type === 'course') {
-			$defaults = intersoccer_attr_refresh_defaults('course');
-			foreach ($defaults as $meta_key => $default_value) {
+			// New variations still seed these when Program Manager does not pass them.
+			// Attribute refresh does not use this seed.
+			$meta_defaults = [
+				'_course_start_date' => function_exists('current_time') ? (string) current_time('Y-m-d') : gmdate('Y-m-d'),
+				'_course_total_weeks' => '16',
+				'_course_holiday_dates' => '',
+			];
+			foreach ($meta_defaults as $meta_key => $default_value) {
 				if (strpos($meta_key, '_') !== 0) {
 					continue;
 				}

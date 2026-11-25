@@ -473,21 +473,196 @@ if (!function_exists('intersoccer_pv_repair_backup_outside_candidates')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_open_basedir_roots')) {
+	/**
+	 * open_basedir roots, or null when the host does not restrict paths.
+	 *
+	 * @return string[]|null
+	 */
+	function intersoccer_pv_repair_open_basedir_roots() {
+		if (array_key_exists('intersoccer_pv_test_open_basedir', $GLOBALS)) {
+			$open = (string) $GLOBALS['intersoccer_pv_test_open_basedir'];
+		} else {
+			$open = ini_get('open_basedir');
+			$open = is_string($open) ? $open : '';
+		}
+		if ($open === '') {
+			return null;
+		}
+		$roots = [];
+		foreach (explode(PATH_SEPARATOR, $open) as $root) {
+			$root = rtrim(str_replace('\\', '/', $root), '/');
+			if ($root !== '') {
+				$roots[] = $root;
+			}
+		}
+		return $roots;
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_path_allowed')) {
+	/**
+	 * False when $path sits outside open_basedir. Those probes warn on restricted hosts.
+	 *
+	 * @param string $path Path.
+	 * @return bool
+	 */
+	function intersoccer_pv_repair_path_allowed($path) {
+		$roots = intersoccer_pv_repair_open_basedir_roots();
+		if ($roots === null) {
+			return true;
+		}
+		$path = rtrim(str_replace('\\', '/', (string) $path), '/');
+		if ($path === '') {
+			return false;
+		}
+		foreach ($roots as $root) {
+			if ($path === $root || strpos($path, $root . '/') === 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 if (!function_exists('intersoccer_pv_repair_dir_creatable')) {
 	/**
 	 * @param string $dir Directory.
 	 * @return bool
 	 */
 	function intersoccer_pv_repair_dir_creatable($dir) {
-		if (is_dir($dir)) {
-			return is_writable($dir);
-		}
-		$parent = dirname($dir);
-		if ($parent === '' || !is_dir($parent) || !is_writable($parent)) {
+		$dir = (string) $dir;
+		if ($dir === '' || !intersoccer_pv_repair_path_allowed($dir)) {
 			return false;
 		}
-		$made = function_exists('wp_mkdir_p') ? wp_mkdir_p($dir) : @mkdir($dir, 0755, true);
-		return (bool) $made && is_dir($dir) && is_writable($dir);
+		$parent = dirname($dir);
+		if (!intersoccer_pv_repair_path_allowed($parent)) {
+			return false;
+		}
+		if (@is_dir($dir)) {
+			return @is_writable($dir);
+		}
+		if ($parent === '' || $parent === '.' || !@is_dir($parent) || !@is_writable($parent)) {
+			return false;
+		}
+		$made = function_exists('wp_mkdir_p') ? @wp_mkdir_p($dir) : @mkdir($dir, 0755, true);
+		return (bool) $made && @is_dir($dir) && @is_writable($dir);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_backup_uploads_dir')) {
+	/**
+	 * Uploads fallback for repair JSON backups.
+	 *
+	 * @return string
+	 */
+	function intersoccer_pv_repair_backup_uploads_dir() {
+		if (!empty($GLOBALS['intersoccer_pv_test_upload_basedir'])) {
+			$base = (string) $GLOBALS['intersoccer_pv_test_upload_basedir'];
+		} else {
+			$uploads = function_exists('wp_upload_dir') ? wp_upload_dir() : ['basedir' => sys_get_temp_dir()];
+			$base = isset($uploads['basedir']) && is_string($uploads['basedir']) && $uploads['basedir'] !== ''
+				? $uploads['basedir']
+				: sys_get_temp_dir();
+		}
+		return rtrim(str_replace('\\', '/', $base), '/') . '/intersoccer-pv-repair-backups';
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_backup_normalize_dir')) {
+	/**
+	 * @param string $dir Directory.
+	 * @return string
+	 */
+	function intersoccer_pv_repair_backup_normalize_dir($dir) {
+		$dir = rtrim(str_replace('\\', '/', (string) $dir), '/');
+		if ($dir !== '' && @is_dir($dir)) {
+			$real = @realpath($dir);
+			if (is_string($real) && $real !== '') {
+				return rtrim(str_replace('\\', '/', $real), '/');
+			}
+		}
+		return $dir;
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_backup_recorded_dir')) {
+	/**
+	 * Absolute directory stored when the backup was written.
+	 *
+	 * @param string $filename Filename.
+	 * @return string
+	 */
+	function intersoccer_pv_repair_backup_recorded_dir($filename) {
+		$index = intersoccer_pv_repair_state_get('intersoccer_pv_repair_backup_index', []);
+		if (!is_array($index)) {
+			return '';
+		}
+		$found = '';
+		foreach ($index as $entry) {
+			if (!is_array($entry) || (string) ($entry['file'] ?? '') !== $filename) {
+				continue;
+			}
+			if (!empty($entry['dir']) && is_string($entry['dir'])) {
+				$found = $entry['dir'];
+			}
+		}
+		return $found;
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_backup_lookup_dirs')) {
+	/**
+	 * Recorded directory first, then both known locations, then the active directory.
+	 *
+	 * @param string $filename Filename.
+	 * @return string[]
+	 */
+	function intersoccer_pv_repair_backup_lookup_dirs($filename) {
+		$dirs = [];
+		$recorded = intersoccer_pv_repair_backup_recorded_dir($filename);
+		if ($recorded !== '') {
+			$dirs[] = $recorded;
+		}
+		foreach (intersoccer_pv_repair_backup_outside_candidates() as $candidate) {
+			$dirs[] = $candidate;
+		}
+		$dirs[] = intersoccer_pv_repair_backup_uploads_dir();
+		if (!empty($GLOBALS['intersoccer_pv_test_backup_dir'])) {
+			$dirs[] = (string) $GLOBALS['intersoccer_pv_test_backup_dir'];
+		}
+		$unique = [];
+		foreach ($dirs as $dir) {
+			$dir = intersoccer_pv_repair_backup_normalize_dir($dir);
+			if ($dir === '' || isset($unique[$dir])) {
+				continue;
+			}
+			$unique[$dir] = $dir;
+		}
+		return array_values($unique);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_backup_locate')) {
+	/**
+	 * @param string $filename Filename.
+	 * @return string|null Absolute file path.
+	 */
+	function intersoccer_pv_repair_backup_locate($filename) {
+		$filename = basename((string) $filename);
+		if (!preg_match('/^[a-z0-9._-]+\.json$/', $filename)) {
+			return null;
+		}
+		foreach (intersoccer_pv_repair_backup_lookup_dirs($filename) as $dir) {
+			if (!intersoccer_pv_repair_path_allowed($dir)) {
+				continue;
+			}
+			$path = $dir . '/' . $filename;
+			if (@is_readable($path)) {
+				return $path;
+			}
+		}
+		return null;
 	}
 }
 
@@ -501,11 +676,7 @@ if (!function_exists('intersoccer_pv_repair_backup_dir_resolve')) {
 				return $candidate;
 			}
 		}
-		$uploads = function_exists('wp_upload_dir') ? wp_upload_dir() : ['basedir' => sys_get_temp_dir()];
-		$base = isset($uploads['basedir']) && is_string($uploads['basedir']) && $uploads['basedir'] !== ''
-			? $uploads['basedir']
-			: sys_get_temp_dir();
-		return rtrim($base, '/\\') . '/intersoccer-pv-repair-backups';
+		return intersoccer_pv_repair_backup_uploads_dir();
 	}
 }
 
@@ -562,6 +733,7 @@ if (!function_exists('intersoccer_pv_repair_write_backup')) {
 		}
 		$index[] = [
 			'file' => $name,
+			'dir' => intersoccer_pv_repair_backup_normalize_dir($dir),
 			'tool' => $tool_key,
 			'user_id' => (int) $user_id,
 			'created_at' => $payload['created_at'],
@@ -582,12 +754,16 @@ if (!function_exists('intersoccer_pv_repair_replace_backup_rows')) {
 		if (!preg_match('/^[a-z0-9._-]+\.json$/', $filename)) {
 			return;
 		}
-		$data = intersoccer_pv_repair_read_backup($filename);
-		if ($data === null) {
+		$path = intersoccer_pv_repair_backup_locate($filename);
+		if ($path === null) {
+			return;
+		}
+		$data = json_decode((string) file_get_contents($path), true);
+		if (!is_array($data)) {
 			return;
 		}
 		$data['rows'] = $rows;
-		file_put_contents(intersoccer_pv_repair_backup_dir() . '/' . $filename, intersoccer_pv_repair_json($data));
+		file_put_contents($path, intersoccer_pv_repair_json($data));
 	}
 }
 
@@ -597,12 +773,8 @@ if (!function_exists('intersoccer_pv_repair_read_backup')) {
 	 * @return array|null
 	 */
 	function intersoccer_pv_repair_read_backup($filename) {
-		$filename = basename((string) $filename);
-		if (!preg_match('/^[a-z0-9._-]+\.json$/', $filename)) {
-			return null;
-		}
-		$path = intersoccer_pv_repair_backup_dir() . '/' . $filename;
-		if (!is_readable($path)) {
+		$path = intersoccer_pv_repair_backup_locate($filename);
+		if ($path === null) {
 			return null;
 		}
 		$data = json_decode((string) file_get_contents($path), true);
@@ -650,6 +822,9 @@ if (!function_exists('intersoccer_pv_repair_rollback_rows')) {
 		$rows = is_array($backup['rows'] ?? null) ? $backup['rows'] : [];
 		foreach ($rows as $row) {
 			if (!is_array($row) || !array_key_exists('id', $row)) {
+				continue;
+			}
+			if (!empty($row['needs_manual'])) {
 				continue;
 			}
 			$current = call_user_func($read_current, $row['id']);
@@ -834,13 +1009,108 @@ if (!function_exists('intersoccer_pv_repair_delete_repair_options')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_backup_dir_is_removable')) {
+	/**
+	 * Only this plugin's backup directories, plus the active test directory.
+	 *
+	 * @param string $dir Directory.
+	 * @return bool
+	 */
+	function intersoccer_pv_repair_backup_dir_is_removable($dir) {
+		$dir = intersoccer_pv_repair_backup_normalize_dir($dir);
+		if ($dir === '' || $dir === '/' || $dir === '.' || $dir === dirname($dir)) {
+			return false;
+		}
+		if (basename($dir) === 'intersoccer-pv-repair-backups') {
+			return true;
+		}
+		if (!empty($GLOBALS['intersoccer_pv_test_backup_dir'])) {
+			$test = intersoccer_pv_repair_backup_normalize_dir((string) $GLOBALS['intersoccer_pv_test_backup_dir']);
+			if ($test !== '' && $dir === $test) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_delete_backup_tree')) {
+	/**
+	 * @param string $dir Directory.
+	 * @return void
+	 */
+	function intersoccer_pv_repair_delete_backup_tree($dir) {
+		if (!intersoccer_pv_repair_path_allowed($dir) || !@is_dir($dir)) {
+			return;
+		}
+		$items = @scandir($dir);
+		if (!is_array($items)) {
+			return;
+		}
+		foreach ($items as $item) {
+			if ($item === '.' || $item === '..') {
+				continue;
+			}
+			$path = $dir . '/' . $item;
+			if (@is_dir($path) && !@is_link($path)) {
+				intersoccer_pv_repair_delete_backup_tree($path);
+			} else {
+				@unlink($path);
+			}
+		}
+		@rmdir($dir);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_delete_backup_dirs')) {
+	/**
+	 * Delete backup files and this plugin's backup directories.
+	 *
+	 * Recorded directories are removed first. Preferred (outside the web root)
+	 * and the uploads fallback are removed when they are this plugin's backup dirs.
+	 *
+	 * @return void
+	 */
+	function intersoccer_pv_repair_delete_backup_dirs() {
+		$dirs = [];
+		$index = intersoccer_pv_repair_state_get('intersoccer_pv_repair_backup_index', []);
+		if (is_array($index)) {
+			foreach ($index as $entry) {
+				if (is_array($entry) && !empty($entry['dir']) && is_string($entry['dir'])) {
+					$dirs[] = $entry['dir'];
+				}
+			}
+		}
+		if (!empty($GLOBALS['intersoccer_pv_test_backup_dir'])) {
+			$dirs[] = (string) $GLOBALS['intersoccer_pv_test_backup_dir'];
+		}
+		foreach (intersoccer_pv_repair_backup_outside_candidates() as $candidate) {
+			$dirs[] = $candidate;
+		}
+		$dirs[] = intersoccer_pv_repair_backup_uploads_dir();
+		$seen = [];
+		foreach ($dirs as $dir) {
+			$normalized = intersoccer_pv_repair_backup_normalize_dir($dir);
+			if ($normalized === '' || isset($seen[$normalized]) || !intersoccer_pv_repair_backup_dir_is_removable($normalized)) {
+				continue;
+			}
+			$seen[$normalized] = true;
+			if (!@is_dir($normalized)) {
+				continue;
+			}
+			intersoccer_pv_repair_delete_backup_tree($normalized);
+		}
+	}
+}
+
 if (!function_exists('intersoccer_pv_repair_uninstall')) {
 	/**
-	 * Uninstall hook: drop PV repair options. Leave the shared cap while Reports & Rosters is active.
+	 * Uninstall hook: drop backup files, then PV repair options. Leave the shared cap while Reports & Rosters is active.
 	 *
 	 * @return void
 	 */
 	function intersoccer_pv_repair_uninstall() {
+		intersoccer_pv_repair_delete_backup_dirs();
 		if (!intersoccer_pv_repair_reports_plugin_active()) {
 			intersoccer_pv_repair_remove_cap_from_roles();
 		}
