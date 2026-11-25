@@ -1882,7 +1882,14 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 				'backup' => $backup,
 				'note' => $note,
 			]);
-			$message = __('Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written.', 'intersoccer-product-variations');
+			// Icl abort already rolled back (or reported conflicts). Other early
+			// stops still need the operator to roll back rows that were written.
+			$rollback_done = defined('INTERSOCCER_PV_REPAIR_ICL_ABORT') && (int) $e->getCode() === (int) INTERSOCCER_PV_REPAIR_ICL_ABORT;
+			if ($rollback_done) {
+				$message = __('Apply stopped early. The backup is the pre-Apply snapshot.', 'intersoccer-product-variations');
+			} else {
+				$message = __('Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written.', 'intersoccer-product-variations');
+			}
 			if ($reason !== '') {
 				$message .= ' ' . sprintf(
 					/* translators: %s: error detail */

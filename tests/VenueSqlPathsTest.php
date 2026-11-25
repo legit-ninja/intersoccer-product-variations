@@ -489,7 +489,7 @@ class VenueSqlPathsTest extends TestCase {
 		} else {
 			unset($GLOBALS['wpdb']);
 		}
-		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'], $GLOBALS['intersoccer_pv_test_cache_touches'], $GLOBALS['intersoccer_pv_test_after_write']);
+		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'], $GLOBALS['intersoccer_pv_test_cache_touches'], $GLOBALS['intersoccer_test_actions']['intersoccer_pv_repair_after_write']);
 		if (function_exists('intersoccer_pv_wpml_icl_translations_table_reset_exists_cache')) {
 			intersoccer_pv_wpml_icl_translations_table_reset_exists_cache();
 		}
@@ -661,6 +661,63 @@ class VenueSqlPathsTest extends TestCase {
 		$this->assertContains('attrs:301', $ids);
 	}
 
+	public function test_refresh_needs_manual_omits_parent_non_variation_attributes(): void {
+		$non_variation = [
+			'pa_program-year',
+			'pa_girls-only',
+			'pa_days-of-week',
+			'pa_canton-region',
+			'pa_city',
+			'pa_activity-type',
+			'pa_program-season',
+		];
+		$variation = [
+			'pa_booking-type',
+			'pa_age-group',
+			'pa_camp-times',
+		];
+		$attributes = [];
+		foreach ($variation as $key) {
+			$attributes[$key] = [
+				'name' => $key,
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			];
+		}
+		foreach ($non_variation as $key) {
+			$attributes[$key] = [
+				'name' => $key,
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 0,
+				'is_taxonomy' => 1,
+			];
+		}
+		$this->db->add_post(400, 'product');
+		$this->db->add_post(401, 'product_variation', 400);
+		$this->db->add_meta(400, '_intersoccer_product_type', 'camp');
+		$this->db->add_meta(400, '_product_attributes', $attributes);
+		$this->db->add_meta(401, 'attribute_pa_camp-times', '');
+		$this->db->add_icl(51, 'post_product', 400, 900, 'en', '');
+		$this->db->add_icl(52, 'post_product_variation', 401, 901, 'en', '');
+
+		$preview = intersoccer_pv_tool_refresh_attributes(true, ['product_id' => 400]);
+		$ids = array_map(static function ($row) {
+			return (string) ($row['id'] ?? '');
+		}, $preview['rows']);
+		foreach ($non_variation as $key) {
+			$this->assertNotContains('manual:attr:401:' . $key, $ids, $key . ' is a parent non-variation attribute');
+		}
+		$this->assertNotContains('manual:attr:401:pa_course-times', $ids);
+		$this->assertContains('attrs:401', $ids);
+		$manual_attr = array_values(array_filter($ids, static function ($id) {
+			return strpos($id, 'manual:attr:401:') === 0;
+		}));
+		$this->assertSame([], $manual_attr);
+	}
+
 	public function test_venue_apply_aborts_and_restores_when_icl_changes_mid_write(): void {
 		$this->seedCampVenueTwin();
 		$this->assertIclAbortRestores(
@@ -801,13 +858,14 @@ class VenueSqlPathsTest extends TestCase {
 		$this->assertNotSame([], $icl_before);
 
 		$twin_id = (int) $twin_id;
-		$GLOBALS['intersoccer_pv_test_after_write'] = static function () use ($twin_id) {
+		$mutate = static function () use ($twin_id) {
 			foreach ($GLOBALS['wpdb']->icl as $index => $row) {
 				if ((int) ($row['element_id'] ?? 0) === $twin_id && ($row['element_type'] ?? '') === 'post_product_variation') {
 					$GLOBALS['wpdb']->icl[$index]['source_language_code'] = null;
 				}
 			}
 		};
+		add_action('intersoccer_pv_repair_after_write', $mutate, 10, 3);
 
 		$executor(false, ['product_id' => $product_id]);
 		$aborted = false;
@@ -818,7 +876,7 @@ class VenueSqlPathsTest extends TestCase {
 			$aborted = true;
 			$message = $e->getMessage();
 		}
-		unset($GLOBALS['intersoccer_pv_test_after_write']);
+		unset($GLOBALS['intersoccer_test_actions']['intersoccer_pv_repair_after_write']);
 		$this->assertTrue($aborted, $tool . ' must abort when icl changes mid-Apply');
 		$this->assertStringContainsString('translation records changed', $message);
 		$this->assertStringContainsString('All writes were undone', $message);

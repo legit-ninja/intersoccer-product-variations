@@ -78,6 +78,10 @@ if (!function_exists('intersoccer_pv_repair_icl_rows_clear_cache')) {
 }
 
 
+if (!defined('INTERSOCCER_PV_REPAIR_ICL_ABORT')) {
+	define('INTERSOCCER_PV_REPAIR_ICL_ABORT', 4601);
+}
+
 if (!function_exists('intersoccer_pv_repair_abort_if_icl_changed')) {
 	/**
 	 * Compare a fresh after-Apply icl snapshot to the pre-Apply snapshot.
@@ -117,9 +121,9 @@ if (!function_exists('intersoccer_pv_repair_abort_if_icl_changed')) {
 			intersoccer_pv_repair_icl_restore($icl_before);
 		}
 		if ($had_conflicts) {
-			throw new RuntimeException(__('Apply was aborted because translation records changed. Writes that could be rolled back were undone; conflicting rows were left as they are.', 'intersoccer-product-variations'));
+			throw new RuntimeException(__('Apply was aborted because translation records changed. Writes that could be rolled back were undone; conflicting rows were left as they are.', 'intersoccer-product-variations'), INTERSOCCER_PV_REPAIR_ICL_ABORT);
 		}
-		throw new RuntimeException(__('Apply was aborted because translation records changed. All writes were undone.', 'intersoccer-product-variations'));
+		throw new RuntimeException(__('Apply was aborted because translation records changed. All writes were undone.', 'intersoccer-product-variations'), INTERSOCCER_PV_REPAIR_ICL_ABORT);
 	}
 }
 
@@ -451,7 +455,7 @@ if (!function_exists('intersoccer_pv_repair_raw_meta_keys')) {
 
 if (!function_exists('intersoccer_pv_repair_product_used_attribute_taxonomies')) {
 	/**
-	 * Attribute taxonomies the parent or variation actually uses (not a padded known list).
+	 * Attribute taxonomies used for variations (attribute_* meta and parent is_variation attributes).
 	 *
 	 * @param int $parent_id    Parent product ID.
 	 * @param int $variation_id Variation ID.
@@ -468,6 +472,24 @@ if (!function_exists('intersoccer_pv_repair_product_used_attribute_taxonomies'))
 				$used[$key] = true;
 			}
 		};
+		$parent_attr_is_variation = static function ($attr) {
+			if (is_object($attr) && method_exists($attr, 'get_variation')) {
+				return (bool) $attr->get_variation();
+			}
+			if (is_array($attr)) {
+				return !empty($attr['is_variation']);
+			}
+			return false;
+		};
+		$parent_attr_key = static function ($key, $attr) {
+			if (is_object($attr) && method_exists($attr, 'get_name')) {
+				$name = (string) $attr->get_name();
+				if ($name !== '') {
+					return $name;
+				}
+			}
+			return (string) $key;
+		};
 		$variation_id = (int) $variation_id;
 		if ($variation_id > 0 && function_exists('intersoccer_pv_repair_raw_meta_keys')) {
 			foreach (intersoccer_pv_repair_raw_meta_keys($variation_id) as $key) {
@@ -481,8 +503,10 @@ if (!function_exists('intersoccer_pv_repair_product_used_attribute_taxonomies'))
 				$raw = maybe_unserialize($raw);
 			}
 			if (is_array($raw)) {
-				foreach (array_keys($raw) as $key) {
-					$add($key);
+				foreach ($raw as $key => $attr) {
+					if ($parent_attr_is_variation($attr)) {
+						$add($parent_attr_key($key, $attr));
+					}
 				}
 			}
 		}
@@ -497,10 +521,24 @@ if (!function_exists('intersoccer_pv_repair_product_used_attribute_taxonomies'))
 					$attrs = $product->get_attributes();
 				}
 			}
-			if (is_array($attrs)) {
-				foreach (array_keys($attrs) as $key) {
-					$add($key);
+			if (!is_array($attrs)) {
+				continue;
+			}
+			$from_parent = ($object_id === $parent_id);
+			foreach ($attrs as $key => $attr) {
+				if ($from_parent) {
+					// Parent get_attributes() includes shop-level attributes.
+					// Count those only when they are used for variations.
+					if (is_object($attr) || is_array($attr)) {
+						if (!$parent_attr_is_variation($attr)) {
+							continue;
+						}
+						$add($parent_attr_key($key, $attr));
+						continue;
+					}
+					continue;
 				}
+				$add($key);
 			}
 		}
 		return $used;
@@ -1005,22 +1043,6 @@ if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 }
 
 
-if (!function_exists('intersoccer_pv_repair_notify_test_after_write')) {
-	/**
-	 * Optional test hook after a post meta write (SQL or update_post_meta path).
-	 *
-	 * @param int    $post_id Post ID.
-	 * @param string $key     Meta key.
-	 * @param mixed  $value   Meta value.
-	 * @return void
-	 */
-	function intersoccer_pv_repair_notify_test_after_write($post_id, $key, $value) {
-		if (isset($GLOBALS['intersoccer_pv_test_after_write']) && is_callable($GLOBALS['intersoccer_pv_test_after_write'])) {
-			call_user_func($GLOBALS['intersoccer_pv_test_after_write'], (int) $post_id, (string) $key, $value);
-		}
-	}
-}
-
 if (!function_exists('intersoccer_pv_repair_write_post_meta')) {
 	/**
 	 * @param int    $post_id Post ID.
@@ -1058,8 +1080,8 @@ if (!function_exists('intersoccer_pv_repair_write_post_meta')) {
 			if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
 				intersoccer_pv_repair_touch_post_caches($post_id);
 			}
-			if (function_exists('intersoccer_pv_repair_notify_test_after_write')) {
-				intersoccer_pv_repair_notify_test_after_write($post_id, $key, $value);
+			if (function_exists('do_action')) {
+				do_action('intersoccer_pv_repair_after_write', $post_id, $key, $value);
 			}
 			return;
 		}
@@ -1069,8 +1091,8 @@ if (!function_exists('intersoccer_pv_repair_write_post_meta')) {
 		if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
 			intersoccer_pv_repair_touch_post_caches($post_id);
 		}
-		if (function_exists('intersoccer_pv_repair_notify_test_after_write')) {
-			intersoccer_pv_repair_notify_test_after_write($post_id, $key, $value);
+		if (function_exists('do_action')) {
+			do_action('intersoccer_pv_repair_after_write', $post_id, $key, $value);
 		}
 	}
 }
