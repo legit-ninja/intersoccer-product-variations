@@ -515,6 +515,9 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 							}
 							$GLOBALS['intersoccer_test_products'][$variation_id]->set_attributes($stored);
 						}
+						if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
+							intersoccer_pv_repair_touch_post_caches($variation_id);
+						}
 					}
 				}
 				if ($type === 'course') {
@@ -1227,7 +1230,13 @@ if (!function_exists('intersoccer_pv_facet_side_snapshot')) {
 				continue;
 			}
 			$meta_key = 'attribute_' . $taxonomy;
-			$meta[$meta_key] = function_exists('get_post_meta') ? (string) get_post_meta((int) $variation_id, $meta_key, true) : '';
+			if (function_exists('intersoccer_pv_repair_raw_post_meta')) {
+				$meta[$meta_key] = (string) intersoccer_pv_repair_raw_post_meta((int) $variation_id, $meta_key);
+			} elseif (function_exists('get_post_meta')) {
+				$meta[$meta_key] = (string) get_post_meta((int) $variation_id, $meta_key, true);
+			} else {
+				$meta[$meta_key] = '';
+			}
 			$records = intersoccer_pv_facet_term_records((int) $variation_id, $taxonomy);
 			$terms[$taxonomy] = $records['slugs'];
 			$term_ids[$taxonomy] = $records['ids'];
@@ -1369,10 +1378,24 @@ if (!function_exists('intersoccer_pv_facet_translation_state')) {
 	function intersoccer_pv_facet_translation_state($variation_id) {
 		$taxes = ['pa_camp-terms', 'pa_intersoccer-venues'];
 		$translations = [];
-		if (!function_exists('intersoccer_foreach_translated_product_variations')) {
-			return $translations;
+		$twin_ids = [];
+		if (function_exists('intersoccer_pv_repair_icl_source_and_twins')) {
+			$resolved = intersoccer_pv_repair_icl_source_and_twins((int) $variation_id, ['post_product_variation']);
+			foreach ($resolved['twins'] as $twin) {
+				$tid = (int) ($twin['id'] ?? 0);
+				if ($tid > 0) {
+					$twin_ids[] = $tid;
+				}
+			}
+		} elseif (function_exists('intersoccer_foreach_translated_product_variations')) {
+			foreach (intersoccer_foreach_translated_product_variations((int) $variation_id) as $tid) {
+				$tid = (int) $tid;
+				if ($tid > 0) {
+					$twin_ids[] = $tid;
+				}
+			}
 		}
-		foreach (intersoccer_foreach_translated_product_variations((int) $variation_id) as $tid) {
+		foreach (array_values(array_unique($twin_ids)) as $tid) {
 			$tid = (int) $tid;
 			if ($tid <= 0) {
 				continue;
@@ -1471,9 +1494,18 @@ if (!function_exists('intersoccer_pv_repair_read_value')) {
 						$attributes = [];
 					}
 				}
+				$meta = is_array($snap['meta'] ?? null) ? $snap['meta'] : [];
+				foreach ($attributes as $attr_key => $attr_value) {
+					$attr_key = (string) $attr_key;
+					if ($attr_key === '') {
+						continue;
+					}
+					$meta_key = strpos($attr_key, 'attribute_') === 0 ? $attr_key : 'attribute_' . $attr_key;
+					$meta[$meta_key] = (string) $attr_value;
+				}
 				return [
 					'attributes' => $attributes,
-					'meta' => $snap['meta'],
+					'meta' => $meta,
 					'terms' => $snap['terms'],
 					'term_ids' => $snap['term_ids'] ?? [],
 					'translations' => intersoccer_pv_facet_translation_state($variation_id),
@@ -1557,6 +1589,9 @@ if (!function_exists('intersoccer_pv_repair_restore_value')) {
 				}
 			}
 			intersoccer_pv_repair_restore_facet_side($variation_id, $before);
+			if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
+				intersoccer_pv_repair_touch_post_caches($variation_id);
+			}
 		}
 	}
 }
@@ -1570,7 +1605,7 @@ if (!function_exists('intersoccer_pv_repair_restore_object_terms')) {
 	 * @return void
 	 */
 	function intersoccer_pv_repair_restore_object_terms($object_id, array $state) {
-		if (!function_exists('wp_set_object_terms')) {
+		if (!function_exists('intersoccer_pv_repair_write_object_terms') && !function_exists('wp_set_object_terms')) {
 			return;
 		}
 		$object_id = (int) $object_id;
@@ -1611,9 +1646,13 @@ if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 	 */
 	function intersoccer_pv_repair_restore_facet_side($variation_id, array $before) {
 		$variation_id = (int) $variation_id;
-		if (isset($before['meta']) && is_array($before['meta']) && function_exists('update_post_meta')) {
+		if (isset($before['meta']) && is_array($before['meta'])) {
 			foreach ($before['meta'] as $meta_key => $meta_value) {
-				update_post_meta($variation_id, (string) $meta_key, $meta_value);
+				if (function_exists('intersoccer_pv_repair_write_post_meta')) {
+					intersoccer_pv_repair_write_post_meta($variation_id, (string) $meta_key, $meta_value);
+				} elseif (function_exists('update_post_meta')) {
+					update_post_meta($variation_id, (string) $meta_key, $meta_value);
+				}
 			}
 		}
 		intersoccer_pv_repair_restore_object_terms($variation_id, $before);
@@ -1641,9 +1680,13 @@ if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 					$twin_product->set_attributes($current);
 				}
 			}
-			if (isset($twin['meta']) && is_array($twin['meta']) && function_exists('update_post_meta')) {
+			if (isset($twin['meta']) && is_array($twin['meta'])) {
 				foreach ($twin['meta'] as $meta_key => $meta_value) {
-					update_post_meta($tid, (string) $meta_key, $meta_value);
+					if (function_exists('intersoccer_pv_repair_write_post_meta')) {
+						intersoccer_pv_repair_write_post_meta($tid, (string) $meta_key, $meta_value);
+					} elseif (function_exists('update_post_meta')) {
+						update_post_meta($tid, (string) $meta_key, $meta_value);
+					}
 				}
 			}
 			intersoccer_pv_repair_restore_object_terms($tid, $twin);

@@ -190,6 +190,33 @@ class InterSoccerPvRepairFakeWpdb {
 			}
 			return $this->meta_value((int) $match[1], $match[2]);
 		}
+		if (stripos($query, 'SELECT t.slug FROM') !== false) {
+			if (!preg_match("/t\\.term_id = (\\d+).+taxonomy = '([^']+)'/s", $query, $match)) {
+				return null;
+			}
+			$term_id = (int) $match[1];
+			if (isset($this->terms_rows[$term_id]) && $this->terms_rows[$term_id]['taxonomy'] === $match[2]) {
+				return $this->terms_rows[$term_id]['slug'];
+			}
+			return null;
+		}
+		if (stripos($query, 'SELECT t.term_id FROM') !== false && stripos($query, 't.slug') !== false) {
+			if (preg_match("/taxonomy = '([^']+)'.+t\\.slug = '([^']+)'/s", $query, $match)) {
+				$taxonomy = $match[1];
+				$slug = $match[2];
+			} elseif (preg_match("/t\\.slug = '([^']+)'.+taxonomy = '([^']+)'/s", $query, $match)) {
+				$slug = $match[1];
+				$taxonomy = $match[2];
+			} else {
+				return null;
+			}
+			foreach ($this->terms_rows as $term) {
+				if ($term['taxonomy'] === $taxonomy && $term['slug'] === $slug) {
+					return $term['term_id'];
+				}
+			}
+			return null;
+		}
 		return null;
 	}
 
@@ -234,7 +261,59 @@ class InterSoccerPvRepairFakeWpdb {
 		return [];
 	}
 
+	public function get_row($query, $output = null) {
+		unset($output);
+		$query = (string) $query;
+		if (stripos($query, 'SELECT t.term_id, t.slug') !== false && stripos($query, 'dest.trid') !== false) {
+			if (!preg_match("/src_tt\.taxonomy = '([^']+)'/", $query, $tax_match)
+				|| !preg_match("/dest\.language_code = '([^']+)'/", $query, $lang_match)
+				|| !preg_match("/src\.element_type = '([^']+)'/", $query, $type_match)
+				|| !preg_match("/src_tt\.term_id = (\d+)/", $query, $term_match)
+			) {
+				return null;
+			}
+			$taxonomy = $tax_match[1];
+			$lang = $lang_match[1];
+			$element_type = $type_match[1];
+			$source_term_id = (int) $term_match[1];
+			if (!isset($this->terms_rows[$source_term_id]) || $this->terms_rows[$source_term_id]['taxonomy'] !== $taxonomy) {
+				return null;
+			}
+			$src_tt = (int) $this->terms_rows[$source_term_id]['term_taxonomy_id'];
+			$trid = 0;
+			foreach ($this->icl as $row) {
+				if ((string) ($row['element_type'] ?? '') === $element_type && (int) ($row['element_id'] ?? 0) === $src_tt) {
+					$trid = (int) ($row['trid'] ?? 0);
+					break;
+				}
+			}
+			if ($trid <= 0) {
+				return null;
+			}
+			foreach ($this->icl as $row) {
+				if ((int) ($row['trid'] ?? 0) !== $trid
+					|| (string) ($row['element_type'] ?? '') !== $element_type
+					|| (string) ($row['language_code'] ?? '') !== $lang
+				) {
+					continue;
+				}
+				$dest_tt = (int) ($row['element_id'] ?? 0);
+				foreach ($this->terms_rows as $term) {
+					if ((int) $term['term_taxonomy_id'] === $dest_tt && $term['taxonomy'] === $taxonomy) {
+						return [
+							'term_id' => (int) $term['term_id'],
+							'slug' => (string) $term['slug'],
+						];
+					}
+				}
+			}
+			return null;
+		}
+		return null;
+	}
+
 	public function query($query) {
+
 		$query = (string) $query;
 		$this->queries[] = $query;
 		if (preg_match('/^(START TRANSACTION|COMMIT|ROLLBACK)/i', $query)) {
@@ -381,6 +460,7 @@ class VenueSqlPathsTest extends TestCase {
 		if (!defined('ARRAY_A')) {
 			define('ARRAY_A', 'ARRAY_A');
 		}
+		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
 		$this->previous_wpdb = $GLOBALS['wpdb'] ?? null;
 		$this->db = new InterSoccerPvRepairFakeWpdb();
 		$GLOBALS['wpdb'] = $this->db;
@@ -402,7 +482,7 @@ class VenueSqlPathsTest extends TestCase {
 		} else {
 			unset($GLOBALS['wpdb']);
 		}
-		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache']);
+		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'], $GLOBALS['intersoccer_pv_test_cache_touches']);
 		if (function_exists('intersoccer_pv_wpml_icl_translations_table_reset_exists_cache')) {
 			intersoccer_pv_wpml_icl_translations_table_reset_exists_cache();
 		}
@@ -485,12 +565,22 @@ class VenueSqlPathsTest extends TestCase {
 		$this->assertSame('monday', $attr_row['after']['attributes']['pa_course-day']);
 		$this->assertSame('', (string) $this->db->meta_value(201, 'attribute_pa_course-day'));
 
+		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
 		$applied = intersoccer_pv_tool_refresh_attributes(false, ['product_id' => 200]);
 		$attr_row = $this->rowById($applied['rows'], 'attrs:201');
 		$this->assertSame('monday', (string) $this->db->meta_value(201, 'attribute_pa_course-day'));
+		$this->assertTrue($this->cacheTouched('post', 201), 'Refresh Apply must refresh post cache/transients/lookup');
 
-		intersoccer_pv_repair_restore_value('attrs:201', $attr_row['before'], $attr_row['after']);
+		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
+		$result = intersoccer_pv_repair_rollback_rows(
+			['rows' => [$attr_row]],
+			'intersoccer_pv_repair_read_value',
+			'intersoccer_pv_repair_restore_value'
+		);
+		$this->assertSame(1, (int) $result['restored'], 'Refresh rollback must pass the after-state conflict check');
+		$this->assertSame([], $result['conflicts']);
 		$this->assertSame('', (string) $this->db->meta_value(201, 'attribute_pa_course-day'));
+		$this->assertTrue($this->cacheTouched('post', 201), 'Refresh rollback must refresh post cache/transients/lookup');
 	}
 
 	public function test_refresh_under_admin_language_touches_only_source_and_leaves_icl_unchanged(): void {
@@ -524,7 +614,88 @@ class VenueSqlPathsTest extends TestCase {
 		}
 	}
 
+	public function test_partial_slug_resolution_refuses_the_write(): void {
+		$this->db->add_term(5, 'zurich', 'pa_intersoccer-venues');
+		$this->db->add_term(10, 'nyon', 'pa_intersoccer-venues');
+		$this->db->add_rel(100, 10);
+		$this->db->add_rel(100, 5);
+
+		intersoccer_pv_repair_write_object_terms(100, 'pa_intersoccer-venues', [], ['zurich', 'ghost']);
+		$this->assertSame([5, 10], $this->db->term_ids_for(100, 'pa_intersoccer-venues'), 'Partial slug lists must not drop existing terms');
+	}
+
+	public function test_venue_twin_mapping_apply_and_rollback_on_sql_path(): void {
+		$this->db->add_post(100, 'product');
+		$this->db->add_post(150, 'product');
+		$this->db->add_post(101, 'product_variation', 100);
+		$this->db->add_post(102, 'product_variation', 150);
+		$this->db->add_meta(100, '_intersoccer_product_type', 'camp');
+		$this->db->add_meta(100, '_product_attributes', [
+			'pa_intersoccer-venues' => [
+				'name' => 'pa_intersoccer-venues',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+		]);
+		$this->db->add_term(5, 'nyon', 'pa_intersoccer-venues', 50);
+		$this->db->add_term(15, 'nyon-fr', 'pa_intersoccer-venues', 115);
+		$this->db->add_rel(100, 5);
+		$this->db->add_icl(21, 'post_product', 100, 500, 'en', '');
+		$this->db->add_icl(22, 'post_product', 150, 500, 'fr', 'en');
+		$this->db->add_icl(23, 'post_product_variation', 101, 600, 'en', '');
+		$this->db->add_icl(24, 'post_product_variation', 102, 600, 'fr', 'en');
+		$this->db->add_icl(31, 'tax_pa_intersoccer-venues', 50, 700, 'en', '');
+		$this->db->add_icl(32, 'tax_pa_intersoccer-venues', 115, 700, 'fr', 'en');
+
+		$mapped = intersoccer_pv_repair_map_term_for_language(5, 'pa_intersoccer-venues', 'fr');
+		$this->assertIsArray($mapped);
+		$this->assertSame(15, (int) $mapped['term_id']);
+		$this->assertSame('nyon-fr', $mapped['slug']);
+
+		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
+		$applied = intersoccer_pv_tool_repair_venue(false, ['product_id' => 100]);
+		$attr_row = $this->rowById($applied['rows'], 'attrs:101');
+		$this->assertIsArray($attr_row);
+		$this->assertSame('nyon', (string) $this->db->meta_value(101, 'attribute_pa_intersoccer-venues'));
+		$this->assertSame([5], $this->db->term_ids_for(101, 'pa_intersoccer-venues'));
+		$this->assertSame('nyon-fr', (string) $this->db->meta_value(102, 'attribute_pa_intersoccer-venues'));
+		$this->assertSame([15], $this->db->term_ids_for(102, 'pa_intersoccer-venues'));
+		$this->assertTrue($this->cacheTouched('post', 101));
+		$this->assertTrue($this->cacheTouched('post', 102));
+
+		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
+		$result = intersoccer_pv_repair_rollback_rows(
+			['rows' => $applied['rows']],
+			'intersoccer_pv_repair_read_value',
+			'intersoccer_pv_repair_restore_value'
+		);
+		$this->assertSame([], $result['conflicts'], 'Venue twin rollback must pass the after-state conflict check');
+		$this->assertGreaterThanOrEqual(1, (int) $result['restored']);
+		$this->assertSame('', (string) ($this->db->meta_value(101, 'attribute_pa_intersoccer-venues') ?? ''));
+		$this->assertSame([], $this->db->term_ids_for(101, 'pa_intersoccer-venues'));
+		$this->assertSame('', (string) ($this->db->meta_value(102, 'attribute_pa_intersoccer-venues') ?? ''));
+		$this->assertSame([], $this->db->term_ids_for(102, 'pa_intersoccer-venues'));
+		$this->assertTrue($this->cacheTouched('post', 101), 'Venue rollback must refresh post cache/transients/lookup');
+	}
+
+	private function cacheTouched($kind, $post_id): bool {
+		$kind = (string) $kind;
+		$post_id = (int) $post_id;
+		foreach ($GLOBALS['intersoccer_pv_test_cache_touches'] ?? [] as $entry) {
+			if (!is_array($entry) || ($entry[0] ?? '') !== $kind) {
+				continue;
+			}
+			if ((int) ($entry[1] ?? 0) === $post_id) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private function seedRefreshCourse($parent_id, $source_variation, $twin_variation) {
+
 		$this->db->add_post($parent_id, 'product');
 		$this->db->add_post($source_variation, 'product_variation', $parent_id);
 		$this->db->add_meta($parent_id, '_intersoccer_product_type', 'course');

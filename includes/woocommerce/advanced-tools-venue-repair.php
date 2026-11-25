@@ -653,46 +653,116 @@ if (!function_exists('intersoccer_pv_repair_resolve_term_ids')) {
 	 */
 	function intersoccer_pv_repair_resolve_term_ids($taxonomy, array $slugs, array $explicit_ids = []) {
 		$taxonomy = (string) $taxonomy;
-		$ids = array_values(array_unique(array_filter(array_map('intval', $explicit_ids))));
-		if ($ids !== [] || $taxonomy === '') {
-			return $ids;
-		}
+		$explicit = array_values(array_unique(array_filter(array_map('intval', $explicit_ids))));
 		$slugs = array_values(array_unique(array_filter(array_map('strval', $slugs), static function ($slug) {
 			return $slug !== '';
 		})));
-		if ($slugs === []) {
-			return [];
+		if ($taxonomy === '' || $slugs === []) {
+			return $explicit;
 		}
+
+		$slug_of = [];
 		if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
-			foreach ($slugs as $slug) {
-				foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
-					if (($row['taxonomy'] ?? '') === $taxonomy && (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug)) {
-						$ids[] = (int) $term_id;
-						break;
+			foreach ($explicit as $term_id) {
+				$row = $GLOBALS['intersoccer_test_terms'][$term_id] ?? null;
+				if (is_array($row) && ($row['taxonomy'] ?? '') === $taxonomy) {
+					$slug_of[$term_id] = (string) ($row['slug'] ?? '');
+				}
+			}
+		} else {
+			global $wpdb;
+			if ($wpdb && is_object($wpdb) && isset($wpdb->terms, $wpdb->term_taxonomy) && method_exists($wpdb, 'get_var') && method_exists($wpdb, 'prepare')) {
+				foreach ($explicit as $term_id) {
+					$slug = $wpdb->get_var($wpdb->prepare(
+						"SELECT t.slug FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE t.term_id = %d AND tt.taxonomy = %s LIMIT 1",
+						$term_id,
+						$taxonomy
+					));
+					if (is_string($slug) && $slug !== '') {
+						$slug_of[$term_id] = $slug;
 					}
 				}
 			}
-			return array_values(array_unique(array_filter($ids)));
 		}
-		global $wpdb;
-		if (!$wpdb || !is_object($wpdb) || !isset($wpdb->terms, $wpdb->term_taxonomy) || !method_exists($wpdb, 'get_results') || !method_exists($wpdb, 'prepare')) {
-			return [];
-		}
-		$placeholders = implode(',', array_fill(0, count($slugs), '%s'));
-		$sql = $wpdb->prepare(
-			"SELECT t.term_id, t.slug FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE tt.taxonomy = %s AND t.slug IN ({$placeholders})",
-			array_merge([$taxonomy], $slugs)
-		);
-		$found = [];
-		foreach ((array) $wpdb->get_results($sql, ARRAY_A) as $row) {
-			$found[(string) ($row['slug'] ?? '')] = (int) ($row['term_id'] ?? 0);
-		}
+
+		$lookup_slug = static function ($slug) use ($taxonomy) {
+			if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+				foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
+					if (!is_array($row) || ($row['taxonomy'] ?? '') !== $taxonomy) {
+						continue;
+					}
+					if (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug) {
+						return (int) $term_id;
+					}
+				}
+				return 0;
+			}
+			global $wpdb;
+			if (!$wpdb || !is_object($wpdb) || !isset($wpdb->terms, $wpdb->term_taxonomy) || !method_exists($wpdb, 'get_var') || !method_exists($wpdb, 'prepare')) {
+				return 0;
+			}
+			return (int) $wpdb->get_var($wpdb->prepare(
+				"SELECT t.term_id FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE tt.taxonomy = %s AND t.slug = %s LIMIT 1",
+				$taxonomy,
+				$slug
+			));
+		};
+
+		$resolved = [];
 		foreach ($slugs as $slug) {
-			if (!empty($found[$slug])) {
-				$ids[] = (int) $found[$slug];
+			$matched = 0;
+			foreach ($explicit as $term_id) {
+				if (($slug_of[$term_id] ?? '') === $slug) {
+					$matched = $term_id;
+					break;
+				}
+			}
+			if ($matched <= 0) {
+				$matched = (int) $lookup_slug($slug);
+			}
+			if ($matched > 0) {
+				$resolved[] = $matched;
 			}
 		}
-		return array_values(array_unique(array_filter($ids)));
+		return array_values(array_unique(array_filter($resolved)));
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_touch_post_caches')) {
+	/**
+	 * Refresh post cache, product transients, and the WC attribute lookup table.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return void
+	 */
+	function intersoccer_pv_repair_touch_post_caches($post_id) {
+		$post_id = (int) $post_id;
+		if ($post_id <= 0) {
+			return;
+		}
+		if (isset($GLOBALS['intersoccer_pv_test_cache_touches']) && is_array($GLOBALS['intersoccer_pv_test_cache_touches'])) {
+			$GLOBALS['intersoccer_pv_test_cache_touches'][] = ['post', $post_id];
+		}
+		if (function_exists('clean_post_cache')) {
+			clean_post_cache($post_id);
+		}
+		if (function_exists('wc_delete_product_transients')) {
+			wc_delete_product_transients($post_id);
+		}
+		$class = 'Automattic\\WooCommerce\\Internal\\ProductAttributesLookup\\LookupDataStore';
+		if (!function_exists('wc_get_container') || !class_exists($class)) {
+			return;
+		}
+		try {
+			$store = wc_get_container()->get($class);
+			if (is_object($store) && method_exists($store, 'on_product_changed')) {
+				$store->on_product_changed($post_id);
+			} elseif (is_object($store) && method_exists($store, 'create_data_for_product')) {
+				$store->create_data_for_product($post_id);
+			}
+		} catch (Throwable $e) {
+			unset($e);
+		}
 	}
 }
 
@@ -709,34 +779,17 @@ if (!function_exists('intersoccer_pv_repair_touch_term_object_caches')) {
 		$object_id = (int) $object_id;
 		$taxonomy = (string) $taxonomy;
 		$tt_ids = array_values(array_unique(array_filter(array_map('intval', $tt_ids))));
+		if (isset($GLOBALS['intersoccer_pv_test_cache_touches']) && is_array($GLOBALS['intersoccer_pv_test_cache_touches'])) {
+			$GLOBALS['intersoccer_pv_test_cache_touches'][] = ['terms', $object_id, $taxonomy];
+		}
 		if ($tt_ids !== [] && function_exists('wp_update_term_count')) {
 			wp_update_term_count($tt_ids, $taxonomy);
 		}
 		if ($object_id > 0 && $taxonomy !== '' && function_exists('clean_object_term_cache')) {
 			clean_object_term_cache($object_id, $taxonomy);
 		}
-		if ($object_id > 0 && function_exists('clean_post_cache')) {
-			clean_post_cache($object_id);
-		}
-		if ($object_id > 0 && function_exists('wc_delete_product_transients')) {
-			wc_delete_product_transients($object_id);
-		}
-		if ($object_id <= 0) {
-			return;
-		}
-		$class = 'Automattic\\WooCommerce\\Internal\\ProductAttributesLookup\\LookupDataStore';
-		if (!function_exists('wc_get_container') || !class_exists($class)) {
-			return;
-		}
-		try {
-			$store = wc_get_container()->get($class);
-			if (is_object($store) && method_exists($store, 'on_product_changed')) {
-				$store->on_product_changed($object_id);
-			} elseif (is_object($store) && method_exists($store, 'create_data_for_product')) {
-				$store->create_data_for_product($object_id);
-			}
-		} catch (Throwable $e) {
-			unset($e);
+		if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
+			intersoccer_pv_repair_touch_post_caches($object_id);
 		}
 	}
 }
@@ -761,11 +814,14 @@ if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 		$slugs = array_values(array_unique(array_filter(array_map('strval', $slugs), static function ($slug) {
 			return $slug !== '';
 		})));
-		if ($term_ids === [] && $slugs !== [] && function_exists('intersoccer_pv_repair_resolve_term_ids')) {
-			$term_ids = intersoccer_pv_repair_resolve_term_ids($taxonomy, $slugs);
+		if ($slugs !== [] && function_exists('intersoccer_pv_repair_resolve_term_ids')) {
+			$term_ids = intersoccer_pv_repair_resolve_term_ids($taxonomy, $slugs, $term_ids);
+		}
+		if ($slugs !== [] && count($term_ids) !== count($slugs)) {
+			// Refuse a partial write: every slug must resolve, otherwise terms would be dropped.
+			return;
 		}
 		if ($term_ids === [] && $slugs !== []) {
-			// Refuse to delete existing relationships when slugs could not be resolved.
 			return;
 		}
 		if (isset($GLOBALS['intersoccer_test_products']) || isset($GLOBALS['intersoccer_test_terms']) || isset($GLOBALS['intersoccer_test_product_terms'])) {
@@ -854,27 +910,38 @@ if (!function_exists('intersoccer_pv_repair_write_post_meta')) {
 		if ($post_id <= 0 || $key === '') {
 			return;
 		}
+		$use_sql = empty($GLOBALS['intersoccer_test_products']) && !isset($GLOBALS['intersoccer_test_terms']);
+		global $wpdb;
+		if ($use_sql && $wpdb && is_object($wpdb) && isset($wpdb->postmeta) && method_exists($wpdb, 'query') && method_exists($wpdb, 'prepare')) {
+			$stored = $value;
+			if (!is_scalar($stored) && $stored !== null && function_exists('maybe_serialize')) {
+				$stored = maybe_serialize($stored);
+			} elseif (is_array($stored) || is_object($stored)) {
+				$stored = serialize($stored);
+			}
+			$wpdb->query('START TRANSACTION');
+			$deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = %s", $post_id, $key));
+			if ($deleted === false) {
+				$wpdb->query('ROLLBACK');
+				return;
+			}
+			$inserted = $wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES (%d, %s, %s)", $post_id, $key, (string) $stored));
+			if ($inserted === false) {
+				$wpdb->query('ROLLBACK');
+				return;
+			}
+			$wpdb->query('COMMIT');
+			if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
+				intersoccer_pv_repair_touch_post_caches($post_id);
+			}
+			return;
+		}
 		if (function_exists('update_post_meta')) {
 			update_post_meta($post_id, $key, $value);
 		}
-		if (!empty($GLOBALS['intersoccer_test_products']) || isset($GLOBALS['intersoccer_test_terms'])) {
-			return;
+		if (function_exists('intersoccer_pv_repair_touch_post_caches')) {
+			intersoccer_pv_repair_touch_post_caches($post_id);
 		}
-		global $wpdb;
-		if (!$wpdb || !is_object($wpdb) || !isset($wpdb->postmeta) || !method_exists($wpdb, 'query') || !method_exists($wpdb, 'prepare')) {
-			return;
-		}
-		$stored = $value;
-		if (!is_scalar($stored) && $stored !== null && function_exists('maybe_serialize')) {
-			$stored = maybe_serialize($stored);
-		} elseif (is_array($stored) || is_object($stored)) {
-			$stored = serialize($stored);
-		}
-		$deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = %s", $post_id, $key));
-		if ($deleted === false) {
-			return;
-		}
-		$wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES (%d, %s, %s)", $post_id, $key, (string) $stored));
 	}
 }
 
@@ -1360,9 +1427,16 @@ if (!function_exists('intersoccer_pv_venue_build_plan')) {
 						if ($is_manual) {
 							continue;
 						}
-						$twin_slugs[$taxonomy] = (string) ($twin_after['attributes'][$taxonomy] ?? '');
-						$ids = $twin_after['term_ids'][$taxonomy] ?? [];
-						$twin_ids[$taxonomy] = (int) ($ids[0] ?? 0);
+						$before_twin = isset($before_twins[(string) $tid]) && is_array($before_twins[(string) $tid]) ? $before_twins[(string) $tid] : [];
+						$before_slug = (string) (($before_twin['attributes'][$taxonomy] ?? $before_twin['meta']['attribute_' . $taxonomy] ?? ''));
+						$after_slug = (string) ($twin_after['attributes'][$taxonomy] ?? '');
+						$before_ids = array_values(array_map('intval', (array) ($before_twin['term_ids'][$taxonomy] ?? [])));
+						$after_ids = array_values(array_map('intval', (array) ($twin_after['term_ids'][$taxonomy] ?? [])));
+						if ($before_slug === $after_slug && $before_ids === $after_ids) {
+							continue;
+						}
+						$twin_slugs[$taxonomy] = $after_slug;
+						$twin_ids[$taxonomy] = (int) ($after_ids[0] ?? 0);
 					}
 					if ($twin_slugs !== []) {
 						intersoccer_pv_repair_write_variation_facets($tid, $twin_slugs, $twin_ids);
