@@ -13,6 +13,13 @@
 	/** Snapshot of parent attrs for selected type (Step 2 rows hidden on Step 4). */
 	var lastParentAttrs = {};
 
+	function formatAdminDate(value) {
+		if (window.InterSoccerAdminDate && typeof window.InterSoccerAdminDate.format === 'function') {
+			return window.InterSoccerAdminDate.format(value) || '';
+		}
+		return value || '';
+	}
+
 	// =========================================================================
 	// Wizard navigation
 	// =========================================================================
@@ -1558,10 +1565,14 @@
 			end: $row.find('.intersoccer-pm-camp-end').val()
 		}).done(function(response) {
 			if (response.success) {
+				if (response.data && response.data.schedule) {
+					$row.find('.intersoccer-pm-camp-start').val(formatAdminDate(response.data.schedule.start));
+					$row.find('.intersoccer-pm-camp-end').val(formatAdminDate(response.data.schedule.end));
+				}
 				$status.text(PM.i18n.saved).css('color', 'green');
 				setTimeout(function() { $status.text(''); }, 2000);
 			} else {
-				$status.text(PM.i18n.error).css('color', 'red');
+				$status.text((response.data && response.data.message) ? response.data.message : PM.i18n.error).css('color', 'red');
 			}
 		}).fail(function() {
 			$status.text(PM.i18n.error).css('color', 'red');
@@ -1605,8 +1616,8 @@
 				var $tr = $('tr[data-variation-id="' + row.variation_id + '"]');
 				if (!$tr.length || !row.schedule) return;
 				$tr.find('.intersoccer-pm-camp-week').val(row.schedule.week || '');
-				$tr.find('.intersoccer-pm-camp-start').val(row.schedule.start || '');
-				$tr.find('.intersoccer-pm-camp-end').val(row.schedule.end || '');
+				$tr.find('.intersoccer-pm-camp-start').val(formatAdminDate(row.schedule.start));
+				$tr.find('.intersoccer-pm-camp-end').val(formatAdminDate(row.schedule.end));
 			});
 			$status.text('Updated ' + (response.data.updated || 0) + ' variations.').css('color', 'green');
 		}).fail(function() {

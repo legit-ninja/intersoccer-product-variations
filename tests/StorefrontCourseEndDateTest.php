@@ -85,7 +85,7 @@ class StorefrontCourseEndDateTest extends TestCase
 
         $this->assertSame(
             '',
-            intersoccer_storefront_course_end_date($variation_id, 9200, '', '13/01/2026', 4, [])
+            intersoccer_storefront_course_end_date($variation_id, 9200, '', '31/02/2026', 4, [])
         );
     }
 }

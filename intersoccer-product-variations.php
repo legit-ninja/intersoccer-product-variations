@@ -422,6 +422,7 @@ $includes = [
     'includes/woocommerce/attribute-enforcement.php',
     'includes/woocommerce/admin-ui.php',
     'includes/woocommerce/pm-wpml-sync.php',
+    'includes/woocommerce/admin-date-format.php',
     'includes/woocommerce/program-manager.php',
     'includes/woocommerce/product-types.php',
     'includes/woocommerce/product-course.php',
