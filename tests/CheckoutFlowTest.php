@@ -3,7 +3,7 @@
  * Test: Checkout Flow
  * 
  * Purpose: Ensure checkout processing, order metadata, and player assignments work correctly
- * Covers: checkout-calculations.php, checkout.php - order processing
+ * Covers: checkout-calculations.php - order processing
  * 
  * CRITICAL: Checkout errors = lost sales and customer frustration
  */

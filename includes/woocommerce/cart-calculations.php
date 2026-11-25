@@ -947,25 +947,6 @@ function intersoccer_inject_course_prorated_price($variation_data, $product, $va
 }
 
 /**
- * AJAX handler for dynamic price calculation.
- * NOTE: This handler is DEPRECATED - the active handler is in includes/ajax-handlers.php
- * Keeping this commented out to avoid duplicate handler conflicts.
- */
-// add_action('wp_ajax_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
-// add_action('wp_ajax_nopriv_intersoccer_calculate_dynamic_price', 'intersoccer_calculate_dynamic_price_callback');
-function intersoccer_calculate_dynamic_price_callback_DEPRECATED() {
-    check_ajax_referer('intersoccer_nonce', 'nonce');
-
-    $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
-    $variation_id = isset($_POST['variation_id']) ? (int) $_POST['variation_id'] : 0;
-    $camp_days = isset($_POST['camp_days']) ? (array) $_POST['camp_days'] : [];
-    $remaining_weeks = isset($_POST['remaining_weeks']) && is_numeric($_POST['remaining_weeks']) ? (int) $_POST['remaining_weeks'] : null;
-
-    $price = intersoccer_calculate_price($product_id, $variation_id, $camp_days, $remaining_weeks);
-    wp_send_json_success(['price' => wc_price($price)]);
-}
-
-/**
  * Add custom JavaScript for dynamic price updates.
  */
 add_action('woocommerce_single_product_summary', 'intersoccer_add_price_update_script', 35);
@@ -1260,29 +1241,6 @@ function intersoccer_add_price_update_script() {
             // NOTE: Disabled this handler to prevent duplicate price updates
             // elementor-widgets.php handles day checkbox changes for single-day camps
             // This handler was causing race conditions and price doubling (CHF 960 instead of CHF 480)
-            /*
-            var debounceCampUpdate = debounce(updateCampPrice, 500);
-            $('form.cart').on('change', 'input[name="camp_days_temp[]"]', function() {
-                console.log('InterSoccer: Day checkbox changed event fired');
-                // Immediately update hidden inputs to ensure they're posted with cart addition
-                $('input.intersoccer-camp-day-input').remove();
-                var campDays = $('input[name="camp_days_temp[]"]:checked').map(function() {
-                    return $(this).val();
-                }).get();
-                console.log('InterSoccer: Selected camp days:', campDays);
-                if (campDays.length === 0) {
-                    console.log('InterSoccer: No days selected, clearing session data');
-                    clearSessionData();
-                }
-                campDays.forEach(function(day) {
-                    $('form.cart').append('<input type="hidden" name="camp_days[]" value="' + day + '" class="intersoccer-camp-day-input">');
-                });
-                if (debugEnabled) {
-                    console.log('InterSoccer: Camp day checkbox changed, updated hidden inputs immediately');
-                }
-                debounceCampUpdate();
-            });
-            */
 
             function debounce(func, wait) {
                 var timeout;
