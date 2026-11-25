@@ -1181,9 +1181,12 @@ if (!function_exists('intersoccer_pv_venue_build_plan')) {
 		if ($source_id <= 0) {
 			$source_id = (int) $product_id;
 		}
-		$type = class_exists('InterSoccer_Product_Types') ? (string) InterSoccer_Product_Types::get_product_type($source_id) : '';
-		if ($type === '' && function_exists('get_post_meta')) {
+		$type = '';
+		if (function_exists('intersoccer_pv_repair_raw_post_meta')) {
 			$type = (string) intersoccer_pv_repair_raw_post_meta($source_id, '_intersoccer_product_type');
+		}
+		if ($type === '' && class_exists('InterSoccer_Product_Types')) {
+			$type = (string) InterSoccer_Product_Types::get_product_type($source_id);
 		}
 		if ($type !== 'camp') {
 			return [];

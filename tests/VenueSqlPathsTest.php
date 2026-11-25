@@ -461,6 +461,13 @@ class VenueSqlPathsTest extends TestCase {
 			define('ARRAY_A', 'ARRAY_A');
 		}
 		$GLOBALS['intersoccer_pv_test_cache_touches'] = [];
+		if (isset($GLOBALS['intersoccer_test_transients']) && is_array($GLOBALS['intersoccer_test_transients'])) {
+			foreach (array_keys($GLOBALS['intersoccer_test_transients']) as $transient) {
+				if (strpos((string) $transient, 'intersoccer_type_') === 0) {
+					unset($GLOBALS['intersoccer_test_transients'][$transient]);
+				}
+			}
+		}
 		$this->previous_wpdb = $GLOBALS['wpdb'] ?? null;
 		$this->db = new InterSoccerPvRepairFakeWpdb();
 		$GLOBALS['wpdb'] = $this->db;
@@ -651,6 +658,7 @@ class VenueSqlPathsTest extends TestCase {
 
 		$mapped = intersoccer_pv_repair_map_term_for_language(5, 'pa_intersoccer-venues', 'fr');
 		$this->assertIsArray($mapped);
+
 		$this->assertSame(15, (int) $mapped['term_id']);
 		$this->assertSame('nyon-fr', $mapped['slug']);
 
