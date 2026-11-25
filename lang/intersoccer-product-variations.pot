@@ -1442,3 +1442,14 @@ msgstr ""
 
 msgid "Backup directory does not exist."
 msgstr ""
+
+msgid ""
+"Apply was aborted because translation records changed. All writes were "
+"undone."
+msgstr ""
+
+msgid ""
+"Apply was aborted because translation records changed. Writes that could be "
+"rolled back were undone; conflicting rows were left as they are."
+msgstr ""
+

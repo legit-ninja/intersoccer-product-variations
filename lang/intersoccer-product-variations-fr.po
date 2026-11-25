@@ -1451,3 +1451,19 @@ msgstr "Raison : %s"
 
 msgid "Backup directory does not exist."
 msgstr "Le dossier de sauvegarde n'existe pas."
+
+msgid ""
+"Apply was aborted because translation records changed. All writes were "
+"undone."
+msgstr ""
+"L'application a été interrompue car les enregistrements de traduction ont "
+"changé. Toutes les écritures ont été annulées."
+
+msgid ""
+"Apply was aborted because translation records changed. Writes that could be "
+"rolled back were undone; conflicting rows were left as they are."
+msgstr ""
+"L'application a été interrompue car les enregistrements de traduction ont "
+"changé. Les écritures qui pouvaient être annulées l'ont été ; les lignes en "
+"conflit ont été laissées en l'état."
+

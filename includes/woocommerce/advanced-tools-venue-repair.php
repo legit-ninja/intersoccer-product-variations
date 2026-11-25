@@ -37,22 +37,41 @@ if (!function_exists('intersoccer_pv_repair_default_language')) {
 
 if (!function_exists('intersoccer_pv_repair_icl_rows_all')) {
 	/**
+	 * All icl_translations rows, cached once per request for the SQL path.
+	 *
 	 * @return array<int,array<string,mixed>>
 	 */
 	function intersoccer_pv_repair_icl_rows_all() {
 		if (isset($GLOBALS['intersoccer_test_icl_translations']) && is_array($GLOBALS['intersoccer_test_icl_translations'])) {
 			return array_values($GLOBALS['intersoccer_test_icl_translations']);
 		}
+		if (isset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache']) && is_array($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'])) {
+			return $GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'];
+		}
 		global $wpdb;
 		if (!$wpdb || !is_object($wpdb) || !method_exists($wpdb, 'get_results')) {
+			$GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'] = [];
 			return [];
 		}
 		if (!function_exists('intersoccer_pv_wpml_icl_translations_table_exists') || !intersoccer_pv_wpml_icl_translations_table_exists()) {
+			$GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'] = [];
 			return [];
 		}
 		$table = $wpdb->prefix . 'icl_translations';
 		$rows = $wpdb->get_results("SELECT translation_id, element_type, element_id, trid, language_code, source_language_code FROM {$table}", ARRAY_A);
-		return is_array($rows) ? $rows : [];
+		$GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'] = is_array($rows) ? $rows : [];
+		return $GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'];
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_icl_rows_clear_cache')) {
+	/**
+	 * Drop the per-request SQL cache of icl_translations (after a restore).
+	 *
+	 * @return void
+	 */
+	function intersoccer_pv_repair_icl_rows_clear_cache() {
+		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache']);
 	}
 }
 
@@ -234,20 +253,44 @@ if (!function_exists('intersoccer_pv_repair_icl_restore')) {
 				$normalized[] = intersoccer_pv_repair_icl_normalize_row($row);
 			}
 		}
-		if (isset($GLOBALS['intersoccer_test_icl_translations']) && is_array($GLOBALS['intersoccer_test_icl_translations'])) {
-			$keep_types = ['post_product' => true, 'post_product_variation' => true];
-			$trids = [];
-			foreach ($normalized as $row) {
-				$trids[(int) $row['trid']] = true;
+		$keep_types = ['post_product' => true, 'post_product_variation' => true];
+		$trids = [];
+		$translation_ids = [];
+		$element_ids = [];
+		foreach ($normalized as $row) {
+			$trid = (int) $row['trid'];
+			$translation_id = (int) $row['translation_id'];
+			$element_id = (int) $row['element_id'];
+			if ($trid > 0) {
+				$trids[$trid] = true;
 			}
+			if ($translation_id > 0) {
+				$translation_ids[$translation_id] = true;
+			}
+			if ($element_id > 0) {
+				$element_ids[$element_id] = true;
+			}
+		}
+		$should_drop = static function (array $row) use ($keep_types, $trids, $translation_ids, $element_ids) {
+			if (!isset($keep_types[$row['element_type']])) {
+				return false;
+			}
+			return isset($trids[(int) $row['trid']])
+				|| isset($translation_ids[(int) $row['translation_id']])
+				|| isset($element_ids[(int) $row['element_id']]);
+		};
+		if (isset($GLOBALS['intersoccer_test_icl_translations']) && is_array($GLOBALS['intersoccer_test_icl_translations'])) {
 			$kept = [];
 			foreach ($GLOBALS['intersoccer_test_icl_translations'] as $row) {
 				$row = intersoccer_pv_repair_icl_normalize_row(is_array($row) ? $row : []);
-				if (!isset($keep_types[$row['element_type']]) || !isset($trids[(int) $row['trid']])) {
+				if (!$should_drop($row)) {
 					$kept[] = $row;
 				}
 			}
 			$GLOBALS['intersoccer_test_icl_translations'] = array_merge($kept, $normalized);
+			if (function_exists('intersoccer_pv_repair_icl_rows_clear_cache')) {
+				intersoccer_pv_repair_icl_rows_clear_cache();
+			}
 			return;
 		}
 		global $wpdb;
@@ -255,18 +298,19 @@ if (!function_exists('intersoccer_pv_repair_icl_restore')) {
 			return;
 		}
 		$table = $wpdb->prefix . 'icl_translations';
-		$trids = [];
-		foreach ($normalized as $row) {
-			$trid = (int) $row['trid'];
-			if ($trid > 0) {
-				$trids[$trid] = true;
-			}
+		$clauses = [];
+		if ($translation_ids !== []) {
+			$clauses[] = 'translation_id IN (' . implode(',', array_map('intval', array_keys($translation_ids))) . ')';
 		}
-		if ($trids === []) {
-			return;
+		if ($element_ids !== []) {
+			$clauses[] = 'element_id IN (' . implode(',', array_map('intval', array_keys($element_ids))) . ')';
 		}
-		$in = implode(',', array_map('intval', array_keys($trids)));
-		$wpdb->query("DELETE FROM {$table} WHERE trid IN ({$in}) AND element_type IN ('post_product','post_product_variation')");
+		if ($trids !== []) {
+			$clauses[] = 'trid IN (' . implode(',', array_map('intval', array_keys($trids))) . ')';
+		}
+		if ($clauses !== []) {
+			$wpdb->query("DELETE FROM {$table} WHERE element_type IN ('post_product','post_product_variation') AND (" . implode(' OR ', $clauses) . ")");
+		}
 		foreach ($normalized as $row) {
 			$wpdb->insert(
 				$table,
@@ -279,6 +323,9 @@ if (!function_exists('intersoccer_pv_repair_icl_restore')) {
 					'source_language_code' => $row['source_language_code'] === '' ? null : $row['source_language_code'],
 				]
 			);
+		}
+		if (function_exists('intersoccer_pv_repair_icl_rows_clear_cache')) {
+			intersoccer_pv_repair_icl_rows_clear_cache();
 		}
 	}
 }
@@ -390,18 +437,33 @@ if (!function_exists('intersoccer_pv_repair_raw_variation_attributes')) {
 
 if (!function_exists('intersoccer_pv_repair_raw_term_records')) {
 	/**
-	 * Term IDs and slugs for an object, from term_relationships or the test store.
+	 * Term IDs and slugs for an object, kept as aligned (id, slug) pairs.
 	 *
 	 * @param int    $object_id Object ID.
 	 * @param string $taxonomy  Taxonomy.
-	 * @return array{ids:array<int,int>,slugs:array<int,string>}
+	 * @return array{ids:array<int,int>,slugs:array<int,string>,pairs:array<int,array{id:int,slug:string}>}
 	 */
 	function intersoccer_pv_repair_raw_term_records($object_id, $taxonomy) {
 		$object_id = (int) $object_id;
 		$taxonomy = (string) $taxonomy;
+		$empty = ['ids' => [], 'slugs' => [], 'pairs' => []];
 		if ($object_id <= 0 || $taxonomy === '') {
-			return ['ids' => [], 'slugs' => []];
+			return $empty;
 		}
+		$pairs = [];
+		$push = static function ($term_id, $slug) use (&$pairs) {
+			$term_id = (int) $term_id;
+			$slug = (string) $slug;
+			if ($term_id <= 0 || $slug === '') {
+				return;
+			}
+			foreach ($pairs as $existing) {
+				if ((int) $existing['id'] === $term_id) {
+					return;
+				}
+			}
+			$pairs[] = ['id' => $term_id, 'slug' => $slug];
+		};
 		if (isset($GLOBALS['intersoccer_test_product_term_ids'][$object_id][$taxonomy]) || isset($GLOBALS['intersoccer_test_product_terms'][$object_id][$taxonomy]) || isset($GLOBALS['intersoccer_test_terms'])) {
 			$ids = isset($GLOBALS['intersoccer_test_product_term_ids'][$object_id][$taxonomy])
 				? array_values(array_map('intval', (array) $GLOBALS['intersoccer_test_product_term_ids'][$object_id][$taxonomy]))
@@ -409,27 +471,35 @@ if (!function_exists('intersoccer_pv_repair_raw_term_records')) {
 			$slugs = isset($GLOBALS['intersoccer_test_product_terms'][$object_id][$taxonomy])
 				? array_values(array_map('strval', (array) $GLOBALS['intersoccer_test_product_terms'][$object_id][$taxonomy]))
 				: [];
-			if ($ids === [] && $slugs !== [] && !empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+			if ($ids !== []) {
+				foreach ($ids as $index => $term_id) {
+					$slug = '';
+					if (!empty($GLOBALS['intersoccer_test_terms'][$term_id]['slug'])) {
+						$slug = (string) $GLOBALS['intersoccer_test_terms'][$term_id]['slug'];
+					} elseif (isset($slugs[$index])) {
+						$slug = (string) $slugs[$index];
+					}
+					$push($term_id, $slug);
+				}
+			} elseif ($slugs !== []) {
 				foreach ($slugs as $slug) {
-					foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
-						if (($row['taxonomy'] ?? '') === $taxonomy && (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug)) {
-							$ids[] = (int) $term_id;
-							break;
+					$term_id = 0;
+					if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+						foreach ($GLOBALS['intersoccer_test_terms'] as $candidate => $row) {
+							if (($row['taxonomy'] ?? '') === $taxonomy && (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug)) {
+								$term_id = (int) $candidate;
+								break;
+							}
 						}
 					}
+					$push($term_id, $slug);
 				}
 			}
-			$ids = array_values(array_unique(array_filter($ids)));
-			sort($ids);
-			$slugs = array_values(array_unique(array_filter($slugs, static function ($slug) {
-				return $slug !== '';
-			})));
-			sort($slugs);
-			return ['ids' => $ids, 'slugs' => $slugs];
+			return intersoccer_pv_repair_term_records_from_pairs($pairs);
 		}
 		global $wpdb;
 		if (!$wpdb || !is_object($wpdb) || !method_exists($wpdb, 'get_results') || !isset($wpdb->term_relationships)) {
-			return ['ids' => [], 'slugs' => []];
+			return $empty;
 		}
 		$terms_table = $wpdb->terms;
 		$tt_table = $wpdb->term_taxonomy;
@@ -442,19 +512,32 @@ if (!function_exists('intersoccer_pv_repair_raw_term_records')) {
 			$object_id,
 			$taxonomy
 		), ARRAY_A);
+		foreach ((array) $rows as $row) {
+			$push((int) ($row['term_id'] ?? 0), (string) ($row['slug'] ?? ''));
+		}
+		return intersoccer_pv_repair_term_records_from_pairs($pairs);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_term_records_from_pairs')) {
+	/**
+	 * @param array<int,array{id:int,slug:string}> $pairs Aligned pairs.
+	 * @return array{ids:array<int,int>,slugs:array<int,string>,pairs:array<int,array{id:int,slug:string}>}
+	 */
+	function intersoccer_pv_repair_term_records_from_pairs(array $pairs) {
+		usort(
+			$pairs,
+			static function ($left, $right) {
+				return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
+			}
+		);
 		$ids = [];
 		$slugs = [];
-		foreach ((array) $rows as $row) {
-			$ids[] = (int) ($row['term_id'] ?? 0);
-			$slugs[] = (string) ($row['slug'] ?? '');
+		foreach ($pairs as $pair) {
+			$ids[] = (int) $pair['id'];
+			$slugs[] = (string) $pair['slug'];
 		}
-		$ids = array_values(array_unique(array_filter($ids)));
-		sort($ids);
-		$slugs = array_values(array_unique(array_filter($slugs, static function ($slug) {
-			return $slug !== '';
-		})));
-		sort($slugs);
-		return ['ids' => $ids, 'slugs' => $slugs];
+		return ['ids' => $ids, 'slugs' => $slugs, 'pairs' => $pairs];
 	}
 }
 
@@ -559,6 +642,105 @@ if (!function_exists('intersoccer_pv_repair_map_term_for_language')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_resolve_term_ids')) {
+	/**
+	 * Resolve taxonomy term IDs from explicit IDs or slug+taxonomy (raw SQL or the test store).
+	 *
+	 * @param string             $taxonomy     Taxonomy.
+	 * @param array<int,string>  $slugs        Slugs.
+	 * @param array<int,int>     $explicit_ids Optional known IDs.
+	 * @return array<int,int>
+	 */
+	function intersoccer_pv_repair_resolve_term_ids($taxonomy, array $slugs, array $explicit_ids = []) {
+		$taxonomy = (string) $taxonomy;
+		$ids = array_values(array_unique(array_filter(array_map('intval', $explicit_ids))));
+		if ($ids !== [] || $taxonomy === '') {
+			return $ids;
+		}
+		$slugs = array_values(array_unique(array_filter(array_map('strval', $slugs), static function ($slug) {
+			return $slug !== '';
+		})));
+		if ($slugs === []) {
+			return [];
+		}
+		if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
+			foreach ($slugs as $slug) {
+				foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
+					if (($row['taxonomy'] ?? '') === $taxonomy && (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug)) {
+						$ids[] = (int) $term_id;
+						break;
+					}
+				}
+			}
+			return array_values(array_unique(array_filter($ids)));
+		}
+		global $wpdb;
+		if (!$wpdb || !is_object($wpdb) || !isset($wpdb->terms, $wpdb->term_taxonomy) || !method_exists($wpdb, 'get_results') || !method_exists($wpdb, 'prepare')) {
+			return [];
+		}
+		$placeholders = implode(',', array_fill(0, count($slugs), '%s'));
+		$sql = $wpdb->prepare(
+			"SELECT t.term_id, t.slug FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE tt.taxonomy = %s AND t.slug IN ({$placeholders})",
+			array_merge([$taxonomy], $slugs)
+		);
+		$found = [];
+		foreach ((array) $wpdb->get_results($sql, ARRAY_A) as $row) {
+			$found[(string) ($row['slug'] ?? '')] = (int) ($row['term_id'] ?? 0);
+		}
+		foreach ($slugs as $slug) {
+			if (!empty($found[$slug])) {
+				$ids[] = (int) $found[$slug];
+			}
+		}
+		return array_values(array_unique(array_filter($ids)));
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_touch_term_object_caches')) {
+	/**
+	 * Refresh term counts, object/post caches, transients, and the WC attribute lookup table.
+	 *
+	 * @param int             $object_id Object ID.
+	 * @param string          $taxonomy  Taxonomy.
+	 * @param array<int,int>  $tt_ids    Term taxonomy IDs whose counts changed.
+	 * @return void
+	 */
+	function intersoccer_pv_repair_touch_term_object_caches($object_id, $taxonomy, array $tt_ids = []) {
+		$object_id = (int) $object_id;
+		$taxonomy = (string) $taxonomy;
+		$tt_ids = array_values(array_unique(array_filter(array_map('intval', $tt_ids))));
+		if ($tt_ids !== [] && function_exists('wp_update_term_count')) {
+			wp_update_term_count($tt_ids, $taxonomy);
+		}
+		if ($object_id > 0 && $taxonomy !== '' && function_exists('clean_object_term_cache')) {
+			clean_object_term_cache($object_id, $taxonomy);
+		}
+		if ($object_id > 0 && function_exists('clean_post_cache')) {
+			clean_post_cache($object_id);
+		}
+		if ($object_id > 0 && function_exists('wc_delete_product_transients')) {
+			wc_delete_product_transients($object_id);
+		}
+		if ($object_id <= 0) {
+			return;
+		}
+		$class = 'Automattic\\WooCommerce\\Internal\\ProductAttributesLookup\\LookupDataStore';
+		if (!function_exists('wc_get_container') || !class_exists($class)) {
+			return;
+		}
+		try {
+			$store = wc_get_container()->get($class);
+			if (is_object($store) && method_exists($store, 'on_product_changed')) {
+				$store->on_product_changed($object_id);
+			} elseif (is_object($store) && method_exists($store, 'create_data_for_product')) {
+				$store->create_data_for_product($object_id);
+			}
+		} catch (Throwable $e) {
+			unset($e);
+		}
+	}
+}
+
 if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 	/**
 	 * Attach terms by ID without WCML term-sync hooks (direct relationships or the test stub).
@@ -566,7 +748,7 @@ if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 	 * @param int               $object_id Object ID.
 	 * @param string            $taxonomy  Taxonomy.
 	 * @param array<int,int>    $term_ids  Term IDs.
-	 * @param array<int,string> $slugs     Fallback slugs for the test store.
+	 * @param array<int,string> $slugs     Slugs used to resolve IDs when none are given.
 	 * @return void
 	 */
 	function intersoccer_pv_repair_write_object_terms($object_id, $taxonomy, array $term_ids, array $slugs = []) {
@@ -576,6 +758,16 @@ if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 			return;
 		}
 		$term_ids = array_values(array_unique(array_filter(array_map('intval', $term_ids))));
+		$slugs = array_values(array_unique(array_filter(array_map('strval', $slugs), static function ($slug) {
+			return $slug !== '';
+		})));
+		if ($term_ids === [] && $slugs !== [] && function_exists('intersoccer_pv_repair_resolve_term_ids')) {
+			$term_ids = intersoccer_pv_repair_resolve_term_ids($taxonomy, $slugs);
+		}
+		if ($term_ids === [] && $slugs !== []) {
+			// Refuse to delete existing relationships when slugs could not be resolved.
+			return;
+		}
 		if (isset($GLOBALS['intersoccer_test_products']) || isset($GLOBALS['intersoccer_test_terms']) || isset($GLOBALS['intersoccer_test_product_terms'])) {
 			if (function_exists('wp_set_object_terms')) {
 				wp_set_object_terms($object_id, $term_ids !== [] ? $term_ids : $slugs, $taxonomy);
@@ -591,16 +783,60 @@ if (!function_exists('intersoccer_pv_repair_write_object_terms')) {
 		}
 		$tt = $wpdb->term_taxonomy;
 		$tr = $wpdb->term_relationships;
-		$wpdb->query($wpdb->prepare(
-			"DELETE tr FROM {$tr} tr INNER JOIN {$tt} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = %s",
-			$object_id,
-			$taxonomy
-		));
+		$new_tt = [];
 		foreach ($term_ids as $term_id) {
 			$tt_id = (int) $wpdb->get_var($wpdb->prepare("SELECT term_taxonomy_id FROM {$tt} WHERE term_id = %d AND taxonomy = %s LIMIT 1", $term_id, $taxonomy));
 			if ($tt_id > 0) {
-				$wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$tr} (object_id, term_taxonomy_id, term_order) VALUES (%d, %d, 0)", $object_id, $tt_id));
+				$new_tt[] = $tt_id;
 			}
+		}
+		if ($term_ids !== [] && $new_tt === []) {
+			return;
+		}
+		$old_tt = [];
+		if (method_exists($wpdb, 'get_col')) {
+			$old_tt = array_map('intval', (array) $wpdb->get_col($wpdb->prepare(
+				"SELECT tr.term_taxonomy_id FROM {$tr} tr INNER JOIN {$tt} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = %s",
+				$object_id,
+				$taxonomy
+			)));
+		}
+		$use_tx = method_exists($wpdb, 'query');
+		if ($use_tx) {
+			$wpdb->query('START TRANSACTION');
+		}
+		$ok = true;
+		foreach ($new_tt as $tt_id) {
+			$result = $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$tr} (object_id, term_taxonomy_id, term_order) VALUES (%d, %d, 0)", $object_id, $tt_id));
+			if ($result === false) {
+				$ok = false;
+				break;
+			}
+		}
+		if ($ok) {
+			if ($new_tt === []) {
+				$result = $wpdb->query($wpdb->prepare(
+					"DELETE tr FROM {$tr} tr INNER JOIN {$tt} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = %s",
+					$object_id,
+					$taxonomy
+				));
+			} else {
+				$in = implode(',', array_map('intval', $new_tt));
+				$result = $wpdb->query($wpdb->prepare(
+					"DELETE tr FROM {$tr} tr INNER JOIN {$tt} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = %s AND tr.term_taxonomy_id NOT IN ({$in})",
+					$object_id,
+					$taxonomy
+				));
+			}
+			if ($result === false) {
+				$ok = false;
+			}
+		}
+		if ($use_tx) {
+			$wpdb->query($ok ? 'COMMIT' : 'ROLLBACK');
+		}
+		if ($ok && function_exists('intersoccer_pv_repair_touch_term_object_caches')) {
+			intersoccer_pv_repair_touch_term_object_caches($object_id, $taxonomy, array_merge($old_tt, $new_tt));
 		}
 	}
 }
@@ -620,8 +856,25 @@ if (!function_exists('intersoccer_pv_repair_write_post_meta')) {
 		}
 		if (function_exists('update_post_meta')) {
 			update_post_meta($post_id, $key, $value);
+		}
+		if (!empty($GLOBALS['intersoccer_test_products']) || isset($GLOBALS['intersoccer_test_terms'])) {
 			return;
 		}
+		global $wpdb;
+		if (!$wpdb || !is_object($wpdb) || !isset($wpdb->postmeta) || !method_exists($wpdb, 'query') || !method_exists($wpdb, 'prepare')) {
+			return;
+		}
+		$stored = $value;
+		if (!is_scalar($stored) && $stored !== null && function_exists('maybe_serialize')) {
+			$stored = maybe_serialize($stored);
+		} elseif (is_array($stored) || is_object($stored)) {
+			$stored = serialize($stored);
+		}
+		$deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = %s", $post_id, $key));
+		if ($deleted === false) {
+			return;
+		}
+		$wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) VALUES (%d, %s, %s)", $post_id, $key, (string) $stored));
 	}
 }
 
@@ -755,16 +1008,17 @@ if (!function_exists('intersoccer_pv_repair_source_product_ids')) {
 
 if (!function_exists('intersoccer_pv_venue_parent_attr_row')) {
 	/**
-	 * @param int    $product_id Product ID.
-	 * @param string $taxonomy   Taxonomy.
-	 * @param array<int,string> $slugs Raw slugs.
+	 * @param int               $product_id Product ID.
+	 * @param string            $taxonomy   Taxonomy.
+	 * @param array<int,string> $slugs      Raw slugs.
+	 * @param array<int,int>    $term_ids   Aligned term IDs.
 	 * @return array<string,mixed>|null
 	 */
-	function intersoccer_pv_venue_parent_attr_row($product_id, $taxonomy, array $slugs) {
+	function intersoccer_pv_venue_parent_attr_row($product_id, $taxonomy, array $slugs, array $term_ids = []) {
 		$product_id = (int) $product_id;
 		$taxonomy = (string) $taxonomy;
 		$slugs = array_values(array_unique(array_filter(array_map('strval', $slugs))));
-		sort($slugs);
+		$term_ids = array_values(array_unique(array_filter(array_map('intval', $term_ids))));
 		if ($product_id <= 0 || $taxonomy === '' || $slugs === []) {
 			return null;
 		}
@@ -782,8 +1036,8 @@ if (!function_exists('intersoccer_pv_venue_parent_attr_row')) {
 				$is_variation = (bool) $attrs[$taxonomy]->get_variation();
 			}
 		}
-		$before = ['is_variation' => (bool) $is_variation, 'slugs' => $slugs];
-		$after = ['is_variation' => true, 'slugs' => $slugs];
+		$before = ['is_variation' => (bool) $is_variation, 'slugs' => $slugs, 'term_ids' => $term_ids];
+		$after = ['is_variation' => true, 'slugs' => $slugs, 'term_ids' => $term_ids];
 		if ($before == $after) {
 			return null;
 		}
@@ -799,24 +1053,17 @@ if (!function_exists('intersoccer_pv_venue_write_parent_attr')) {
 	/**
 	 * @param int    $product_id Product ID.
 	 * @param string $taxonomy   Taxonomy.
-	 * @param array  $state      is_variation + slugs.
+	 * @param array  $state      is_variation + slugs + optional term_ids.
 	 * @return void
 	 */
 	function intersoccer_pv_venue_write_parent_attr($product_id, $taxonomy, array $state) {
 		$product_id = (int) $product_id;
 		$taxonomy = (string) $taxonomy;
 		$slugs = isset($state['slugs']) && is_array($state['slugs']) ? array_values(array_map('strval', $state['slugs'])) : [];
-		$term_ids = [];
-		foreach ($slugs as $slug) {
-			if (!empty($GLOBALS['intersoccer_test_terms']) && is_array($GLOBALS['intersoccer_test_terms'])) {
-				foreach ($GLOBALS['intersoccer_test_terms'] as $term_id => $row) {
-					if (($row['taxonomy'] ?? '') === $taxonomy && (($row['slug'] ?? '') === $slug || ($row['name'] ?? '') === $slug)) {
-						$term_ids[] = (int) $term_id;
-						break;
-					}
-				}
-			}
-		}
+		$explicit = isset($state['term_ids']) && is_array($state['term_ids']) ? $state['term_ids'] : [];
+		$term_ids = function_exists('intersoccer_pv_repair_resolve_term_ids')
+			? intersoccer_pv_repair_resolve_term_ids($taxonomy, $slugs, $explicit)
+			: array_values(array_map('intval', $explicit));
 		intersoccer_pv_repair_write_object_terms($product_id, $taxonomy, $term_ids, $slugs);
 		$raw = intersoccer_pv_repair_raw_post_meta($product_id, '_product_attributes');
 		if (is_string($raw) && $raw !== '' && function_exists('maybe_unserialize')) {
@@ -883,14 +1130,14 @@ if (!function_exists('intersoccer_pv_venue_build_plan')) {
 		$rows = [];
 		$venue_records = intersoccer_pv_repair_raw_term_records($source_id, 'pa_intersoccer-venues');
 		$camp_records = intersoccer_pv_repair_raw_term_records($source_id, 'pa_camp-terms');
-		$parent_row = intersoccer_pv_venue_parent_attr_row($source_id, 'pa_intersoccer-venues', $venue_records['slugs']);
+		$parent_row = intersoccer_pv_venue_parent_attr_row($source_id, 'pa_intersoccer-venues', $venue_records['slugs'], $venue_records['ids']);
 		if ($parent_row) {
 			$rows[] = $parent_row;
 			if ($write) {
 				intersoccer_pv_venue_write_parent_attr($source_id, 'pa_intersoccer-venues', $parent_row['after']);
 			}
 		}
-		$parent_row = intersoccer_pv_venue_parent_attr_row($source_id, 'pa_camp-terms', $camp_records['slugs']);
+		$parent_row = intersoccer_pv_venue_parent_attr_row($source_id, 'pa_camp-terms', $camp_records['slugs'], $camp_records['ids']);
 		if ($parent_row) {
 			$rows[] = $parent_row;
 			if ($write) {
@@ -898,43 +1145,29 @@ if (!function_exists('intersoccer_pv_venue_build_plan')) {
 			}
 		}
 		$venue_slug_to_id = [];
-		foreach ($venue_records['ids'] as $i => $tid) {
-			$slug = $venue_records['slugs'][$i] ?? '';
+		$venue_pairs = isset($venue_records['pairs']) && is_array($venue_records['pairs']) ? $venue_records['pairs'] : [];
+		if ($venue_pairs === []) {
+			foreach ($venue_records['ids'] as $index => $tid) {
+				$venue_pairs[] = ['id' => (int) $tid, 'slug' => (string) ($venue_records['slugs'][$index] ?? '')];
+			}
+		}
+		foreach ($venue_pairs as $pair) {
+			$slug = (string) ($pair['slug'] ?? '');
 			if ($slug !== '') {
-				$venue_slug_to_id[$slug] = (int) $tid;
-			}
-		}
-		if ($venue_slug_to_id === [] && $venue_records['ids'] !== [] && $venue_records['slugs'] !== []) {
-			foreach ($venue_records['slugs'] as $index => $slug) {
-				if (isset($venue_records['ids'][$index])) {
-					$venue_slug_to_id[$slug] = (int) $venue_records['ids'][$index];
-				}
-			}
-		}
-		// Rebuild slug=>id from terms store when counts differ.
-		if ($venue_records['ids'] !== [] && !empty($GLOBALS['intersoccer_test_terms'])) {
-			$venue_slug_to_id = [];
-			foreach ($venue_records['ids'] as $tid) {
-				$slug = (string) ($GLOBALS['intersoccer_test_terms'][$tid]['slug'] ?? '');
-				if ($slug !== '') {
-					$venue_slug_to_id[$slug] = (int) $tid;
-				}
+				$venue_slug_to_id[$slug] = (int) ($pair['id'] ?? 0);
 			}
 		}
 		$camp_slug_to_id = [];
-		if (!empty($GLOBALS['intersoccer_test_terms'])) {
-			foreach ($camp_records['ids'] as $tid) {
-				$slug = (string) ($GLOBALS['intersoccer_test_terms'][$tid]['slug'] ?? '');
-				if ($slug !== '') {
-					$camp_slug_to_id[$slug] = (int) $tid;
-				}
+		$camp_pairs = isset($camp_records['pairs']) && is_array($camp_records['pairs']) ? $camp_records['pairs'] : [];
+		if ($camp_pairs === []) {
+			foreach ($camp_records['ids'] as $index => $tid) {
+				$camp_pairs[] = ['id' => (int) $tid, 'slug' => (string) ($camp_records['slugs'][$index] ?? '')];
 			}
 		}
-		if ($camp_slug_to_id === []) {
-			foreach ($camp_records['slugs'] as $index => $slug) {
-				if (isset($camp_records['ids'][$index])) {
-					$camp_slug_to_id[$slug] = (int) $camp_records['ids'][$index];
-				}
+		foreach ($camp_pairs as $pair) {
+			$slug = (string) ($pair['slug'] ?? '');
+			if ($slug !== '') {
+				$camp_slug_to_id[$slug] = (int) ($pair['id'] ?? 0);
 			}
 		}
 		foreach (intersoccer_pv_repair_variable_children($source_id) as $variation_id) {
@@ -1207,7 +1440,7 @@ if (!function_exists('intersoccer_pv_repair_element_ids_from_rows')) {
 				continue;
 			}
 			$id = (string) ($row['id'] ?? '');
-			if (preg_match('/^(?:attrs|parent-attr|manual:twin):(\d+)/', $id, $matches)) {
+			if (preg_match('/^(?:attrs|parent-attr|manual:twin|manual:attr):(\d+)/', $id, $matches)) {
 				$ids[] = (int) $matches[1];
 			}
 			foreach (['before', 'after'] as $side) {

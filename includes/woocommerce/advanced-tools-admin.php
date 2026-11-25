@@ -365,6 +365,9 @@ if (!function_exists('intersoccer_pv_tool_repair_venue')) {
 
 if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 	/**
+	 * Fill empty required attributes on default-language variations only.
+	 * Twins are listed as needs-manual. Writes go to attribute_* post meta; no product save.
+	 *
 	 * @param bool  $dry_run Dry run.
 	 * @param array $scope   Scope.
 	 * @return array
@@ -378,15 +381,17 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 		}
 		$product_id = (int) ($scope['product_id'] ?? 0);
 		$rows = [];
-		$ids = intersoccer_pv_tool_product_ids($product_id, false, false);
+		$ids = function_exists('intersoccer_pv_repair_source_product_ids')
+			? intersoccer_pv_repair_source_product_ids($product_id)
+			: intersoccer_pv_tool_product_ids($product_id, false, false);
 		foreach ($ids as $parent_id) {
+			$parent_id = (int) $parent_id;
 			$type = class_exists('InterSoccer_Product_Types') ? (string) InterSoccer_Product_Types::get_product_type($parent_id) : '';
+			if ($type === '' && function_exists('intersoccer_pv_repair_raw_post_meta')) {
+				$type = (string) intersoccer_pv_repair_raw_post_meta($parent_id, '_intersoccer_product_type');
+			}
 			$defaults = function_exists('intersoccer_attr_refresh_defaults') ? intersoccer_attr_refresh_defaults($type) : [];
 			if ($defaults === []) {
-				continue;
-			}
-			$product = function_exists('wc_get_product') ? wc_get_product($parent_id) : null;
-			if (!$product || !method_exists($product, 'get_children')) {
 				continue;
 			}
 			$required = [];
@@ -395,24 +400,44 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 					$required[(string) $taxonomy] = true;
 				}
 			}
-			foreach ($product->get_children() as $variation_id) {
+			$children = function_exists('intersoccer_pv_repair_variable_children')
+				? intersoccer_pv_repair_variable_children($parent_id)
+				: [];
+			if ($children === []) {
+				$product = function_exists('wc_get_product') ? wc_get_product($parent_id) : null;
+				if ($product && method_exists($product, 'get_children')) {
+					$children = array_map('intval', (array) $product->get_children());
+				}
+			}
+			foreach ($children as $variation_id) {
 				$variation_id = (int) $variation_id;
-				if ($type === 'course' && intersoccer_pv_course_variation_is_running($variation_id)) {
+				if ($variation_id <= 0) {
 					continue;
 				}
-				$variation = function_exists('wc_get_product') ? wc_get_product($variation_id) : null;
-				if (!$variation || !method_exists($variation, 'get_attributes')) {
+				if (function_exists('intersoccer_pv_repair_icl_source_and_twins')) {
+					$resolved = intersoccer_pv_repair_icl_source_and_twins($variation_id, ['post_product_variation']);
+					$source_id = (int) $resolved['source_id'];
+					if ($source_id > 0 && $source_id !== $variation_id) {
+						continue;
+					}
+					$twins = $resolved['twins'];
+				} else {
+					$twins = [];
+				}
+				if ($type === 'course' && function_exists('intersoccer_pv_course_variation_is_running') && intersoccer_pv_course_variation_is_running($variation_id)) {
 					continue;
 				}
-				$current_attrs = $variation->get_attributes();
-				if (!is_array($current_attrs)) {
-					$current_attrs = [];
+				$current_attrs = function_exists('intersoccer_pv_repair_raw_variation_attributes')
+					? intersoccer_pv_repair_raw_variation_attributes($variation_id)
+					: [];
+				if (isset($GLOBALS['intersoccer_test_products'][$variation_id]) && is_object($GLOBALS['intersoccer_test_products'][$variation_id]) && method_exists($GLOBALS['intersoccer_test_products'][$variation_id], 'get_attributes')) {
+					$from_obj = $GLOBALS['intersoccer_test_products'][$variation_id]->get_attributes();
+					if (is_array($from_obj)) {
+						$current_attrs = array_merge($current_attrs, $from_obj);
+					}
 				}
-				$original_attrs = $current_attrs;
-				$before_attrs = [];
-				$after_attrs = [];
 				$attr_keys = [];
-				foreach (array_keys($original_attrs) as $key) {
+				foreach (array_keys($current_attrs) as $key) {
 					$key = (string) $key;
 					if (strpos($key, 'pa_') === 0) {
 						$attr_keys[$key] = true;
@@ -424,8 +449,10 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 						$attr_keys[$key] = true;
 					}
 				}
+				$before_attrs = [];
+				$after_attrs = [];
 				foreach (array_keys($attr_keys) as $key) {
-					$current = array_key_exists($key, $original_attrs) ? (string) $original_attrs[$key] : '';
+					$current = array_key_exists($key, $current_attrs) ? (string) $current_attrs[$key] : '';
 					if ($current !== '') {
 						continue;
 					}
@@ -433,7 +460,6 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 					if (isset($required[$key]) && $fill !== '') {
 						$before_attrs[$key] = '';
 						$after_attrs[$key] = $fill;
-						$current_attrs[$key] = $fill;
 						continue;
 					}
 					$rows[] = [
@@ -443,29 +469,59 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 						'after' => ['attributes' => [$key => ''], 'needs_manual' => '1'],
 					];
 				}
+				foreach ($twins as $twin) {
+					$tid = (int) ($twin['id'] ?? 0);
+					if ($tid <= 0) {
+						continue;
+					}
+					foreach (array_keys($after_attrs) as $key) {
+						$rows[] = [
+							'id' => 'manual:attr:' . $tid . ':' . $key,
+							'needs_manual' => true,
+							'before' => ['attributes' => [$key => '']],
+							'after' => ['attributes' => [$key => ''], 'needs_manual' => '1'],
+						];
+					}
+				}
 				if ($before_attrs !== []) {
+					$before_meta = [];
+					$after_meta = [];
+					foreach ($before_attrs as $key => $value) {
+						$before_meta['attribute_' . $key] = $value;
+					}
+					foreach ($after_attrs as $key => $value) {
+						$after_meta['attribute_' . $key] = $value;
+					}
 					$rows[] = [
 						'id' => 'attrs:' . $variation_id,
-						'before' => ['attributes' => $before_attrs],
-						'after' => ['attributes' => $after_attrs],
+						'before' => ['attributes' => $before_attrs, 'meta' => $before_meta],
+						'after' => ['attributes' => $after_attrs, 'meta' => $after_meta],
 					];
-					if (!$dry_run && method_exists($variation, 'set_attributes')) {
-						$stored = $variation->get_attributes();
-						if (!is_array($stored)) {
-							$stored = [];
-						}
+					if (!$dry_run) {
 						foreach ($after_attrs as $attr_key => $attr_value) {
-							$stored[$attr_key] = $attr_value;
+							if (function_exists('intersoccer_pv_repair_write_post_meta')) {
+								intersoccer_pv_repair_write_post_meta($variation_id, 'attribute_' . $attr_key, $attr_value);
+							} elseif (function_exists('update_post_meta')) {
+								update_post_meta($variation_id, 'attribute_' . $attr_key, $attr_value);
+							}
 						}
-						$variation->set_attributes($stored);
-						if (method_exists($variation, 'save')) {
-							$variation->save();
+						if (isset($GLOBALS['intersoccer_test_products'][$variation_id]) && is_object($GLOBALS['intersoccer_test_products'][$variation_id]) && method_exists($GLOBALS['intersoccer_test_products'][$variation_id], 'get_attributes') && method_exists($GLOBALS['intersoccer_test_products'][$variation_id], 'set_attributes')) {
+							$stored = $GLOBALS['intersoccer_test_products'][$variation_id]->get_attributes();
+							if (!is_array($stored)) {
+								$stored = [];
+							}
+							foreach ($after_attrs as $attr_key => $attr_value) {
+								$stored[$attr_key] = $attr_value;
+							}
+							$GLOBALS['intersoccer_test_products'][$variation_id]->set_attributes($stored);
 						}
 					}
 				}
 				if ($type === 'course') {
 					foreach (['_course_start_date', '_course_total_weeks', '_course_holiday_dates'] as $meta_key) {
-						$current_meta = function_exists('get_post_meta') ? get_post_meta($variation_id, $meta_key, true) : '';
+						$current_meta = function_exists('intersoccer_pv_repair_raw_post_meta')
+							? intersoccer_pv_repair_raw_post_meta($variation_id, $meta_key)
+							: (function_exists('get_post_meta') ? get_post_meta($variation_id, $meta_key, true) : '');
 						if (!intersoccer_pv_repair_course_meta_is_blank($current_meta)) {
 							continue;
 						}
@@ -1373,10 +1429,33 @@ if (!function_exists('intersoccer_pv_repair_read_value')) {
 				'week' => (string) ($meta['week'] ?? ''),
 			];
 		}
-		if (strpos($id, 'parent-attr:') === 0 && class_exists('InterSoccer_Program_Manager')) {
+		if (strpos($id, 'parent-attr:') === 0) {
 			$rest = substr($id, strlen('parent-attr:'));
 			$parts = explode(':', $rest, 2);
-			return InterSoccer_Program_Manager::parent_taxonomy_attribute_snapshot((int) ($parts[0] ?? 0), (string) ($parts[1] ?? ''));
+			$product_id = (int) ($parts[0] ?? 0);
+			$taxonomy = (string) ($parts[1] ?? '');
+			$records = function_exists('intersoccer_pv_repair_raw_term_records')
+				? intersoccer_pv_repair_raw_term_records($product_id, $taxonomy)
+				: ['ids' => [], 'slugs' => []];
+			$is_variation = false;
+			if (class_exists('InterSoccer_Program_Manager') && method_exists('InterSoccer_Program_Manager', 'parent_taxonomy_attribute_snapshot')) {
+				$legacy = InterSoccer_Program_Manager::parent_taxonomy_attribute_snapshot($product_id, $taxonomy);
+				if (is_array($legacy) && array_key_exists('is_variation', $legacy)) {
+					$is_variation = (bool) $legacy['is_variation'];
+				}
+			}
+			$raw = function_exists('intersoccer_pv_repair_raw_post_meta') ? intersoccer_pv_repair_raw_post_meta($product_id, '_product_attributes') : null;
+			if (is_string($raw) && $raw !== '' && function_exists('maybe_unserialize')) {
+				$raw = maybe_unserialize($raw);
+			}
+			if (is_array($raw) && isset($raw[$taxonomy]) && is_array($raw[$taxonomy])) {
+				$is_variation = !empty($raw[$taxonomy]['is_variation']) || !empty($raw[$taxonomy]['is_taxonomy']) || $is_variation;
+			}
+			return [
+				'is_variation' => $is_variation,
+				'slugs' => $records['slugs'] ?? [],
+				'term_ids' => $records['ids'] ?? [],
+			];
 		}
 		if (strpos($id, 'attrs:') === 0) {
 				$variation_id = (int) substr($id, 6);
@@ -1453,18 +1532,29 @@ if (!function_exists('intersoccer_pv_repair_restore_value')) {
 			);
 			return;
 		}
-		if (strpos($id, 'attrs:') === 0 && function_exists('wc_get_product') && isset($before['attributes']) && is_array($before['attributes'])) {
+		if (strpos($id, 'attrs:') === 0 && isset($before['attributes']) && is_array($before['attributes'])) {
 			$variation_id = (int) substr($id, 6);
-			$product = wc_get_product($variation_id);
-			if ($product && method_exists($product, 'get_attributes') && method_exists($product, 'set_attributes')) {
-				$current = $product->get_attributes();
-				if (!is_array($current)) {
-					$current = [];
+			foreach ($before['attributes'] as $key => $value) {
+				$key = (string) $key;
+				$meta_key = strpos($key, 'attribute_') === 0 ? $key : 'attribute_' . $key;
+				if (function_exists('intersoccer_pv_repair_write_post_meta')) {
+					intersoccer_pv_repair_write_post_meta($variation_id, $meta_key, $value);
+				} elseif (function_exists('update_post_meta')) {
+					update_post_meta($variation_id, $meta_key, $value);
 				}
-				foreach ($before['attributes'] as $key => $value) {
-					$current[$key] = $value;
+			}
+			if (function_exists('wc_get_product')) {
+				$product = wc_get_product($variation_id);
+				if ($product && method_exists($product, 'get_attributes') && method_exists($product, 'set_attributes')) {
+					$current = $product->get_attributes();
+					if (!is_array($current)) {
+						$current = [];
+					}
+					foreach ($before['attributes'] as $key => $value) {
+						$current[$key] = $value;
+					}
+					$product->set_attributes($current);
 				}
-				$product->set_attributes($current);
 			}
 			intersoccer_pv_repair_restore_facet_side($variation_id, $before);
 		}
@@ -1571,26 +1661,34 @@ if (!function_exists('intersoccer_pv_repair_restore_parent_attr')) {
 	 * @return void
 	 */
 	function intersoccer_pv_repair_restore_parent_attr($product_id, $taxonomy, array $before) {
-		if ($product_id <= 0 || $taxonomy === '' || !function_exists('wc_get_product')) {
+		$product_id = (int) $product_id;
+		$taxonomy = (string) $taxonomy;
+		if ($product_id <= 0 || $taxonomy === '') {
 			return;
 		}
-		$product = wc_get_product($product_id);
-		if (!$product || !method_exists($product, 'get_attributes') || !method_exists($product, 'set_attributes')) {
-			return;
+		if (function_exists('wc_get_product')) {
+			$product = wc_get_product($product_id);
+			if ($product && method_exists($product, 'get_attributes') && method_exists($product, 'set_attributes')) {
+				$attributes = $product->get_attributes();
+				if (!is_array($attributes)) {
+					$attributes = [];
+				}
+				if (isset($attributes[$taxonomy]) && is_object($attributes[$taxonomy]) && method_exists($attributes[$taxonomy], 'set_variation')) {
+					$attributes[$taxonomy]->set_variation(!empty($before['is_variation']));
+				}
+				$product->set_attributes($attributes);
+			}
 		}
-		$attributes = $product->get_attributes();
-		if (!is_array($attributes)) {
-			$attributes = [];
-		}
-		if (isset($attributes[$taxonomy]) && is_object($attributes[$taxonomy]) && method_exists($attributes[$taxonomy], 'set_variation')) {
-			$attributes[$taxonomy]->set_variation(!empty($before['is_variation']));
-		}
-		$product->set_attributes($attributes);
 		if (function_exists('intersoccer_pv_venue_write_parent_attr')) {
 			intersoccer_pv_venue_write_parent_attr($product_id, $taxonomy, $before);
 			return;
 		}
 		$slugs = isset($before['slugs']) && is_array($before['slugs']) ? array_values(array_map('strval', $before['slugs'])) : [];
+		$ids = isset($before['term_ids']) && is_array($before['term_ids']) ? $before['term_ids'] : [];
+		if (function_exists('intersoccer_pv_repair_write_object_terms')) {
+			intersoccer_pv_repair_write_object_terms($product_id, $taxonomy, $ids, $slugs);
+			return;
+		}
 		if ($slugs !== [] && function_exists('wp_set_object_terms')) {
 			wp_set_object_terms($product_id, $slugs, $taxonomy);
 		}
@@ -1714,7 +1812,7 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 		}
 		$backup = intersoccer_pv_repair_write_backup($tool, $user_id, $again['rows']);
 		$icl_before = null;
-		if ($tool === 'repair_venue' && function_exists('intersoccer_pv_repair_icl_snapshot') && function_exists('intersoccer_pv_repair_element_ids_from_rows')) {
+		if (in_array($tool, ['repair_venue', 'refresh_attributes'], true) && function_exists('intersoccer_pv_repair_icl_snapshot') && function_exists('intersoccer_pv_repair_element_ids_from_rows')) {
 			$icl_before = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($again['rows']));
 		}
 		try {
@@ -1722,14 +1820,19 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 			if ($icl_before !== null && function_exists('intersoccer_pv_repair_icl_snapshot')) {
 				$icl_after = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($again['rows']));
 				if ($icl_after !== $icl_before) {
+					$had_conflicts = false;
 					if (function_exists('intersoccer_pv_repair_rollback_rows')) {
 						$payload = function_exists('intersoccer_pv_repair_read_backup') ? intersoccer_pv_repair_read_backup($backup) : ['rows' => $again['rows']];
 						if (is_array($payload)) {
-							intersoccer_pv_repair_rollback_rows($payload, 'intersoccer_pv_repair_read_value', 'intersoccer_pv_repair_restore_value');
+							$rolled = intersoccer_pv_repair_rollback_rows($payload, 'intersoccer_pv_repair_read_value', 'intersoccer_pv_repair_restore_value');
+							$had_conflicts = is_array($rolled) && !empty($rolled['conflicts']);
 						}
 					}
 					if (function_exists('intersoccer_pv_repair_icl_restore')) {
 						intersoccer_pv_repair_icl_restore($icl_before);
+					}
+					if ($had_conflicts) {
+						throw new RuntimeException(__('Apply was aborted because translation records changed. Writes that could be rolled back were undone; conflicting rows were left as they are.', 'intersoccer-product-variations'));
 					}
 					throw new RuntimeException(__('Apply was aborted because translation records changed. All writes were undone.', 'intersoccer-product-variations'));
 				}
