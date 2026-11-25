@@ -489,7 +489,7 @@ class VenueSqlPathsTest extends TestCase {
 		} else {
 			unset($GLOBALS['wpdb']);
 		}
-		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'], $GLOBALS['intersoccer_pv_test_cache_touches']);
+		unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache'], $GLOBALS['intersoccer_pv_test_cache_touches'], $GLOBALS['intersoccer_pv_test_after_write']);
 		if (function_exists('intersoccer_pv_wpml_icl_translations_table_reset_exists_cache')) {
 			intersoccer_pv_wpml_icl_translations_table_reset_exists_cache();
 		}
@@ -621,6 +621,82 @@ class VenueSqlPathsTest extends TestCase {
 		}
 	}
 
+
+	public function test_refresh_needs_manual_omits_unused_course_times_on_camp(): void {
+		$this->db->add_post(300, 'product');
+		$this->db->add_post(301, 'product_variation', 300);
+		$this->db->add_meta(300, '_intersoccer_product_type', 'camp');
+		$this->db->add_meta(300, '_product_attributes', [
+			'pa_booking-type' => [
+				'name' => 'pa_booking-type',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+			'pa_age-group' => [
+				'name' => 'pa_age-group',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+			'pa_camp-times' => [
+				'name' => 'pa_camp-times',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+		]);
+		$this->db->add_meta(301, 'attribute_pa_camp-times', '');
+		$this->db->add_icl(41, 'post_product', 300, 800, 'en', '');
+		$this->db->add_icl(42, 'post_product_variation', 301, 801, 'en', '');
+
+		$preview = intersoccer_pv_tool_refresh_attributes(true, ['product_id' => 300]);
+		$ids = array_map(static function ($row) {
+			return (string) ($row['id'] ?? '');
+		}, $preview['rows']);
+		$this->assertNotContains('manual:attr:301:pa_course-times', $ids);
+		$this->assertContains('attrs:301', $ids);
+	}
+
+	public function test_venue_apply_aborts_and_restores_when_icl_changes_mid_write(): void {
+		$this->seedCampVenueTwin();
+		$this->assertIclAbortRestores(
+			'repair_venue',
+			100,
+			102,
+			static function () {
+				return (string) ($GLOBALS['wpdb']->meta_value(101, 'attribute_pa_intersoccer-venues') ?? '');
+			},
+			''
+		);
+	}
+
+	public function test_refresh_apply_aborts_and_restores_when_icl_changes_mid_write(): void {
+		$this->seedRefreshCourse(200, 201, 202);
+		$this->db->add_meta(201, 'attribute_pa_course-day', '');
+		$this->db->add_meta(200, '_product_attributes', [
+			'pa_course-day' => [
+				'name' => 'pa_course-day',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+		]);
+		$this->assertIclAbortRestores(
+			'refresh_attributes',
+			200,
+			202,
+			static function () {
+				return (string) ($GLOBALS['wpdb']->meta_value(201, 'attribute_pa_course-day') ?? '');
+			},
+			''
+		);
+	}
+
 	public function test_partial_slug_resolution_refuses_the_write(): void {
 		$this->db->add_term(5, 'zurich', 'pa_intersoccer-venues');
 		$this->db->add_term(10, 'nyon', 'pa_intersoccer-venues');
@@ -686,6 +762,68 @@ class VenueSqlPathsTest extends TestCase {
 		$this->assertSame('', (string) ($this->db->meta_value(102, 'attribute_pa_intersoccer-venues') ?? ''));
 		$this->assertSame([], $this->db->term_ids_for(102, 'pa_intersoccer-venues'));
 		$this->assertTrue($this->cacheTouched('post', 101), 'Venue rollback must refresh post cache/transients/lookup');
+	}
+
+
+	private function seedCampVenueTwin(): void {
+		$this->db->add_post(100, 'product');
+		$this->db->add_post(150, 'product');
+		$this->db->add_post(101, 'product_variation', 100);
+		$this->db->add_post(102, 'product_variation', 150);
+		$this->db->add_meta(100, '_intersoccer_product_type', 'camp');
+		$this->db->add_meta(100, '_product_attributes', [
+			'pa_intersoccer-venues' => [
+				'name' => 'pa_intersoccer-venues',
+				'value' => '',
+				'is_visible' => 1,
+				'is_variation' => 1,
+				'is_taxonomy' => 1,
+			],
+		]);
+		$this->db->add_term(5, 'nyon', 'pa_intersoccer-venues', 50);
+		$this->db->add_term(15, 'nyon-fr', 'pa_intersoccer-venues', 115);
+		$this->db->add_rel(100, 5);
+		$this->db->add_icl(21, 'post_product', 100, 500, 'en', '');
+		$this->db->add_icl(22, 'post_product', 150, 500, 'fr', 'en');
+		$this->db->add_icl(23, 'post_product_variation', 101, 600, 'en', '');
+		$this->db->add_icl(24, 'post_product_variation', 102, 600, 'fr', 'en');
+		$this->db->add_icl(31, 'tax_pa_intersoccer-venues', 50, 700, 'en', '');
+		$this->db->add_icl(32, 'tax_pa_intersoccer-venues', 115, 700, 'fr', 'en');
+	}
+
+	private function assertIclAbortRestores($tool, $product_id, $twin_id, $read_written, $restored_value): void {
+		$executor = $tool === 'repair_venue' ? 'intersoccer_pv_tool_repair_venue' : 'intersoccer_pv_tool_refresh_attributes';
+		$preview = $executor(true, ['product_id' => $product_id]);
+		$this->assertNotSame([], $preview['rows']);
+		// Warm the per-request lookup cache the way a real Apply does.
+		intersoccer_pv_repair_icl_rows_all();
+		$icl_before = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($preview['rows']));
+		$this->assertNotSame([], $icl_before);
+
+		$twin_id = (int) $twin_id;
+		$GLOBALS['intersoccer_pv_test_after_write'] = static function () use ($twin_id) {
+			foreach ($GLOBALS['wpdb']->icl as $index => $row) {
+				if ((int) ($row['element_id'] ?? 0) === $twin_id && ($row['element_type'] ?? '') === 'post_product_variation') {
+					$GLOBALS['wpdb']->icl[$index]['source_language_code'] = null;
+				}
+			}
+		};
+
+		$executor(false, ['product_id' => $product_id]);
+		$aborted = false;
+		$message = '';
+		try {
+			intersoccer_pv_repair_abort_if_icl_changed($icl_before, $preview['rows'], ['rows' => $preview['rows']]);
+		} catch (RuntimeException $e) {
+			$aborted = true;
+			$message = $e->getMessage();
+		}
+		unset($GLOBALS['intersoccer_pv_test_after_write']);
+		$this->assertTrue($aborted, $tool . ' must abort when icl changes mid-Apply');
+		$this->assertStringContainsString('translation records changed', $message);
+		$this->assertStringContainsString('All writes were undone', $message);
+		$this->assertSame($restored_value, $read_written(), $tool . ' writes must be rolled back');
+		$this->assertSame($icl_before, intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($preview['rows'])), $tool . ' icl must be restored');
 	}
 
 	private function cacheTouched($kind, $post_id): bool {

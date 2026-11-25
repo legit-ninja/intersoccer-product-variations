@@ -386,9 +386,12 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 			: intersoccer_pv_tool_product_ids($product_id, false, false);
 		foreach ($ids as $parent_id) {
 			$parent_id = (int) $parent_id;
-			$type = class_exists('InterSoccer_Product_Types') ? (string) InterSoccer_Product_Types::get_product_type($parent_id) : '';
-			if ($type === '' && function_exists('intersoccer_pv_repair_raw_post_meta')) {
+			$type = '';
+			if (function_exists('intersoccer_pv_repair_raw_post_meta')) {
 				$type = (string) intersoccer_pv_repair_raw_post_meta($parent_id, '_intersoccer_product_type');
+			}
+			if ($type === '' && class_exists('InterSoccer_Product_Types')) {
+				$type = (string) InterSoccer_Product_Types::get_product_type($parent_id);
 			}
 			$defaults = function_exists('intersoccer_attr_refresh_defaults') ? intersoccer_attr_refresh_defaults($type) : [];
 			if ($defaults === []) {
@@ -436,13 +439,10 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 						$current_attrs = array_merge($current_attrs, $from_obj);
 					}
 				}
-				$attr_keys = [];
-				foreach (array_keys($current_attrs) as $key) {
-					$key = (string) $key;
-					if (strpos($key, 'pa_') === 0) {
-						$attr_keys[$key] = true;
-					}
-				}
+				$used_keys = function_exists('intersoccer_pv_repair_product_used_attribute_taxonomies')
+					? intersoccer_pv_repair_product_used_attribute_taxonomies($parent_id, $variation_id)
+					: [];
+				$attr_keys = $used_keys;
 				foreach ($defaults as $key => $default) {
 					$key = (string) $key;
 					if ($key !== '' && strpos($key, 'pa_') === 0 && !is_array($default)) {
@@ -460,6 +460,9 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 					if (isset($required[$key]) && $fill !== '') {
 						$before_attrs[$key] = '';
 						$after_attrs[$key] = $fill;
+						continue;
+					}
+					if (!isset($used_keys[$key])) {
 						continue;
 					}
 					$rows[] = [
@@ -1860,25 +1863,8 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 		}
 		try {
 			$applied = intersoccer_pv_advanced_tools_execute($tool, false, $scope);
-			if ($icl_before !== null && function_exists('intersoccer_pv_repair_icl_snapshot')) {
-				$icl_after = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($again['rows']));
-				if ($icl_after !== $icl_before) {
-					$had_conflicts = false;
-					if (function_exists('intersoccer_pv_repair_rollback_rows')) {
-						$payload = function_exists('intersoccer_pv_repair_read_backup') ? intersoccer_pv_repair_read_backup($backup) : ['rows' => $again['rows']];
-						if (is_array($payload)) {
-							$rolled = intersoccer_pv_repair_rollback_rows($payload, 'intersoccer_pv_repair_read_value', 'intersoccer_pv_repair_restore_value');
-							$had_conflicts = is_array($rolled) && !empty($rolled['conflicts']);
-						}
-					}
-					if (function_exists('intersoccer_pv_repair_icl_restore')) {
-						intersoccer_pv_repair_icl_restore($icl_before);
-					}
-					if ($had_conflicts) {
-						throw new RuntimeException(__('Apply was aborted because translation records changed. Writes that could be rolled back were undone; conflicting rows were left as they are.', 'intersoccer-product-variations'));
-					}
-					throw new RuntimeException(__('Apply was aborted because translation records changed. All writes were undone.', 'intersoccer-product-variations'));
-				}
+			if (function_exists('intersoccer_pv_repair_abort_if_icl_changed')) {
+				intersoccer_pv_repair_abort_if_icl_changed($icl_before, $again['rows'], $backup);
 			}
 		} catch (Throwable $e) {
 			$reason = trim((string) $e->getMessage());
