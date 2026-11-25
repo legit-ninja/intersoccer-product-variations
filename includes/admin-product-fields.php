@@ -1032,6 +1032,10 @@ function intersoccer_handle_repair_late_pickup_admin_post() {
     $target = function_exists('intersoccer_pv_advanced_tools_page_slug')
         ? admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=late-pickup&product_id=' . $product_id)
         : admin_url('edit.php?post_type=product');
+    if (defined('INTERSOCCER_PV_REPAIR_TEST') && INTERSOCCER_PV_REPAIR_TEST) {
+        $GLOBALS['intersoccer_pv_test_redirect'] = $target;
+        return;
+    }
     wp_safe_redirect($target);
     exit;
 }

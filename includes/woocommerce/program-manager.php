@@ -2142,35 +2142,11 @@ class InterSoccer_Program_Manager {
 	}
 
 	public static function ajax_apply_parsed_camp_dates() {
-		check_ajax_referer(self::NONCE_ACTION, 'nonce');
 		if (function_exists('intersoccer_pv_repair_reject_legacy_ajax')) {
 			intersoccer_pv_repair_reject_legacy_ajax();
 			return;
 		}
-		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')]);
-		return;
-
-		if (!current_user_can(self::CAPABILITY)) {
-			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
-		}
-
-		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
-		$force      = !empty($_POST['force']);
-
-		if (!function_exists('intersoccer_migrate_camp_dates_for_product')) {
-			require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/woocommerce/camp-schedule-migrate.php';
-		}
-
-		$result = intersoccer_migrate_camp_dates_for_product($product_id, [
-			'force'   => $force,
-			'dry_run' => false,
-		]);
-
-		if (is_wp_error($result)) {
-			wp_send_json_error(['message' => $result->get_error_message()]);
-		}
-
-		wp_send_json_success($result);
+		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')], 403);
 	}
 
 	/**
@@ -2266,34 +2242,11 @@ class InterSoccer_Program_Manager {
 	 * AJAX: promote Venue/Camp Term to variation attrs and backfill empty values.
 	 */
 	public static function ajax_repair_camp_facets() {
-		check_ajax_referer(self::NONCE_ACTION, 'nonce');
 		if (function_exists('intersoccer_pv_repair_reject_legacy_ajax')) {
 			intersoccer_pv_repair_reject_legacy_ajax();
 			return;
 		}
-		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')]);
-		return;
-
-		if (!current_user_can(self::CAPABILITY)) {
-			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
-		}
-
-		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
-		$result = self::repair_camp_variation_facets($product_id);
-		if (empty($result['promoted'])) {
-			wp_send_json_error(['message' => __('Not a camp variable product.', 'intersoccer-product-variations')]);
-		}
-
-		wp_send_json_success([
-			'result' => $result,
-			'completeness' => self::get_product_completeness($product_id),
-			'message' => sprintf(
-				/* translators: 1: updated variations, 2: venue rows still needing manual venue */
-				__('Camp facets repaired: %1$d variations updated. %2$d still need a venue (multi-venue products).', 'intersoccer-product-variations'),
-				(int) $result['updated'],
-				(int) $result['venue_needs_manual']
-			),
-		]);
+		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')], 403);
 	}
 
 	/**

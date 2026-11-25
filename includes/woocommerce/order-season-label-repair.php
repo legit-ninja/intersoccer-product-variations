@@ -1433,7 +1433,7 @@ function intersoccer_season_label_repair_store_preview(array $report) {
 		'at'     => time(),
 		'report' => $report,
 	];
-	$ttl = defined('HOUR_IN_SECONDS') ? HOUR_IN_SECONDS : 3600;
+	$ttl = defined('INTERSOCCER_PV_REPAIR_PREVIEW_TTL') ? (int) INTERSOCCER_PV_REPAIR_PREVIEW_TTL : 1800;
 	if (function_exists('set_transient')) {
 		set_transient(InterSoccer_Order_Season_Label_Repair::PREVIEW_TRANSIENT, $payload, $ttl);
 	} else {
@@ -1447,11 +1447,16 @@ function intersoccer_season_label_repair_store_preview(array $report) {
 function intersoccer_season_label_repair_get_preview() {
 	if (function_exists('get_transient')) {
 		$data = get_transient(InterSoccer_Order_Season_Label_Repair::PREVIEW_TRANSIENT);
-		return is_array($data) ? $data : null;
+	} else {
+		$data = $GLOBALS[InterSoccer_Order_Season_Label_Repair::PREVIEW_TRANSIENT] ?? null;
 	}
-	return isset($GLOBALS[InterSoccer_Order_Season_Label_Repair::PREVIEW_TRANSIENT])
-		? $GLOBALS[InterSoccer_Order_Season_Label_Repair::PREVIEW_TRANSIENT]
-		: null;
+	if (!is_array($data)) {
+		return null;
+	}
+	$fresh = function_exists('intersoccer_pv_repair_preview_is_fresh')
+		? intersoccer_pv_repair_preview_is_fresh($data['at'] ?? 0)
+		: ((int) ($data['at'] ?? 0) > 0 && (time() - (int) $data['at']) < 1800);
+	return $fresh ? $data : null;
 }
 
 /**

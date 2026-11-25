@@ -857,15 +857,22 @@ function intersoccer_course_date_repair_preview($report = null) {
 	$key = InterSoccer_Order_Course_Date_Repair::PREVIEW_TRANSIENT . '_' . (function_exists('get_current_user_id') ? (int) get_current_user_id() : 0);
 	if ($report !== null) {
 		$payload = ['at' => time(), 'report' => $report];
+		$ttl = defined('INTERSOCCER_PV_REPAIR_PREVIEW_TTL') ? (int) INTERSOCCER_PV_REPAIR_PREVIEW_TTL : 1800;
 		if (function_exists('set_transient')) {
-			set_transient($key, $payload, defined('HOUR_IN_SECONDS') ? HOUR_IN_SECONDS : 3600);
+			set_transient($key, $payload, $ttl);
 		} else {
 			$GLOBALS[$key] = $payload;
 		}
 		return $payload;
 	}
 	$data = function_exists('get_transient') ? get_transient($key) : ($GLOBALS[$key] ?? null);
-	return is_array($data) ? $data : null;
+	if (!is_array($data)) {
+		return null;
+	}
+	$fresh = function_exists('intersoccer_pv_repair_preview_is_fresh')
+		? intersoccer_pv_repair_preview_is_fresh($data['at'] ?? 0)
+		: ((int) ($data['at'] ?? 0) > 0 && (time() - (int) $data['at']) < 1800);
+	return $fresh ? $data : null;
 }
 
 /**

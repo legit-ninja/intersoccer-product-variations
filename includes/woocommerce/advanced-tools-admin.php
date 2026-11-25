@@ -22,7 +22,8 @@ if (!function_exists('intersoccer_pv_advanced_tools_definitions')) {
 		return [
 			'automated_batch' => [
 				'label' => __('Automated batch', 'intersoccer-product-variations'),
-				'description' => __('Fills missing order-line metadata for the statuses and scan limit you choose. Strip deprecated metadata and prune legacy label twins stay off unless you check them. This path is shop-wide.', 'intersoccer-product-variations'),
+				'description' => __('Lists each order-line field that would change for the statuses and scan limit you choose. Strip deprecated metadata and prune legacy label twins stay off unless you check them. Removing metadata also requires DELETE. This path is shop-wide. Apply is refused above 200 changes.', 'intersoccer-product-variations'),
+				'asks_delete' => true,
 				'fields' => [
 					['name' => 'order_statuses', 'label' => __('Order statuses', 'intersoccer-product-variations'), 'type' => 'text'],
 					['name' => 'scan_limit', 'label' => __('Orders to scan', 'intersoccer-product-variations'), 'type' => 'number'],
@@ -39,8 +40,10 @@ if (!function_exists('intersoccer_pv_advanced_tools_definitions')) {
 			],
 			'course_holiday_fix' => [
 				'label' => __('Course Holiday Fix', 'intersoccer-product-variations'),
-				'description' => __('One-time correction for courses saved with inflated session counts. Hidden after it has run. Shop-wide.', 'intersoccer-product-variations'),
+				'description' => __('One-time course holiday correction. This fixer does not list the fields it would change, so Apply is not offered and there is no rollback.', 'intersoccer-product-variations'),
 				'fields' => [],
+				'offers_apply' => false,
+				'no_rollback' => true,
 			],
 			'refresh_attributes' => [
 				'label' => __('Refresh Attributes', 'intersoccer-product-variations'),
@@ -300,28 +303,12 @@ if (!function_exists('intersoccer_pv_tool_course_holiday_fix')) {
 	 * @return array
 	 */
 	function intersoccer_pv_tool_course_holiday_fix($dry_run) {
+		unset($dry_run);
 		$has_run = function_exists('intersoccer_course_holiday_fix_has_run') && intersoccer_course_holiday_fix_has_run();
-		$available = function_exists('intersoccer_run_course_holiday_fix');
-		if ($has_run || !$available) {
-			$summary = $has_run
-				? __('The course holiday fix has already run.', 'intersoccer-product-variations')
-				: __('The one-time course holiday fixer is not loaded.', 'intersoccer-product-variations');
-			return intersoccer_pv_advanced_tools_empty_result($summary, true);
-		}
-		if (!$dry_run) {
-			intersoccer_run_course_holiday_fix();
-		}
-		return [
-			'summary' => __('Course holiday fix is ready to run once.', 'intersoccer-product-variations'),
-			'counts' => ['changed' => 1, 'added' => 0, 'updated' => 1, 'deleted' => 0],
-			'rows' => [[
-				'id' => 'option:course_holiday_fix',
-				'before' => ['value' => 'pending'],
-				'after' => ['value' => 'ran'],
-			]],
-			'shop_wide' => true,
-			'wrote' => !$dry_run,
-		];
+		$summary = $has_run
+			? __('The course holiday fix has already run. Apply is not offered. No rollback.', 'intersoccer-product-variations')
+			: __('The course holiday fixer cannot list the fields it would change. Apply is not offered. No rollback.', 'intersoccer-product-variations');
+		return intersoccer_pv_advanced_tools_empty_result($summary, true);
 	}
 }
 
@@ -393,22 +380,40 @@ if (!function_exists('intersoccer_pv_tool_refresh_attributes')) {
 				continue;
 			}
 			foreach ($product->get_children() as $variation_id) {
-				$variation = wc_get_product($variation_id);
+				$variation = function_exists('wc_get_product') ? wc_get_product($variation_id) : null;
 				if (!$variation || !method_exists($variation, 'get_attributes')) {
 					continue;
 				}
 				$before = $variation->get_attributes();
-				if ($before === [] || $before === '') {
+				if (!is_array($before)) {
+					$before = [];
+				}
+				$after = [];
+				if (method_exists($product, 'get_attributes')) {
+					foreach ((array) $product->get_attributes() as $attr) {
+						if (!is_object($attr) || !method_exists($attr, 'get_variation') || !$attr->get_variation()) {
+							continue;
+						}
+						$name = method_exists($attr, 'get_name') ? (string) $attr->get_name() : '';
+						if ($name !== '') {
+							$after[$name] = '';
+						}
+					}
+				}
+				if ($before == $after) {
 					continue;
 				}
 				$rows[] = [
 					'id' => 'attrs:' . (int) $variation_id,
 					'before' => ['attributes' => $before],
-					'after' => ['attributes' => []],
+					'after' => ['attributes' => $after],
 				];
-			}
-			if (!$dry_run && class_exists('InterSoccer_Program_Manager')) {
-				InterSoccer_Program_Manager::process_bulk_item('refresh_attrs', $parent_id);
+				if (!$dry_run && method_exists($variation, 'set_attributes')) {
+					$variation->set_attributes($after);
+					if (method_exists($variation, 'save')) {
+						$variation->save();
+					}
+				}
 			}
 		}
 		return [
@@ -560,8 +565,24 @@ if (!function_exists('intersoccer_pv_tool_late_pickup')) {
 				'after' => ['value' => 'yes'],
 			];
 		}
-		if (!$dry_run && $rows !== [] && function_exists('intersoccer_enable_late_pickup_for_all_camp_variations')) {
-			intersoccer_enable_late_pickup_for_all_camp_variations($product_id);
+		if (!$dry_run && $rows !== []) {
+			$written = 0;
+			foreach ($rows as $row) {
+				$parts = explode(':', (string) ($row['id'] ?? ''));
+				$variation_id = (int) ($parts[1] ?? 0);
+				if ($variation_id > 0 && function_exists('update_post_meta')) {
+					update_post_meta($variation_id, '_intersoccer_enable_late_pickup', 'yes');
+					if (function_exists('wc_delete_product_transients')) {
+						wc_delete_product_transients($variation_id);
+					}
+				}
+				$written++;
+				if (defined('INTERSOCCER_PV_REPAIR_TEST') && INTERSOCCER_PV_REPAIR_TEST
+					&& !empty($GLOBALS['intersoccer_pv_test_interrupt_after'])
+					&& $written >= (int) $GLOBALS['intersoccer_pv_test_interrupt_after']) {
+					throw new RuntimeException('interrupted');
+				}
+			}
 		}
 		return [
 			'summary' => sprintf(
@@ -612,6 +633,169 @@ if (!function_exists('intersoccer_pv_order_meta_snapshot')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_item_meta_map')) {
+	/**
+	 * @param object $item Order item.
+	 * @return array<string,string>
+	 */
+	function intersoccer_pv_item_meta_map($item) {
+		$meta = [];
+		if (!is_object($item) || !method_exists($item, 'get_meta_data')) {
+			return $meta;
+		}
+		foreach ($item->get_meta_data() as $meta_obj) {
+			$data = is_object($meta_obj) && method_exists($meta_obj, 'get_data') ? $meta_obj->get_data() : (array) $meta_obj;
+			$key = (string) ($data['key'] ?? '');
+			if ($key === '') {
+				continue;
+			}
+			$value = $data['value'] ?? '';
+			$meta[$key] = is_scalar($value) ? (string) $value : intersoccer_pv_repair_json($value);
+		}
+		ksort($meta);
+		return $meta;
+	}
+}
+
+if (!function_exists('intersoccer_pv_item_restore_meta_map')) {
+	/**
+	 * @param object               $item   Order item.
+	 * @param array<string,string> $before Previous meta.
+	 * @return void
+	 */
+	function intersoccer_pv_item_restore_meta_map($item, array $before) {
+		if (!is_object($item) || !method_exists($item, 'get_meta_data')) {
+			return;
+		}
+		$current = intersoccer_pv_item_meta_map($item);
+		foreach ($current as $key => $value) {
+			if (!array_key_exists($key, $before) && method_exists($item, 'delete_meta_data')) {
+				$item->delete_meta_data($key);
+			}
+		}
+		foreach ($before as $key => $value) {
+			if (!array_key_exists($key, $current) || (string) $current[$key] !== (string) $value) {
+				if (method_exists($item, 'update_meta_data')) {
+					$item->update_meta_data($key, $value);
+				}
+			}
+		}
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_counts_from_rows')) {
+	/**
+	 * @param array $rows Change rows.
+	 * @return array{changed:int,added:int,updated:int,deleted:int}
+	 */
+	function intersoccer_pv_repair_counts_from_rows(array $rows) {
+		$updated = 0;
+		$deleted = 0;
+		foreach ($rows as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+			$before = is_array($row['before'] ?? null) ? $row['before'] : [];
+			$after = is_array($row['after'] ?? null) ? $row['after'] : [];
+			$wrapped = isset($before['value']) || isset($after['value']) || isset($before['attributes']) || isset($after['attributes'])
+				|| isset($before['start']) || isset($after['start']) || isset($before['items']) || isset($after['items']);
+			if ($wrapped) {
+				$updated++;
+				continue;
+			}
+			foreach ($before as $key => $value) {
+				if (!array_key_exists($key, $after)) {
+					$deleted++;
+				} elseif ((string) $after[$key] !== (string) $value) {
+					$updated++;
+				}
+			}
+			foreach ($after as $key => $value) {
+				if (!array_key_exists($key, $before)) {
+					$updated++;
+				}
+			}
+		}
+		return [
+			'changed' => count($rows),
+			'added' => 0,
+			'updated' => $updated,
+			'deleted' => $deleted,
+		];
+	}
+}
+
+if (!function_exists('intersoccer_pv_order_repair_rows')) {
+	/**
+	 * Field changes update_order_metadata would write, using the same options.
+	 *
+	 * @param object $order     Order.
+	 * @param bool   $fix_only  Activity type only.
+	 * @param bool   $strip     Strip deprecated keys.
+	 * @param bool   $prune     Prune legacy twins.
+	 * @param bool   $persist   Save when true. Dry runs restore the item in memory.
+	 * @return array<int,array<string,mixed>>
+	 */
+	function intersoccer_pv_order_repair_rows($order, $fix_only, $strip, $prune, $persist) {
+		if (!is_object($order) || !method_exists($order, 'get_items')) {
+			return [];
+		}
+		$rows = [];
+		$order_id = method_exists($order, 'get_id') ? (int) $order->get_id() : 0;
+		foreach ($order->get_items() as $item_id => $item) {
+			if (!is_object($item) || !method_exists($item, 'get_meta_data')) {
+				continue;
+			}
+			if (class_exists('WC_Order_Item_Product') && !($item instanceof WC_Order_Item_Product)) {
+				continue;
+			}
+			$before = intersoccer_pv_item_meta_map($item);
+			if (function_exists('intersoccer_resolve_order_item_product_context') && function_exists('intersoccer_write_order_line_meta')) {
+				$resolved = intersoccer_resolve_order_item_product_context($item);
+				$type = (string) ($resolved['product_type'] ?? '');
+				if (in_array($type, ['camp', 'course', 'birthday', 'tournament'], true)) {
+					intersoccer_write_order_line_meta($item, [
+						'order' => $order,
+						'product_id' => (int) ($resolved['resolved_product_id'] ?? 0),
+						'variation_id' => (int) ($resolved['variation_id'] ?? 0),
+						'product_type' => $type,
+						'fix_activity_type_only' => (bool) $fix_only,
+						'mode' => 'repair',
+					]);
+					if (function_exists('intersoccer_prune_camp_schedule_order_meta_twins')) {
+						intersoccer_prune_camp_schedule_order_meta_twins($item);
+					}
+					if ($prune && function_exists('intersoccer_prune_legacy_order_meta_twins')) {
+						intersoccer_prune_legacy_order_meta_twins($item);
+					}
+					if ($strip && function_exists('intersoccer_strip_deprecated_order_line_meta')) {
+						intersoccer_strip_deprecated_order_line_meta($item);
+					}
+				}
+			}
+			$after = intersoccer_pv_item_meta_map($item);
+			if ($before !== $after) {
+				$rows[] = [
+					'id' => 'order-item:' . $order_id . ':' . (int) $item_id,
+					'before' => $before,
+					'after' => $after,
+				];
+			}
+			if (!$persist || $before === $after) {
+				intersoccer_pv_item_restore_meta_map($item, $before);
+				continue;
+			}
+			if (method_exists($item, 'save')) {
+				$item->save();
+			}
+		}
+		if ($persist && $rows !== [] && method_exists($order, 'save')) {
+			$order->save();
+		}
+		return $rows;
+	}
+}
+
 if (!function_exists('intersoccer_pv_tool_automated_batch')) {
 	/**
 	 * @param bool  $dry_run Dry run.
@@ -639,36 +823,43 @@ if (!function_exists('intersoccer_pv_tool_automated_batch')) {
 		$ids = array_map('intval', (array) intersoccer_get_orders_needing_updates($statuses, $limit));
 		$rows = [];
 		foreach ($ids as $order_id) {
-			if ($order_id <= 0) {
+			if ($order_id <= 0 || !function_exists('wc_get_order')) {
 				continue;
 			}
-			$before = intersoccer_pv_order_meta_snapshot($order_id);
-			if (!$dry_run && function_exists('wc_get_order')) {
-				$order = wc_get_order($order_id);
+			$order = wc_get_order($order_id);
+			if (!$order) {
+				continue;
+			}
+			$rows = array_merge($rows, intersoccer_pv_order_repair_rows($order, false, $strip, $prune, false));
+		}
+		$within_cap = count($rows) > 0 && count($rows) <= (int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP;
+		if (!$dry_run && $within_cap) {
+			foreach ($ids as $order_id) {
+				$order = function_exists('wc_get_order') ? wc_get_order($order_id) : null;
 				if ($order) {
-					intersoccer_update_order_metadata($order, false, $strip, $prune);
+					intersoccer_pv_order_repair_rows($order, false, $strip, $prune, true);
 				}
 			}
-			$after = $dry_run ? $before : intersoccer_pv_order_meta_snapshot($order_id);
-			if ($dry_run) {
-				$after['queued'] = '1';
-			}
-			$rows[] = [
-				'id' => 'order:' . $order_id,
-				'before' => $before,
-				'after' => $after,
-			];
+		}
+		$counts = intersoccer_pv_repair_counts_from_rows($rows);
+		$summary = sprintf(
+			/* translators: %d: field-change count */
+			__('Order-line field changes: %d.', 'intersoccer-product-variations'),
+			count($rows)
+		);
+		if (count($rows) > (int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP) {
+			$summary .= ' ' . sprintf(
+				/* translators: %d: backup row cap */
+				__('Apply is refused above %d changes. Narrow the scan. Nothing was written.', 'intersoccer-product-variations'),
+				(int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP
+			);
 		}
 		return [
-			'summary' => sprintf(
-				/* translators: %d: order count */
-				__('Orders needing metadata updates: %d.', 'intersoccer-product-variations'),
-				count($rows)
-			),
-			'counts' => ['changed' => count($rows), 'added' => 0, 'updated' => count($rows), 'deleted' => 0],
+			'summary' => $summary,
+			'counts' => $counts,
 			'rows' => $rows,
 			'shop_wide' => true,
-			'wrote' => !$dry_run && $rows !== [],
+			'wrote' => !$dry_run && $within_cap,
 		];
 	}
 }
@@ -687,6 +878,12 @@ if (!function_exists('intersoccer_pv_repair_read_value')) {
 		if (strpos($id, 'meta:') === 0 && function_exists('get_post_meta')) {
 			$parts = explode(':', $id, 3);
 			return ['value' => (string) get_post_meta((int) ($parts[1] ?? 0), (string) ($parts[2] ?? ''), true)];
+		}
+		if (strpos($id, 'order-item:') === 0) {
+			$parts = explode(':', $id);
+			$order = function_exists('wc_get_order') ? wc_get_order((int) ($parts[1] ?? 0)) : null;
+			$item = ($order && method_exists($order, 'get_item')) ? $order->get_item((int) ($parts[2] ?? 0)) : null;
+			return $item ? intersoccer_pv_item_meta_map($item) : [];
 		}
 		if (strpos($id, 'order:') === 0) {
 			return intersoccer_pv_order_meta_snapshot((int) substr($id, 6));
@@ -723,6 +920,18 @@ if (!function_exists('intersoccer_pv_repair_restore_value')) {
 			return;
 		}
 		$id = (string) $id;
+		if (strpos($id, 'order-item:') === 0 && is_array($before)) {
+			$parts = explode(':', $id);
+			$order = function_exists('wc_get_order') ? wc_get_order((int) ($parts[1] ?? 0)) : null;
+			$item = ($order && method_exists($order, 'get_item')) ? $order->get_item((int) ($parts[2] ?? 0)) : null;
+			if ($item) {
+				intersoccer_pv_item_restore_meta_map($item, $before);
+				if (method_exists($item, 'save')) {
+					$item->save();
+				}
+			}
+			return;
+		}
 		if (strpos($id, 'meta:') === 0 && function_exists('update_post_meta')) {
 			$parts = explode(':', $id, 3);
 			update_post_meta((int) ($parts[1] ?? 0), (string) ($parts[2] ?? ''), (string) ($before['value'] ?? ''));
@@ -795,6 +1004,7 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 		if (!isset($definitions[$tool])) {
 			return ['type' => 'error', 'message' => __('Unknown repair.', 'intersoccer-product-variations'), 'result' => null];
 		}
+		$offers_apply = !array_key_exists('offers_apply', $definitions[$tool]) || !empty($definitions[$tool]['offers_apply']);
 		$scope = intersoccer_pv_advanced_tools_scope_from_post($tool);
 		if ($mode === 'preview') {
 			$result = intersoccer_pv_advanced_tools_execute($tool, true, $scope);
@@ -812,17 +1022,32 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 			if ($result['error'] !== '' && (int) $result['counts']['changed'] === 0) {
 				return ['type' => 'error', 'message' => $result['summary'] !== '' ? $result['summary'] : $result['error'], 'result' => $result];
 			}
+			if (count($result['rows']) > (int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP) {
+				$message .= ' ' . sprintf(
+					/* translators: %d: backup row cap */
+					__('Apply is refused above %d changes.', 'intersoccer-product-variations'),
+					(int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP
+				);
+			}
 			return ['type' => 'info', 'message' => $message . ' ' . $result['summary'], 'result' => $result];
 		}
 		if ($mode !== 'apply') {
 			return ['type' => 'error', 'message' => __('Unknown action.', 'intersoccer-product-variations'), 'result' => null];
+		}
+		if (!$offers_apply) {
+			return [
+				'type' => 'error',
+				'message' => __('Apply is not offered for this tool. No rollback.', 'intersoccer-product-variations'),
+				'result' => null,
+			];
 		}
 		$gate = intersoccer_pv_repair_gate_apply(
 			$user_id,
 			$tool,
 			$scope,
 			intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_phrase'),
-			intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_global')
+			intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_global'),
+			intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_delete')
 		);
 		if (!$gate['ok']) {
 			return ['type' => 'error', 'message' => $gate['error'], 'result' => null];
@@ -836,10 +1061,37 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 				'result' => null,
 			];
 		}
+		if (count($again['rows']) > (int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP) {
+			return [
+				'type' => 'error',
+				'message' => sprintf(
+					/* translators: %d: backup row cap */
+					__('Apply is refused above %d changes. Narrow the scope so the backup can cover every row.', 'intersoccer-product-variations'),
+					(int) INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP
+				),
+				'result' => null,
+			];
+		}
 		$backup = intersoccer_pv_repair_write_backup($tool, $user_id, $again['rows']);
-		$applied = intersoccer_pv_advanced_tools_execute($tool, false, $scope);
-		if ($applied['rows'] !== []) {
-			intersoccer_pv_repair_replace_backup_rows($backup, $applied['rows']);
+		try {
+			$applied = intersoccer_pv_advanced_tools_execute($tool, false, $scope);
+		} catch (Throwable $e) {
+			unset($e);
+			intersoccer_pv_repair_clear_preview($user_id, $tool);
+			intersoccer_pv_repair_log([
+				'user_id' => $user_id,
+				'tool' => $tool,
+				'mode' => 'apply',
+				'scope' => intersoccer_pv_advanced_tools_scope_label($scope),
+				'counts' => ['changed' => 0, 'added' => 0, 'updated' => 0, 'deleted' => 0],
+				'backup' => $backup,
+				'note' => 'partial',
+			]);
+			return [
+				'type' => 'error',
+				'message' => __('Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written.', 'intersoccer-product-variations'),
+				'result' => null,
+			];
 		}
 		intersoccer_pv_repair_clear_preview($user_id, $tool);
 		intersoccer_pv_repair_log([
@@ -904,7 +1156,7 @@ if (!function_exists('intersoccer_pv_repair_phrase_fields')) {
 	 * @param bool $show_global Show the GLOBAL field.
 	 * @return void
 	 */
-	function intersoccer_pv_repair_phrase_fields($show_global) {
+	function intersoccer_pv_repair_phrase_fields($show_global, $show_delete = false) {
 		?>
 		<p>
 			<label>
@@ -917,6 +1169,14 @@ if (!function_exists('intersoccer_pv_repair_phrase_fields')) {
 				<label>
 					<?php esc_html_e('Type GLOBAL for a shop-wide scope', 'intersoccer-product-variations'); ?>
 					<input type="text" name="intersoccer_pv_repair_global" value="" autocomplete="off" class="regular-text" />
+				</label>
+			</p>
+		<?php endif; ?>
+		<?php if ($show_delete) : ?>
+			<p>
+				<label>
+					<?php esc_html_e('Type DELETE when Preview removes metadata', 'intersoccer-product-variations'); ?>
+					<input type="text" name="intersoccer_pv_repair_delete" value="" autocomplete="off" class="regular-text" />
 				</label>
 			</p>
 		<?php endif; ?>
@@ -1032,7 +1292,8 @@ if (!function_exists('intersoccer_pv_render_tool_form')) {
 						<?php esc_html_e('Preview (dry run)', 'intersoccer-product-variations'); ?>
 					</button>
 				</p>
-				<?php intersoccer_pv_repair_phrase_fields(true); ?>
+				<?php if (!empty($definition['offers_apply']) || !array_key_exists('offers_apply', $definition)) : ?>
+				<?php intersoccer_pv_repair_phrase_fields(true, !empty($definition['asks_delete'])); ?>
 				<p>
 					<button type="submit" class="button button-primary" name="intersoccer_pv_repair_mode" value="apply">
 						<?php esc_html_e('Apply', 'intersoccer-product-variations'); ?>
@@ -1042,6 +1303,9 @@ if (!function_exists('intersoccer_pv_render_tool_form')) {
 					<p class="description"><?php esc_html_e('GLOBAL is required when the product ID is empty, and when parsed dates overwrite existing values.', 'intersoccer-product-variations'); ?></p>
 				<?php else : ?>
 					<p class="description"><?php esc_html_e('This tool is shop-wide. Type GLOBAL as well as APPLY.', 'intersoccer-product-variations'); ?></p>
+				<?php endif; ?>
+				<?php else : ?>
+					<p class="description"><?php esc_html_e('Apply is not offered. No rollback.', 'intersoccer-product-variations'); ?></p>
 				<?php endif; ?>
 			</form>
 		</div>
@@ -1070,7 +1334,7 @@ if (!function_exists('intersoccer_pv_render_advanced_tools_page')) {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e('Advanced tools', 'intersoccer-product-variations'); ?></h1>
-			<p><?php esc_html_e('Repairs stay off everyday product screens. Preview writes nothing. Apply asks you to type APPLY. A shop-wide run also asks you to type GLOBAL. Each Apply stores a JSON backup and can be rolled back when the current value still matches what Apply wrote.', 'intersoccer-product-variations'); ?></p>
+			<p><?php esc_html_e('Repairs stay off everyday product screens. Preview lists the fields that would change and writes nothing. Apply asks you to type APPLY. A shop-wide run also asks you to type GLOBAL. Removals also ask you to type DELETE. Apply is refused above 200 changes. The backup is taken before Apply and can roll back rows that still match what Apply wrote, including a partial Apply. Tools marked no rollback are not in the backup list.', 'intersoccer-product-variations'); ?></p>
 			<?php if (!empty($notice['message'])) : ?>
 				<div class="notice notice-<?php echo $notice['type'] === 'error' ? 'error' : 'info'; ?>"><p><?php echo esc_html($notice['message']); ?></p></div>
 			<?php endif; ?>
@@ -1157,6 +1421,11 @@ if (!function_exists('intersoccer_pv_render_backup_rollback')) {
 		echo '<table class="widefat striped" style="max-width:920px;"><thead><tr><th>' . esc_html__('File', 'intersoccer-product-variations') . '</th><th>' . esc_html__('Tool', 'intersoccer-product-variations') . '</th><th></th></tr></thead><tbody>';
 		foreach (array_reverse($index) as $row) {
 			if (!is_array($row) || empty($row['file'])) {
+				continue;
+			}
+			$tool_key = (string) ($row['tool'] ?? '');
+			$definitions = intersoccer_pv_advanced_tools_definitions();
+			if ($tool_key !== '' && !empty($definitions[$tool_key]['no_rollback'])) {
 				continue;
 			}
 			echo '<tr><td><code>' . esc_html((string) $row['file']) . '</code></td><td>' . esc_html((string) ($row['tool'] ?? '')) . '</td><td>';

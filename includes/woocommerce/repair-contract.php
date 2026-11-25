@@ -28,6 +28,18 @@ if (!defined('INTERSOCCER_PV_REPAIR_APPLY_PHRASE')) {
 if (!defined('INTERSOCCER_PV_REPAIR_GLOBAL_PHRASE')) {
 	define('INTERSOCCER_PV_REPAIR_GLOBAL_PHRASE', 'GLOBAL');
 }
+if (!defined('INTERSOCCER_PV_REPAIR_DELETE_PHRASE')) {
+	define('INTERSOCCER_PV_REPAIR_DELETE_PHRASE', 'DELETE');
+}
+if (!defined('INTERSOCCER_PV_REPAIR_PREVIEW_TTL')) {
+	define('INTERSOCCER_PV_REPAIR_PREVIEW_TTL', 30 * 60);
+}
+if (!defined('INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP')) {
+	define('INTERSOCCER_PV_REPAIR_BACKUP_ROW_CAP', 200);
+}
+if (!defined('INTERSOCCER_PV_REPAIR_BACKUP_SUFFIX_BYTES')) {
+	define('INTERSOCCER_PV_REPAIR_BACKUP_SUFFIX_BYTES', 16);
+}
 
 if (!function_exists('intersoccer_pv_advanced_tools_page_slug')) {
 	/**
@@ -47,9 +59,13 @@ if (!function_exists('intersoccer_pv_repair_grant_administrator_cap')) {
 			return;
 		}
 		$role = get_role('administrator');
-		if ($role && method_exists($role, 'add_cap')) {
-			$role->add_cap(INTERSOCCER_PV_REPAIR_CAP, true);
+		if (!$role || !method_exists($role, 'add_cap')) {
+			return;
 		}
+		if (method_exists($role, 'has_cap') && $role->has_cap(INTERSOCCER_PV_REPAIR_CAP)) {
+			return;
+		}
+		$role->add_cap(INTERSOCCER_PV_REPAIR_CAP, true);
 	}
 }
 
@@ -259,9 +275,24 @@ if (!function_exists('intersoccer_pv_repair_store_preview')) {
 			'rows' => $rows,
 			'summary' => (string) ($result['summary'] ?? ''),
 			'shop_wide' => !empty($result['shop_wide']),
+			'deletes' => (int) ($counts['deleted'] ?? 0),
 			'changed' => $changed,
 			'created_at' => time(),
 		]);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_preview_is_fresh')) {
+	/**
+	 * A Preview older than 30 minutes is missing.
+	 *
+	 * @param int $created_at Unix timestamp.
+	 * @return bool
+	 */
+	function intersoccer_pv_repair_preview_is_fresh($created_at) {
+		$created_at = (int) $created_at;
+		$ttl = defined('INTERSOCCER_PV_REPAIR_PREVIEW_TTL') ? (int) INTERSOCCER_PV_REPAIR_PREVIEW_TTL : 1800;
+		return $created_at > 0 && (time() - $created_at) < $ttl;
 	}
 }
 
@@ -274,6 +305,9 @@ if (!function_exists('intersoccer_pv_repair_get_preview')) {
 	function intersoccer_pv_repair_get_preview($user_id, $tool) {
 		$stored = intersoccer_pv_repair_state_get(intersoccer_pv_repair_preview_key($user_id, $tool), null);
 		if (!is_array($stored) || empty($stored['fingerprint']) || !empty($stored['consumed'])) {
+			return null;
+		}
+		if (!intersoccer_pv_repair_preview_is_fresh($stored['created_at'] ?? 0)) {
 			return null;
 		}
 		return $stored;
@@ -342,9 +376,10 @@ if (!function_exists('intersoccer_pv_repair_gate_apply')) {
 	 * @param array  $scope        Scope.
 	 * @param string $typed_apply  Typed APPLY phrase.
 	 * @param string $typed_global Typed GLOBAL phrase.
+	 * @param string $typed_delete Typed DELETE phrase.
 	 * @return array{ok:bool,error:string,code:string}
 	 */
-	function intersoccer_pv_repair_gate_apply($user_id, $tool, array $scope, $typed_apply, $typed_global) {
+	function intersoccer_pv_repair_gate_apply($user_id, $tool, array $scope, $typed_apply, $typed_global, $typed_delete = '') {
 		$preview = intersoccer_pv_repair_get_preview($user_id, $tool);
 		if ($preview === null) {
 			return [
@@ -372,6 +407,17 @@ if (!function_exists('intersoccer_pv_repair_gate_apply')) {
 				'ok' => false,
 				'error' => __('This scope is shop-wide. Type GLOBAL as well as APPLY.', 'intersoccer-product-variations'),
 				'code' => 'global_phrase',
+			];
+		}
+		$deletes = (int) ($preview['deletes'] ?? 0);
+		if ($deletes === 0 && is_array($preview['counts'] ?? null)) {
+			$deletes = (int) ($preview['counts']['deleted'] ?? 0);
+		}
+		if ($deletes > 0 && trim((string) $typed_delete) !== INTERSOCCER_PV_REPAIR_DELETE_PHRASE) {
+			return [
+				'ok' => false,
+				'error' => __('Preview removes metadata. Type DELETE to confirm those removals.', 'intersoccer-product-variations'),
+				'code' => 'delete_phrase',
 			];
 		}
 		if ((int) ($preview['changed'] ?? 0) === 0) {
@@ -408,6 +454,11 @@ if (!function_exists('intersoccer_pv_repair_backup_dir')) {
 		if (!file_exists($index)) {
 			file_put_contents($index, "<?php\n// Silence is golden.\n");
 		}
+		$htaccess = $dir . '/.htaccess';
+		if (!file_exists($htaccess)) {
+			$rules = "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n";
+			file_put_contents($htaccess, $rules);
+		}
 		return $dir;
 	}
 }
@@ -422,7 +473,11 @@ if (!function_exists('intersoccer_pv_repair_write_backup')) {
 	function intersoccer_pv_repair_write_backup($tool, $user_id, array $rows) {
 		$dir = intersoccer_pv_repair_backup_dir();
 		$tool_key = function_exists('sanitize_key') ? sanitize_key($tool) : preg_replace('/[^a-z0-9_\-]/', '', strtolower((string) $tool));
-		$name = $tool_key . '-' . gmdate('Ymd-His') . '-' . (int) $user_id . '-' . bin2hex(random_bytes(3)) . '.json';
+		$bytes = defined('INTERSOCCER_PV_REPAIR_BACKUP_SUFFIX_BYTES') ? (int) INTERSOCCER_PV_REPAIR_BACKUP_SUFFIX_BYTES : 16;
+		if ($bytes < 16) {
+			$bytes = 16;
+		}
+		$name = $tool_key . '-' . gmdate('Ymd-His') . '-' . (int) $user_id . '-' . bin2hex(random_bytes($bytes)) . '.json';
 		$payload = [
 			'tool' => $tool_key,
 			'user_id' => (int) $user_id,
@@ -588,6 +643,104 @@ if (!function_exists('intersoccer_pv_repair_reject_legacy_ajax')) {
 			return;
 		}
 		intersoccer_pv_repair_stop($message);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_option_is_repair_state')) {
+	/**
+	 * Options created for repair previews, backups, and run logs.
+	 *
+	 * @param string $name Option name.
+	 * @return bool
+	 */
+	function intersoccer_pv_repair_option_is_repair_state($name) {
+		$name = (string) $name;
+		$name = preg_replace('/^(_site_transient_timeout_|_site_transient_|_transient_timeout_|_transient_)/', '', $name);
+		return is_string($name) && (bool) preg_match('/^intersoccer_.*repair/i', $name);
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_remove_cap_from_roles')) {
+	/**
+	 * Remove the repair capability from every role that has it.
+	 *
+	 * @return void
+	 */
+	function intersoccer_pv_repair_remove_cap_from_roles() {
+		$names = ['administrator', 'shop_manager'];
+		if (function_exists('wp_roles')) {
+			$wp_roles = wp_roles();
+			if (is_object($wp_roles) && isset($wp_roles->roles) && is_array($wp_roles->roles)) {
+				$names = array_keys($wp_roles->roles);
+			}
+		}
+		if (!function_exists('get_role')) {
+			return;
+		}
+		foreach ($names as $name) {
+			$role = get_role($name);
+			if (!$role || !method_exists($role, 'remove_cap')) {
+				continue;
+			}
+			if (method_exists($role, 'has_cap') && !$role->has_cap(INTERSOCCER_PV_REPAIR_CAP)) {
+				continue;
+			}
+			$role->remove_cap(INTERSOCCER_PV_REPAIR_CAP);
+		}
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_delete_repair_options')) {
+	/**
+	 * Delete options whose names match intersoccer_*repair*.
+	 *
+	 * @return void
+	 */
+	function intersoccer_pv_repair_delete_repair_options() {
+		$names = [];
+		foreach (['intersoccer_test_options', 'intersoccer_test_option_store', 'intersoccer_pv_repair_memory'] as $bucket) {
+			if (isset($GLOBALS[$bucket]) && is_array($GLOBALS[$bucket])) {
+				$names = array_merge($names, array_keys($GLOBALS[$bucket]));
+			}
+		}
+		if (isset($GLOBALS['wpdb']) && is_object($GLOBALS['wpdb']) && method_exists($GLOBALS['wpdb'], 'get_col') && isset($GLOBALS['wpdb']->options)) {
+			$like = method_exists($GLOBALS['wpdb'], 'esc_like') ? $GLOBALS['wpdb']->esc_like('intersoccer_') . '%' . $GLOBALS['wpdb']->esc_like('repair') . '%' : 'intersoccer_%repair%';
+			$sql = $GLOBALS['wpdb']->prepare(
+				"SELECT option_name FROM {$GLOBALS['wpdb']->options} WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s",
+				$like,
+				'_transient_' . $like,
+				'_transient_timeout_' . $like
+			);
+			$found = $GLOBALS['wpdb']->get_col($sql);
+			if (is_array($found)) {
+				$names = array_merge($names, $found);
+			}
+		}
+		foreach (array_unique($names) as $name) {
+			if (!is_string($name) || !intersoccer_pv_repair_option_is_repair_state($name)) {
+				continue;
+			}
+			if (function_exists('delete_option')) {
+				delete_option($name);
+			}
+			foreach (['intersoccer_test_options', 'intersoccer_test_option_store', 'intersoccer_pv_repair_memory'] as $bucket) {
+				if (isset($GLOBALS[$bucket]) && is_array($GLOBALS[$bucket])) {
+					unset($GLOBALS[$bucket][$name]);
+				}
+			}
+		}
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_uninstall')) {
+	/**
+	 * Uninstall hook: drop the repair capability and repair options. Does not drop product data.
+	 *
+	 * @return void
+	 */
+	function intersoccer_pv_repair_uninstall() {
+		intersoccer_pv_repair_remove_cap_from_roles();
+		intersoccer_pv_repair_delete_repair_options();
 	}
 }
 
