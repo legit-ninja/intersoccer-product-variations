@@ -76,7 +76,7 @@ msgstr ""
 
 # wpml-name: bbb6d0bc761a2f032a30a03aa30166a4
 msgid "Refresh Attributes"
-msgstr "Attribute aktualisieren"
+msgstr ""
 
 # wpml-name: fbcf0d1f787c74663ca9dc925ebf5f0c
 msgid "Health Status"
@@ -92,7 +92,7 @@ msgstr ""
 
 # wpml-name: 97f08a40f22a625d0cbfe03db3349108
 msgid "Product ID"
-msgstr "Produkt-ID"
+msgstr ""
 
 # wpml-name: 8052057babac105e7e98556c65ef7361
 msgid "Export Analysis to CSV"
@@ -1091,286 +1091,281 @@ msgid "Course Information"
 msgstr "Kursinformationen"
 
 msgid "InterSoccer Advanced tools: Products & orders"
-msgstr "InterSoccer Erweiterte Werkzeuge: Produkte und Bestellungen"
+msgstr ""
 
 msgid "InterSoccer Advanced tools: Rosters & reports"
-msgstr "InterSoccer Erweiterte Werkzeuge: Listen und Berichte"
+msgstr ""
 
 msgid "Fills empty required camp and course attributes when the registry has a safe default. Existing values are kept. Missing course start date, length, and holidays are listed as needs manual and are not written. An empty attribute that means Any is listed as needs manual unless that attribute is required. Courses that have already started and not finished are skipped. Leave the product ID empty only for a shop-wide run (GLOBAL)."
-msgstr "Füllt leere erforderliche Camp- und Kursattribute, wenn die Registrierung einen sicheren Standardwert hat. Vorhandene Werte bleiben erhalten. Fehlendes Kursstartdatum, fehlende Dauer und fehlende Ferien werden als manuell erforderlich aufgeführt und nicht geschrieben. Ein leeres Attribut, das Beliebig bedeutet, wird als manuell erforderlich aufgeführt, sofern dieses Attribut nicht erforderlich ist. Kurse, die bereits begonnen und noch nicht beendet sind, werden übersprungen. Lassen Sie die Produkt-ID nur für einen shopweiten Lauf leer (GLOBAL)."
+msgstr ""
 
 msgid "Seeds camp start, end, and week from the camp-terms label when dates are empty. Overwrite existing dates, or leave the product ID empty, only with GLOBAL. The WP-CLI command dry-runs unless --apply is passed. This screen stays Preview-first."
-msgstr "Setzt Camp-Start, Camp-Ende und Woche aus der Camp-Zeitraum-Bezeichnung, wenn die Daten leer sind. Vorhandene Daten überschreiben oder die Produkt-ID leer lassen nur mit GLOBAL. Der WP-CLI-Befehl bleibt ein Probelauf, bis --apply angegeben wird. Diese Ansicht bleibt zuerst eine Vorschau."
+msgstr ""
 
 msgid "Course end dates run from Advanced tools."
-msgstr "Kursenddaten werden über die erweiterten Werkzeuge ausgeführt."
+msgstr ""
 
 msgid "Refresh Attributes runs from Advanced tools."
-msgstr "Die Attributaktualisierung wird über die erweiterten Werkzeuge ausgeführt."
+msgstr ""
 
 #, php-format
 msgid "Attribute refresh changes: %d."
-msgstr "Attributaktualisierungen: %d."
+msgstr ""
 
 #, php-format
 msgid "Venue or camp-term changes: %d."
-msgstr "Änderungen an Ort oder Camp-Zeitraum: %d."
+msgstr ""
 
 msgid "Automated batch"
-msgstr "Automatisierte Stapelverarbeitung"
+msgstr ""
 
 msgid "Lists each order-line field that would change for the statuses and scan limit you choose. Strip deprecated metadata and prune legacy label twins stay off unless you check them. Removing metadata also requires DELETE. This path is shop-wide. Apply is refused above 200 changes."
-msgstr "Listet jedes Bestellpositionsfeld auf, das sich für die gewählten Status und die Scan-Grenze ändern würde. Veraltete Metadaten entfernen und alte Bezeichnungs-Dubletten bereinigen bleiben aus, bis Sie sie ankreuzen. Das Entfernen von Metadaten verlangt zusätzlich DELETE. Dieser Weg gilt für den ganzen Shop. Anwenden wird abgelehnt, sobald mehr als 200 Änderungen vorliegen."
+msgstr ""
 
 msgid "Order statuses"
-msgstr "Bestellstatus"
+msgstr ""
 
 msgid "Orders to scan"
-msgstr "Zu prüfende Bestellungen"
+msgstr ""
 
 msgid "Strip deprecated metadata"
-msgstr "Veraltete Metadaten entfernen"
+msgstr ""
 
 msgid "Prune legacy label twins"
-msgstr "Alte Bezeichnungs-Dubletten bereinigen"
+msgstr ""
 
 msgid "Shows the proposed end date next to the current end date for each course variation. Leave the product ID empty only for a shop-wide run (GLOBAL)."
-msgstr "Zeigt das vorgeschlagene Enddatum neben dem aktuellen Enddatum für jede Kursvariante. Lassen Sie die Produkt-ID nur für einen shopweiten Lauf leer (GLOBAL)."
+msgstr ""
 
 msgid "Repair Venue / Camp Term"
-msgstr "Ort / Camp-Zeitraum reparieren"
+msgstr ""
 
 msgid "Promotes venue and camp term onto variations and backfills empty values. Leave the product ID empty only for a shop-wide run (GLOBAL)."
-msgstr "Überträgt Ort und Camp-Zeitraum auf die Varianten und füllt leere Werte. Lassen Sie die Produkt-ID nur für einen shopweiten Lauf leer (GLOBAL)."
+msgstr ""
 
 msgid "Apply parsed dates from camp-terms"
-msgstr "Extrahierte Daten aus Camp-Zeiträumen anwenden"
+msgstr ""
 
 msgid "Overwrite existing start dates"
-msgstr "Vorhandene Startdaten überschreiben"
+msgstr ""
 
 msgid "Re-enable late pick up"
-msgstr "Spätabholung wieder aktivieren"
+msgstr ""
 
 msgid "Turns late pick up on for full-day variations of one camp. Half-day variations are left off. Enter the camp product ID."
-msgstr "Schaltet die Spätabholung für Ganztagsvarianten eines Camps ein. Halbtagsvarianten bleiben aus. Geben Sie die Camp-Produkt-ID ein."
+msgstr ""
 
 msgid "Unknown repair."
-msgstr "Unbekannte Reparatur."
+msgstr ""
 
 msgid "Course end dates are unavailable."
-msgstr "Kursenddaten sind nicht verfügbar."
+msgstr ""
 
 #, php-format
 msgid "Proposed end date changes: %d."
-msgstr "Vorgeschlagene Enddatum-Änderungen: %d."
+msgstr ""
 
 #, php-format
 msgid "Needs manual: %d."
-msgstr "Manuell erforderlich: %d."
+msgstr ""
 
 msgid "Camp date migration is unavailable."
-msgstr "Die Camp-Datumsmigration ist nicht verfügbar."
+msgstr ""
 
 #, php-format
 msgid "Parsed camp date changes: %d."
-msgstr "Extrahierte Camp-Datum-Änderungen: %d."
+msgstr ""
 
 msgid "Enter a camp product ID."
-msgstr "Geben Sie eine Camp-Produkt-ID ein."
+msgstr ""
 
 msgid "Camp product was not found."
-msgstr "Das Camp-Produkt wurde nicht gefunden."
+msgstr ""
 
 #, php-format
 msgid "Late pick up would be enabled on %d variation(s)."
-msgstr "Die Spätabholung würde für %d Variante(n) aktiviert."
+msgstr ""
 
 msgid "Order metadata repair is unavailable."
-msgstr "Die Reparatur der Bestellmetadaten ist nicht verfügbar."
+msgstr ""
 
 #, php-format
 msgid "Order-line field changes: %d."
-msgstr "Änderungen an Bestellpositionsfeldern: %d."
+msgstr ""
 
 #, php-format
 msgid "Apply is refused above %d changes. Narrow the scan. Nothing was written."
-msgstr "Anwenden wird abgelehnt bei mehr als %d Änderungen. Grenzen Sie den Scan ein. Es wurde nichts geschrieben."
+msgstr ""
 
 msgid "Security check failed."
-msgstr "Sicherheitsprüfung fehlgeschlagen."
+msgstr ""
 
 msgid "Preview finished. Nothing was written."
-msgstr "Vorschau abgeschlossen. Es wurde nichts geschrieben."
+msgstr ""
 
 #, php-format
 msgid "Apply is refused above %d changes."
-msgstr "Anwenden wird abgelehnt bei mehr als %d Änderungen."
+msgstr ""
 
 msgid "Unknown action."
-msgstr "Unbekannte Aktion."
+msgstr ""
 
 msgid "Apply is not offered for this tool. No rollback."
-msgstr "Anwenden wird für dieses Werkzeug nicht angeboten. Kein Zurücksetzen."
+msgstr ""
 
 msgid "The change set no longer matches the Preview. Run Preview again."
-msgstr "Die Änderungen stimmen nicht mehr mit der Vorschau überein. Führen Sie die Vorschau erneut aus."
+msgstr ""
 
 #, php-format
 msgid "Apply is refused above %d changes. Narrow the scope so the backup can cover every row."
-msgstr "Anwenden wird abgelehnt bei mehr als %d Änderungen. Grenzen Sie den Umfang ein, damit die Sicherung jede Zeile abdeckt."
+msgstr ""
 
 msgid "Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written."
-msgstr "Anwenden wurde vorzeitig beendet. Die Sicherung ist der Stand vor Anwenden. Setzen Sie die geschriebenen Zeilen zurück."
+msgstr ""
 
 msgid "Apply finished."
-msgstr "Anwenden abgeschlossen."
+msgstr ""
 
 msgid "Type APPLY to confirm."
-msgstr "Geben Sie APPLY ein, um zu bestätigen."
+msgstr ""
 
 msgid "Backup file was not found."
-msgstr "Sicherungsdatei wurde nicht gefunden."
+msgstr ""
 
 #, php-format
 msgid "Rollback restored %1$d rows. Conflicts left untouched: %2$d."
-msgstr "Zurücksetzen hat %1$d Zeilen wiederhergestellt. Unveränderte Konflikte: %2$d."
+msgstr ""
 
 msgid "Type APPLY to confirm"
-msgstr "Geben Sie APPLY ein, um zu bestätigen"
+msgstr ""
 
 msgid "Type GLOBAL for a shop-wide scope"
-msgstr "Geben Sie GLOBAL für einen shopweiten Umfang ein"
+msgstr ""
 
 msgid "Type DELETE when Preview removes metadata"
-msgstr "Geben Sie DELETE ein, wenn die Vorschau Metadaten entfernt"
+msgstr ""
 
 msgid "Scan & preview"
-msgstr "Scannen und Vorschau"
+msgstr ""
 
 msgid "Season labels"
-msgstr "Saisonbezeichnungen"
+msgstr ""
 
 msgid "Course dates"
-msgstr "Kursdaten"
+msgstr ""
 
 msgid "Product repairs"
-msgstr "Produktreparaturen"
+msgstr ""
 
 msgid "Late pick up"
-msgstr "Spätabholung"
+msgstr ""
 
 msgid "Preview (dry run)"
-msgstr "Vorschau (Probelauf)"
+msgstr ""
 
 msgid "Apply"
-msgstr "Anwenden"
+msgstr ""
 
 msgid "GLOBAL is required when the product ID is empty, and when parsed dates overwrite existing values."
-msgstr "GLOBAL ist erforderlich, wenn die Produkt-ID leer ist und wenn extrahierte Daten vorhandene Werte überschreiben."
+msgstr ""
 
 msgid "This tool is shop-wide. Type GLOBAL as well as APPLY."
-msgstr "Dieses Werkzeug gilt für den ganzen Shop. Geben Sie auch GLOBAL und APPLY ein."
+msgstr ""
 
 msgid "Apply is not offered. No rollback."
-msgstr "Anwenden wird nicht angeboten. Kein Zurücksetzen."
+msgstr ""
 
 msgid "Repairs stay off everyday product screens. Preview lists the fields that would change and writes nothing. Apply asks you to type APPLY. A shop-wide run also asks you to type GLOBAL. Removals also ask you to type DELETE. Apply is refused above 200 changes. The backup is taken before Apply and can roll back rows that still match what Apply wrote, including a partial Apply. Tools marked no rollback are not in the backup list."
-msgstr "Reparaturen bleiben auf den gewöhnlichen Produktseiten aus. Die Vorschau listet die Felder, die sich ändern würden, und schreibt nichts. Anwenden verlangt, dass Sie APPLY eingeben. Ein shopweiter Lauf verlangt zusätzlich GLOBAL. Entfernungen verlangen zusätzlich DELETE. Anwenden wird abgelehnt, sobald mehr als 200 Änderungen vorliegen. Die Sicherung wird vor Anwenden erstellt und kann Zeilen zurücksetzen, die noch dem entsprechen, was Anwenden geschrieben hat, einschließlich eines teilweisen Anwendens. Werkzeuge ohne Zurücksetzen stehen nicht in der Sicherungsliste."
+msgstr ""
 
 msgid "Preview rows"
-msgstr "Vorschauzeilen"
+msgstr ""
 
 msgid "ID"
-msgstr "ID"
+msgstr ""
 
 msgid "Before"
-msgstr "Vorher"
+msgstr ""
 
 msgid "After"
-msgstr "Nachher"
+msgstr ""
 
 msgid "Run log"
-msgstr "Ausführungsprotokoll"
+msgstr ""
 
 msgid "No repair runs yet."
-msgstr "Noch keine Reparaturläufe."
+msgstr ""
 
 msgid "When"
-msgstr "Wann"
+msgstr ""
 
 msgid "User"
-msgstr "Benutzer"
+msgstr ""
 
 msgid "Tool"
-msgstr "Werkzeug"
+msgstr ""
 
 msgid "Mode"
-msgstr "Modus"
+msgstr ""
 
 msgid "Scope"
-msgstr "Umfang"
+msgstr ""
 
 msgid "Changed"
-msgstr "Geändert"
+msgstr ""
 
 msgid "Backup"
-msgstr "Sicherung"
+msgstr ""
 
 msgid "Peak memory (MB)"
-msgstr "Speicherhöchstwert (MB)"
+msgstr ""
 
 msgid "Backups"
-msgstr "Sicherungen"
+msgstr ""
 
 msgid "File"
-msgstr "Datei"
+msgstr ""
 
 msgid "APPLY"
-msgstr "APPLY"
+msgstr ""
 
 msgid "Rollback"
-msgstr "Zurücksetzen"
+msgstr ""
 
 msgid "You do not have permission to run repairs."
-msgstr "Sie haben keine Berechtigung, Reparaturen auszuführen."
+msgstr ""
 
 msgid "Run Preview before Apply."
-msgstr "Führen Sie die Vorschau vor Anwenden aus."
+msgstr ""
 
 msgid "This scope is shop-wide. Type GLOBAL as well as APPLY."
-msgstr "Dieser Umfang gilt für den ganzen Shop. Geben Sie GLOBAL sowie APPLY ein."
+msgstr ""
 
 msgid "Preview removes metadata. Type DELETE to confirm those removals."
-msgstr "Die Vorschau entfernt Metadaten. Geben Sie DELETE ein, um diese Entfernungen zu bestätigen."
+msgstr ""
 
 msgid "Preview has no changes. Apply was not run."
-msgstr "Die Vorschau enthält keine Änderungen. Anwenden wurde nicht ausgeführt."
+msgstr ""
 
 msgid "This repair runs only from Advanced tools."
-msgstr "Diese Reparatur läuft nur über die erweiterten Werkzeuge."
+msgstr ""
 
 msgid "Late pick up was enabled on %d variation(s)."
-msgstr "Die Spätabholung wurde für %d Variante(n) aktiviert."
+msgstr ""
 
 msgid "Reason: %s"
-msgstr "Grund: %s"
+msgstr ""
 
 msgid "Backup directory does not exist."
-msgstr "Das Sicherungsverzeichnis existiert nicht."
+msgstr ""
 
 msgid ""
 "Apply was aborted because translation records changed. All writes were "
 "undone."
 msgstr ""
-"Die Anwendung wurde abgebrochen, weil sich die Übersetzungsdatensätze "
-"geändert haben. Alle Schreibvorgänge wurden rückgängig gemacht."
 
 msgid ""
 "Apply was aborted because translation records changed. Writes that could be "
 "rolled back were undone; conflicting rows were left as they are."
 msgstr ""
-"Die Anwendung wurde abgebrochen, weil sich die Übersetzungsdatensätze "
-"geändert haben. Schreibvorgänge, die zurückgesetzt werden konnten, wurden "
-"rückgängig gemacht; widersprüchliche Zeilen wurden unverändert belassen."
 
