@@ -661,6 +661,36 @@ if (!function_exists('get_post_meta')) {
                     $out[$meta_key] = is_array($meta_value) ? $meta_value : [$meta_value];
                 }
             }
+            if (!empty($GLOBALS['intersoccer_test_wcml_filter_all_meta'])) {
+                $lang = (string) ($GLOBALS['intersoccer_test_wpml_current_language'] ?? '');
+                if ($lang !== '' && $lang !== 'all' && !empty($GLOBALS['intersoccer_test_term_translations']) && is_array($GLOBALS['intersoccer_test_term_translations'])) {
+                    foreach ($out as $meta_key => $meta_value) {
+                        $meta_key = (string) $meta_key;
+                        if (strpos($meta_key, 'attribute_') !== 0) {
+                            continue;
+                        }
+                        $taxonomy = substr($meta_key, 10);
+                        $slug = is_array($meta_value) ? (string) ($meta_value[0] ?? '') : (string) $meta_value;
+                        if ($slug === '' || empty($GLOBALS['intersoccer_test_term_translations'][$taxonomy])) {
+                            continue;
+                        }
+                        $maps = $GLOBALS['intersoccer_test_term_translations'][$taxonomy];
+                        if (isset($maps[$slug][$lang]) && $maps[$slug][$lang]) {
+                            $out[$meta_key] = [(string) $maps[$slug][$lang]];
+                            continue;
+                        }
+                        foreach ($maps as $source_slug => $map) {
+                            if (!is_array($map)) {
+                                continue;
+                            }
+                            if (in_array($slug, $map, true) && !empty($map[$lang])) {
+                                $out[$meta_key] = [(string) $map[$lang]];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             return $out;
         }
         if (class_exists('CourseInfoMockData') && isset(CourseInfoMockData::$post_meta[$post_id][$key])) {

@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 require_once __DIR__ . '/repair-contract.php';
+require_once __DIR__ . '/advanced-tools-venue-repair.php';
 
 if (!function_exists('intersoccer_pv_advanced_tools_definitions')) {
 	/**
@@ -1005,17 +1006,8 @@ if (!function_exists('intersoccer_pv_repair_with_raw_wpml')) {
 	function intersoccer_pv_repair_with_raw_wpml($callback) {
 		$previous = null;
 		$switched = false;
-		$can_switch = function_exists('do_action') && (
-			defined('ICL_SITEPRESS_VERSION')
-			|| function_exists('icl_get_current_language')
-			|| (function_exists('has_filter') && has_filter('wpml_current_language'))
-			|| (function_exists('has_action') && has_action('wpml_switch_language'))
-		);
-		if ($can_switch) {
-			$previous = function_exists('apply_filters') ? apply_filters('wpml_current_language', null) : null;
-			do_action('wpml_switch_language', 'all');
-			$switched = true;
-		}
+		// Do not switch the admin language: a later product save would write
+		// that language into icl_translations. Reads use raw SQL / single-key meta.
 		$prev_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] ?? null;
 		$GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
 		try {
@@ -1025,9 +1017,6 @@ if (!function_exists('intersoccer_pv_repair_with_raw_wpml')) {
 				unset($GLOBALS['intersoccer_test_wpml_suppress_term_filters']);
 			} else {
 				$GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prev_suppress;
-			}
-			if ($switched) {
-				do_action('wpml_switch_language', $previous === null || $previous === '' ? 'all' : $previous);
 			}
 		}
 	}
@@ -1043,20 +1032,25 @@ if (!function_exists('intersoccer_pv_repair_raw_variation_attributes')) {
 	function intersoccer_pv_repair_raw_variation_attributes($variation_id) {
 		$variation_id = (int) $variation_id;
 		$attrs = [];
-		if ($variation_id <= 0 || !function_exists('get_post_meta')) {
+		if ($variation_id <= 0) {
 			return $attrs;
 		}
-		$all = get_post_meta($variation_id);
-		if (!is_array($all)) {
-			return $attrs;
-		}
-		foreach ($all as $key => $values) {
-			$key = (string) $key;
-			if (strpos($key, 'attribute_') !== 0) {
-				continue;
+		// Fallback only: the language-safe implementation in
+		// advanced-tools-venue-repair.php is loaded first. Never call
+		// get_post_meta($id) with no key; WCML filters that by admin language.
+		$known = ['attribute_pa_camp-terms', 'attribute_pa_intersoccer-venues', 'attribute_pa_camp-times', 'attribute_pa_age-group', 'attribute_pa_booking-type', 'attribute_pa_course-times'];
+		foreach ($known as $key) {
+			if (function_exists('intersoccer_pv_repair_raw_post_meta')) {
+				$value = intersoccer_pv_repair_raw_post_meta($variation_id, $key);
+			} elseif (function_exists('get_post_meta')) {
+				$value = get_post_meta($variation_id, $key, true);
+			} else {
+				$value = '';
 			}
-			$value = is_array($values) ? ($values[0] ?? '') : $values;
-			$attrs[substr($key, 10)] = is_array($value) ? '' : (string) $value;
+			if (is_array($value)) {
+				$value = (string) ($value[0] ?? '');
+			}
+			$attrs[substr($key, 10)] = (string) $value;
 		}
 		ksort($attrs);
 		return $attrs;
@@ -1106,6 +1100,9 @@ if (!function_exists('intersoccer_pv_facet_term_records')) {
 	function intersoccer_pv_facet_term_records($object_id, $taxonomy) {
 		$object_id = (int) $object_id;
 		$taxonomy = (string) $taxonomy;
+		if (function_exists('intersoccer_pv_repair_raw_term_records')) {
+			return intersoccer_pv_repair_raw_term_records($object_id, $taxonomy);
+		}
 		$reader = static function () use ($object_id, $taxonomy) {
 			$found = [];
 			if (function_exists('wp_get_object_terms')) {
@@ -1468,9 +1465,6 @@ if (!function_exists('intersoccer_pv_repair_restore_value')) {
 					$current[$key] = $value;
 				}
 				$product->set_attributes($current);
-				if (method_exists($product, 'save')) {
-					$product->save();
-				}
 			}
 			intersoccer_pv_repair_restore_facet_side($variation_id, $before);
 		}
@@ -1503,11 +1497,15 @@ if (!function_exists('intersoccer_pv_repair_restore_object_terms')) {
 			}
 			$id_list = isset($ids[$taxonomy]) && is_array($ids[$taxonomy]) ? array_values(array_map('intval', $ids[$taxonomy])) : [];
 			$id_list = array_values(array_filter($id_list));
+			$slug_list = isset($slugs[$taxonomy]) && is_array($slugs[$taxonomy]) ? array_values($slugs[$taxonomy]) : [];
+			if (function_exists('intersoccer_pv_repair_write_object_terms')) {
+				intersoccer_pv_repair_write_object_terms($object_id, $taxonomy, $id_list, $slug_list);
+				continue;
+			}
 			if ($id_list !== []) {
 				wp_set_object_terms($object_id, $id_list, $taxonomy);
 				continue;
 			}
-			$slug_list = isset($slugs[$taxonomy]) && is_array($slugs[$taxonomy]) ? array_values($slugs[$taxonomy]) : [];
 			wp_set_object_terms($object_id, $slug_list, $taxonomy);
 		}
 	}
@@ -1551,9 +1549,6 @@ if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 						$current[$key] = $value;
 					}
 					$twin_product->set_attributes($current);
-					if (method_exists($twin_product, 'save')) {
-						$twin_product->save();
-					}
 				}
 			}
 			if (isset($twin['meta']) && is_array($twin['meta']) && function_exists('update_post_meta')) {
@@ -1591,8 +1586,9 @@ if (!function_exists('intersoccer_pv_repair_restore_parent_attr')) {
 			$attributes[$taxonomy]->set_variation(!empty($before['is_variation']));
 		}
 		$product->set_attributes($attributes);
-		if (method_exists($product, 'save')) {
-			$product->save();
+		if (function_exists('intersoccer_pv_venue_write_parent_attr')) {
+			intersoccer_pv_venue_write_parent_attr($product_id, $taxonomy, $before);
+			return;
 		}
 		$slugs = isset($before['slugs']) && is_array($before['slugs']) ? array_values(array_map('strval', $before['slugs'])) : [];
 		if ($slugs !== [] && function_exists('wp_set_object_terms')) {
@@ -1717,8 +1713,27 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 			];
 		}
 		$backup = intersoccer_pv_repair_write_backup($tool, $user_id, $again['rows']);
+		$icl_before = null;
+		if ($tool === 'repair_venue' && function_exists('intersoccer_pv_repair_icl_snapshot') && function_exists('intersoccer_pv_repair_element_ids_from_rows')) {
+			$icl_before = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($again['rows']));
+		}
 		try {
 			$applied = intersoccer_pv_advanced_tools_execute($tool, false, $scope);
+			if ($icl_before !== null && function_exists('intersoccer_pv_repair_icl_snapshot')) {
+				$icl_after = intersoccer_pv_repair_icl_snapshot(intersoccer_pv_repair_element_ids_from_rows($again['rows']));
+				if ($icl_after !== $icl_before) {
+					if (function_exists('intersoccer_pv_repair_rollback_rows')) {
+						$payload = function_exists('intersoccer_pv_repair_read_backup') ? intersoccer_pv_repair_read_backup($backup) : ['rows' => $again['rows']];
+						if (is_array($payload)) {
+							intersoccer_pv_repair_rollback_rows($payload, 'intersoccer_pv_repair_read_value', 'intersoccer_pv_repair_restore_value');
+						}
+					}
+					if (function_exists('intersoccer_pv_repair_icl_restore')) {
+						intersoccer_pv_repair_icl_restore($icl_before);
+					}
+					throw new RuntimeException(__('Apply was aborted because translation records changed. All writes were undone.', 'intersoccer-product-variations'));
+				}
+			}
 		} catch (Throwable $e) {
 			$reason = trim((string) $e->getMessage());
 			$note = 'partial';

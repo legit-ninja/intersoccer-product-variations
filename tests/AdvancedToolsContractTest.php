@@ -105,6 +105,9 @@ class AdvancedToolsContractTest extends TestCase {
 			$GLOBALS['intersoccer_test_product_term_ids'],
 			$GLOBALS['intersoccer_test_term_translations'],
 			$GLOBALS['intersoccer_test_term_translation_ids'],
+			$GLOBALS['intersoccer_test_icl_translations'],
+			$GLOBALS['intersoccer_test_icl_term_translations'],
+			$GLOBALS['intersoccer_test_wcml_filter_all_meta'],
 			$GLOBALS['intersoccer_pv_test_interrupt_after'],
 			$GLOBALS['intersoccer_pv_test_redirect'],
 			$GLOBALS['intersoccer_pv_test_roles'],
@@ -169,6 +172,30 @@ class AdvancedToolsContractTest extends TestCase {
 				'wrote' => !$dry_run,
 			];
 		};
+	}
+
+	private function seedIclGroup(int $en_parent, int $en_variation, int $fr_variation, array $term_pairs = [], string $twin_lang = 'fr'): void {
+		$GLOBALS['intersoccer_test_icl_translations'] = [
+			['translation_id' => 1, 'element_type' => 'post_product', 'element_id' => $en_parent, 'trid' => 1000, 'language_code' => 'en', 'source_language_code' => ''],
+			['translation_id' => 2, 'element_type' => 'post_product_variation', 'element_id' => $en_variation, 'trid' => 1001, 'language_code' => 'en', 'source_language_code' => ''],
+			['translation_id' => 3, 'element_type' => 'post_product_variation', 'element_id' => $fr_variation, 'trid' => 1001, 'language_code' => $twin_lang, 'source_language_code' => 'en'],
+		];
+		$term_rows = [];
+		$trid = 2000;
+		foreach ($term_pairs as $pair) {
+			$taxonomy = (string) ($pair['taxonomy'] ?? '');
+			$en_id = (int) ($pair['en'] ?? 0);
+			$fr_id = (int) ($pair['fr'] ?? 0);
+			if ($taxonomy === '' || $en_id <= 0) {
+				continue;
+			}
+			$term_rows[] = ['taxonomy' => $taxonomy, 'term_id' => $en_id, 'language_code' => 'en', 'trid' => $trid];
+			if ($fr_id > 0) {
+				$term_rows[] = ['taxonomy' => $taxonomy, 'term_id' => $fr_id, 'language_code' => 'fr', 'trid' => $trid];
+			}
+			$trid++;
+		}
+		$GLOBALS['intersoccer_test_icl_term_translations'] = $term_rows;
 	}
 
 	private function postTool(string $mode, array $extra = []): array {
@@ -1130,6 +1157,7 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][882] = $twin;
+		$this->seedIclGroup(880, 881, 882);
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1303,6 +1331,7 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][882] = $twin;
+		$this->seedIclGroup(880, 881, 882, [['taxonomy' => 'pa_intersoccer-venues', 'en' => 8801, 'fr' => 8803], ['taxonomy' => 'pa_camp-terms', 'en' => 8802, 'fr' => 8804]]);
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1434,6 +1463,7 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][882] = $twin;
+		$this->seedIclGroup(880, 881, 882, [['taxonomy' => 'pa_intersoccer-venues', 'en' => 8801], ['taxonomy' => 'pa_camp-terms', 'en' => 8802, 'fr' => 8804]], 'all');
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1580,6 +1610,7 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][982] = $twin;
+		$this->seedIclGroup(980, 981, 982, [['taxonomy' => 'pa_intersoccer-venues', 'en' => 350, 'fr' => 359], ['taxonomy' => 'pa_camp-terms', 'en' => 997, 'fr' => 1022]]);
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1713,6 +1744,7 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][982] = $twin;
+		$this->seedIclGroup(980, 981, 982, [['taxonomy' => 'pa_camp-terms', 'en' => 997, 'fr' => 1022]]);
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1842,8 +1874,10 @@ PHP
 			'pa_camp-terms' => '',
 		];
 		$GLOBALS['intersoccer_test_products'][982] = $twin;
+		$this->seedIclGroup(980, 981, 982, [['taxonomy' => 'pa_intersoccer-venues', 'en' => 350, 'fr' => 359], ['taxonomy' => 'pa_camp-terms', 'en' => 997, 'fr' => 1022]]);
 		$admin_lang = 'en';
 		$GLOBALS['intersoccer_test_wpml_current_language'] = $admin_lang;
+		$GLOBALS['intersoccer_test_wcml_filter_all_meta'] = true;
 		MockFilters::$filters['wpml_active_languages'] = static function () {
 			return ['en' => [], 'fr' => []];
 		};
@@ -1884,6 +1918,7 @@ PHP
 			$GLOBALS['intersoccer_test_product_term_ids'][981] = [];
 			$GLOBALS['intersoccer_test_product_term_ids'][982] = [];
 			intersoccer_pv_repair_reset_state();
+			$icl_before = intersoccer_pv_repair_icl_snapshot([980, 981, 982]);
 
 			$preview = $this->postTool('preview', [
 				'intersoccer_pv_repair_tool' => 'repair_venue',
@@ -1897,6 +1932,12 @@ PHP
 			]);
 			$this->assertSame('success', $applied['type'], $lang . ': ' . ($applied['message'] ?? ''));
 			$this->assertSame('nyon-fr', (string) get_post_meta(982, 'attribute_pa_intersoccer-venues', true));
+			$this->assertSame('nyon', (string) get_post_meta(981, 'attribute_pa_intersoccer-venues', true), $lang);
+			$this->assertSame([359], array_values(array_map('intval', (array) ($GLOBALS['intersoccer_test_product_term_ids'][982]['pa_intersoccer-venues'] ?? []))), $lang);
+			$this->assertSame([350], array_values(array_map('intval', (array) ($GLOBALS['intersoccer_test_product_term_ids'][981]['pa_intersoccer-venues'] ?? []))), $lang);
+			$this->assertSame([1022], array_values(array_map('intval', (array) ($GLOBALS['intersoccer_test_product_term_ids'][982]['pa_camp-terms'] ?? []))), $lang);
+			$this->assertSame([997], array_values(array_map('intval', (array) ($GLOBALS['intersoccer_test_product_term_ids'][981]['pa_camp-terms'] ?? []))), $lang);
+			$this->assertSame($icl_before, intersoccer_pv_repair_icl_snapshot([980, 981, 982]), $lang . ' icl after apply');
 			// Simulate WCML filtering get_attributes() to the EN slug while raw meta stays FR.
 			$twin->attrs['pa_intersoccer-venues'] = 'nyon';
 			$twin->attrs['pa_camp-terms'] = $camp_slug;
@@ -1913,6 +1954,8 @@ PHP
 			$parent->attributes = [];
 			$this->assertSame('', (string) get_post_meta(982, 'attribute_pa_intersoccer-venues', true), $lang);
 			$this->assertSame('', $twin->attrs['pa_intersoccer-venues'], $lang);
+			$this->assertSame('', (string) get_post_meta(981, 'attribute_pa_intersoccer-venues', true), $lang);
+			$this->assertSame($icl_before, intersoccer_pv_repair_icl_snapshot([980, 981, 982]), $lang . ' icl after rollback');
 		}
 	}
 
