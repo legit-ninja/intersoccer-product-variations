@@ -76,7 +76,7 @@ msgstr ""
 
 # wpml-name: bbb6d0bc761a2f032a30a03aa30166a4
 msgid "Refresh Attributes"
-msgstr ""
+msgstr "Attribute aktualisieren"
 
 # wpml-name: fbcf0d1f787c74663ca9dc925ebf5f0c
 msgid "Health Status"
@@ -92,7 +92,7 @@ msgstr ""
 
 # wpml-name: 97f08a40f22a625d0cbfe03db3349108
 msgid "Product ID"
-msgstr ""
+msgstr "Produkt-ID"
 
 # wpml-name: 8052057babac105e7e98556c65ef7361
 msgid "Export Analysis to CSV"
