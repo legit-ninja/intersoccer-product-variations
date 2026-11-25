@@ -994,6 +994,156 @@ if (!function_exists('intersoccer_pv_tool_automated_batch')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_with_raw_wpml')) {
+	/**
+	 * Run a callback with WPML/WCML language filters off (admin language "all")
+	 * so reads see the stored term and meta, not a translated view.
+	 *
+	 * @param callable $callback Callback.
+	 * @return mixed
+	 */
+	function intersoccer_pv_repair_with_raw_wpml($callback) {
+		$previous = null;
+		$switched = false;
+		$can_switch = function_exists('do_action') && (
+			defined('ICL_SITEPRESS_VERSION')
+			|| function_exists('icl_get_current_language')
+			|| (function_exists('has_filter') && has_filter('wpml_current_language'))
+			|| (function_exists('has_action') && has_action('wpml_switch_language'))
+		);
+		if ($can_switch) {
+			$previous = function_exists('apply_filters') ? apply_filters('wpml_current_language', null) : null;
+			do_action('wpml_switch_language', 'all');
+			$switched = true;
+		}
+		$prev_suppress = $GLOBALS['intersoccer_test_wpml_suppress_term_filters'] ?? null;
+		$GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = true;
+		try {
+			return $callback();
+		} finally {
+			if ($prev_suppress === null) {
+				unset($GLOBALS['intersoccer_test_wpml_suppress_term_filters']);
+			} else {
+				$GLOBALS['intersoccer_test_wpml_suppress_term_filters'] = $prev_suppress;
+			}
+			if ($switched) {
+				do_action('wpml_switch_language', $previous === null || $previous === '' ? 'all' : $previous);
+			}
+		}
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_raw_variation_attributes')) {
+	/**
+	 * Variation attribute values from post meta, without WCML language filtering.
+	 *
+	 * @param int $variation_id Variation ID.
+	 * @return array<string,string>
+	 */
+	function intersoccer_pv_repair_raw_variation_attributes($variation_id) {
+		$variation_id = (int) $variation_id;
+		$attrs = [];
+		if ($variation_id <= 0 || !function_exists('get_post_meta')) {
+			return $attrs;
+		}
+		$all = get_post_meta($variation_id);
+		if (!is_array($all)) {
+			return $attrs;
+		}
+		foreach ($all as $key => $values) {
+			$key = (string) $key;
+			if (strpos($key, 'attribute_') !== 0) {
+				continue;
+			}
+			$value = is_array($values) ? ($values[0] ?? '') : $values;
+			$attrs[substr($key, 10)] = is_array($value) ? '' : (string) $value;
+		}
+		ksort($attrs);
+		return $attrs;
+	}
+}
+
+if (!function_exists('intersoccer_pv_repair_set_object_term')) {
+	/**
+	 * Attach exactly one taxonomy term, identified by term ID when known.
+	 *
+	 * @param int    $object_id Object ID.
+	 * @param string $taxonomy  Taxonomy.
+	 * @param int    $term_id   Term ID, or 0 to use the slug.
+	 * @param string $slug      Fallback slug when no term ID is available.
+	 * @return void
+	 */
+	function intersoccer_pv_repair_set_object_term($object_id, $taxonomy, $term_id, $slug = '') {
+		if (!function_exists('wp_set_object_terms')) {
+			return;
+		}
+		$object_id = (int) $object_id;
+		$taxonomy = (string) $taxonomy;
+		$term_id = (int) $term_id;
+		if ($object_id <= 0 || $taxonomy === '') {
+			return;
+		}
+		if ($term_id > 0) {
+			wp_set_object_terms($object_id, [$term_id], $taxonomy);
+			return;
+		}
+		if ($slug !== '') {
+			wp_set_object_terms($object_id, [$slug], $taxonomy);
+			return;
+		}
+		wp_set_object_terms($object_id, [], $taxonomy);
+	}
+}
+
+if (!function_exists('intersoccer_pv_facet_term_records')) {
+	/**
+	 * Object terms as stored, with term IDs, and WPML term filters suppressed.
+	 *
+	 * @param int    $object_id Object ID.
+	 * @param string $taxonomy  Taxonomy.
+	 * @return array{slugs:string[],ids:int[]}
+	 */
+	function intersoccer_pv_facet_term_records($object_id, $taxonomy) {
+		$object_id = (int) $object_id;
+		$taxonomy = (string) $taxonomy;
+		$reader = static function () use ($object_id, $taxonomy) {
+			$found = [];
+			if (function_exists('wp_get_object_terms')) {
+				$found = wp_get_object_terms($object_id, $taxonomy, ['fields' => 'all']);
+			} elseif (function_exists('wc_get_product_terms')) {
+				$found = wc_get_product_terms($object_id, $taxonomy, ['fields' => 'all']);
+			}
+			if ((function_exists('is_wp_error') && is_wp_error($found)) || !is_array($found)) {
+				$found = [];
+			}
+			$slugs = [];
+			$ids = [];
+			foreach ($found as $term) {
+				if (is_object($term) && !empty($term->term_id)) {
+					$ids[] = (int) $term->term_id;
+					if (!empty($term->slug)) {
+						$slugs[] = (string) $term->slug;
+					}
+				} elseif (is_numeric($term)) {
+					$ids[] = (int) $term;
+				} elseif (is_string($term) && $term !== '') {
+					$slugs[] = $term;
+				}
+			}
+			$ids = array_values(array_unique(array_filter($ids)));
+			sort($ids);
+			$slugs = array_values(array_unique(array_filter($slugs, static function ($slug) {
+				return $slug !== '';
+			})));
+			sort($slugs);
+			return ['slugs' => $slugs, 'ids' => $ids];
+		};
+		return function_exists('intersoccer_pv_repair_with_raw_wpml')
+			? intersoccer_pv_repair_with_raw_wpml($reader)
+			: $reader();
+	}
+}
+
 if (!function_exists('intersoccer_pv_facet_term_slugs')) {
 	/**
 	 * @param int    $object_id Object ID.
@@ -1001,22 +1151,8 @@ if (!function_exists('intersoccer_pv_facet_term_slugs')) {
 	 * @return string[]
 	 */
 	function intersoccer_pv_facet_term_slugs($object_id, $taxonomy) {
-		$object_id = (int) $object_id;
-		$taxonomy = (string) $taxonomy;
-		$found = [];
-		if (function_exists('wp_get_object_terms')) {
-			$found = wp_get_object_terms($object_id, $taxonomy, ['fields' => 'slugs']);
-		} elseif (function_exists('wc_get_product_terms')) {
-			$found = wc_get_product_terms($object_id, $taxonomy, ['fields' => 'slugs']);
-		}
-		if (is_wp_error($found) || !is_array($found)) {
-			$found = [];
-		}
-		$slugs = array_values(array_unique(array_filter(array_map('strval', $found), static function ($slug) {
-			return $slug !== '';
-		})));
-		sort($slugs);
-		return $slugs;
+		$records = intersoccer_pv_facet_term_records($object_id, $taxonomy);
+		return $records['slugs'];
 	}
 }
 
@@ -1031,6 +1167,7 @@ if (!function_exists('intersoccer_pv_facet_side_snapshot')) {
 	function intersoccer_pv_facet_side_snapshot($variation_id, array $taxonomies) {
 		$meta = [];
 		$terms = [];
+		$term_ids = [];
 		foreach ($taxonomies as $taxonomy) {
 			$taxonomy = (string) $taxonomy;
 			if ($taxonomy === '') {
@@ -1038,11 +1175,14 @@ if (!function_exists('intersoccer_pv_facet_side_snapshot')) {
 			}
 			$meta_key = 'attribute_' . $taxonomy;
 			$meta[$meta_key] = function_exists('get_post_meta') ? (string) get_post_meta((int) $variation_id, $meta_key, true) : '';
-			$terms[$taxonomy] = intersoccer_pv_facet_term_slugs((int) $variation_id, $taxonomy);
+			$records = intersoccer_pv_facet_term_records((int) $variation_id, $taxonomy);
+			$terms[$taxonomy] = $records['slugs'];
+			$term_ids[$taxonomy] = $records['ids'];
 		}
 		ksort($meta);
 		ksort($terms);
-		return ['meta' => $meta, 'terms' => $terms];
+		ksort($term_ids);
+		return ['meta' => $meta, 'terms' => $terms, 'term_ids' => $term_ids];
 	}
 }
 
@@ -1071,6 +1211,14 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 		foreach ($written as $taxonomy => $slug) {
 			$after['meta']['attribute_' . $taxonomy] = $slug;
 			$after['terms'][$taxonomy] = [$slug];
+			$source_id = 0;
+			if (function_exists('get_term_by')) {
+				$source_term = get_term_by('slug', $slug, $taxonomy);
+				if ($source_term && !(function_exists('is_wp_error') && is_wp_error($source_term)) && !empty($source_term->term_id)) {
+					$source_id = (int) $source_term->term_id;
+				}
+			}
+			$after['term_ids'][$taxonomy] = $source_id > 0 ? [$source_id] : [];
 		}
 		$before_twins = [];
 		$after_twins = [];
@@ -1083,21 +1231,27 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 				}
 				$key = (string) $tid;
 				$snap = intersoccer_pv_facet_side_snapshot($tid, $taxes);
-				$product = function_exists('wc_get_product') ? wc_get_product($tid) : null;
-				$attrs = ($product && method_exists($product, 'get_attributes')) ? $product->get_attributes() : [];
-				if (!is_array($attrs)) {
-					$attrs = [];
-				}
+				$raw_attrs = function_exists('intersoccer_pv_repair_raw_variation_attributes')
+					? intersoccer_pv_repair_raw_variation_attributes($tid)
+					: [];
 				$attr_before = [];
 				$attr_after = [];
 				$after_meta = $snap['meta'];
 				$after_terms = $snap['terms'];
+				$after_term_ids = $snap['term_ids'] ?? [];
 				$manual = [];
 				foreach ($written as $taxonomy => $slug) {
-					$attr_before[$taxonomy] = isset($attrs[$taxonomy]) ? (string) $attrs[$taxonomy] : '';
+					$attr_before[$taxonomy] = (string) ($raw_attrs[$taxonomy] ?? '');
 					$mapped = $slug;
-					if ($slug !== '' && function_exists('intersoccer_translated_taxonomy_term_slug')) {
-						$mapped = intersoccer_translated_taxonomy_term_slug($slug, $taxonomy, $tid);
+					$mapped_id = 0;
+					if ($slug !== '' && function_exists('intersoccer_translated_taxonomy_term')) {
+						$resolved = intersoccer_translated_taxonomy_term($slug, $taxonomy, $tid);
+						if ($resolved === null) {
+							$mapped = null;
+						} else {
+							$mapped = (string) $resolved['slug'];
+							$mapped_id = (int) $resolved['term_id'];
+						}
 					}
 					if ($mapped === null) {
 						$manual[] = $taxonomy;
@@ -1107,6 +1261,7 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 					$attr_after[$taxonomy] = $mapped;
 					$after_meta['attribute_' . $taxonomy] = $mapped;
 					$after_terms[$taxonomy] = $mapped === '' ? [] : [$mapped];
+					$after_term_ids[$taxonomy] = $mapped_id > 0 ? [$mapped_id] : [];
 				}
 				ksort($attr_before);
 				ksort($attr_after);
@@ -1114,11 +1269,13 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 					'attributes' => $attr_before,
 					'meta' => $snap['meta'],
 					'terms' => $snap['terms'],
+					'term_ids' => $snap['term_ids'] ?? [],
 				];
 				$after_twins[$key] = [
 					'attributes' => $attr_after,
 					'meta' => $after_meta,
 					'terms' => $after_terms,
+					'term_ids' => $after_term_ids,
 				];
 				foreach ($manual as $taxonomy) {
 					$needs_manual_rows[] = [
@@ -1135,11 +1292,13 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 			'before' => [
 				'meta' => $before['meta'],
 				'terms' => $before['terms'],
+				'term_ids' => $before['term_ids'] ?? [],
 				'translations' => $before_twins,
 			],
 			'after' => [
 				'meta' => $after['meta'],
 				'terms' => $after['terms'],
+				'term_ids' => $after['term_ids'] ?? [],
 				'translations' => $after_twins,
 			],
 			'needs_manual' => $needs_manual_rows,
@@ -1165,24 +1324,19 @@ if (!function_exists('intersoccer_pv_facet_translation_state')) {
 			if ($tid <= 0) {
 				continue;
 			}
-			$product = function_exists('wc_get_product') ? wc_get_product($tid) : null;
-			$attrs = ($product && method_exists($product, 'get_attributes')) ? $product->get_attributes() : [];
-			if (!is_array($attrs)) {
-				$attrs = [];
-			}
+			$raw_attrs = function_exists('intersoccer_pv_repair_raw_variation_attributes')
+				? intersoccer_pv_repair_raw_variation_attributes($tid)
+				: [];
 			$subset = [];
 			foreach ($taxes as $taxonomy) {
-				if (array_key_exists($taxonomy, $attrs)) {
-					$subset[$taxonomy] = (string) $attrs[$taxonomy];
-				} else {
-					$subset[$taxonomy] = '';
-				}
+				$subset[$taxonomy] = (string) ($raw_attrs[$taxonomy] ?? '');
 			}
 			$snap = intersoccer_pv_facet_side_snapshot($tid, $taxes);
 			$translations[(string) $tid] = [
 				'attributes' => $subset,
 				'meta' => $snap['meta'],
 				'terms' => $snap['terms'],
+				'term_ids' => $snap['term_ids'] ?? [],
 			];
 		}
 		ksort($translations);
@@ -1227,22 +1381,28 @@ if (!function_exists('intersoccer_pv_repair_read_value')) {
 			$parts = explode(':', $rest, 2);
 			return InterSoccer_Program_Manager::parent_taxonomy_attribute_snapshot((int) ($parts[0] ?? 0), (string) ($parts[1] ?? ''));
 		}
-		if (strpos($id, 'attrs:') === 0 && function_exists('wc_get_product')) {
-			$variation_id = (int) substr($id, 6);
-			$product = wc_get_product($variation_id);
-			$attributes = ($product && method_exists($product, 'get_attributes')) ? $product->get_attributes() : [];
-			if (!is_array($attributes)) {
-				$attributes = [];
+		if (strpos($id, 'attrs:') === 0) {
+				$variation_id = (int) substr($id, 6);
+				$taxes = ['pa_camp-terms', 'pa_intersoccer-venues'];
+				$snap = intersoccer_pv_facet_side_snapshot($variation_id, $taxes);
+				$attributes = function_exists('intersoccer_pv_repair_raw_variation_attributes')
+					? intersoccer_pv_repair_raw_variation_attributes($variation_id)
+					: [];
+				if ($attributes === [] && function_exists('wc_get_product')) {
+					$product = wc_get_product($variation_id);
+					$attributes = ($product && method_exists($product, 'get_attributes')) ? $product->get_attributes() : [];
+					if (!is_array($attributes)) {
+						$attributes = [];
+					}
+				}
+				return [
+					'attributes' => $attributes,
+					'meta' => $snap['meta'],
+					'terms' => $snap['terms'],
+					'term_ids' => $snap['term_ids'] ?? [],
+					'translations' => intersoccer_pv_facet_translation_state($variation_id),
+				];
 			}
-			$taxes = ['pa_camp-terms', 'pa_intersoccer-venues'];
-			$snap = intersoccer_pv_facet_side_snapshot($variation_id, $taxes);
-			return [
-				'attributes' => $attributes,
-				'meta' => $snap['meta'],
-				'terms' => $snap['terms'],
-				'translations' => intersoccer_pv_facet_translation_state($variation_id),
-			];
-		}
 		return null;
 	}
 }
@@ -1317,6 +1477,42 @@ if (!function_exists('intersoccer_pv_repair_restore_value')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_restore_object_terms')) {
+	/**
+	 * Restore taxonomy relationships by term ID when the snapshot has IDs.
+	 *
+	 * @param int   $object_id Object ID.
+	 * @param array $state     Snapshot with optional term_ids and terms.
+	 * @return void
+	 */
+	function intersoccer_pv_repair_restore_object_terms($object_id, array $state) {
+		if (!function_exists('wp_set_object_terms')) {
+			return;
+		}
+		$object_id = (int) $object_id;
+		if ($object_id <= 0) {
+			return;
+		}
+		$ids = isset($state['term_ids']) && is_array($state['term_ids']) ? $state['term_ids'] : [];
+		$slugs = isset($state['terms']) && is_array($state['terms']) ? $state['terms'] : [];
+		$taxonomies = array_unique(array_merge(array_keys($ids), array_keys($slugs)));
+		foreach ($taxonomies as $taxonomy) {
+			$taxonomy = (string) $taxonomy;
+			if ($taxonomy === '') {
+				continue;
+			}
+			$id_list = isset($ids[$taxonomy]) && is_array($ids[$taxonomy]) ? array_values(array_map('intval', $ids[$taxonomy])) : [];
+			$id_list = array_values(array_filter($id_list));
+			if ($id_list !== []) {
+				wp_set_object_terms($object_id, $id_list, $taxonomy);
+				continue;
+			}
+			$slug_list = isset($slugs[$taxonomy]) && is_array($slugs[$taxonomy]) ? array_values($slugs[$taxonomy]) : [];
+			wp_set_object_terms($object_id, $slug_list, $taxonomy);
+		}
+	}
+}
+
 if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 	/**
 	 * Restore post meta, terms, and translation twins captured with a variation attribute row.
@@ -1332,11 +1528,7 @@ if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 				update_post_meta($variation_id, (string) $meta_key, $meta_value);
 			}
 		}
-		if (isset($before['terms']) && is_array($before['terms']) && function_exists('wp_set_object_terms')) {
-			foreach ($before['terms'] as $taxonomy => $slugs) {
-				wp_set_object_terms($variation_id, is_array($slugs) ? array_values($slugs) : [], (string) $taxonomy);
-			}
-		}
+		intersoccer_pv_repair_restore_object_terms($variation_id, $before);
 		if (!isset($before['translations']) || !is_array($before['translations'])) {
 			return;
 		}
@@ -1369,11 +1561,7 @@ if (!function_exists('intersoccer_pv_repair_restore_facet_side')) {
 					update_post_meta($tid, (string) $meta_key, $meta_value);
 				}
 			}
-			if (isset($twin['terms']) && is_array($twin['terms']) && function_exists('wp_set_object_terms')) {
-				foreach ($twin['terms'] as $taxonomy => $slugs) {
-					wp_set_object_terms($tid, is_array($slugs) ? array_values($slugs) : [], (string) $taxonomy);
-				}
-			}
+			intersoccer_pv_repair_restore_object_terms($tid, $twin);
 		}
 	}
 }
@@ -1874,7 +2062,7 @@ if (!function_exists('intersoccer_pv_render_repair_log')) {
 			return;
 		}
 		echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr>';
-		foreach ([__('When', 'intersoccer-product-variations'), __('User', 'intersoccer-product-variations'), __('Tool', 'intersoccer-product-variations'), __('Mode', 'intersoccer-product-variations'), __('Scope', 'intersoccer-product-variations'), __('Changed', 'intersoccer-product-variations'), __('Backup', 'intersoccer-product-variations'), __('Peak memory (MB)', 'intersoccer-product-variations')] as $heading) {
+		foreach ([__('When', 'intersoccer-product-variations'), __('User', 'intersoccer-product-variations'), __('Tool', 'intersoccer-product-variations'), __('Mode', 'intersoccer-product-variations'), __('Scope', 'intersoccer-product-variations'), __('Changed', 'intersoccer-product-variations'), __('Backup', 'intersoccer-product-variations'), __('Note', 'intersoccer-product-variations'), __('Peak memory (MB)', 'intersoccer-product-variations')] as $heading) {
 			echo '<th>' . esc_html($heading) . '</th>';
 		}
 		echo '</tr></thead><tbody>';
@@ -1888,6 +2076,7 @@ if (!function_exists('intersoccer_pv_render_repair_log')) {
 			echo '<td>' . esc_html((string) ($entry['scope'] ?? '')) . '</td>';
 			echo '<td>' . esc_html((string) (int) ($counts['changed'] ?? 0)) . '</td>';
 			echo '<td>' . esc_html((string) ($entry['backup'] ?? '')) . '</td>';
+			echo '<td>' . esc_html((string) ($entry['note'] ?? '')) . '</td>';
 			echo '<td>' . esc_html((string) ($entry['peak_memory_mb'] ?? '')) . '</td>';
 			echo '</tr>';
 		}

@@ -3582,14 +3582,32 @@ class InterSoccer_Program_Manager {
 				// Persist taxonomy attrs as post meta — WC may ignore keys not yet marked for variations.
 				if (!empty($attrs['pa_camp-terms'])) {
 					update_post_meta($var_id, 'attribute_pa_camp-terms', $attrs['pa_camp-terms']);
-					wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+					$camp_term_id = 0;
+					if (function_exists('intersoccer_translated_taxonomy_term')) {
+						$resolved = intersoccer_translated_taxonomy_term((string) $attrs['pa_camp-terms'], 'pa_camp-terms', (int) $var_id);
+						$camp_term_id = is_array($resolved) ? (int) $resolved['term_id'] : 0;
+					}
+					if (function_exists('intersoccer_pv_repair_set_object_term')) {
+						intersoccer_pv_repair_set_object_term((int) $var_id, 'pa_camp-terms', $camp_term_id, (string) $attrs['pa_camp-terms']);
+					} else {
+						wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+					}
 					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
 						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_camp-terms', (string) $attrs['pa_camp-terms']);
 					}
 				}
 				if (!empty($attrs['pa_intersoccer-venues'])) {
 					update_post_meta($var_id, 'attribute_pa_intersoccer-venues', $attrs['pa_intersoccer-venues']);
-					wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+					$venue_term_id = 0;
+					if (function_exists('intersoccer_translated_taxonomy_term')) {
+						$resolved = intersoccer_translated_taxonomy_term((string) $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues', (int) $var_id);
+						$venue_term_id = is_array($resolved) ? (int) $resolved['term_id'] : 0;
+					}
+					if (function_exists('intersoccer_pv_repair_set_object_term')) {
+						intersoccer_pv_repair_set_object_term((int) $var_id, 'pa_intersoccer-venues', $venue_term_id, (string) $attrs['pa_intersoccer-venues']);
+					} else {
+						wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+					}
 					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
 						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_intersoccer-venues', (string) $attrs['pa_intersoccer-venues']);
 					}

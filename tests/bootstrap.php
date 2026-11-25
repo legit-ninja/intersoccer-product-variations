@@ -653,7 +653,16 @@ require_once dirname(__DIR__) . '/includes/woocommerce/product-course.php';
 
 // Define basic WordPress functions that our tests need
 if (!function_exists('get_post_meta')) {
-    function get_post_meta($post_id, $key, $single = false) {
+    function get_post_meta($post_id, $key = '', $single = false) {
+        if ($key === '' || $key === null) {
+            $out = [];
+            if (class_exists('MockMetaData') && isset(MockMetaData::$data[$post_id]) && is_array(MockMetaData::$data[$post_id])) {
+                foreach (MockMetaData::$data[$post_id] as $meta_key => $meta_value) {
+                    $out[$meta_key] = is_array($meta_value) ? $meta_value : [$meta_value];
+                }
+            }
+            return $out;
+        }
         if (class_exists('CourseInfoMockData') && isset(CourseInfoMockData::$post_meta[$post_id][$key])) {
             return CourseInfoMockData::$post_meta[$post_id][$key];
         }

@@ -1447,7 +1447,7 @@ msgid "Late pick up was enabled on %d variation(s)."
 msgstr "La récupération tardive a été activée sur %d variation(s)."
 
 msgid "Reason: %s"
-msgstr "Raison: %s"
+msgstr "Raison : %s"
 
 msgid "Backup directory does not exist."
 msgstr "Le dossier de sauvegarde n'existe pas."
