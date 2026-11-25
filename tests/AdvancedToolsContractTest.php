@@ -124,7 +124,9 @@ class AdvancedToolsContractTest extends TestCase {
 			$GLOBALS['intersoccer_test_orders'],
 			$GLOBALS['intersoccer_test_wc_get_orders'],
 			$GLOBALS['intersoccer_pv_test_post_types'],
-			$GLOBALS['intersoccer_test_wp_get_post_parent_id_map']
+			$GLOBALS['intersoccer_test_wp_get_post_parent_id_map'],
+			$GLOBALS['intersoccer_pv_test_rr_active'],
+			$GLOBALS['intersoccer_pv_test_scan_queries']
 		);
 		$_POST = [];
 		$_GET = [];
@@ -167,10 +169,14 @@ class AdvancedToolsContractTest extends TestCase {
 
 	public function test_administrator_can_render_and_shop_manager_cannot(): void {
 		$_GET['tab'] = 'product-tools';
+		$GLOBALS['intersoccer_pv_test_rr_active'] = true;
 		ob_start();
 		intersoccer_pv_render_advanced_tools_page();
 		$html = ob_get_clean();
-		$this->assertStringContainsString('Advanced tools', $html);
+		$this->assertStringContainsString('InterSoccer Advanced tools: Products &amp; orders', $html);
+		$this->assertStringContainsString('InterSoccer Advanced tools: Rosters &amp; reports', $html);
+		$this->assertStringContainsString('admin.php?page=intersoccer-advanced-tools', $html);
+		unset($GLOBALS['intersoccer_pv_test_rr_active']);
 		$this->assertStringContainsString('Preview (dry run)', $html);
 		$this->assertStringContainsString('Recalculate Course End Dates', $html);
 
@@ -321,6 +327,18 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertStringNotContainsString('intersoccer-pm-apply-parsed-dates-btn', $pm);
 		$this->assertStringNotContainsString('intersoccer-pm-repair-facets-btn', $pm);
 		$this->assertStringNotContainsString("'refresh_attrs'", substr($pm, (int) strpos($pm, 'function get_bulk_actions')));
+		$ajax = substr($pm, (int) strpos($pm, 'function ajax_bulk_process_one'));
+		$ajax = substr($ajax, 0, (int) strpos($ajax, 'function process_bulk_item'));
+		$this->assertStringContainsString("=== 'refresh_attrs'", $ajax);
+		$this->assertStringContainsString('wp_send_json_error', $ajax);
+		$allowed = substr($pm, (int) strpos($pm, 'function process_bulk_item'));
+		$allowed = substr($allowed, 0, (int) strpos($allowed, 'function ' , 20));
+		$this->assertStringNotContainsString("'refresh_attrs'", $allowed);
+
+		$js = (string) file_get_contents(dirname(__DIR__) . '/js/program-manager.js');
+		$this->assertStringNotContainsString('refresh_attrs', $js);
+		$this->assertStringNotContainsString('intersoccer_run_course_holiday_fix', $js);
+		$this->assertStringNotContainsString('intersoccer-pm-course-holiday-fix-btn', $js);
 
 		$fields = (string) file_get_contents(dirname(__DIR__) . '/includes/admin-product-fields.php');
 		$handler = substr($fields, (int) strpos($fields, 'function intersoccer_handle_repair_late_pickup_admin_post'));
@@ -396,6 +414,9 @@ class AdvancedToolsContractTest extends TestCase {
 
 	public function test_uninstall_removes_cap_and_repair_options_only(): void {
 		update_option('intersoccer_pv_repair_run_log', [['tool' => 'late_pickup']]);
+		update_option('intersoccer_rr_repair_run_log', ['keep-rr']);
+		update_option('_transient_intersoccer_pv_repair_preview_1', 'drop-me');
+		update_option('_transient_intersoccer_rr_repair_preview_1', 'keep-rr-transient');
 		update_option('intersoccer_discount_rules', ['keep']);
 		$admin = new InterSoccer_Pv_Test_Role();
 		$shop = new InterSoccer_Pv_Test_Role();
@@ -411,7 +432,23 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertFalse($admin->has_cap('intersoccer_run_repairs'));
 		$this->assertFalse($shop->has_cap('intersoccer_run_repairs'));
 		$this->assertFalse(array_key_exists('intersoccer_pv_repair_run_log', $GLOBALS['intersoccer_test_options'] ?? []));
+		$this->assertFalse(array_key_exists('_transient_intersoccer_pv_repair_preview_1', $GLOBALS['intersoccer_test_options'] ?? []));
+		$this->assertSame(['keep-rr'], get_option('intersoccer_rr_repair_run_log'));
+		$this->assertSame('keep-rr-transient', get_option('_transient_intersoccer_rr_repair_preview_1'));
 		$this->assertSame(['keep'], get_option('intersoccer_discount_rules'));
+	}
+
+	public function test_uninstall_leaves_the_shared_cap_while_rosters_is_active(): void {
+		$admin = new InterSoccer_Pv_Test_Role();
+		$admin->add_cap('intersoccer_run_repairs', true);
+		$GLOBALS['intersoccer_pv_test_roles'] = ['administrator' => $admin];
+		$GLOBALS['intersoccer_pv_test_rr_active'] = true;
+		update_option('intersoccer_rr_repair_run_log', ['keep-rr']);
+		update_option('intersoccer_pv_repair_run_log', ['drop']);
+		intersoccer_pv_repair_uninstall();
+		$this->assertTrue($admin->has_cap('intersoccer_run_repairs'));
+		$this->assertSame(['keep-rr'], get_option('intersoccer_rr_repair_run_log'));
+		$this->assertFalse(array_key_exists('intersoccer_pv_repair_run_log', $GLOBALS['intersoccer_test_options'] ?? []));
 	}
 
 	public function test_delete_phrase_is_required_when_preview_removes_metadata(): void {
@@ -527,9 +564,13 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame('', MockMetaData::$data[502]['_intersoccer_enable_late_pickup']);
 	}
 
-	public function test_real_refresh_attributes_preview_matches_apply(): void {
-		$variation = new class {
-			public $attrs = ['pa_age-group' => 'full-day'];
+	public function test_real_refresh_attributes_keeps_existing_values_and_fills_empty_slots(): void {
+		$this->loadProductTypes();
+		$open = new class {
+			public $attrs = [
+				'pa_age-group' => 'full-day',
+				'pa_course-day' => '',
+			];
 			public function get_attributes() {
 				return $this->attrs;
 			}
@@ -541,47 +582,91 @@ class AdvancedToolsContractTest extends TestCase {
 			public function get_id() {
 				return 77;
 			}
+			public function is_type($type) {
+				return $type === 'variation';
+			}
 		};
-		$parent = new class($variation) {
-			private $variation;
-			public function __construct($variation) {
-				$this->variation = $variation;
+		$running = new class {
+			public $attrs = ['pa_course-day' => ''];
+			public function get_attributes() {
+				return $this->attrs;
+			}
+			public function set_attributes($attributes) {
+				$this->attrs = $attributes;
+			}
+			public function save() {
+			}
+			public function get_id() {
+				return 78;
+			}
+			public function is_type($type) {
+				return $type === 'variation';
+			}
+		};
+		$GLOBALS['intersoccer_test_products'][10] = new class($open, $running) {
+			private $open;
+			private $running;
+			public function __construct($open, $running) {
+				$this->open = $open;
+				$this->running = $running;
 			}
 			public function get_children() {
-				return [77];
+				return [77, 78];
 			}
 			public function get_attributes() {
-				return [
-					'pa_age-group' => new class {
-						public function get_variation() {
-							return true;
-						}
-						public function get_name() {
-							return 'pa_age-group';
-						}
-					},
-				];
+				return [];
 			}
 			public function is_type($type) {
 				return $type === 'variable';
 			}
+			public function get_id() {
+				return 10;
+			}
 		};
-		$GLOBALS['intersoccer_test_products'][10] = $parent;
-		$GLOBALS['intersoccer_test_products'][77] = $variation;
+		$GLOBALS['intersoccer_test_products'][77] = $open;
+		$GLOBALS['intersoccer_test_products'][78] = $running;
 		MockMetaData::$data[10]['_intersoccer_product_type'] = 'course';
+		MockMetaData::$data[77]['_course_start_date'] = '2099-09-01';
+		MockMetaData::$data[77]['_course_total_weeks'] = '';
+		MockMetaData::$data[78]['_course_start_date'] = '2000-01-03';
+		MockMetaData::$data[78]['_end_date'] = '2099-06-01';
+		unset($GLOBALS['intersoccer_test_transients']['intersoccer_type_10']);
+
 		$preview = $this->postTool('preview', [
 			'intersoccer_pv_repair_tool' => 'refresh_attributes',
 			'product_id' => '10',
 		]);
-		$this->assertSame('full-day', $variation->attrs['pa_age-group']);
-		$this->assertSame('', $preview['result']['rows'][0]['after']['attributes']['pa_age-group']);
+		$this->assertSame('full-day', $open->attrs['pa_age-group']);
+		$this->assertSame('', $open->attrs['pa_course-day']);
+		$this->assertSame('', (string) get_post_meta(77, '_course_total_weeks', true));
+		$ids = array_map(static function ($row) {
+			return (string) ($row['id'] ?? '');
+		}, $preview['result']['rows']);
+		$this->assertNotContains('attrs:78', $ids);
+		$this->assertNotContains('meta:78:_course_total_weeks', $ids);
+		$attr_row = null;
+		foreach ($preview['result']['rows'] as $row) {
+			if (($row['id'] ?? '') === 'attrs:77') {
+				$attr_row = $row;
+			}
+		}
+		$this->assertIsArray($attr_row);
+		$this->assertSame('monday', $attr_row['after']['attributes']['pa_course-day']);
+		$this->assertArrayNotHasKey('pa_age-group', $attr_row['after']['attributes']);
+		$this->assertSame('2099-09-01', (string) get_post_meta(77, '_course_start_date', true));
+
 		$applied = $this->postTool('apply', [
 			'intersoccer_pv_repair_tool' => 'refresh_attributes',
 			'product_id' => '10',
 			'intersoccer_pv_repair_phrase' => 'APPLY',
 		]);
 		$this->assertSame('success', $applied['type']);
-		$this->assertSame('', $variation->attrs['pa_age-group']);
+		$this->assertSame(count($preview['result']['rows']), count($applied['result']['rows']));
+		$this->assertSame('full-day', $open->attrs['pa_age-group']);
+		$this->assertSame('monday', $open->attrs['pa_course-day']);
+		$this->assertSame('16', (string) get_post_meta(77, '_course_total_weeks', true));
+		$this->assertSame('2099-09-01', (string) get_post_meta(77, '_course_start_date', true));
+		$this->assertSame('', $running->attrs['pa_course-day']);
 	}
 
 	public function test_real_course_end_date_preview_apply_and_rollback(): void {
@@ -623,19 +708,201 @@ class AdvancedToolsContractTest extends TestCase {
 		$this->assertSame('1999-01-01', MockMetaData::$data[88]['_end_date']);
 	}
 
-	public function test_course_holiday_fix_does_not_offer_apply(): void {
+	public function test_course_holiday_fix_card_has_no_preview_or_apply(): void {
 		$_GET['tab'] = 'product-tools';
 		ob_start();
 		intersoccer_pv_render_advanced_tools_page();
 		$html = ob_get_clean();
-		$this->assertStringContainsString('Apply is not offered. No rollback.', $html);
+		$this->assertStringContainsString('The course holiday fixer is not available in this release.', $html);
+		$this->assertStringNotContainsString('value="course_holiday_fix"', $html);
+		$this->assertStringNotContainsString('intersoccer-pm-course-holiday-fix-btn', $html);
 		$result = $this->postTool('apply', [
 			'intersoccer_pv_repair_tool' => 'course_holiday_fix',
 			'intersoccer_pv_repair_phrase' => 'APPLY',
 			'intersoccer_pv_repair_global' => 'GLOBAL',
 		]);
-		$this->assertStringContainsString('Apply is not offered', $result['message']);
+		$this->assertStringContainsString('Unknown repair', $result['message']);
 		$this->assertSame(0, $GLOBALS['intersoccer_pv_test_writes']);
+	}
+
+	public function test_scan_tab_get_does_not_preview(): void {
+		if (!function_exists('checked')) {
+			function checked($checked, $current = true, $display = true) {
+				$result = (string) $checked === (string) $current ? ' checked="checked"' : '';
+				if ($display) {
+					echo $result;
+				}
+				return $result;
+			}
+		}
+		if (!function_exists('selected')) {
+			function selected($selected, $current = true, $display = true) {
+				$result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+				if ($display) {
+					echo $result;
+				}
+				return $result;
+			}
+		}
+		if (!class_exists('WP_List_Table', false)) {
+			eval('class WP_List_Table { public function __construct($args = []) {} }');
+		}
+		if (!function_exists('intersoccer_render_update_orders_page')) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/admin-ui.php';
+		}
+		$GLOBALS['intersoccer_pv_test_scan_queries'] = 0;
+		$GLOBALS['intersoccer_test_wc_get_orders'] = static function () {
+			$GLOBALS['intersoccer_pv_test_scan_queries']++;
+			return [];
+		};
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_GET = ['tab' => 'scan', 'preview_updates' => '1', 'detailed_preview' => '1'];
+		$_REQUEST = $_GET;
+		ob_start();
+		intersoccer_pv_render_advanced_tools_page();
+		$html = ob_get_clean();
+		$this->assertSame(0, $GLOBALS['intersoccer_pv_test_scan_queries']);
+		$this->assertStringNotContainsString('<h2>Orders Missing Metadata</h2>', $html);
+	}
+
+	public function test_order_item_rollback_deletes_only_keys_apply_added(): void {
+		$this->loadOrderRepairStack();
+		$item = $this->makeOrderItem();
+		$item->meta['Player Note'] = 'keep-me';
+		$item->meta['Activity Type'] = 'Camp';
+		$GLOBALS['intersoccer_test_orders'][9001] = $this->makeOrder($item);
+		$filename = intersoccer_pv_repair_write_backup('automated_batch', 1, [[
+			'id' => 'order-item:9001:31',
+			'before' => [],
+			'after' => ['Activity Type' => 'Camp'],
+		]]);
+		$restored = $this->postTool('rollback', [
+			'intersoccer_pv_repair_tool' => 'rollback',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+			'intersoccer_pv_repair_backup' => $filename,
+		]);
+		$this->assertStringContainsString('restored 1', $restored['message']);
+		$this->assertSame('', (string) $item->get_meta('Activity Type', true));
+		$this->assertSame('keep-me', (string) $item->get_meta('Player Note', true));
+	}
+
+	public function test_real_venue_repair_preview_matches_apply_and_rollback_keeps_other_attributes(): void {
+		$this->loadProductTypes();
+		$this->installVenueRepairStubs();
+		if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+			define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', dirname(__DIR__) . '/');
+		}
+		if (!function_exists('intersoccer_pm_infer_camp_term_slug_for_variation')) {
+			require_once dirname(__DIR__) . '/includes/helpers.php';
+		}
+		if (!class_exists('WP_List_Table', false)) {
+			eval('class WP_List_Table { public function __construct($args = []) {} }');
+		}
+		if (!class_exists('InterSoccer_Program_Manager', false)) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/program-manager.php';
+		}
+		$variation = new class {
+			public $attrs = [
+				'pa_age-group' => '5-13y-full-day',
+				'pa_camp-times' => '1000-1700',
+				'pa_intersoccer-venues' => '',
+				'pa_camp-terms' => '',
+			];
+			public function get_attributes() {
+				return $this->attrs;
+			}
+			public function set_attributes($attributes) {
+				$this->attrs = $attributes;
+			}
+			public function save() {
+			}
+			public function get_id() {
+				return 881;
+			}
+			public function is_type($type) {
+				return $type === 'variation';
+			}
+		};
+		$parent = new class {
+			public $attributes = [];
+			public function get_id() {
+				return 880;
+			}
+			public function get_children() {
+				return [881];
+			}
+			public function is_type($type) {
+				return $type === 'variable';
+			}
+			public function get_attributes() {
+				return $this->attributes;
+			}
+			public function set_attributes($attributes) {
+				$this->attributes = $attributes;
+			}
+			public function save() {
+			}
+		};
+		$GLOBALS['intersoccer_test_products'][880] = $parent;
+		$GLOBALS['intersoccer_test_products'][881] = $variation;
+		$GLOBALS['intersoccer_test_terms'][8801] = [
+			'name' => 'Nyon',
+			'slug' => 'nyon',
+			'taxonomy' => 'pa_intersoccer-venues',
+		];
+		$GLOBALS['intersoccer_test_terms'][8802] = [
+			'name' => 'Autumn Week 1',
+			'slug' => 'autumn-week-1',
+			'taxonomy' => 'pa_camp-terms',
+		];
+		$GLOBALS['intersoccer_test_product_terms'][880]['pa_intersoccer-venues'] = ['nyon'];
+		$GLOBALS['intersoccer_test_product_terms'][880]['pa_camp-terms'] = ['autumn-week-1'];
+		MockMetaData::$data[880]['_intersoccer_product_type'] = 'camp';
+		MockMetaData::$data[881]['_camp_week_index'] = 1;
+		unset($GLOBALS['intersoccer_test_transients']['intersoccer_type_880']);
+
+		$preview = $this->postTool('preview', [
+			'intersoccer_pv_repair_tool' => 'repair_venue',
+			'product_id' => '880',
+		]);
+		$this->assertSame('', $variation->attrs['pa_intersoccer-venues']);
+		$this->assertNotEmpty($preview['result']['rows']);
+		$preview_ids = array_column($preview['result']['rows'], 'id');
+		$this->assertContains('parent-attr:880:pa_intersoccer-venues', $preview_ids);
+		$this->assertContains('attrs:881', $preview_ids);
+
+		$applied = $this->postTool('apply', [
+			'intersoccer_pv_repair_tool' => 'repair_venue',
+			'product_id' => '880',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+		]);
+		$this->assertSame('success', $applied['type'], $applied['message']);
+		$this->assertSame(count($preview['result']['rows']), count($applied['result']['rows']));
+		$this->assertSame(
+			intersoccer_pv_repair_rows_fingerprint($preview['result']['rows']),
+			intersoccer_pv_repair_rows_fingerprint($applied['result']['rows'])
+		);
+		$this->assertSame('nyon', $variation->attrs['pa_intersoccer-venues']);
+		$this->assertSame('autumn-week-1', $variation->attrs['pa_camp-terms']);
+		$this->assertSame('5-13y-full-day', $variation->attrs['pa_age-group']);
+		$this->assertSame('1000-1700', $variation->attrs['pa_camp-times']);
+
+		$log = intersoccer_pv_repair_log_entries();
+		$filename = (string) $log[count($log) - 1]['backup'];
+		$raw = json_decode((string) file_get_contents($this->backupDir . '/' . $filename), true);
+		$backup_ids = array_column($raw['rows'], 'id');
+		$this->assertContains('parent-attr:880:pa_intersoccer-venues', $backup_ids);
+		$this->assertContains('attrs:881', $backup_ids);
+
+		$rolled = $this->postTool('rollback', [
+			'intersoccer_pv_repair_tool' => 'rollback',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+			'intersoccer_pv_repair_backup' => $filename,
+		]);
+		$this->assertStringContainsString('restored', $rolled['message']);
+		$this->assertSame('5-13y-full-day', $variation->attrs['pa_age-group']);
+		$this->assertSame('1000-1700', $variation->attrs['pa_camp-times']);
+		$this->assertArrayHasKey('pa_age-group', $variation->attrs);
 	}
 
 	public function test_get_and_legacy_handlers_write_nothing(): void {
@@ -835,6 +1102,67 @@ class AdvancedToolsContractTest extends TestCase {
 		]);
 		$this->assertStringContainsString('restored 1', $rolled['message']);
 		$this->assertSame('', (string) $item->get_meta('Activity Type', true));
+	}
+
+	private function loadProductTypes(): void {
+		if (!defined('HOUR_IN_SECONDS')) {
+			define('HOUR_IN_SECONDS', 3600);
+		}
+		if (!class_exists('InterSoccer_Product_Types', false)) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/product-types.php';
+		}
+	}
+
+	private function installVenueRepairStubs(): void {
+		if (!function_exists('wc_attribute_taxonomy_id_by_name')) {
+			function wc_attribute_taxonomy_id_by_name($name) {
+				unset($name);
+				return 1;
+			}
+		}
+		if (!function_exists('wc_delete_product_transients')) {
+			function wc_delete_product_transients($product_id = 0) {
+				unset($product_id);
+				return true;
+			}
+		}
+		if (!function_exists('wp_set_object_terms')) {
+			function wp_set_object_terms($object_id, $terms, $taxonomy, $append = false) {
+				unset($append);
+				$stored = [];
+				foreach ((array) $terms as $term) {
+					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term]['name'])) {
+						$stored[] = (string) $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					} else {
+						$stored[] = (string) $term;
+					}
+				}
+				$GLOBALS['intersoccer_test_product_terms'][(int) $object_id][$taxonomy] = $stored;
+				return true;
+			}
+		}
+		if (!class_exists('WC_Product_Attribute', false)) {
+			eval(<<<'PHP'
+class WC_Product_Attribute {
+	private $name;
+	private $options = [];
+	private $id = 0;
+	private $visible = true;
+	private $variation = false;
+	public function get_name() { return $this->name; }
+	public function set_name($name) { $this->name = $name; return $this; }
+	public function get_options() { return $this->options; }
+	public function set_options($options) { $this->options = $options; return $this; }
+	public function get_id() { return $this->id; }
+	public function set_id($id) { $this->id = $id; return $this; }
+	public function set_visible($visible) { $this->visible = (bool) $visible; return $this; }
+	public function get_visible() { return $this->visible; }
+	public function set_variation($variation) { $this->variation = (bool) $variation; return $this; }
+	public function get_variation() { return $this->variation; }
+}
+PHP
+			);
+		}
 	}
 
 	private function loadCampDateStack(): void {

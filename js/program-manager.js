@@ -886,7 +886,6 @@
 	});
 
 	var PM_BULK_ACTIONS = {
-		refresh_attrs: 'bulk_title_refresh',
 		scaffold_variations: 'bulk_title_scaffold',
 		duplicate_to_year: 'bulk_title_duplicate',
 		sync_wpml_languages: 'bulk_title_wpml'
@@ -972,7 +971,6 @@
 	function pmBulkActionTitle(action) {
 		var key = PM_BULK_ACTIONS[action];
 		var fallbacks = {
-			refresh_attrs: 'Refresh Variation Attributes',
 			scaffold_variations: 'Auto-scaffold Missing Variations',
 			duplicate_to_year: 'Duplicate to year…',
 			sync_wpml_languages: 'Sync all languages (WPML)'
@@ -1329,76 +1327,6 @@
 
 		pmStartBulkProgress(action, ids, opts);
 		return false;
-	});
-
-	// =========================================================================
-	// Refresh Attributes (detail view — reuses existing AJAX handler)
-	// =========================================================================
-
-	$(document).on('click', '#intersoccer-pm-refresh-attrs-btn', function() {
-		var $btn = $(this);
-		if ($btn.prop('disabled')) return;
-
-		var variationIds = $btn.data('variation-ids');
-		if (!variationIds || !variationIds.length) {
-			alert('No unhealthy variations to refresh.');
-			return;
-		}
-
-		if (!confirm(PM.i18n.confirm_refresh)) return;
-
-		$btn.prop('disabled', true).text(PM.i18n.refreshing);
-
-		$.post(PM.ajax_url, {
-			action: 'intersoccer_refresh_variation_attributes',
-			nonce: PM.variation_health_nonce,
-			bulk_action: 'refresh',
-			variation_ids: variationIds
-		}).done(function(response) {
-			if (response.success) {
-				alert('Attributes refreshed successfully!');
-				window.location.reload();
-			} else {
-				alert(PM.i18n.error + ': ' + (response.data.message || 'Unknown error'));
-				$btn.prop('disabled', false).text('Refresh Attributes');
-			}
-		}).fail(function() {
-			alert(PM.i18n.error + ': Request failed');
-			$btn.prop('disabled', false).text('Refresh Attributes');
-		});
-	});
-
-	// =========================================================================
-	// Course Holiday Fix (detail view — reuses existing AJAX handler)
-	// =========================================================================
-
-	$(document).on('click', '#intersoccer-pm-course-holiday-fix-btn', function() {
-		var $btn = $(this);
-		if ($btn.prop('disabled')) return;
-
-		if (!confirm('Are you sure you want to run the course holiday fix? This should only be run once.')) {
-			return;
-		}
-
-		var $results = $('#intersoccer-pm-holiday-fix-result');
-		$btn.prop('disabled', true).text('Running…');
-		$results.show().html('<p>Running course holiday fix…</p>');
-
-		$.post(PM.ajax_url, {
-			action: 'intersoccer_run_course_holiday_fix',
-			nonce: PM.course_holiday_fix_nonce
-		}).done(function(response) {
-			if (response.success) {
-				$results.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
-				setTimeout(function() { window.location.reload(); }, 2000);
-			} else {
-				$results.html('<div class="notice notice-error inline"><p>' + escHtml(response.data.message || 'Unknown error') + '</p></div>');
-				$btn.prop('disabled', false).text('Run Course Holiday Fix');
-			}
-		}).fail(function() {
-			$results.html('<div class="notice notice-error inline"><p>Request failed.</p></div>');
-			$btn.prop('disabled', false).text('Run Course Holiday Fix');
-		});
 	});
 
 	// =========================================================================

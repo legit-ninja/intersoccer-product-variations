@@ -103,19 +103,15 @@ class InterSoccer_Program_Manager {
 		wp_localize_script('intersoccer-program-manager', 'intersoccerPM', [
 			'ajax_url'                 => admin_url('admin-ajax.php'),
 			'nonce'                    => wp_create_nonce(self::NONCE_ACTION),
-			'variation_health_nonce'   => wp_create_nonce('intersoccer_variation_health_nonce'),
-			'course_holiday_fix_nonce' => wp_create_nonce('intersoccer_course_holiday_fix_nonce'),
 			'page_url'                 => menu_page_url(self::PAGE_SLUG, false),
 			'i18n'     => [
 				'confirm_create'    => __('Create this program as a Draft product?', 'intersoccer-product-variations'),
 				'confirm_duplicate' => __('Duplicate this program? A new Draft product will be created.', 'intersoccer-product-variations'),
-				'confirm_refresh'   => __('Refresh attributes on all unhealthy variations? This applies default values for missing fields.', 'intersoccer-product-variations'),
 				'confirm_sync_wpml' => __('Sync all languages (WPML)? This creates or refreshes FR/DE product and variation translations from English, copying shared attribute slugs, schedule, prices, and course meta.', 'intersoccer-product-variations'),
 				'saving'            => __('Saving…', 'intersoccer-product-variations'),
 				'saved'             => __('Saved', 'intersoccer-product-variations'),
 				'error'             => __('Error', 'intersoccer-product-variations'),
 				'creating'          => __('Creating program…', 'intersoccer-product-variations'),
-				'refreshing'        => __('Refreshing…', 'intersoccer-product-variations'),
 				'syncing_wpml'      => __('Syncing WPML languages…', 'intersoccer-product-variations'),
 				'select_type'       => __('Please select a program type.', 'intersoccer-product-variations'),
 				'enter_name'        => __('Please enter a program name.', 'intersoccer-product-variations'),
@@ -129,7 +125,6 @@ class InterSoccer_Program_Manager {
 				'bulk_cancelled'    => __('Bulk action stopped.', 'intersoccer-product-variations'),
 				'bulk_reloading'    => __('Reloading…', 'intersoccer-product-variations'),
 				'bulk_select_items' => __('Select one or more programs before applying a bulk action.', 'intersoccer-product-variations'),
-				'bulk_title_refresh'=> __('Refresh Variation Attributes', 'intersoccer-product-variations'),
 				'bulk_title_scaffold'=> __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
 				'bulk_title_duplicate'=> __('Duplicate to year…', 'intersoccer-product-variations'),
 				'bulk_title_wpml'   => __('Sync all languages (WPML)', 'intersoccer-product-variations'),
@@ -1095,7 +1090,7 @@ class InterSoccer_Program_Manager {
 			<?php if ($type === 'course' && function_exists('intersoccer_pv_advanced_tools_page_slug')) : ?>
 			<p class="description">
 				<a href="<?php echo esc_url(admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=product-tools&product_id=' . (int) $product_id)); ?>">
-					<?php esc_html_e('Course end dates and the holiday fix run from Advanced tools.', 'intersoccer-product-variations'); ?>
+					<?php esc_html_e('Course end dates run from Advanced tools.', 'intersoccer-product-variations'); ?>
 				</a>
 			</p>
 			<?php endif; ?>
@@ -2300,6 +2295,12 @@ class InterSoccer_Program_Manager {
 		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
 		$opts       = [];
 
+		if ($action === 'refresh_attrs') {
+			wp_send_json_error([
+				'message' => __('Refresh Attributes runs from Advanced tools.', 'intersoccer-product-variations'),
+			]);
+		}
+
 		if ($action === 'duplicate_to_year') {
 			$target_year   = isset($_POST['pm_target_year']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year'])) : '';
 			$target_custom = isset($_POST['pm_target_year_custom']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year_custom'])) : '';
@@ -2332,7 +2333,7 @@ class InterSoccer_Program_Manager {
 	/**
 	 * Process a single Program Manager list bulk action against one product.
 	 *
-	 * @param string $action     refresh_attrs|scaffold_variations|duplicate_to_year|sync_wpml_languages
+	 * @param string $action     scaffold_variations|duplicate_to_year|sync_wpml_languages
 	 * @param int    $product_id Product ID.
 	 * @param array  $opts       Optional. year/season for duplicate_to_year.
 	 * @return array{ok:bool,outcome:string,product_id:int,product_name:string,message:string,new_product_id:?int,wpml:?array}
@@ -2356,7 +2357,7 @@ class InterSoccer_Program_Manager {
 			'wpml'           => null,
 		];
 
-		$allowed = ['refresh_attrs', 'scaffold_variations', 'duplicate_to_year', 'sync_wpml_languages'];
+		$allowed = ['scaffold_variations', 'duplicate_to_year', 'sync_wpml_languages'];
 		if (!in_array($action, $allowed, true)) {
 			return array_merge($base, [
 				'ok'      => false,
@@ -2374,34 +2375,6 @@ class InterSoccer_Program_Manager {
 					__('Skipped #%d (not a variable product).', 'intersoccer-product-variations'),
 					$product_id
 				),
-			]);
-		}
-
-		if ($action === 'refresh_attrs') {
-			$type = class_exists('InterSoccer_Product_Types')
-				? InterSoccer_Product_Types::get_product_type($product_id)
-				: '';
-			if ($type === 'camp') {
-				self::repair_camp_variation_facets($product_id);
-			} else {
-				foreach ($product->get_children() as $var_id) {
-					$variation = wc_get_product($var_id);
-					if (!$variation) {
-						continue;
-					}
-					$parent_attrs = $product->get_attributes();
-					$var_attrs    = [];
-					foreach ($parent_attrs as $attr) {
-						if ($attr->get_variation()) {
-							$var_attrs[$attr->get_name()] = '';
-						}
-					}
-					$variation->set_attributes($var_attrs);
-					$variation->save();
-				}
-			}
-			return array_merge($base, [
-				'message' => __('Variation attributes refreshed.', 'intersoccer-product-variations'),
 			]);
 		}
 
@@ -3347,6 +3320,91 @@ class InterSoccer_Program_Manager {
 	}
 
 	/**
+	 * Whether a parent taxonomy attribute is used for variations.
+	 *
+	 * @param object $product  Product.
+	 * @param string $taxonomy Taxonomy.
+	 * @return bool
+	 */
+	private static function parent_taxonomy_is_variation($product, $taxonomy) {
+		$attributes = method_exists($product, 'get_attributes') ? $product->get_attributes() : [];
+		if (!is_array($attributes) || !isset($attributes[$taxonomy])) {
+			$product_id = method_exists($product, 'get_id') ? (int) $product->get_id() : 0;
+			$raw = get_post_meta($product_id, '_product_attributes', true);
+			if (is_array($raw) && isset($raw[$taxonomy]) && is_array($raw[$taxonomy])) {
+				return !empty($raw[$taxonomy]['is_variation']);
+			}
+			return false;
+		}
+		$attr = $attributes[$taxonomy];
+		if (is_object($attr) && method_exists($attr, 'get_variation')) {
+			return (bool) $attr->get_variation();
+		}
+		if (is_array($attr) && array_key_exists('is_variation', $attr)) {
+			return !empty($attr['is_variation']);
+		}
+		return false;
+	}
+
+	/**
+	 * Current parent taxonomy variation flag and term slugs.
+	 *
+	 * @param int    $product_id Product ID.
+	 * @param string $taxonomy   Taxonomy.
+	 * @return array{is_variation:bool,slugs:string[]}|null
+	 */
+	public static function parent_taxonomy_attribute_snapshot($product_id, $taxonomy) {
+		$product = function_exists('wc_get_product') ? wc_get_product((int) $product_id) : null;
+		if (!$product) {
+			return null;
+		}
+		$terms = function_exists('wc_get_product_terms')
+			? wc_get_product_terms((int) $product_id, $taxonomy, ['fields' => 'slugs'])
+			: [];
+		if (is_wp_error($terms) || !is_array($terms)) {
+			$terms = [];
+		}
+		$slugs = array_values(array_unique(array_filter(array_map('strval', $terms))));
+		sort($slugs);
+		return [
+			'is_variation' => self::parent_taxonomy_is_variation($product, $taxonomy),
+			'slugs' => $slugs,
+		];
+	}
+
+	/**
+	 * Parent promotion that venue repair would write, or null when nothing changes.
+	 *
+	 * @param int      $product_id Product ID.
+	 * @param string   $taxonomy   Taxonomy.
+	 * @param string[] $extra_slugs Extra slugs to merge.
+	 * @return array{before:array,after:array}|null
+	 */
+	public static function parent_taxonomy_repair_plan($product_id, $taxonomy, $extra_slugs = []) {
+		if (!function_exists('taxonomy_exists') || !taxonomy_exists($taxonomy)) {
+			return null;
+		}
+		$before = self::parent_taxonomy_attribute_snapshot($product_id, $taxonomy);
+		if ($before === null) {
+			return null;
+		}
+		$extra = array_values(array_unique(array_filter(array_map('strval', (array) $extra_slugs))));
+		$merged = array_values(array_unique(array_merge($before['slugs'], $extra)));
+		sort($merged);
+		if ($merged === []) {
+			return null;
+		}
+		$after = [
+			'is_variation' => true,
+			'slugs' => $merged,
+		];
+		if ($before == $after) {
+			return null;
+		}
+		return ['before' => $before, 'after' => $after];
+	}
+
+	/**
 	 * Promote Venue/Camp Term to variation attrs and backfill empty variation values.
 	 *
 	 * Camp Times are left to propose/refresh helpers. Venue is only auto-filled when
@@ -3391,6 +3449,21 @@ class InterSoccer_Program_Manager {
 			$terms = [];
 		}
 
+		foreach ([
+			'pa_intersoccer-venues' => $venues,
+			'pa_camp-terms' => $terms,
+			'pa_camp-times' => [],
+		] as $taxonomy => $extra_slugs) {
+			$plan = self::parent_taxonomy_repair_plan($product_id, $taxonomy, $extra_slugs);
+			if (is_array($plan)) {
+				$result['changes'][] = [
+					'id' => 'parent-attr:' . $product_id . ':' . $taxonomy,
+					'before' => $plan['before'],
+					'after' => $plan['after'],
+				];
+			}
+		}
+
 		$venue_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $venues, $dry_run);
 		$terms_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-terms', $terms, $dry_run);
 		$times_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', [], $dry_run);
@@ -3408,8 +3481,13 @@ class InterSoccer_Program_Manager {
 
 		foreach ($product->get_children() as $var_id) {
 			$variation = wc_get_product($var_id);
-			if (!$variation || !($variation instanceof WC_Product_Variation)) {
+			if (!is_object($variation) || !method_exists($variation, 'get_attributes') || !method_exists($variation, 'set_attributes')) {
 				continue;
+			}
+			if (class_exists('WC_Product_Variation', false) && !($variation instanceof WC_Product_Variation)) {
+				if (!method_exists($variation, 'is_type') || !$variation->is_type('variation')) {
+					continue;
+				}
 			}
 
 			$attrs = $variation->get_attributes();

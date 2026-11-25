@@ -1182,3 +1182,43 @@ msgstr "Veuillez <a href=\"%s\">vous connecter ou créer un compte</a> pour rés
 
 msgid "Course Information"
 msgstr "Informations sur le cours"
+
+#, fuzzy
+msgid "InterSoccer Advanced tools: Products & orders"
+msgstr "InterSoccer Outils avancés: Produits et commandes"
+
+#, fuzzy
+msgid "InterSoccer Advanced tools: Rosters & reports"
+msgstr "InterSoccer Outils avancés: Effectifs et rapports"
+
+#, fuzzy
+msgid "Fills empty camp and course attributes from the registry defaults. Existing values are kept. Courses that have already started and not finished are skipped. Leave the product ID empty only for a shop-wide run (GLOBAL)."
+msgstr "Remplit les attributs de camp et de cours vides à partir des valeurs par défaut. Les valeurs existantes sont conservées. Les cours déjà commencés et non terminés sont ignorés. Laissez l'identifiant produit vide uniquement pour une exécution sur toute la boutique (GLOBAL)."
+
+#, fuzzy
+msgid "Seeds camp start, end, and week from the camp-terms label when dates are empty. Overwrite existing dates, or leave the product ID empty, only with GLOBAL. The WP-CLI command dry-runs unless --apply is passed. This screen stays Preview-first."
+msgstr "Renseigne le début, la fin et la semaine du camp à partir du libellé des périodes lorsque les dates sont vides. Écraser les dates existantes, ou laisser l'identifiant produit vide, uniquement avec GLOBAL. La commande WP-CLI reste une simulation tant que --apply n'est pas passé. Cet écran reste d'abord un aperçu."
+
+#, fuzzy
+msgid "Course Holiday Fix"
+msgstr "Correction des vacances de cours"
+
+#, fuzzy
+msgid "The course holiday fixer is not available in this release."
+msgstr "Le correcteur de vacances de cours n'est pas disponible dans cette version."
+
+#, fuzzy
+msgid "Course end dates run from Advanced tools."
+msgstr "Les dates de fin de cours s'exécutent depuis les outils avancés."
+
+#, fuzzy
+msgid "Refresh Attributes runs from Advanced tools."
+msgstr "L'actualisation des attributs s'exécute depuis les outils avancés."
+
+#, fuzzy, php-format
+msgid "Attribute refresh changes: %d."
+msgstr "Modifications d'attributs: %d."
+
+#, fuzzy, php-format
+msgid "Venue or camp-term changes: %d."
+msgstr "Modifications de lieu ou de période de camp: %d."

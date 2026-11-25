@@ -1234,33 +1234,14 @@ function intersoccer_render_update_orders_page($embedded = false) {
     $strip_deprecated_checked = isset($_REQUEST['strip_deprecated_meta']) && (string) $_REQUEST['strip_deprecated_meta'] === '1';
     // Strip and prune stay off until an office admin checks them on this request.
     $prune_legacy_twins_checked = isset($_REQUEST['prune_legacy_twins']) && (string) $_REQUEST['prune_legacy_twins'] === '1';
-    $show_preview = isset($_REQUEST['preview_updates']) || isset($_REQUEST['detailed_preview']);
-    $show_detailed = isset($_REQUEST['detailed_preview']);
+    $method = isset($_SERVER['REQUEST_METHOD']) ? (string) $_SERVER['REQUEST_METHOD'] : '';
+    $preview_posted = $method === 'POST' && (isset($_POST['preview_updates']) || isset($_POST['detailed_preview']));
+    $show_preview = $preview_posted;
+    $show_detailed = $preview_posted && isset($_POST['detailed_preview']);
 
-    // Verify nonce for any POST action (preview or update)
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ((isset($_POST['preview_updates']) || isset($_POST['detailed_preview'])) || isset($_POST['update_selected_orders']))) {
+    // Verify nonce for any POST action (preview or update). Opening the page does not scan.
+    if ($method === 'POST' && ($preview_posted || isset($_POST['update_selected_orders']))) {
         check_admin_referer('intersoccer_update_orders', 'intersoccer_update_orders_nonce');
-    }
-
-    // Preserve preview state/filters across pagination links by redirecting preview POST to GET.
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['preview_updates']) || isset($_POST['detailed_preview']))) {
-        $query_args = [
-            'page' => $page_slug,
-            'tab' => 'scan',
-            'preview_updates' => isset($_POST['preview_updates']) ? '1' : null,
-            'detailed_preview' => isset($_POST['detailed_preview']) ? '1' : null,
-            'preview_limit' => $preview_limit_value,
-            'fix_activity_type_only' => $fix_activity_type_only_checked ? '1' : '0',
-            'strip_deprecated_meta' => $strip_deprecated_checked ? '1' : '0',
-            'prune_legacy_twins' => $prune_legacy_twins_checked ? '1' : '0',
-            'order_statuses' => $selected_statuses,
-        ];
-        $query_args = array_filter($query_args, static function ($value) {
-            return $value !== null;
-        });
-        $url = admin_url('admin.php?' . http_build_query($query_args));
-        wp_safe_redirect($url);
-        exit;
     }
 
     // Handle bulk update. Preview is the scan above; Apply requires typed APPLY.
@@ -2646,7 +2627,7 @@ function intersoccer_render_variation_health_page() {
     $tools = function_exists('intersoccer_pv_advanced_tools_page_slug')
         ? admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=product-tools')
         : '';
-    echo '<div class="wrap"><h1>' . esc_html__('Advanced tools', 'intersoccer-product-variations') . '</h1>';
+    echo '<div class="wrap"><h1>' . esc_html__('InterSoccer Advanced tools: Products & orders', 'intersoccer-product-variations') . '</h1>';
     echo '<p>' . esc_html__('Variation repairs run from Advanced tools.', 'intersoccer-product-variations') . '</p>';
     if ($tools !== '') {
         echo '<p><a class="button button-secondary" href="' . esc_url($tools) . '">' . esc_html__('Open Advanced tools', 'intersoccer-product-variations') . '</a></p>';

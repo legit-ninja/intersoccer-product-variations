@@ -86,10 +86,19 @@ PHP
 
 	public function test_missing_product_skipped(): void {
 		self::$products[999001] = false;
-		$result = InterSoccer_Program_Manager::process_bulk_item('refresh_attrs', 999001);
+		$result = InterSoccer_Program_Manager::process_bulk_item('scaffold_variations', 999001);
 		$this->assertTrue($result['ok']);
 		$this->assertSame('skipped', $result['outcome']);
 		$this->assertStringContainsString('not a variable product', $result['message']);
+	}
+
+	public function test_refresh_attrs_is_rejected(): void {
+		$this->makeVariableProduct(510, 'Do Not Refresh');
+		self::$product_types[510] = 'course';
+		$result = InterSoccer_Program_Manager::process_bulk_item('refresh_attrs', 510);
+		$this->assertFalse($result['ok']);
+		$this->assertSame('failed', $result['outcome']);
+		$this->assertStringContainsString('Unknown bulk action', $result['message']);
 	}
 
 	public function test_duplicate_requires_year(): void {

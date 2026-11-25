@@ -1173,3 +1173,35 @@ msgstr ""
 
 msgid "Course Information"
 msgstr ""
+
+msgid "InterSoccer Advanced tools: Products & orders"
+msgstr ""
+
+msgid "InterSoccer Advanced tools: Rosters & reports"
+msgstr ""
+
+msgid "Fills empty camp and course attributes from the registry defaults. Existing values are kept. Courses that have already started and not finished are skipped. Leave the product ID empty only for a shop-wide run (GLOBAL)."
+msgstr ""
+
+msgid "Seeds camp start, end, and week from the camp-terms label when dates are empty. Overwrite existing dates, or leave the product ID empty, only with GLOBAL. The WP-CLI command dry-runs unless --apply is passed. This screen stays Preview-first."
+msgstr ""
+
+msgid "Course Holiday Fix"
+msgstr ""
+
+msgid "The course holiday fixer is not available in this release."
+msgstr ""
+
+msgid "Course end dates run from Advanced tools."
+msgstr ""
+
+msgid "Refresh Attributes runs from Advanced tools."
+msgstr ""
+
+#, php-format
+msgid "Attribute refresh changes: %d."
+msgstr ""
+
+#, php-format
+msgid "Venue or camp-term changes: %d."
+msgstr ""

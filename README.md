@@ -11,7 +11,7 @@ Taxonomy standard (attributes, term shapes, order-meta keys, distressed bands): 
 
 ## Camp schedule meta (2.7.18+)
 
-Camp variations store `_camp_start_date`, `_camp_end_date`, and `_camp_week_index`. Program Manager can edit/pre-fill these and seed them from camp-terms via `wp intersoccer migrate-camp-dates`. Parsing dates from `pa_camp-terms` remains a **deprecated fallback** during migration — see `scratch/BACKLOG-remove-camp-terms-date-parse.md` and `.cursor/rules/camp-date-meta.mdc`.
+Camp variations store `_camp_start_date`, `_camp_end_date`, and `_camp_week_index`. Program Manager can edit/pre-fill these and seed them from camp-terms via `wp intersoccer migrate-camp-dates`. That command dry-runs unless `--apply` is passed. Parsing dates from `pa_camp-terms` remains a **deprecated fallback** during migration — see `scratch/BACKLOG-remove-camp-terms-date-parse.md` and `.cursor/rules/camp-date-meta.mdc`.
 
 ## Program Manager + WPML (EN source of truth)
 
