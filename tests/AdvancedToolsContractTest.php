@@ -1342,6 +1342,148 @@ PHP
 		$this->assertNotContains('nyon', (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_intersoccer-venues'] ?? []));
 	}
 
+	public function test_venue_repair_needs_manual_when_twin_language_is_unknown(): void {
+		$this->loadProductTypes();
+		$this->installVenueRepairStubs();
+		if (!defined('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR')) {
+			define('INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR', dirname(__DIR__) . '/');
+		}
+		if (!function_exists('intersoccer_pm_infer_camp_term_slug_for_variation')) {
+			require_once dirname(__DIR__) . '/includes/helpers.php';
+		}
+		if (!function_exists('intersoccer_translated_taxonomy_term_slug')) {
+			require_once dirname(__DIR__) . '/includes/language-helpers.php';
+		}
+		if (!class_exists('WP_List_Table', false)) {
+			eval('class WP_List_Table { public function __construct($args = []) {} }');
+		}
+		if (!class_exists('InterSoccer_Program_Manager', false)) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/program-manager.php';
+		}
+		$variation = new class {
+			public $attrs = [
+				'pa_age-group' => '5-13y-full-day',
+				'pa_camp-times' => '1000-1700',
+				'pa_intersoccer-venues' => '',
+				'pa_camp-terms' => '',
+			];
+			public function get_attributes() { return $this->attrs; }
+			public function set_attributes($attributes) { $this->attrs = $attributes; }
+			public function save() {}
+			public function get_id() { return 881; }
+			public function is_type($type) { return $type === 'variation'; }
+		};
+		$parent = new class {
+			public $attributes = [];
+			public function get_id() { return 880; }
+			public function get_children() { return [881]; }
+			public function is_type($type) { return $type === 'variable'; }
+			public function get_attributes() { return $this->attributes; }
+			public function set_attributes($attributes) { $this->attributes = $attributes; }
+			public function save() {}
+		};
+		$GLOBALS['intersoccer_test_products'][880] = $parent;
+		$GLOBALS['intersoccer_test_products'][881] = $variation;
+		$GLOBALS['intersoccer_test_terms'][8801] = ['name' => 'Nyon', 'slug' => 'nyon', 'taxonomy' => 'pa_intersoccer-venues'];
+		$GLOBALS['intersoccer_test_terms'][8802] = ['name' => 'Autumn Week 1', 'slug' => 'autumn-week-1', 'taxonomy' => 'pa_camp-terms'];
+		$GLOBALS['intersoccer_test_terms'][8803] = ['name' => 'Nyon FR', 'slug' => 'nyon-fr', 'taxonomy' => 'pa_intersoccer-venues'];
+		$GLOBALS['intersoccer_test_terms'][8804] = ['name' => 'Automne semaine 1', 'slug' => 'automne-semaine-1', 'taxonomy' => 'pa_camp-terms'];
+		$GLOBALS['intersoccer_test_product_terms'][880]['pa_intersoccer-venues'] = ['nyon'];
+		$GLOBALS['intersoccer_test_product_terms'][880]['pa_camp-terms'] = ['autumn-week-1'];
+		$GLOBALS['intersoccer_test_product_terms'][881] = [];
+		$GLOBALS['intersoccer_test_product_terms'][882] = [];
+		$GLOBALS['intersoccer_test_term_translations']['pa_intersoccer-venues']['nyon'] = ['en' => 'nyon', 'fr' => 'nyon-fr'];
+		$GLOBALS['intersoccer_test_term_translations']['pa_camp-terms']['autumn-week-1'] = ['en' => 'autumn-week-1', 'fr' => 'automne-semaine-1'];
+		MockMetaData::$data[880]['_intersoccer_product_type'] = 'camp';
+		MockMetaData::$data[881]['_camp_week_index'] = 1;
+		unset($GLOBALS['intersoccer_test_transients']['intersoccer_type_880']);
+		if (!class_exists('WC_Product_Variation', false)) {
+			eval('class WC_Product_Variation { public function get_attributes() { return []; } public function set_attributes($attributes) {} public function save() { return 0; } }');
+		}
+		if (!class_exists('PvAdvancedToolsTwinVariation', false)) {
+			eval(<<<'PHP'
+	class PvAdvancedToolsTwinVariation extends WC_Product_Variation {
+		public $attrs = [];
+		private $id;
+		public function __construct($id) { $this->id = (int) $id; }
+		public function get_id() { return $this->id; }
+		public function get_attributes() { return $this->attrs; }
+		public function set_attributes($attributes) { $this->attrs = $attributes; }
+		public function save() { return $this->id; }
+		public function is_type($type) { return $type === 'variation'; }
+	}
+	PHP
+			);
+		}
+		if (!defined('ICL_SITEPRESS_VERSION')) {
+			define('ICL_SITEPRESS_VERSION', 'test');
+		}
+		$twin = new PvAdvancedToolsTwinVariation(882);
+		$twin->attrs = [
+			'pa_age-group' => '5-8y',
+			'pa_intersoccer-venues' => '',
+			'pa_camp-terms' => '',
+		];
+		$GLOBALS['intersoccer_test_products'][882] = $twin;
+		MockFilters::$filters['wpml_active_languages'] = static function () {
+			return ['en' => [], 'fr' => []];
+		};
+		MockFilters::$filters['wpml_element_language_code'] = static function ($empty = null, $args = []) {
+			$id = is_array($args) ? (int) ($args['element_id'] ?? 0) : 0;
+			$type = is_array($args) ? (string) ($args['element_type'] ?? '') : '';
+			if ($id === 882) {
+				return null;
+			}
+			if (strpos($type, 'tax_') === 0) {
+				return 'en';
+			}
+			return $id === 881 || $id === 880 ? 'en' : null;
+		};
+		MockFilters::$filters['wpml_current_language'] = static function () {
+			return 'en';
+		};
+		MockFilters::$filters['wpml_object_id'] = static function ($id, $type = null, $return_original = null, $lang = null) {
+			unset($return_original);
+			if ((int) $id === 881 && $lang === 'fr') {
+				return 882;
+			}
+			if ((int) $id === 8801 && $lang === 'fr') {
+				return 8803;
+			}
+			if ((int) $id === 8802 && $lang === 'fr') {
+				return 8804;
+			}
+			if ($lang === 'en' || $lang === null || $lang === '') {
+				return (int) $id;
+			}
+			return 0;
+		};
+		$this->assertNull(intersoccer_translated_taxonomy_term_slug('nyon', 'pa_intersoccer-venues', 882));
+		$preview = $this->postTool('preview', [
+			'intersoccer_pv_repair_tool' => 'repair_venue',
+			'product_id' => '880',
+		]);
+		$preview_ids = array_column($preview['result']['rows'] ?? [], 'id');
+		$this->assertContains('manual:twin:882:pa_intersoccer-venues', $preview_ids);
+		$this->assertContains('manual:twin:882:pa_camp-terms', $preview_ids);
+		$applied = $this->postTool('apply', [
+			'intersoccer_pv_repair_tool' => 'repair_venue',
+			'product_id' => '880',
+			'intersoccer_pv_repair_phrase' => 'APPLY',
+		]);
+		$this->assertSame('success', $applied['type'], $applied['message']);
+		$this->assertSame('nyon', $variation->attrs['pa_intersoccer-venues']);
+		$this->assertSame('autumn-week-1', $variation->attrs['pa_camp-terms']);
+		$this->assertSame('', $twin->attrs['pa_intersoccer-venues']);
+		$this->assertSame('', $twin->attrs['pa_camp-terms']);
+		$this->assertSame('5-8y', $twin->attrs['pa_age-group']);
+		$this->assertSame('', (string) get_post_meta(882, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('', (string) get_post_meta(882, 'attribute_pa_camp-terms', true));
+		$this->assertNotContains('nyon', (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_intersoccer-venues'] ?? []));
+		$this->assertNotContains('nyon-fr', (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_intersoccer-venues'] ?? []));
+		$this->assertNotContains('autumn-week-1', (array) ($GLOBALS['intersoccer_test_product_terms'][882]['pa_camp-terms'] ?? []));
+	}
+
 	public function test_season_label_list_backups_does_not_create_the_directory(): void {
 		if (!class_exists('InterSoccer_Order_Season_Label_Repair', false)) {
 			require_once dirname(__DIR__) . '/includes/woocommerce/order-season-label-repair.php';
@@ -1355,6 +1497,24 @@ PHP
 		unset($GLOBALS['intersoccer_test_season_label_backup_dir']);
 		@rmdir($base);
 	}
+
+	public function test_course_date_list_backups_does_not_create_the_directory(): void {
+		if (!class_exists('InterSoccer_Order_Season_Label_Repair', false)) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/order-season-label-repair.php';
+		}
+		if (!class_exists('InterSoccer_Order_Course_Date_Repair', false)) {
+			require_once dirname(__DIR__) . '/includes/woocommerce/order-course-date-repair.php';
+		}
+		$base = sys_get_temp_dir() . '/pv-course-get-' . getmypid() . '-' . uniqid('', true);
+		$GLOBALS['intersoccer_test_season_label_backup_dir'] = $base . '/intersoccer-backups';
+		$this->assertDirectoryDoesNotExist($GLOBALS['intersoccer_test_season_label_backup_dir']);
+		$list = InterSoccer_Order_Course_Date_Repair::list_backups();
+		$this->assertSame([], $list);
+		$this->assertDirectoryDoesNotExist($GLOBALS['intersoccer_test_season_label_backup_dir']);
+		unset($GLOBALS['intersoccer_test_season_label_backup_dir']);
+		@rmdir($base);
+	}
+
 
 	public function test_uninstall_detects_reports_plugin_by_main_file_not_folder(): void {
 		unset($GLOBALS['intersoccer_pv_test_rr_active']);

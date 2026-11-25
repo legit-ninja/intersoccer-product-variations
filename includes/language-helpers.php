@@ -643,11 +643,13 @@ function intersoccer_translated_taxonomy_term_slug($slug, $taxonomy, $target_id)
                 'element_type' => 'post_product',
             ]);
         }
-        if (!$lang) {
-            $lang = apply_filters('wpml_current_language', null);
-        }
     }
-    $lang = is_string($lang) ? $lang : '';
+    $lang = is_string($lang) ? trim($lang) : '';
+    // Do not fall back to the current admin language: under 'en' that would
+    // write the English slug onto a twin whose language could not be determined.
+    if ($lang === '' || strtolower($lang) === 'all') {
+        return null;
+    }
 
     if ($has_test_map && isset($GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug]) && is_array($GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug])) {
         $map = $GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug];

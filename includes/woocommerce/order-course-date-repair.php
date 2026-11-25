@@ -709,11 +709,12 @@ class InterSoccer_Order_Course_Date_Repair {
 	/**
 	 * Backup directory (shared with the Season labels tool).
 	 *
+	 * @param bool $create Create the directory and deny-web files when missing.
 	 * @return string|WP_Error
 	 */
-	public static function backup_dir() {
+	public static function backup_dir($create = true) {
 		if (class_exists('InterSoccer_Order_Season_Label_Repair')) {
-			return InterSoccer_Order_Season_Label_Repair::backup_dir();
+			return InterSoccer_Order_Season_Label_Repair::backup_dir($create);
 		}
 		return new WP_Error('backup_dir', __('Backup directory unavailable.', 'intersoccer-product-variations'));
 	}
@@ -768,7 +769,7 @@ class InterSoccer_Order_Course_Date_Repair {
 	 * @return array<int,array{path:string,basename:string,mtime:int}>
 	 */
 	public static function list_backups() {
-		$dir = self::backup_dir();
+		$dir = self::backup_dir(false);
 		if (is_wp_error($dir) || !is_dir($dir)) {
 			return [];
 		}
