@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 function intersoccer_migrate_camp_dates_for_product($product_id, $args = []) {
 	$args = array_merge([
 		'force'   => false,
-		'dry_run' => false,
+		'dry_run' => true,
 	], is_array($args) ? $args : []);
 
 	$product_id = (int) $product_id;
@@ -133,7 +133,7 @@ function intersoccer_migrate_camp_dates_for_product($product_id, $args = []) {
 function intersoccer_migrate_camp_dates_all($args = []) {
 	$args = array_merge([
 		'force'   => false,
-		'dry_run' => false,
+		'dry_run' => true,
 	], is_array($args) ? $args : []);
 
 	$summary = [
@@ -194,17 +194,20 @@ if (defined('WP_CLI') && WP_CLI) {
 	 * : Overwrite existing `_camp_start_date` values.
 	 *
 	 * [--dry-run]
-	 * : Report only; do not write meta.
+	 * : Report only; do not write meta. This is the default. --dry-run stays available as an explicit dry-run.
+	 *
+	 * [--apply]
+	 * : Write meta. Required for any change. The Advanced tools screen stays Preview-first and asks for GLOBAL on a shop-wide or overwrite run.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp intersoccer migrate-camp-dates --dry-run
-	 *     wp intersoccer migrate-camp-dates --product=39700
+	 *     wp intersoccer migrate-camp-dates
+	 *     wp intersoccer migrate-camp-dates --product=39700 --apply
 	 */
 	WP_CLI::add_command('intersoccer migrate-camp-dates', function ($args, $assoc_args) {
 		$opts = [
 			'force'   => isset($assoc_args['force']),
-			'dry_run' => isset($assoc_args['dry-run']),
+			'dry_run' => !isset($assoc_args['apply']) || isset($assoc_args['dry-run']),
 		];
 
 		if (!empty($assoc_args['product'])) {

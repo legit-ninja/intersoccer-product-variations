@@ -16,6 +16,13 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
+if (!function_exists('intersoccer_admin_parse_date')) {
+	$intersoccer_admin_date_format = __DIR__ . '/admin-date-format.php';
+	if (file_exists($intersoccer_admin_date_format)) {
+		require_once $intersoccer_admin_date_format;
+	}
+}
+
 class InterSoccer_Program_Manager {
 
 	const NONCE_ACTION = 'intersoccer_pm_nonce';
@@ -77,10 +84,18 @@ class InterSoccer_Program_Manager {
 			'2.8.4.0'
 		);
 
+		wp_enqueue_script('jquery-ui-datepicker');
+		wp_enqueue_script(
+			'intersoccer-admin-date-format',
+			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/admin-date-format.js',
+			['jquery', 'jquery-ui-datepicker'],
+			'1.0.0',
+			true
+		);
 		wp_enqueue_script(
 			'intersoccer-program-manager',
 			INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_URL . 'js/program-manager.js',
-			['jquery'],
+			['jquery', 'intersoccer-admin-date-format'],
 			'2.8.4.0',
 			true
 		);
@@ -88,19 +103,15 @@ class InterSoccer_Program_Manager {
 		wp_localize_script('intersoccer-program-manager', 'intersoccerPM', [
 			'ajax_url'                 => admin_url('admin-ajax.php'),
 			'nonce'                    => wp_create_nonce(self::NONCE_ACTION),
-			'variation_health_nonce'   => wp_create_nonce('intersoccer_variation_health_nonce'),
-			'course_holiday_fix_nonce' => wp_create_nonce('intersoccer_course_holiday_fix_nonce'),
 			'page_url'                 => menu_page_url(self::PAGE_SLUG, false),
 			'i18n'     => [
 				'confirm_create'    => __('Create this program as a Draft product?', 'intersoccer-product-variations'),
 				'confirm_duplicate' => __('Duplicate this program? A new Draft product will be created.', 'intersoccer-product-variations'),
-				'confirm_refresh'   => __('Refresh attributes on all unhealthy variations? This applies default values for missing fields.', 'intersoccer-product-variations'),
 				'confirm_sync_wpml' => __('Sync all languages (WPML)? This creates or refreshes FR/DE product and variation translations from English, copying shared attribute slugs, schedule, prices, and course meta.', 'intersoccer-product-variations'),
 				'saving'            => __('Saving…', 'intersoccer-product-variations'),
 				'saved'             => __('Saved', 'intersoccer-product-variations'),
 				'error'             => __('Error', 'intersoccer-product-variations'),
 				'creating'          => __('Creating program…', 'intersoccer-product-variations'),
-				'refreshing'        => __('Refreshing…', 'intersoccer-product-variations'),
 				'syncing_wpml'      => __('Syncing WPML languages…', 'intersoccer-product-variations'),
 				'select_type'       => __('Please select a program type.', 'intersoccer-product-variations'),
 				'enter_name'        => __('Please enter a program name.', 'intersoccer-product-variations'),
@@ -114,7 +125,6 @@ class InterSoccer_Program_Manager {
 				'bulk_cancelled'    => __('Bulk action stopped.', 'intersoccer-product-variations'),
 				'bulk_reloading'    => __('Reloading…', 'intersoccer-product-variations'),
 				'bulk_select_items' => __('Select one or more programs before applying a bulk action.', 'intersoccer-product-variations'),
-				'bulk_title_refresh'=> __('Refresh Variation Attributes', 'intersoccer-product-variations'),
 				'bulk_title_scaffold'=> __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
 				'bulk_title_duplicate'=> __('Duplicate to year…', 'intersoccer-product-variations'),
 				'bulk_title_wpml'   => __('Sync all languages (WPML)', 'intersoccer-product-variations'),
@@ -389,13 +399,7 @@ class InterSoccer_Program_Manager {
 				$processed   = 0;
 
 				if ($action === 'refresh_attrs') {
-					foreach ($product_ids as $pid) {
-						$result = self::process_bulk_item('refresh_attrs', $pid);
-						if (($result['outcome'] ?? '') === 'processed') {
-							$processed++;
-						}
-					}
-					echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('%d products processed — variation attributes refreshed.', 'intersoccer-product-variations'), $processed) . '</p></div>';
+					echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__('Refresh Attributes runs from Advanced tools.', 'intersoccer-product-variations') . '</p></div>';
 				} elseif ($action === 'scaffold_variations') {
 					foreach ($product_ids as $pid) {
 						$result = self::process_bulk_item('scaffold_variations', $pid);
@@ -667,12 +671,6 @@ class InterSoccer_Program_Manager {
 	// =========================================================================
 
 	private static function render_detail_view($product_id) {
-		// Handle recalc form submission before rendering
-		if (isset($_POST['intersoccer_recalc_end_dates']) && check_admin_referer('intersoccer_recalc_nonce')) {
-			intersoccer_run_course_end_date_update_callback();
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Course end dates recalculated successfully.', 'intersoccer-product-variations') . '</p></div>';
-		}
-
 		$product = wc_get_product($product_id);
 		if (!$product || !$product->is_type('variable')) {
 			echo '<div class="wrap"><div class="notice notice-error"><p>' . esc_html__('Invalid or non-variable product.', 'intersoccer-product-variations') . '</p></div></div>';
@@ -890,7 +888,7 @@ class InterSoccer_Program_Manager {
 				<p>
 					<label>
 						<?php esc_html_e('Week 1 start', 'intersoccer-product-variations'); ?>
-						<input type="date" id="intersoccer-pm-week1-start" />
+						<input type="text" class="intersoccer-admin-date" id="intersoccer-pm-week1-start" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 					</label>
 					&nbsp;
 					<label>
@@ -901,17 +899,14 @@ class InterSoccer_Program_Manager {
 					<button type="button" class="button" id="intersoccer-pm-propose-weeks-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
 						<?php esc_html_e('Propose remaining weeks', 'intersoccer-product-variations'); ?>
 					</button>
-					<button type="button" class="button" id="intersoccer-pm-apply-parsed-dates-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
-						<?php esc_html_e('Apply parsed dates from camp-terms', 'intersoccer-product-variations'); ?>
-					</button>
 					<button type="button" class="button" id="intersoccer-pm-propose-times-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
 						<?php esc_html_e('Propose times from age', 'intersoccer-product-variations'); ?>
 					</button>
-					<button type="button" class="button button-primary" id="intersoccer-pm-repair-facets-btn" data-product-id="<?php echo esc_attr($product_id); ?>">
-						<?php esc_html_e('Repair Venue / Camp Term on variations', 'intersoccer-product-variations'); ?>
-					</button>
 				</p>
-				<p class="description"><?php esc_html_e('Propose fills empty rows only (+7 days per week index). Apply parsed uses the deprecated camp-terms parser once to seed meta. Propose times fills empty pa_camp-times from age (Half Day → 1000-1230, Full Day → 1000-1700). Repair promotes Venue and Camp Term to variation attributes and backfills Camp Term from week meta (single-venue products also get Venue).', 'intersoccer-product-variations'); ?></p>
+				<p class="description"><?php esc_html_e('Propose fills empty rows only (+7 days per week index). Propose times fills empty pa_camp-times from age (Half Day → 1000-1230, Full Day → 1000-1700). Parsed dates, venue repair, and attribute refresh run from Advanced tools.', 'intersoccer-product-variations'); ?></p>
+				<?php if (function_exists('intersoccer_pv_advanced_tools_page_slug')) : ?>
+					<p><a href="<?php echo esc_url(admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=product-tools&product_id=' . (int) $product_id)); ?>"><?php esc_html_e('Open Advanced tools for this product', 'intersoccer-product-variations'); ?></a></p>
+				<?php endif; ?>
 				<span id="intersoccer-pm-schedule-tools-status"></span>
 			</div>
 			<?php endif; ?>
@@ -1064,10 +1059,10 @@ class InterSoccer_Program_Manager {
 								<input type="number" min="1" max="52" class="intersoccer-pm-camp-week" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['week'] !== null ? $sched['week'] : ''); ?>" style="width: 60px;" />
 							</td>
 							<td>
-								<input type="date" class="intersoccer-pm-camp-start" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['start']); ?>" />
+								<input type="text" class="intersoccer-admin-date intersoccer-pm-camp-start" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr(function_exists('intersoccer_admin_format_date') ? intersoccer_admin_format_date($sched['start']) : $sched['start']); ?>" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 							</td>
 							<td>
-								<input type="date" class="intersoccer-pm-camp-end" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr($sched['end']); ?>" />
+								<input type="text" class="intersoccer-admin-date intersoccer-pm-camp-end" data-variation-id="<?php echo esc_attr($var_id); ?>" value="<?php echo esc_attr(function_exists('intersoccer_admin_format_date') ? intersoccer_admin_format_date($sched['end']) : $sched['end']); ?>" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" />
 								<span class="intersoccer-pm-schedule-status"></span>
 								<?php
 								$missing_dates_flag = function_exists('intersoccer_camp_variation_missing_dates_flag')
@@ -1092,48 +1087,12 @@ class InterSoccer_Program_Manager {
 				</tbody>
 			</table>
 
-			<?php // --- Variation Health Tools (merged from standalone Variation Health page) --- ?>
-			<?php
-			$unhealthy_ids = [];
-			foreach ($completeness['variations_issues'] as $vid => $issues) {
-				$unhealthy_ids[] = (int) $vid;
-			}
-			?>
-
-			<?php if (!empty($unhealthy_ids)) : ?>
-			<div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
-				<h3><?php esc_html_e('Variation Health Tools', 'intersoccer-product-variations'); ?></h3>
-				<p class="description"><?php esc_html_e('Refresh attributes on unhealthy variations to apply default values for missing fields.', 'intersoccer-product-variations'); ?></p>
-				<p>
-					<button type="button" class="button button-primary" id="intersoccer-pm-refresh-attrs-btn"
-						data-variation-ids="<?php echo esc_attr(wp_json_encode($unhealthy_ids)); ?>">
-						<?php printf(esc_html__('Refresh Attributes (%d unhealthy)', 'intersoccer-product-variations'), count($unhealthy_ids)); ?>
-					</button>
-				</p>
-			</div>
-			<?php endif; ?>
-
-			<?php if ($type === 'course') : ?>
-			<div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
-				<h3><?php esc_html_e('Course Tools', 'intersoccer-product-variations'); ?></h3>
-
-				<form method="post" action="" style="margin-bottom: 12px;">
-					<?php wp_nonce_field('intersoccer_recalc_nonce'); ?>
-					<p class="description"><?php esc_html_e('Recalculate end dates for all course variations based on start date, sessions, and holidays.', 'intersoccer-product-variations'); ?></p>
-					<input type="submit" name="intersoccer_recalc_end_dates" class="button" value="<?php esc_attr_e('Recalculate Course End Dates', 'intersoccer-product-variations'); ?>" />
-				</form>
-
-				<?php if (function_exists('intersoccer_course_holiday_fix_has_run') && !intersoccer_course_holiday_fix_has_run()) : ?>
-				<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee;">
-					<p><strong><?php esc_html_e('Course Holiday Fix (One-time)', 'intersoccer-product-variations'); ?></strong></p>
-					<p class="description"><?php esc_html_e('Fix existing courses that were created with inflated session counts to work around the old holiday calculation bug.', 'intersoccer-product-variations'); ?></p>
-					<button type="button" class="button button-secondary" id="intersoccer-pm-course-holiday-fix-btn">
-						<?php esc_html_e('Run Course Holiday Fix', 'intersoccer-product-variations'); ?>
-					</button>
-					<div id="intersoccer-pm-holiday-fix-result" style="margin-top: 10px; display: none;"></div>
-				</div>
-				<?php endif; ?>
-			</div>
+			<?php if ($type === 'course' && function_exists('intersoccer_pv_advanced_tools_page_slug')) : ?>
+			<p class="description">
+				<a href="<?php echo esc_url(admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=product-tools&product_id=' . (int) $product_id)); ?>">
+					<?php esc_html_e('Course end dates run from Advanced tools.', 'intersoccer-product-variations'); ?>
+				</a>
+			</p>
 			<?php endif; ?>
 
 		</div>
@@ -1234,8 +1193,8 @@ class InterSoccer_Program_Manager {
 						</tr>
 						<?php endforeach; endforeach; ?>
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
-							<th><label for="pm-course-start-date"><?php esc_html_e('Course start date', 'intersoccer-product-variations'); ?></label></th>
-							<td><input type="date" id="pm-course-start-date" /></td>
+							<th><label for="pm-course-start-date"><?php esc_html_e('Course start date (DD/MM/YYYY)', 'intersoccer-product-variations'); ?></label></th>
+							<td><input type="text" class="intersoccer-admin-date" id="pm-course-start-date" placeholder="<?php echo esc_attr(function_exists('intersoccer_admin_date_placeholder') ? intersoccer_admin_date_placeholder() : 'DD/MM/YYYY'); ?>" autocomplete="off" /></td>
 						</tr>
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
 							<th><label for="pm-course-total-weeks"><?php esc_html_e('Total weeks / sessions', 'intersoccer-product-variations'); ?></label></th>
@@ -1244,8 +1203,8 @@ class InterSoccer_Program_Manager {
 						<tr class="intersoccer-pm-attr-row intersoccer-pm-course-meta-row" data-types="course" style="display:none;">
 							<th><label for="pm-course-holiday-dates"><?php esc_html_e('Holiday dates', 'intersoccer-product-variations'); ?></label></th>
 							<td>
-								<textarea id="pm-course-holiday-dates" rows="3" class="large-text" placeholder="<?php esc_attr_e('One Y-m-d per line, e.g. 2026-12-25', 'intersoccer-product-variations'); ?>"></textarea>
-								<p class="description"><?php esc_html_e('Applied to each variation as _course_holiday_dates before generation.', 'intersoccer-product-variations'); ?></p>
+								<textarea id="pm-course-holiday-dates" rows="3" class="large-text" placeholder="<?php esc_attr_e('One date per line, e.g. 25/12/2026', 'intersoccer-product-variations'); ?>"></textarea>
+								<p class="description"><?php esc_html_e('Use DD/MM/YYYY (for example 06/03/2027 for 6 March). Applied to each variation as _course_holiday_dates before generation.', 'intersoccer-product-variations'); ?></p>
 							</td>
 						</tr>
 						<tr class="intersoccer-pm-attr-row" data-types="camp,course,birthday,tournament" style="display:none;">
@@ -2085,6 +2044,23 @@ class InterSoccer_Program_Manager {
 			wp_send_json_error(['message' => __('Invalid variation.', 'intersoccer-product-variations')]);
 		}
 
+		if (function_exists('intersoccer_admin_parse_date_result')) {
+			$start_parsed = intersoccer_admin_parse_date_result($start);
+			$end_parsed   = intersoccer_admin_parse_date_result($end);
+			if ($start_parsed['invalid'] || $end_parsed['invalid']) {
+				$bad = $start_parsed['invalid'] ? $start_parsed['input'] : $end_parsed['input'];
+				wp_send_json_error([
+					'message' => sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('"%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). The dates were not changed.', 'intersoccer-product-variations'),
+						$bad
+					),
+				]);
+			}
+			$start = $start_parsed['ymd'];
+			$end   = $end_parsed['ymd'];
+		}
+
 		intersoccer_update_camp_schedule($variation_id, $start, $end, $week > 0 ? $week : null, true);
 		wc_delete_product_transients($variation->get_parent_id());
 
@@ -2109,6 +2085,20 @@ class InterSoccer_Program_Manager {
 		$product = wc_get_product($product_id);
 		if (!$product || !$product->is_type('variable') || !function_exists('intersoccer_camp_schedule_propose_from_week1')) {
 			wp_send_json_error(['message' => __('Invalid product.', 'intersoccer-product-variations')]);
+		}
+
+		if (function_exists('intersoccer_admin_parse_date_result')) {
+			$week1_parsed = intersoccer_admin_parse_date_result($week1_start);
+			if ($week1_parsed['empty'] || $week1_parsed['invalid']) {
+				wp_send_json_error([
+					'message' => sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('Week 1 start "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March).', 'intersoccer-product-variations'),
+						$week1_parsed['input'] !== '' ? $week1_parsed['input'] : $week1_start
+					),
+				]);
+			}
+			$week1_start = $week1_parsed['ymd'];
 		}
 
 		$updated = 0;
@@ -2147,29 +2137,11 @@ class InterSoccer_Program_Manager {
 	}
 
 	public static function ajax_apply_parsed_camp_dates() {
-		check_ajax_referer(self::NONCE_ACTION, 'nonce');
-
-		if (!current_user_can(self::CAPABILITY)) {
-			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		if (function_exists('intersoccer_pv_repair_reject_legacy_ajax')) {
+			intersoccer_pv_repair_reject_legacy_ajax();
+			return;
 		}
-
-		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
-		$force      = !empty($_POST['force']);
-
-		if (!function_exists('intersoccer_migrate_camp_dates_for_product')) {
-			require_once INTERSOCCER_PRODUCT_VARIATIONS_PLUGIN_DIR . 'includes/woocommerce/camp-schedule-migrate.php';
-		}
-
-		$result = intersoccer_migrate_camp_dates_for_product($product_id, [
-			'force'   => $force,
-			'dry_run' => false,
-		]);
-
-		if (is_wp_error($result)) {
-			wp_send_json_error(['message' => $result->get_error_message()]);
-		}
-
-		wp_send_json_success($result);
+		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')], 403);
 	}
 
 	/**
@@ -2265,28 +2237,11 @@ class InterSoccer_Program_Manager {
 	 * AJAX: promote Venue/Camp Term to variation attrs and backfill empty values.
 	 */
 	public static function ajax_repair_camp_facets() {
-		check_ajax_referer(self::NONCE_ACTION, 'nonce');
-
-		if (!current_user_can(self::CAPABILITY)) {
-			wp_send_json_error(['message' => __('Permission denied.', 'intersoccer-product-variations')]);
+		if (function_exists('intersoccer_pv_repair_reject_legacy_ajax')) {
+			intersoccer_pv_repair_reject_legacy_ajax();
+			return;
 		}
-
-		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
-		$result = self::repair_camp_variation_facets($product_id);
-		if (empty($result['promoted'])) {
-			wp_send_json_error(['message' => __('Not a camp variable product.', 'intersoccer-product-variations')]);
-		}
-
-		wp_send_json_success([
-			'result' => $result,
-			'completeness' => self::get_product_completeness($product_id),
-			'message' => sprintf(
-				/* translators: 1: updated variations, 2: venue rows still needing manual venue */
-				__('Camp facets repaired: %1$d variations updated. %2$d still need a venue (multi-venue products).', 'intersoccer-product-variations'),
-				(int) $result['updated'],
-				(int) $result['venue_needs_manual']
-			),
-		]);
+		wp_send_json_error(['message' => __('This repair runs only from Advanced tools.', 'intersoccer-product-variations')], 403);
 	}
 
 	/**
@@ -2340,6 +2295,12 @@ class InterSoccer_Program_Manager {
 		$product_id = isset($_POST['product_id']) ? absint($_POST['product_id']) : 0;
 		$opts       = [];
 
+		if ($action === 'refresh_attrs') {
+			wp_send_json_error([
+				'message' => __('Refresh Attributes runs from Advanced tools.', 'intersoccer-product-variations'),
+			]);
+		}
+
 		if ($action === 'duplicate_to_year') {
 			$target_year   = isset($_POST['pm_target_year']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year'])) : '';
 			$target_custom = isset($_POST['pm_target_year_custom']) ? sanitize_text_field(wp_unslash($_POST['pm_target_year_custom'])) : '';
@@ -2372,7 +2333,7 @@ class InterSoccer_Program_Manager {
 	/**
 	 * Process a single Program Manager list bulk action against one product.
 	 *
-	 * @param string $action     refresh_attrs|scaffold_variations|duplicate_to_year|sync_wpml_languages
+	 * @param string $action     scaffold_variations|duplicate_to_year|sync_wpml_languages
 	 * @param int    $product_id Product ID.
 	 * @param array  $opts       Optional. year/season for duplicate_to_year.
 	 * @return array{ok:bool,outcome:string,product_id:int,product_name:string,message:string,new_product_id:?int,wpml:?array}
@@ -2396,7 +2357,7 @@ class InterSoccer_Program_Manager {
 			'wpml'           => null,
 		];
 
-		$allowed = ['refresh_attrs', 'scaffold_variations', 'duplicate_to_year', 'sync_wpml_languages'];
+		$allowed = ['scaffold_variations', 'duplicate_to_year', 'sync_wpml_languages'];
 		if (!in_array($action, $allowed, true)) {
 			return array_merge($base, [
 				'ok'      => false,
@@ -2414,34 +2375,6 @@ class InterSoccer_Program_Manager {
 					__('Skipped #%d (not a variable product).', 'intersoccer-product-variations'),
 					$product_id
 				),
-			]);
-		}
-
-		if ($action === 'refresh_attrs') {
-			$type = class_exists('InterSoccer_Product_Types')
-				? InterSoccer_Product_Types::get_product_type($product_id)
-				: '';
-			if ($type === 'camp') {
-				self::repair_camp_variation_facets($product_id);
-			} else {
-				foreach ($product->get_children() as $var_id) {
-					$variation = wc_get_product($var_id);
-					if (!$variation) {
-						continue;
-					}
-					$parent_attrs = $product->get_attributes();
-					$var_attrs    = [];
-					foreach ($parent_attrs as $attr) {
-						if ($attr->get_variation()) {
-							$var_attrs[$attr->get_name()] = '';
-						}
-					}
-					$variation->set_attributes($var_attrs);
-					$variation->save();
-				}
-			}
-			return array_merge($base, [
-				'message' => __('Variation attributes refreshed.', 'intersoccer-product-variations'),
 			]);
 		}
 
@@ -3297,7 +3230,7 @@ class InterSoccer_Program_Manager {
 	 * @param string[] $extra_slugs
 	 * @return bool True when parent attribute is marked is_variation after save.
 	 */
-	private static function ensure_parent_taxonomy_variation_attribute($product_id, $taxonomy, $extra_slugs = []) {
+	private static function ensure_parent_taxonomy_variation_attribute($product_id, $taxonomy, $extra_slugs = [], $dry_run = false) {
 		$product = wc_get_product($product_id);
 		if (!$product || !taxonomy_exists($taxonomy)) {
 			return false;
@@ -3311,6 +3244,10 @@ class InterSoccer_Program_Manager {
 		$merged = array_values(array_unique(array_merge($current, $extra_slugs)));
 		if (empty($merged)) {
 			return false;
+		}
+
+		if ($dry_run) {
+			return true;
 		}
 
 		wp_set_object_terms($product_id, $merged, $taxonomy);
@@ -3383,6 +3320,91 @@ class InterSoccer_Program_Manager {
 	}
 
 	/**
+	 * Whether a parent taxonomy attribute is used for variations.
+	 *
+	 * @param object $product  Product.
+	 * @param string $taxonomy Taxonomy.
+	 * @return bool
+	 */
+	private static function parent_taxonomy_is_variation($product, $taxonomy) {
+		$attributes = method_exists($product, 'get_attributes') ? $product->get_attributes() : [];
+		if (!is_array($attributes) || !isset($attributes[$taxonomy])) {
+			$product_id = method_exists($product, 'get_id') ? (int) $product->get_id() : 0;
+			$raw = get_post_meta($product_id, '_product_attributes', true);
+			if (is_array($raw) && isset($raw[$taxonomy]) && is_array($raw[$taxonomy])) {
+				return !empty($raw[$taxonomy]['is_variation']);
+			}
+			return false;
+		}
+		$attr = $attributes[$taxonomy];
+		if (is_object($attr) && method_exists($attr, 'get_variation')) {
+			return (bool) $attr->get_variation();
+		}
+		if (is_array($attr) && array_key_exists('is_variation', $attr)) {
+			return !empty($attr['is_variation']);
+		}
+		return false;
+	}
+
+	/**
+	 * Current parent taxonomy variation flag and term slugs.
+	 *
+	 * @param int    $product_id Product ID.
+	 * @param string $taxonomy   Taxonomy.
+	 * @return array{is_variation:bool,slugs:string[]}|null
+	 */
+	public static function parent_taxonomy_attribute_snapshot($product_id, $taxonomy) {
+		$product = function_exists('wc_get_product') ? wc_get_product((int) $product_id) : null;
+		if (!$product) {
+			return null;
+		}
+		$terms = function_exists('wc_get_product_terms')
+			? wc_get_product_terms((int) $product_id, $taxonomy, ['fields' => 'slugs'])
+			: [];
+		if (is_wp_error($terms) || !is_array($terms)) {
+			$terms = [];
+		}
+		$slugs = array_values(array_unique(array_filter(array_map('strval', $terms))));
+		sort($slugs);
+		return [
+			'is_variation' => self::parent_taxonomy_is_variation($product, $taxonomy),
+			'slugs' => $slugs,
+		];
+	}
+
+	/**
+	 * Parent promotion that venue repair would write, or null when nothing changes.
+	 *
+	 * @param int      $product_id Product ID.
+	 * @param string   $taxonomy   Taxonomy.
+	 * @param string[] $extra_slugs Extra slugs to merge.
+	 * @return array{before:array,after:array}|null
+	 */
+	public static function parent_taxonomy_repair_plan($product_id, $taxonomy, $extra_slugs = []) {
+		if (!function_exists('taxonomy_exists') || !taxonomy_exists($taxonomy)) {
+			return null;
+		}
+		$before = self::parent_taxonomy_attribute_snapshot($product_id, $taxonomy);
+		if ($before === null) {
+			return null;
+		}
+		$extra = array_values(array_unique(array_filter(array_map('strval', (array) $extra_slugs))));
+		$merged = array_values(array_unique(array_merge($before['slugs'], $extra)));
+		sort($merged);
+		if ($merged === []) {
+			return null;
+		}
+		$after = [
+			'is_variation' => true,
+			'slugs' => $merged,
+		];
+		if ($before == $after) {
+			return null;
+		}
+		return ['before' => $before, 'after' => $after];
+	}
+
+	/**
 	 * Promote Venue/Camp Term to variation attrs and backfill empty variation values.
 	 *
 	 * Camp Times are left to propose/refresh helpers. Venue is only auto-filled when
@@ -3391,13 +3413,15 @@ class InterSoccer_Program_Manager {
 	 * @param int $product_id
 	 * @return array{promoted:bool,updated:int,skipped:int,venue_needs_manual:int}
 	 */
-	public static function repair_camp_variation_facets($product_id) {
+	public static function repair_camp_variation_facets($product_id, $dry_run = false) {
 		$product_id = absint($product_id);
+		$dry_run = (bool) $dry_run;
 		$result = [
 			'promoted' => false,
 			'updated' => 0,
 			'skipped' => 0,
 			'venue_needs_manual' => 0,
+			'changes' => [],
 		];
 
 		$product = wc_get_product($product_id);
@@ -3425,9 +3449,24 @@ class InterSoccer_Program_Manager {
 			$terms = [];
 		}
 
-		$venue_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $venues);
-		$terms_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-terms', $terms);
-		$times_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', []);
+		foreach ([
+			'pa_intersoccer-venues' => $venues,
+			'pa_camp-terms' => $terms,
+			'pa_camp-times' => [],
+		] as $taxonomy => $extra_slugs) {
+			$plan = self::parent_taxonomy_repair_plan($product_id, $taxonomy, $extra_slugs);
+			if (is_array($plan)) {
+				$result['changes'][] = [
+					'id' => 'parent-attr:' . $product_id . ':' . $taxonomy,
+					'before' => $plan['before'],
+					'after' => $plan['after'],
+				];
+			}
+		}
+
+		$venue_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_intersoccer-venues', $venues, $dry_run);
+		$terms_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-terms', $terms, $dry_run);
+		$times_ok = self::ensure_parent_taxonomy_variation_attribute($product_id, 'pa_camp-times', [], $dry_run);
 		$result['promoted'] = ($venue_ok || $venues === []) && ($terms_ok || $terms === []) && $times_ok !== false;
 		$result['parent_flags'] = [
 			'pa_intersoccer-venues' => $venue_ok,
@@ -3442,8 +3481,13 @@ class InterSoccer_Program_Manager {
 
 		foreach ($product->get_children() as $var_id) {
 			$variation = wc_get_product($var_id);
-			if (!$variation || !($variation instanceof WC_Product_Variation)) {
+			if (!is_object($variation) || !method_exists($variation, 'get_attributes') || !method_exists($variation, 'set_attributes')) {
 				continue;
+			}
+			if (class_exists('WC_Product_Variation', false) && !($variation instanceof WC_Product_Variation)) {
+				if (!method_exists($variation, 'is_type') || !$variation->is_type('variation')) {
+					continue;
+				}
 			}
 
 			$attrs = $variation->get_attributes();
@@ -3451,6 +3495,8 @@ class InterSoccer_Program_Manager {
 
 			$venue = isset($attrs['pa_intersoccer-venues']) ? (string) $attrs['pa_intersoccer-venues'] : '';
 			$term  = isset($attrs['pa_camp-terms']) ? (string) $attrs['pa_camp-terms'] : '';
+			$old_venue = $venue;
+			$old_term = $term;
 
 			// Prefer stored meta when WC attribute object is empty (avoids wiping on save).
 			if ($venue === '') {
@@ -3487,19 +3533,81 @@ class InterSoccer_Program_Manager {
 			}
 
 			if ($changed) {
+				$before_row = [
+					'attributes' => [
+						'pa_intersoccer-venues' => $old_venue,
+						'pa_camp-terms' => $old_term,
+					],
+				];
+				$after_row = [
+					'attributes' => [
+						'pa_intersoccer-venues' => (string) ($attrs['pa_intersoccer-venues'] ?? ''),
+						'pa_camp-terms' => (string) ($attrs['pa_camp-terms'] ?? ''),
+					],
+				];
+				if (function_exists('intersoccer_pv_facet_side_effect_plan')) {
+					$side = intersoccer_pv_facet_side_effect_plan((int) $var_id, [
+						'pa_camp-terms' => (string) ($attrs['pa_camp-terms'] ?? ''),
+						'pa_intersoccer-venues' => (string) ($attrs['pa_intersoccer-venues'] ?? ''),
+					]);
+					$before_row = array_merge($before_row, $side['before']);
+					$after_row = array_merge($after_row, $side['after']);
+					foreach ((array) ($side['needs_manual'] ?? []) as $manual) {
+						$tid = (int) ($manual['tid'] ?? 0);
+						$taxonomy = (string) ($manual['taxonomy'] ?? '');
+						if ($tid <= 0 || $taxonomy === '') {
+							continue;
+						}
+						$current = (string) ($manual['current'] ?? '');
+						$result['changes'][] = [
+							'id' => 'manual:twin:' . $tid . ':' . $taxonomy,
+							'needs_manual' => true,
+							'before' => ['attributes' => [$taxonomy => $current]],
+							'after' => ['attributes' => [$taxonomy => $current], 'needs_manual' => '1'],
+						];
+						$result['venue_needs_manual']++;
+					}
+				}
+				$result['changes'][] = [
+					'id' => 'attrs:' . (int) $var_id,
+					'before' => $before_row,
+					'after' => $after_row,
+				];
+				if ($dry_run) {
+					$result['updated']++;
+					continue;
+				}
 				$variation->set_attributes($attrs);
 				$variation->save();
 				// Persist taxonomy attrs as post meta — WC may ignore keys not yet marked for variations.
 				if (!empty($attrs['pa_camp-terms'])) {
 					update_post_meta($var_id, 'attribute_pa_camp-terms', $attrs['pa_camp-terms']);
-					wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+					$camp_term_id = 0;
+					if (function_exists('intersoccer_translated_taxonomy_term')) {
+						$resolved = intersoccer_translated_taxonomy_term((string) $attrs['pa_camp-terms'], 'pa_camp-terms', (int) $var_id);
+						$camp_term_id = is_array($resolved) ? (int) $resolved['term_id'] : 0;
+					}
+					if (function_exists('intersoccer_pv_repair_set_object_term')) {
+						intersoccer_pv_repair_set_object_term((int) $var_id, 'pa_camp-terms', $camp_term_id, (string) $attrs['pa_camp-terms']);
+					} else {
+						wp_set_object_terms($var_id, $attrs['pa_camp-terms'], 'pa_camp-terms');
+					}
 					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
 						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_camp-terms', (string) $attrs['pa_camp-terms']);
 					}
 				}
 				if (!empty($attrs['pa_intersoccer-venues'])) {
 					update_post_meta($var_id, 'attribute_pa_intersoccer-venues', $attrs['pa_intersoccer-venues']);
-					wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+					$venue_term_id = 0;
+					if (function_exists('intersoccer_translated_taxonomy_term')) {
+						$resolved = intersoccer_translated_taxonomy_term((string) $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues', (int) $var_id);
+						$venue_term_id = is_array($resolved) ? (int) $resolved['term_id'] : 0;
+					}
+					if (function_exists('intersoccer_pv_repair_set_object_term')) {
+						intersoccer_pv_repair_set_object_term((int) $var_id, 'pa_intersoccer-venues', $venue_term_id, (string) $attrs['pa_intersoccer-venues']);
+					} else {
+						wp_set_object_terms($var_id, $attrs['pa_intersoccer-venues'], 'pa_intersoccer-venues');
+					}
 					if (function_exists('intersoccer_sync_variation_taxonomy_attribute_to_translations')) {
 						intersoccer_sync_variation_taxonomy_attribute_to_translations((int) $var_id, 'pa_intersoccer-venues', (string) $attrs['pa_intersoccer-venues']);
 					}
@@ -3517,7 +3625,9 @@ class InterSoccer_Program_Manager {
 			}
 		}
 
-		wc_delete_product_transients($product_id);
+		if (!$dry_run) {
+			wc_delete_product_transients($product_id);
+		}
 
 		return $result;
 	}
@@ -3556,8 +3666,14 @@ class InterSoccer_Program_Manager {
 		}
 
 		if ($type === 'course') {
-			$defaults = intersoccer_attr_refresh_defaults('course');
-			foreach ($defaults as $meta_key => $default_value) {
+			// New variations still seed these when Program Manager does not pass them.
+			// Attribute refresh does not use this seed.
+			$meta_defaults = [
+				'_course_start_date' => function_exists('current_time') ? (string) current_time('Y-m-d') : gmdate('Y-m-d'),
+				'_course_total_weeks' => '16',
+				'_course_holiday_dates' => '',
+			];
+			foreach ($meta_defaults as $meta_key => $default_value) {
 				if (strpos($meta_key, '_') !== 0) {
 					continue;
 				}
@@ -3567,6 +3683,25 @@ class InterSoccer_Program_Manager {
 				}
 				if ($meta_key === '_course_holiday_dates') {
 					$value = self::normalize_course_holiday_dates($value);
+				}
+				if ($meta_key === '_course_start_date' || $meta_key === '_end_date') {
+					if (function_exists('intersoccer_admin_parse_date_result')) {
+						$parsed = intersoccer_admin_parse_date_result($value);
+						if ($parsed['ok']) {
+							$value = $parsed['ymd'];
+						} elseif ($parsed['invalid']) {
+							if (function_exists('intersoccer_admin_date_flag_error')) {
+								intersoccer_admin_date_flag_error(sprintf(
+									/* translators: %s is the date the admin typed. */
+									__('Date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
+									$parsed['input']
+								));
+							}
+							continue;
+						} else {
+							$value = '';
+						}
+					}
 				}
 				if ($meta_key === '_course_total_weeks') {
 					$value = (string) max(0, (int) $value);
@@ -3729,7 +3864,23 @@ class InterSoccer_Program_Manager {
 		$out = [];
 		foreach ($lines as $line) {
 			$line = trim((string) $line);
-			if ($line !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) {
+			if ($line === '') {
+				continue;
+			}
+			if (function_exists('intersoccer_admin_parse_date_result')) {
+				$parsed = intersoccer_admin_parse_date_result($line);
+				if ($parsed['ok']) {
+					$out[] = $parsed['ymd'];
+				} elseif ($parsed['invalid'] && function_exists('intersoccer_admin_date_flag_error')) {
+					intersoccer_admin_date_flag_error(sprintf(
+						/* translators: %s is the date the admin typed. */
+						__('Holiday date "%s" is not a valid day/month/year date. Use DD/MM/YYYY (for example 06/03/2027 for 6 March). That date was not saved.', 'intersoccer-product-variations'),
+						$parsed['input']
+					));
+				}
+				continue;
+			}
+			if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) {
 				$out[] = $line;
 			}
 		}
@@ -3775,7 +3926,6 @@ class InterSoccer_Program_List_Table extends WP_List_Table {
 
 	public function get_bulk_actions() {
 		$actions = [
-			'refresh_attrs'       => __('Refresh Variation Attributes', 'intersoccer-product-variations'),
 			'scaffold_variations' => __('Auto-scaffold Missing Variations', 'intersoccer-product-variations'),
 			'duplicate_to_year'   => __('Duplicate to year…', 'intersoccer-product-variations'),
 		];

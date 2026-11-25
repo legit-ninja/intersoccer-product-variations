@@ -160,8 +160,10 @@ PHP
 				$object_id = (int) $object_id;
 				$names = [];
 				foreach ((array) $terms as $term) {
-					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term])) {
-						$names[] = $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					if (is_numeric($term) && !empty($GLOBALS['intersoccer_test_terms'][(int) $term]['name'])) {
+						$names[] = (string) $GLOBALS['intersoccer_test_terms'][(int) $term]['name'];
+					} elseif (!is_numeric($term) && (string) $term !== '') {
+						$names[] = (string) $term;
 					}
 				}
 				$GLOBALS['intersoccer_test_product_terms'][$object_id][$taxonomy] = $names;
@@ -223,10 +225,19 @@ PHP
 class WC_Product_Attribute {
 	private $name;
 	private $options = [];
+	private $id = 0;
+	private $visible = true;
+	private $variation = false;
 	public function get_name() { return $this->name; }
 	public function set_name($name) { $this->name = $name; return $this; }
 	public function get_options() { return $this->options; }
 	public function set_options($options) { $this->options = $options; return $this; }
+	public function get_id() { return $this->id; }
+	public function set_id($id) { $this->id = $id; return $this; }
+	public function set_visible($visible) { $this->visible = (bool) $visible; return $this; }
+	public function get_visible() { return $this->visible; }
+	public function set_variation($variation) { $this->variation = (bool) $variation; return $this; }
+	public function get_variation() { return $this->variation; }
 }
 PHP
 			);

@@ -328,12 +328,13 @@ class AdminProductFieldsTest extends TestCase {
     public function testMalformedStartDateIsNotPassedToTheCalculator() {
         require_once dirname(__DIR__) . '/includes/admin-product-fields.php';
 
-        $this->assertSame('', intersoccer_validated_course_start_date('13/01/2026'));
+        $this->assertSame('2026-01-13', intersoccer_validated_course_start_date('13/01/2026'));
+        $this->assertSame('', intersoccer_validated_course_start_date('31/02/2026'));
         $this->assertSame('', intersoccer_validated_course_start_date('not-a-date'));
         $this->assertSame('2026-01-05', intersoccer_validated_course_start_date('2026-01-05'));
         $this->assertSame(
             '',
-            intersoccer_end_date_for_course_variation(9102, 9100, '13/01/2026', 4, [])
+            intersoccer_end_date_for_course_variation(9102, 9100, '31/02/2026', 4, [])
         );
     }
 

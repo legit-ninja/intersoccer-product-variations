@@ -486,7 +486,10 @@ function intersoccer_attr_health_required_keys($product_type) {
 }
 
 /**
- * Defaults applied by Variation Health refresh action.
+ * Safe fills for empty required variation attributes.
+ *
+ * Course start date, length, and holidays are not invented here. Attribute
+ * refresh reports those as needs manual and does not write them.
  *
  * @param string $product_type
  * @return array<string,string>
@@ -501,9 +504,6 @@ function intersoccer_attr_refresh_defaults($product_type) {
         ],
         'course' => [
             'pa_course-day' => 'monday',
-            '_course_start_date' => gmdate('Y-m-d'),
-            '_course_total_weeks' => '16',
-            '_course_holiday_dates' => '',
         ],
     ];
 

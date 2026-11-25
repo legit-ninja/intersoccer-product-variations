@@ -257,7 +257,14 @@ class InterSoccer_Course {
      * @param int $total_weeks Total sessions the customer should receive.
      * @return string End date in 'Y-m-d' or empty.
      */
-    public static function calculate_end_date($variation_id, $total_weeks) {
+    /**
+     * Proposed end date for a variation. Does not write.
+     *
+     * @param int $variation_id Variation ID.
+     * @param int $total_weeks  Total sessions the customer should receive.
+     * @return string End date in 'Y-m-d' or empty.
+     */
+    public static function preview_end_date($variation_id, $total_weeks) {
         $context = self::build_context(0, $variation_id, ['include_base_price' => false]);
 
         if ($total_weeks && $total_weeks !== $context->get_total_weeks()) {
@@ -273,7 +280,11 @@ class InterSoccer_Course {
             );
         }
 
-        $end_date = self::schedule_calculator()->calculate_end_date($context);
+        return (string) self::schedule_calculator()->calculate_end_date($context);
+    }
+
+    public static function calculate_end_date($variation_id, $total_weeks) {
+        $end_date = self::preview_end_date($variation_id, $total_weeks);
 
         if ($end_date) {
             update_post_meta($variation_id, '_end_date', $end_date);
