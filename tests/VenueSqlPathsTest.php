@@ -493,35 +493,35 @@ class VenueSqlPathsTest extends TestCase {
 		$this->assertSame('', (string) $this->db->meta_value(201, 'attribute_pa_course-day'));
 	}
 
-	/**
-	 * @dataProvider adminLanguageProvider
-	 */
-	public function test_refresh_under_admin_language_touches_only_source_and_leaves_icl_unchanged(string $lang): void {
-		unset($lang);
-		$this->seedRefreshCourse(200, 201, 202);
-		$this->db->add_meta(201, 'attribute_pa_course-day', '');
-		$this->db->add_meta(202, 'attribute_pa_course-day', '');
-		$icl_before = intersoccer_pv_repair_icl_snapshot([200, 201, 202]);
-		$this->assertNotSame([], $icl_before);
+	public function test_refresh_under_admin_language_touches_only_source_and_leaves_icl_unchanged(): void {
+		foreach (['en', 'fr', 'all'] as $lang) {
+			unset($GLOBALS['intersoccer_pv_repair_icl_rows_sql_cache']);
+			if (class_exists('MockMetaData')) {
+				MockMetaData::$data = [];
+			}
+			$this->db = new InterSoccerPvRepairFakeWpdb();
+			$GLOBALS['wpdb'] = $this->db;
+			if (function_exists('intersoccer_pv_wpml_icl_translations_table_reset_exists_cache')) {
+				intersoccer_pv_wpml_icl_translations_table_reset_exists_cache();
+			}
+			$GLOBALS['intersoccer_test_wpml_current_language'] = $lang;
+			$this->seedRefreshCourse(200, 201, 202);
+			$this->db->add_meta(201, 'attribute_pa_course-day', '');
+			$this->db->add_meta(202, 'attribute_pa_course-day', '');
+			$icl_before = intersoccer_pv_repair_icl_snapshot([200, 201, 202]);
+			$this->assertNotSame([], $icl_before, $lang);
 
-		$applied = intersoccer_pv_tool_refresh_attributes(false, ['product_id' => 200]);
-		$ids = array_map(static function ($row) {
-			return (string) ($row['id'] ?? '');
-		}, $applied['rows']);
-		$this->assertContains('attrs:201', $ids);
-		$this->assertNotContains('attrs:202', $ids);
-		$this->assertContains('manual:attr:202:pa_course-day', $ids);
-		$this->assertSame('monday', (string) $this->db->meta_value(201, 'attribute_pa_course-day'));
-		$this->assertSame('', (string) $this->db->meta_value(202, 'attribute_pa_course-day'));
-		$this->assertSame($icl_before, intersoccer_pv_repair_icl_snapshot([200, 201, 202]));
-	}
-
-	public static function adminLanguageProvider(): array {
-		return [
-			'en' => ['en'],
-			'fr' => ['fr'],
-			'all' => ['all'],
-		];
+			$applied = intersoccer_pv_tool_refresh_attributes(false, ['product_id' => 200]);
+			$ids = array_map(static function ($row) {
+				return (string) ($row['id'] ?? '');
+			}, $applied['rows']);
+			$this->assertContains('attrs:201', $ids, $lang);
+			$this->assertNotContains('attrs:202', $ids, $lang);
+			$this->assertContains('manual:attr:202:pa_course-day', $ids, $lang);
+			$this->assertSame('monday', (string) $this->db->meta_value(201, 'attribute_pa_course-day'), $lang);
+			$this->assertSame('', (string) $this->db->meta_value(202, 'attribute_pa_course-day'), $lang);
+			$this->assertSame($icl_before, intersoccer_pv_repair_icl_snapshot([200, 201, 202]), $lang);
+		}
 	}
 
 	private function seedRefreshCourse($parent_id, $source_variation, $twin_variation) {
