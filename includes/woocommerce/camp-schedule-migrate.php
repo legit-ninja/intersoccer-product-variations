@@ -194,7 +194,7 @@ if (defined('WP_CLI') && WP_CLI) {
 	 * : Overwrite existing `_camp_start_date` values.
 	 *
 	 * [--dry-run]
-	 * : Report only; do not write meta.
+	 * : Report only; do not write meta. Omitting this flag writes. The Advanced tools screen is Preview-first and asks for GLOBAL on a shop-wide or overwrite run.
 	 *
 	 * ## EXAMPLES
 	 *

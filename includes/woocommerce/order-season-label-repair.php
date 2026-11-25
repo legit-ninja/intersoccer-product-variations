@@ -1460,8 +1460,8 @@ function intersoccer_season_label_repair_get_preview() {
  * @param bool $embedded When true, omit outer wrap (Order Meta Repair tab).
  */
 function intersoccer_render_season_label_repair_page($embedded = false) {
-	if (!current_user_can('manage_woocommerce')) {
-		wp_die(__('You do not have permission to access this page.', 'intersoccer-product-variations'));
+	if (!function_exists('intersoccer_pv_user_can_run_repairs') || !intersoccer_pv_user_can_run_repairs()) {
+		wp_die(__('You do not have permission to run repairs.', 'intersoccer-product-variations'));
 	}
 
 	$notice  = '';
@@ -1479,16 +1479,47 @@ function intersoccer_render_season_label_repair_page($embedded = false) {
 				$report = null;
 			} else {
 				intersoccer_season_label_repair_store_preview($report);
+				if (function_exists('intersoccer_pv_repair_log')) {
+					intersoccer_pv_repair_log([
+						'user_id' => (int) get_current_user_id(),
+						'tool' => 'season_labels',
+						'mode' => 'preview',
+						'scope' => 'shop',
+						'counts' => ['changed' => count((array) ($report['rows'] ?? []))],
+						'backup' => '',
+					]);
+				}
 				$notice = __('Dry-run preview completed. No meta was written.', 'intersoccer-product-variations');
 			}
 		} elseif ($action === 'apply') {
-			$confirm = !empty($_POST['intersoccer_season_label_repair_confirm']);
+			$phrase = function_exists('intersoccer_pv_repair_posted_phrase')
+				? intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_phrase')
+				: '';
+			$global = function_exists('intersoccer_pv_repair_posted_phrase')
+				? intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_global')
+				: '';
 			$preview = intersoccer_season_label_repair_get_preview();
-			if (!$confirm) {
-				$notice = __('Confirm the Apply checkbox after running a preview in this session.', 'intersoccer-product-variations');
+			$stored_rows = (is_array($preview) && is_array($preview['report']['rows'] ?? null)) ? $preview['report']['rows'] : [];
+			if (trim($phrase) !== 'APPLY') {
+				$notice = __('Type APPLY to confirm.', 'intersoccer-product-variations');
+			} elseif (trim($global) !== 'GLOBAL') {
+				$notice = __('This scope is shop-wide. Type GLOBAL as well as APPLY.', 'intersoccer-product-variations');
 			} elseif (!$preview || empty($preview['report'])) {
-				$notice = __('Run Preview (dry run) in this session before Apply.', 'intersoccer-product-variations');
+				$notice = __('Run Preview before Apply.', 'intersoccer-product-variations');
+			} elseif ($stored_rows === []) {
+				$notice = __('Preview has no changes. Apply was not run.', 'intersoccer-product-variations');
 			} else {
+				$fresh = InterSoccer_Order_Season_Label_Repair::run_dry();
+				$fresh_rows = is_wp_error($fresh) || !is_array($fresh['rows'] ?? null) ? null : $fresh['rows'];
+				$stored_fp = function_exists('intersoccer_pv_repair_rows_fingerprint')
+					? intersoccer_pv_repair_rows_fingerprint($stored_rows)
+					: '';
+				$fresh_fp = is_array($fresh_rows) && function_exists('intersoccer_pv_repair_rows_fingerprint')
+					? intersoccer_pv_repair_rows_fingerprint($fresh_rows)
+					: '';
+				if (!is_array($fresh_rows) || $stored_fp === '' || $stored_fp !== $fresh_fp) {
+					$notice = __('The change set no longer matches the Preview. Run Preview again.', 'intersoccer-product-variations');
+				} else {
 				$report = InterSoccer_Order_Season_Label_Repair::run_apply();
 				if (is_wp_error($report)) {
 					$notice = $report->get_error_message();
@@ -1501,6 +1532,17 @@ function intersoccer_render_season_label_repair_page($embedded = false) {
 						$report['backup_file'] ? basename((string) $report['backup_file']) : '—'
 					);
 					intersoccer_season_label_repair_store_preview($report);
+					if (function_exists('intersoccer_pv_repair_log')) {
+						intersoccer_pv_repair_log([
+							'user_id' => (int) get_current_user_id(),
+							'tool' => 'season_labels',
+							'mode' => 'apply',
+							'scope' => 'shop',
+							'counts' => ['changed' => (int) ($report['updated'] ?? 0)],
+							'backup' => !empty($report['backup_file']) ? basename((string) $report['backup_file']) : '',
+						]);
+					}
+				}
 				}
 			}
 		} elseif ($action === 'rollback') {
@@ -1552,10 +1594,12 @@ function intersoccer_render_season_label_repair_page($embedded = false) {
 
 		<form method="post" style="margin-bottom: 2em;">
 			<?php wp_nonce_field('intersoccer_season_label_repair'); ?>
-			<label>
-				<input type="checkbox" name="intersoccer_season_label_repair_confirm" value="1" />
-				<?php esc_html_e('I confirm this Apply follows a Preview in this session.', 'intersoccer-product-variations'); ?>
-			</label>
+			<?php
+			if (function_exists('intersoccer_pv_repair_phrase_fields')) {
+				intersoccer_pv_repair_phrase_fields(true);
+			}
+			?>
+			<p class="description"><?php esc_html_e('Season label repair covers every matching order line. Type APPLY and GLOBAL.', 'intersoccer-product-variations'); ?></p>
 			<p>
 				<button type="submit" class="button button-primary" name="intersoccer_season_label_repair_action" value="apply">
 					<?php esc_html_e('Apply', 'intersoccer-product-variations'); ?>

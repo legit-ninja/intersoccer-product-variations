@@ -8,7 +8,7 @@
  * line with its CURRENT variation and rewrites only those schedule fields.
  *
  * - Dry run (Preview) is the default and writes nothing.
- * - Apply needs a confirmation tick, refuses when the change set differs from the
+ * - Apply needs the typed phrase APPLY (and GLOBAL for all course lines), refuses when the change set differs from the
  *   Preview, writes a JSON backup first, then re-syncs the touched orders' roster
  *   rows through Reports & Rosters (scoped, never deletes).
  * - Rollback restores each value only while it still holds what Apply wrote.
@@ -874,8 +874,8 @@ function intersoccer_course_date_repair_preview($report = null) {
  * @param bool $embedded Inside the Order Meta Repair page.
  */
 function intersoccer_render_course_date_repair_page($embedded = true) {
-	if (!current_user_can('manage_woocommerce')) {
-		wp_die(esc_html__('You do not have permission to access this page.', 'intersoccer-product-variations'));
+	if (!function_exists('intersoccer_pv_user_can_run_repairs') || !intersoccer_pv_user_can_run_repairs()) {
+		wp_die(esc_html__('You do not have permission to run repairs.', 'intersoccer-product-variations'));
 	}
 	$notice = '';
 	$report = null;
@@ -900,14 +900,36 @@ function intersoccer_render_course_date_repair_page($embedded = true) {
 				$report = null;
 			} else {
 				intersoccer_course_date_repair_preview($report);
+				if (function_exists('intersoccer_pv_repair_log')) {
+					intersoccer_pv_repair_log([
+						'user_id' => (int) get_current_user_id(),
+						'tool' => 'course_dates',
+						'mode' => 'preview',
+						'scope' => $form_all ? 'all_course_lines' : 'scoped',
+						'counts' => ['changed' => count((array) ($report['rows'] ?? []))],
+						'backup' => '',
+					]);
+				}
 				$notice = __('Preview (dry run) completed. Nothing was written.', 'intersoccer-product-variations');
 			}
 		} elseif ($action === 'apply') {
 			$stored = intersoccer_course_date_repair_preview();
-			if (empty($_POST['intersoccer_course_date_repair_confirm'])) {
-				$notice = __('Tick the confirmation box before Apply.', 'intersoccer-product-variations');
+			$phrase = function_exists('intersoccer_pv_repair_posted_phrase')
+				? intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_phrase')
+				: '';
+			$global = function_exists('intersoccer_pv_repair_posted_phrase')
+				? intersoccer_pv_repair_posted_phrase('intersoccer_pv_repair_global')
+				: '';
+			$shop_wide = is_array($stored) && !empty($stored['report']['scope']['all_course_lines']);
+			$change_count = (is_array($stored) && is_array($stored['report']['rows'] ?? null)) ? count($stored['report']['rows']) : 0;
+			if (trim($phrase) !== 'APPLY') {
+				$notice = __('Type APPLY to confirm.', 'intersoccer-product-variations');
+			} elseif ($shop_wide && trim($global) !== 'GLOBAL') {
+				$notice = __('This scope is shop-wide. Type GLOBAL as well as APPLY.', 'intersoccer-product-variations');
 			} elseif (!$stored || empty($stored['report']) || ($stored['report']['mode'] ?? '') !== 'dry_run') {
-				$notice = __('Run Preview (dry run) first, then Apply.', 'intersoccer-product-variations');
+				$notice = __('Run Preview before Apply.', 'intersoccer-product-variations');
+			} elseif ($change_count === 0) {
+				$notice = __('Preview has no changes. Apply was not run.', 'intersoccer-product-variations');
 			} else {
 				$prev = $stored['report'];
 				$report = InterSoccer_Order_Course_Date_Repair::run_apply((array) $prev['scope'], (string) $prev['fingerprint']);
@@ -922,6 +944,16 @@ function intersoccer_render_course_date_repair_page($embedded = true) {
 						$report['backup_file'] ? basename((string) $report['backup_file']) : '—'
 					);
 					intersoccer_course_date_repair_preview($report);
+					if (function_exists('intersoccer_pv_repair_log')) {
+						intersoccer_pv_repair_log([
+							'user_id' => (int) get_current_user_id(),
+							'tool' => 'course_dates',
+							'mode' => 'apply',
+							'scope' => $shop_wide ? 'all_course_lines' : 'scoped',
+							'counts' => ['changed' => (int) ($report['updated'] ?? 0)],
+							'backup' => !empty($report['backup_file']) ? basename((string) $report['backup_file']) : '',
+						]);
+					}
 				}
 			}
 		} elseif ($action === 'rollback') {
@@ -978,8 +1010,12 @@ function intersoccer_render_course_date_repair_page($embedded = true) {
 
 	<form method="post" style="margin-bottom:2em;">
 		<?php wp_nonce_field('intersoccer_course_date_repair'); ?>
-		<label><input type="checkbox" name="intersoccer_course_date_repair_confirm" value="1" />
-			<?php esc_html_e('I checked the Preview below and a full database backup exists. Apply exactly these changes.', 'intersoccer-product-variations'); ?></label>
+		<?php
+		if (function_exists('intersoccer_pv_repair_phrase_fields')) {
+			intersoccer_pv_repair_phrase_fields(true);
+		}
+		?>
+		<p class="description"><?php esc_html_e('Type APPLY. Type GLOBAL as well when the Preview used all course lines.', 'intersoccer-product-variations'); ?></p>
 		<p><button type="submit" class="button button-primary" name="intersoccer_course_date_repair_action" value="apply"><?php esc_html_e('Apply', 'intersoccer-product-variations'); ?></button></p>
 	</form>
 

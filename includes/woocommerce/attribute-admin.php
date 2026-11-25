@@ -27,7 +27,9 @@ function intersoccer_attr_render_attributes_admin_panel() {
     $audit = intersoccer_attr_audit();
     $templates = intersoccer_attr_product_type_templates();
     $nonce = wp_create_nonce('intersoccer_attr_admin');
-    $health_url = admin_url('edit.php?post_type=product&page=intersoccer-variation-health');
+    $health_url = function_exists('intersoccer_pv_advanced_tools_page_slug')
+        ? admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=product-tools')
+        : admin_url('admin.php?page=intersoccer-pv-advanced-tools&tab=product-tools');
     ?>
     <div class="notice notice-info intersoccer-attr-panel" style="padding: 12px 16px; margin-top: 12px;">
         <h2 style="margin: 0 0 8px;"><?php esc_html_e('InterSoccer Attribute Setup', 'intersoccer-product-variations'); ?></h2>
@@ -61,7 +63,7 @@ function intersoccer_attr_render_attributes_admin_panel() {
                 <?php esc_html_e('Run Audit', 'intersoccer-product-variations'); ?>
             </button>
             <a class="button button-link" href="<?php echo esc_url($health_url); ?>">
-                <?php esc_html_e('Variation Health Dashboard', 'intersoccer-product-variations'); ?>
+                <?php esc_html_e('Advanced tools', 'intersoccer-product-variations'); ?>
             </a>
         </p>
 

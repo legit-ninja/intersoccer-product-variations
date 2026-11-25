@@ -32,11 +32,16 @@ function intersoccer_redirect_legacy_order_meta_repair_pages() {
     if (!isset($map[$page])) {
         return;
     }
-    if (!current_user_can('manage_woocommerce')) {
+    $can_repair = function_exists('intersoccer_pv_user_can_run_repairs')
+        ? intersoccer_pv_user_can_run_repairs()
+        : current_user_can('intersoccer_run_repairs');
+    if (!$can_repair) {
         return;
     }
     $args = [
-        'page' => intersoccer_order_meta_repair_page_slug(),
+        'page' => function_exists('intersoccer_pv_advanced_tools_page_slug')
+            ? intersoccer_pv_advanced_tools_page_slug()
+            : intersoccer_order_meta_repair_page_slug(),
         'tab' => $map[$page],
     ];
     foreach (['order_statuses', 'preview_limit', 'fix_activity_type_only', 'strip_deprecated_meta', 'prune_legacy_twins', 'preview_updates', 'detailed_preview'] as $key) {

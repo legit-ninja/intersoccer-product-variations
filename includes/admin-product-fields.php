@@ -1025,52 +1025,31 @@ function intersoccer_sync_course_metadata_on_translation_complete($post_id, $dat
 }
 
 /**
- * Admin-post repair handler (use wp_nonce_url-generated links only).
+ * Legacy admin-post endpoint. It does not write. Late pick up repair is a POST on Advanced tools.
  */
 function intersoccer_handle_repair_late_pickup_admin_post() {
-    if (!is_user_logged_in() || !current_user_can('manage_woocommerce')) {
-        wp_safe_redirect(wp_login_url(admin_url('edit.php?post_type=product')));
-        exit;
-    }
-
     $product_id = isset($_REQUEST['product_id']) ? (int) $_REQUEST['product_id'] : 0;
-    $redirect = $product_id > 0
-        ? get_edit_post_link($product_id, 'raw')
+    $target = function_exists('intersoccer_pv_advanced_tools_page_slug')
+        ? admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=late-pickup&product_id=' . $product_id)
         : admin_url('edit.php?post_type=product');
-
-    if (!$redirect) {
-        $redirect = admin_url('edit.php?post_type=product');
-    }
-
-    $nonce = isset($_REQUEST['_wpnonce']) ? sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])) : '';
-    if ($product_id <= 0 || !wp_verify_nonce($nonce, 'intersoccer_repair_late_pickup_' . $product_id)) {
-        wp_safe_redirect(add_query_arg('intersoccer_late_pickup_repair_error', '1', $redirect));
-        exit;
-    }
-
-    $updated = intersoccer_enable_late_pickup_for_all_camp_variations($product_id);
-
-    wp_safe_redirect(add_query_arg('intersoccer_late_pickup_repaired', $updated, $redirect));
+    wp_safe_redirect($target);
     exit;
 }
 add_action('admin_post_intersoccer_repair_late_pickup', 'intersoccer_handle_repair_late_pickup_admin_post');
 
 /**
- * Repair link for a camp product edit screen.
+ * Advanced tools link for a camp product. The link does not write.
  *
- * @param int $product_id
+ * @param int $product_id Product ID.
  * @return string
  */
 function intersoccer_get_late_pickup_repair_url($product_id) {
     $product_id = (int) $product_id;
-    if ($product_id <= 0) {
+    if ($product_id <= 0 || !function_exists('intersoccer_pv_advanced_tools_page_slug')) {
         return '';
     }
 
-    return wp_nonce_url(
-        admin_url('admin-post.php?action=intersoccer_repair_late_pickup&product_id=' . $product_id),
-        'intersoccer_repair_late_pickup_' . $product_id
-    );
+    return admin_url('admin.php?page=' . intersoccer_pv_advanced_tools_page_slug() . '&tab=late-pickup&product_id=' . $product_id);
 }
 
 /**
@@ -1110,9 +1089,9 @@ function intersoccer_render_late_pickup_repair_panel() {
             $total
         )
     );
-    if ($enabled < $total && $repair_url !== '') {
-        echo '<br /><a class="button button-secondary" href="' . esc_url($repair_url) . '" style="margin-top: 8px;">';
-        echo esc_html__('Re-enable late pick up on all variations', 'intersoccer-product-variations');
+    if ($repair_url !== '') {
+        echo '<br /><a href="' . esc_url($repair_url) . '">';
+        echo esc_html__('Re-enable late pick up from Advanced tools', 'intersoccer-product-variations');
         echo '</a>';
     }
     echo '</p></div>';
@@ -1127,7 +1106,7 @@ add_action('admin_notices', function () {
     if (isset($_GET['intersoccer_late_pickup_repair_error'])) {
         echo '<div class="notice notice-error is-dismissible"><p>';
         echo esc_html__(
-            'Late pick up repair could not run (invalid or expired link). Open the camp product in admin and use the "Re-enable late pick up on all variations" button on the General tab.',
+            'Late pick up repair could not run from this link. Open Advanced tools, preview the camp, then type APPLY.',
             'intersoccer-product-variations'
         );
         echo '</p></div>';

@@ -54,6 +54,7 @@ if (!function_exists('wp_safe_redirect')) {
     }
 }
 
+require_once dirname(__DIR__) . '/includes/woocommerce/repair-contract.php';
 require_once dirname(__DIR__) . '/includes/woocommerce/order-meta-repair-admin.php';
 
 class OrderMetaRepairMenuTest extends TestCase {
@@ -71,9 +72,11 @@ class OrderMetaRepairMenuTest extends TestCase {
     public function test_admin_ui_registers_unified_submenu_not_legacy_slugs() {
         $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php');
         $this->assertNotFalse($src);
-        $this->assertStringContainsString("intersoccer_order_meta_repair_page_slug()", $src);
-        $this->assertStringContainsString("intersoccer_render_order_meta_repair_page", $src);
-        // Old tools are not registered as submenu pages anymore.
+        $this->assertStringContainsString('intersoccer_render_order_meta_repair_page', $src);
+        $this->assertDoesNotMatchRegularExpression(
+            "/add_submenu_page\s*\([^;]*'intersoccer-order-meta-repair'/s",
+            $src
+        );
         $this->assertDoesNotMatchRegularExpression(
             "/add_submenu_page\s*\([^;]*'intersoccer-update-orders'/s",
             $src
@@ -82,6 +85,11 @@ class OrderMetaRepairMenuTest extends TestCase {
             "/add_submenu_page\s*\([^;]*'intersoccer-automated-updates'/s",
             $src
         );
+        $advanced = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/advanced-tools-admin.php');
+        $contract = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/repair-contract.php');
+        $this->assertStringContainsString("'intersoccer-pv-advanced-tools'", $contract);
+        $this->assertStringContainsString('intersoccer_pv_register_advanced_tools_menu', $advanced);
+        $this->assertStringContainsString('add_submenu_page', $advanced);
         $helper = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/order-meta-repair-admin.php');
         $this->assertStringContainsString("'intersoccer-update-orders'", $helper);
         $this->assertStringContainsString("'intersoccer-automated-updates'", $helper);
@@ -91,7 +99,7 @@ class OrderMetaRepairMenuTest extends TestCase {
         $_GET['page'] = 'intersoccer-update-orders';
         intersoccer_redirect_legacy_order_meta_repair_pages();
         $this->assertNotNull($GLOBALS['intersoccer_test_redirect']);
-        $this->assertStringContainsString('page=intersoccer-order-meta-repair', $GLOBALS['intersoccer_test_redirect']);
+        $this->assertStringContainsString('page=intersoccer-pv-advanced-tools', $GLOBALS['intersoccer_test_redirect']);
         $this->assertStringContainsString('tab=scan', $GLOBALS['intersoccer_test_redirect']);
     }
 
@@ -99,12 +107,12 @@ class OrderMetaRepairMenuTest extends TestCase {
         $_GET['page'] = 'intersoccer-automated-updates';
         intersoccer_redirect_legacy_order_meta_repair_pages();
         $this->assertNotNull($GLOBALS['intersoccer_test_redirect']);
-        $this->assertStringContainsString('page=intersoccer-order-meta-repair', $GLOBALS['intersoccer_test_redirect']);
+        $this->assertStringContainsString('page=intersoccer-pv-advanced-tools', $GLOBALS['intersoccer_test_redirect']);
         $this->assertStringContainsString('tab=batch', $GLOBALS['intersoccer_test_redirect']);
     }
 
     public function test_order_meta_repair_page_exposes_season_labels_tab() {
-        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php');
+        $src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/advanced-tools-admin.php');
         $this->assertNotFalse($src);
         $this->assertStringContainsString("'season-labels'", $src);
         $this->assertStringContainsString('intersoccer_render_season_label_repair_page', $src);

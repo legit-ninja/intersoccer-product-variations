@@ -529,6 +529,9 @@ if (!function_exists('did_action')) {
 
 if (!function_exists('current_user_can')) {
     function current_user_can($capability) {
+        if (isset($GLOBALS['intersoccer_test_user_caps']) && is_array($GLOBALS['intersoccer_test_user_caps'])) {
+            return !empty($GLOBALS['intersoccer_test_user_caps'][$capability]);
+        }
         return true;
     }
 }

@@ -417,6 +417,8 @@ $includes = [
     'includes/woocommerce/attribute-sync.php',
     'includes/woocommerce/attribute-admin.php',
     'includes/woocommerce/order-meta-contract.php',
+    'includes/woocommerce/repair-contract.php',
+    'includes/woocommerce/advanced-tools-admin.php',
     'includes/woocommerce/order-season-label-repair.php',
     'includes/woocommerce/order-course-date-repair.php',
     'includes/woocommerce/attribute-enforcement.php',

@@ -391,7 +391,7 @@ class OrderCourseDateRepairTest extends TestCase {
 	}
 
 	public function test_order_meta_repair_page_exposes_course_dates_tab() {
-		$src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/admin-ui.php');
+		$src = file_get_contents(dirname(__DIR__) . '/includes/woocommerce/advanced-tools-admin.php');
 		$this->assertStringContainsString("'course-dates'", $src);
 		$this->assertStringContainsString('intersoccer_render_course_date_repair_page', $src);
 		$main = file_get_contents(dirname(__DIR__) . '/intersoccer-product-variations.php');
