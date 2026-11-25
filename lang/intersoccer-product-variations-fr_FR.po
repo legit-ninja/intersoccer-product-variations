@@ -1442,3 +1442,12 @@ msgstr "L'aperçu ne contient aucune modification. L'application n'a pas été e
 
 msgid "This repair runs only from Advanced tools."
 msgstr "Cette réparation s'exécute uniquement depuis les outils avancés."
+
+msgid "Late pick up was enabled on %d variation(s)."
+msgstr "La récupération tardive a été activée sur %d variation(s)."
+
+msgid "Reason: %s"
+msgstr "Raison: %s"
+
+msgid "Backup directory does not exist."
+msgstr "Le dossier de sauvegarde n'existe pas."

@@ -906,6 +906,38 @@ if (!function_exists('intersoccer_pv_repair_option_is_repair_state')) {
 	}
 }
 
+if (!function_exists('intersoccer_pv_repair_active_plugin_has_basename')) {
+	/**
+	 * True when an active plugin main file matches $basename, regardless of folder.
+	 *
+	 * @param string $basename Main PHP file, e.g. intersoccer-reports-rosters.php.
+	 * @return bool
+	 */
+	function intersoccer_pv_repair_active_plugin_has_basename($basename) {
+		$basename = basename((string) $basename);
+		if ($basename === '') {
+			return false;
+		}
+		$plugins = [];
+		if (isset($GLOBALS['intersoccer_pv_test_active_plugins']) && is_array($GLOBALS['intersoccer_pv_test_active_plugins'])) {
+			$plugins = $GLOBALS['intersoccer_pv_test_active_plugins'];
+		} else {
+			if (function_exists('get_option')) {
+				$plugins = (array) get_option('active_plugins', []);
+			}
+			if (function_exists('is_multisite') && is_multisite() && function_exists('get_site_option')) {
+				$plugins = array_merge($plugins, array_keys((array) get_site_option('active_sitewide_plugins', [])));
+			}
+		}
+		foreach ($plugins as $plugin) {
+			if (basename((string) $plugin) === $basename) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 if (!function_exists('intersoccer_pv_repair_reports_plugin_active')) {
 	/**
 	 * Reports & Rosters still owns the shared repair capability when it is active.
@@ -916,22 +948,16 @@ if (!function_exists('intersoccer_pv_repair_reports_plugin_active')) {
 		if (array_key_exists('intersoccer_pv_test_rr_active', $GLOBALS)) {
 			return (bool) $GLOBALS['intersoccer_pv_test_rr_active'];
 		}
+		if (array_key_exists('intersoccer_pv_test_active_plugins', $GLOBALS)) {
+			return intersoccer_pv_repair_active_plugin_has_basename('intersoccer-reports-rosters.php');
+		}
 		if (function_exists('intersoccer_rr_user_can_run_repairs')) {
 			return true;
 		}
 		if (defined('INTERSOCCER_REPORTS_ROSTERS_LOADED') || defined('INTERSOCCER_RR_ADVANCED_TOOLS_PAGE')) {
 			return true;
 		}
-		if (!function_exists('is_plugin_active') && defined('ABSPATH')) {
-			$plugin_php = rtrim((string) ABSPATH, '/\\') . '/wp-admin/includes/plugin.php';
-			if (is_readable($plugin_php)) {
-				require_once $plugin_php;
-			}
-		}
-		if (function_exists('is_plugin_active')) {
-			return is_plugin_active('intersoccer-reports-rosters/intersoccer-reports-rosters.php');
-		}
-		return false;
+		return intersoccer_pv_repair_active_plugin_has_basename('intersoccer-reports-rosters.php');
 	}
 }
 

@@ -1349,3 +1349,12 @@ msgstr "Die Vorschau enthält keine Änderungen. Anwenden wurde nicht ausgeführ
 
 msgid "This repair runs only from Advanced tools."
 msgstr "Diese Reparatur läuft nur über die erweiterten Werkzeuge."
+
+msgid "Late pick up was enabled on %d variation(s)."
+msgstr "Die Spätabholung wurde für %d Variante(n) aktiviert."
+
+msgid "Reason: %s"
+msgstr "Grund: %s"
+
+msgid "Backup directory does not exist."
+msgstr "Das Sicherungsverzeichnis existiert nicht."

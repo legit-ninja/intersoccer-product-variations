@@ -603,6 +603,88 @@ function intersoccer_sync_product_status_to_translations($product_id, $status) {
     return $updated;
 }
 
+
+/**
+ * Map a taxonomy term slug onto the language of a translated product or variation.
+ * Returns null when WPML is active and no term translation exists, so callers
+ * can report needs-manual instead of writing the source-language term.
+ *
+ * @param string $slug       Source term slug.
+ * @param string $taxonomy   Taxonomy, e.g. pa_intersoccer-venues.
+ * @param int    $target_id  Translated product or variation ID.
+ * @return string|null
+ */
+function intersoccer_translated_taxonomy_term_slug($slug, $taxonomy, $target_id) {
+    $slug = sanitize_text_field((string) $slug);
+    $taxonomy = function_exists('sanitize_title') ? sanitize_title((string) $taxonomy) : (string) $taxonomy;
+    $target_id = (int) $target_id;
+    if ($slug === '') {
+        return '';
+    }
+    if ($taxonomy === '' || $target_id <= 0) {
+        return $slug;
+    }
+
+    $wpml_on = defined('ICL_SITEPRESS_VERSION') || function_exists('icl_get_current_language');
+    $has_test_map = isset($GLOBALS['intersoccer_test_term_translations']) && is_array($GLOBALS['intersoccer_test_term_translations']);
+    if (!$wpml_on && !$has_test_map) {
+        return $slug;
+    }
+
+    $lang = '';
+    if (function_exists('apply_filters')) {
+        $lang = apply_filters('wpml_element_language_code', null, [
+            'element_id' => $target_id,
+            'element_type' => 'post_product_variation',
+        ]);
+        if (!$lang) {
+            $lang = apply_filters('wpml_element_language_code', null, [
+                'element_id' => $target_id,
+                'element_type' => 'post_product',
+            ]);
+        }
+        if (!$lang) {
+            $lang = apply_filters('wpml_current_language', null);
+        }
+    }
+    $lang = is_string($lang) ? $lang : '';
+
+    if ($has_test_map && isset($GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug]) && is_array($GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug])) {
+        $map = $GLOBALS['intersoccer_test_term_translations'][$taxonomy][$slug];
+        if ($lang !== '' && array_key_exists($lang, $map)) {
+            $mapped = $map[$lang];
+            if ($mapped === false || $mapped === null || $mapped === '') {
+                return null;
+            }
+            return (string) $mapped;
+        }
+    }
+
+    if (!function_exists('get_term_by') || !function_exists('apply_filters')) {
+        return $wpml_on ? null : $slug;
+    }
+    $term = get_term_by('slug', $slug, $taxonomy);
+    if (!$term || (function_exists('is_wp_error') && is_wp_error($term)) || empty($term->term_id)) {
+        return $wpml_on ? null : $slug;
+    }
+    $source_lang = apply_filters('wpml_element_language_code', null, [
+        'element_id' => (int) $term->term_id,
+        'element_type' => 'tax_' . $taxonomy,
+    ]);
+    if (is_string($source_lang) && $source_lang !== '' && $lang !== '' && $source_lang === $lang) {
+        return $slug;
+    }
+    $translated_id = (int) apply_filters('wpml_object_id', (int) $term->term_id, $taxonomy, false, $lang);
+    if ($translated_id <= 0) {
+        return null;
+    }
+    $translated = function_exists('get_term') ? get_term($translated_id, $taxonomy) : null;
+    if (!$translated || (function_exists('is_wp_error') && is_wp_error($translated)) || empty($translated->slug)) {
+        return null;
+    }
+    return (string) $translated->slug;
+}
+
 /**
  * Copy a taxonomy attribute slug to WPML-translated variations (meta + WC attrs when possible).
  *
@@ -621,19 +703,27 @@ function intersoccer_sync_variation_taxonomy_attribute_to_translations($variatio
 
     $meta_key = 'attribute_' . $taxonomy;
     foreach (intersoccer_foreach_translated_product_variations($variation_id) as $tid) {
+        $tid = (int) $tid;
+        $mapped = $slug;
+        if ($slug !== '' && function_exists('intersoccer_translated_taxonomy_term_slug')) {
+            $mapped = intersoccer_translated_taxonomy_term_slug($slug, $taxonomy, $tid);
+            if ($mapped === null) {
+                continue;
+            }
+        }
         if (function_exists('wc_get_product')) {
             $variation = wc_get_product($tid);
             if ($variation && is_a($variation, 'WC_Product_Variation')) {
                 $attrs              = $variation->get_attributes();
-                $attrs[$taxonomy]   = $slug;
+                $attrs[$taxonomy]   = $mapped;
                 $variation->set_attributes($attrs);
                 $variation->save();
             }
         }
-        update_post_meta($tid, $meta_key, $slug);
+        update_post_meta($tid, $meta_key, $mapped);
         if (function_exists('wp_set_object_terms')) {
-            if ($slug !== '') {
-                wp_set_object_terms($tid, $slug, $taxonomy);
+            if ($mapped !== '') {
+                wp_set_object_terms($tid, $mapped, $taxonomy);
             } else {
                 wp_set_object_terms($tid, [], $taxonomy);
             }

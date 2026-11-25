@@ -1433,3 +1433,12 @@ msgstr ""
 
 msgid "This repair runs only from Advanced tools."
 msgstr ""
+
+msgid "Late pick up was enabled on %d variation(s)."
+msgstr ""
+
+msgid "Reason: %s"
+msgstr ""
+
+msgid "Backup directory does not exist."
+msgstr ""

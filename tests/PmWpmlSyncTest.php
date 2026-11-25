@@ -270,8 +270,8 @@ PHP
 
 		$this->assertSame('2026-07-06', get_post_meta($this->fr_var, '_camp_start_date', true));
 		$this->assertSame('2026-07-10', get_post_meta($this->de_var, '_camp_end_date', true));
-		$this->assertSame('geneve-stade', get_post_meta($this->fr_var, 'attribute_pa_intersoccer-venues', true));
-		$this->assertSame('geneve-stade', get_post_meta($this->de_var, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('', get_post_meta($this->fr_var, 'attribute_pa_intersoccer-venues', true));
+		$this->assertSame('', get_post_meta($this->de_var, 'attribute_pa_intersoccer-venues', true));
 	}
 
 	public function test_sync_path_refreshes_existing_translations_without_duplicate(): void {

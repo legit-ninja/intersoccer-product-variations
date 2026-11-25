@@ -681,12 +681,19 @@ if (!function_exists('intersoccer_pv_tool_late_pickup')) {
 				}
 			}
 		}
-		return [
-			'summary' => sprintf(
+		$summary = $dry_run
+			? sprintf(
 				/* translators: %d: variation count */
 				__('Late pick up would be enabled on %d variation(s).', 'intersoccer-product-variations'),
 				count($rows)
-			),
+			)
+			: sprintf(
+				/* translators: %d: variation count */
+				__('Late pick up was enabled on %d variation(s).', 'intersoccer-product-variations'),
+				count($rows)
+			);
+		return [
+			'summary' => $summary,
 			'counts' => ['changed' => count($rows), 'added' => 0, 'updated' => count($rows), 'deleted' => 0],
 			'rows' => $rows,
 			'shop_wide' => false,
@@ -1067,6 +1074,7 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 		}
 		$before_twins = [];
 		$after_twins = [];
+		$needs_manual_rows = [];
 		if (function_exists('intersoccer_foreach_translated_product_variations')) {
 			foreach (intersoccer_foreach_translated_product_variations((int) $variation_id) as $tid) {
 				$tid = (int) $tid;
@@ -1084,11 +1092,21 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 				$attr_after = [];
 				$after_meta = $snap['meta'];
 				$after_terms = $snap['terms'];
+				$manual = [];
 				foreach ($written as $taxonomy => $slug) {
 					$attr_before[$taxonomy] = isset($attrs[$taxonomy]) ? (string) $attrs[$taxonomy] : '';
-					$attr_after[$taxonomy] = $slug;
-					$after_meta['attribute_' . $taxonomy] = $slug;
-					$after_terms[$taxonomy] = [$slug];
+					$mapped = $slug;
+					if ($slug !== '' && function_exists('intersoccer_translated_taxonomy_term_slug')) {
+						$mapped = intersoccer_translated_taxonomy_term_slug($slug, $taxonomy, $tid);
+					}
+					if ($mapped === null) {
+						$manual[] = $taxonomy;
+						$attr_after[$taxonomy] = $attr_before[$taxonomy];
+						continue;
+					}
+					$attr_after[$taxonomy] = $mapped;
+					$after_meta['attribute_' . $taxonomy] = $mapped;
+					$after_terms[$taxonomy] = $mapped === '' ? [] : [$mapped];
 				}
 				ksort($attr_before);
 				ksort($attr_after);
@@ -1102,6 +1120,13 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 					'meta' => $after_meta,
 					'terms' => $after_terms,
 				];
+				foreach ($manual as $taxonomy) {
+					$needs_manual_rows[] = [
+						'tid' => $tid,
+						'taxonomy' => $taxonomy,
+						'current' => $attr_before[$taxonomy],
+					];
+				}
 			}
 		}
 		ksort($before_twins);
@@ -1117,6 +1142,7 @@ if (!function_exists('intersoccer_pv_facet_side_effect_plan')) {
 				'terms' => $after['terms'],
 				'translations' => $after_twins,
 			],
+			'needs_manual' => $needs_manual_rows,
 		];
 	}
 }
@@ -1506,7 +1532,11 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 		try {
 			$applied = intersoccer_pv_advanced_tools_execute($tool, false, $scope);
 		} catch (Throwable $e) {
-			unset($e);
+			$reason = trim((string) $e->getMessage());
+			$note = 'partial';
+			if ($reason !== '') {
+				$note .= ': ' . $reason;
+			}
 			intersoccer_pv_repair_clear_preview($user_id, $tool);
 			intersoccer_pv_repair_log([
 				'user_id' => $user_id,
@@ -1515,11 +1545,19 @@ if (!function_exists('intersoccer_pv_advanced_tools_handle_request')) {
 				'scope' => intersoccer_pv_advanced_tools_scope_label($scope),
 				'counts' => ['changed' => 0, 'added' => 0, 'updated' => 0, 'deleted' => 0],
 				'backup' => $backup,
-				'note' => 'partial',
+				'note' => $note,
 			]);
+			$message = __('Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written.', 'intersoccer-product-variations');
+			if ($reason !== '') {
+				$message .= ' ' . sprintf(
+					/* translators: %s: error detail */
+					__('Reason: %s', 'intersoccer-product-variations'),
+					$reason
+				);
+			}
 			return [
 				'type' => 'error',
-				'message' => __('Apply stopped early. The backup is the pre-Apply snapshot. Roll back rows that were written.', 'intersoccer-product-variations'),
+				'message' => $message,
 				'result' => null,
 			];
 		}

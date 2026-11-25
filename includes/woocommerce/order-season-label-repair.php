@@ -1173,7 +1173,7 @@ class InterSoccer_Order_Season_Label_Repair {
 	 *
 	 * @return string|WP_Error Absolute path.
 	 */
-	public static function backup_dir() {
+	public static function backup_dir($create = true) {
 		if (!empty($GLOBALS['intersoccer_test_season_label_backup_dir'])) {
 			$dir = (string) $GLOBALS['intersoccer_test_season_label_backup_dir'];
 		} elseif (function_exists('wp_upload_dir')) {
@@ -1184,6 +1184,10 @@ class InterSoccer_Order_Season_Label_Repair {
 			$dir = intersoccer_pv_season_label_trailingslashit($uploads['basedir']) . self::BACKUP_SUBDIR;
 		} else {
 			return new WP_Error('backup_dir', __('Uploads directory unavailable.', 'intersoccer-product-variations'));
+		}
+
+		if (!$create) {
+			return is_dir($dir) ? $dir : new WP_Error('backup_dir', __('Backup directory does not exist.', 'intersoccer-product-variations'));
 		}
 
 		if (!is_dir($dir)) {
@@ -1259,7 +1263,7 @@ class InterSoccer_Order_Season_Label_Repair {
 	 * @return array<int,array{path:string,basename:string,mtime:int}>
 	 */
 	public static function list_backups() {
-		$dir = self::backup_dir();
+		$dir = self::backup_dir(false);
 		if (is_wp_error($dir) || !is_dir($dir)) {
 			return [];
 		}

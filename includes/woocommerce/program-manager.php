@@ -3552,6 +3552,21 @@ class InterSoccer_Program_Manager {
 					]);
 					$before_row = array_merge($before_row, $side['before']);
 					$after_row = array_merge($after_row, $side['after']);
+					foreach ((array) ($side['needs_manual'] ?? []) as $manual) {
+						$tid = (int) ($manual['tid'] ?? 0);
+						$taxonomy = (string) ($manual['taxonomy'] ?? '');
+						if ($tid <= 0 || $taxonomy === '') {
+							continue;
+						}
+						$current = (string) ($manual['current'] ?? '');
+						$result['changes'][] = [
+							'id' => 'manual:twin:' . $tid . ':' . $taxonomy,
+							'needs_manual' => true,
+							'before' => ['attributes' => [$taxonomy => $current]],
+							'after' => ['attributes' => [$taxonomy => $current], 'needs_manual' => '1'],
+						];
+						$result['venue_needs_manual']++;
+					}
 				}
 				$result['changes'][] = [
 					'id' => 'attrs:' . (int) $var_id,
